@@ -10,7 +10,10 @@ import type { AgentSnapshotPayload, WorkspaceDescriptorPayload } from "./message
 import { WorkspaceDirectory } from "./workspace-directory.js";
 import type { PersistedProjectRecord, PersistedWorkspaceRecord } from "./workspace-registry.js";
 import type { TerminalActivity } from "@getpaseo/protocol/terminal-activity";
-import type { ProviderSubagentWorkspaceActivity } from "./workspace-directory.js";
+import type {
+  AgentBackgroundWorkActivity,
+  ProviderSubagentWorkspaceActivity,
+} from "./workspace-directory.js";
 
 const NOW = "2026-03-01T12:00:00.000Z";
 
@@ -65,6 +68,7 @@ class WorkspaceStatus {
 
   private readonly agents: AgentSnapshotPayload[] = [];
   private readonly providerSubagents: ProviderSubagentWorkspaceActivity[] = [];
+  private readonly backgroundWork: AgentBackgroundWorkActivity[] = [];
   private readonly terminals: Array<{
     cwd: string;
     workspaceId?: string;
@@ -86,6 +90,7 @@ class WorkspaceStatus {
       return times;
     },
     listProviderSubagentActivity: async () => this.providerSubagents,
+    listAgentBackgroundWorkActivity: async () => this.backgroundWork,
     listTerminalActivityContributions: async () => this.terminals,
     isProviderVisibleToClient: () => true,
     buildWorkspaceDescriptor: async ({ workspace }) => ({
@@ -141,6 +146,10 @@ class WorkspaceStatus {
         labels: { [PARENT_AGENT_ID_LABEL]: "parent-agent" },
       }),
     );
+  }
+
+  hasBackgroundWork(input: AgentBackgroundWorkActivity): void {
+    this.backgroundWork.push(input);
   }
 
   hasProviderSubagent(input: ProviderSubagentWorkspaceActivity): void {
@@ -443,6 +452,32 @@ describe("WorkspaceDirectory", () => {
     });
   });
 
+  test("an idle agent's background work keeps its workspace running", async () => {
+    const workspace = new WorkspaceStatus();
+
+    workspace.hasRootAgent({ id: "parent-agent", status: "idle" });
+    workspace.hasBackgroundWork({ agentId: "parent-agent", startedAt: "2026-03-01T12:01:00.000Z" });
+
+    await expect(workspace.workspaceDescriptor()).resolves.toMatchObject({
+      status: "running",
+      statusEnteredAt: "2026-03-01T12:01:00.000Z",
+    });
+  });
+
+  test("background work outranks a finished turn awaiting attention", async () => {
+    const workspace = new WorkspaceStatus();
+
+    workspace.hasRootAgent({
+      id: "parent-agent",
+      status: "idle",
+      requiresAttention: true,
+      attentionReason: "finished",
+    });
+    workspace.hasBackgroundWork({ agentId: "parent-agent", startedAt: "2026-03-01T12:01:00.000Z" });
+
+    await expect(workspace.workspaceDescriptor()).resolves.toMatchObject({ status: "running" });
+  });
+
   test("running cross-workspace subagent contributes to its own workspace", async () => {
     const workspace = new WorkspaceStatus();
 
@@ -579,6 +614,7 @@ describe("WorkspaceDirectory empty projects", () => {
       listAgentPayloads: async () => [],
       workspaceLastUserMessageTimes: async () => new Map(),
       listProviderSubagentActivity: async () => [],
+      listAgentBackgroundWorkActivity: async () => [],
       listTerminalActivityContributions: async () => [],
       isProviderVisibleToClient: () => true,
       buildWorkspaceDescriptor: async ({ workspace }) => ({
@@ -743,6 +779,7 @@ test("Git observation targets exclude archived records without hydrating app des
     listAgentPayloads: unexpectedHydration,
     workspaceLastUserMessageTimes: unexpectedHydration,
     listProviderSubagentActivity: unexpectedHydration,
+    listAgentBackgroundWorkActivity: unexpectedHydration,
     listTerminalActivityContributions: unexpectedHydration,
     buildWorkspaceDescriptor: unexpectedHydration,
     isProviderVisibleToClient: () => true,
