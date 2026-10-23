@@ -40,6 +40,25 @@ await directory.subscription.release();
 
 `client.agents.subscribe()` 和 Agent 句柄上的 `subscribe()` 会为该 API 实例持有的观察添加本地监听器。它们不会请求数据。当多个带过滤条件的视图需要各自的更新时，请使用返回的订阅上的回调。
 
+## 跟踪一个 Agent 的后台工作 {#follow-an-agents-background-work}
+
+后台工作是指 agent 在工具调用返回后仍在运行的内容：用 `run_in_background` 启动的 Claude shell、`Monitor` 监视，或其他不属于子 agent 的任务。子 agent 和工作流仍显示在该 agent 的子 agent 中。
+
+```ts
+const agent = client.agents.ref(agentId);
+
+const unsubscribe = agent.backgroundWork.subscribe((items) => render(items));
+
+// 当这个视图关闭时：
+unsubscribe();
+```
+
+订阅建立后，`subscribe()` 会用当前列表调用一次监听器，每次重连后再调用一次，之后每次变化时都传入完整列表。一次性读取请用 `list()`，例如等待列表清空的自动化。每个条目包含 `id`、`kind`（shell 和 Claude `Monitor` 监视为 `"shell"`，其余为 `"other"`；任何未知值都按 `"other"` 处理）、`description`（或 `null`）和 `startedAt`。provider 进程重启或 agent 关闭时，列表会清空。daemon 重启后不保留任何内容。
+
+传入 `subscribe(listener, { onError })` 可在读取当前列表失败时收到错误；此时不会调用监听器，并会在下次重连时重新读取列表。不传 `onError` 时，错误会被记录到日志。
+
+当主机未声明 `features.agentBackgroundWork` 时，`list()` 会 reject，`subscribe()` 会抛出错误；请让用户更新主机。
+
 ## 跟踪时间线事件 {#follow-timeline-events}
 
 ```ts

@@ -217,6 +217,8 @@ Workspace status is an aggregate activity signal computed **per `workspaceId`**.
 
 Running provider-native subagents contribute `running` to the workspace owned by their parent agent. Their completed, failed, and canceled states stay in the parent's subagents track.
 
+Live background work (a background shell or a Claude `Monitor` watch) also contributes `running` to the workspace that owns its agent, so an agent that ended its turn to wait on its own work does not read as done. The workspace returns to the agent's own bucket when the work stops.
+
 A finished workspace can be marked unread after it has been reviewed. The daemon restores
 `finished` attention on its newest eligible workspace-root agent without sending a new completion
 notification. Opening the workspace clears that attention through the normal focus flow.

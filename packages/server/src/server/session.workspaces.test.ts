@@ -597,6 +597,7 @@ function createSessionForWorkspaceTests(
     subscribe: () => () => {},
     listAgents: () => [],
     listProviderSubagentActivity: () => [],
+    listBackgroundWorkActivity: () => [],
     getAgent: () => null,
     getLastAssistantMessage: async () => null,
     archiveAgent: async () => ({ archivedAt: new Date().toISOString() }),
@@ -8544,6 +8545,63 @@ test("overlapping workspace rebuilds publish the newest provider subagent status
     message.payload.kind === "upsert" ? [message.payload.workspace.status] : [],
   );
   expect(statuses).toEqual(["running", "done"]);
+});
+
+test("an idle agent's background work moves its workspace to running and back", async () => {
+  const emitted: SessionOutboundMessage[] = [];
+  const agent = makeManagedAgent({
+    id: "background-parent",
+    cwd: REPO_CWD,
+    workspaceId: "ws-repo-running",
+    lifecycle: "idle",
+    updatedAt: "2026-08-01T10:00:00.000Z",
+  }) as unknown as ManagedAgent;
+  let backgroundWork: Array<{ agentId: string; startedAt: string }> = [];
+  let listener: ((event: AgentManagerEvent) => void) | null = null;
+  const session = createSessionForWorkspaceTests({
+    onMessage: (message) => emitted.push(message),
+    agentStorage: { list: async () => [] },
+    agentManager: {
+      subscribe: (nextListener: (event: AgentManagerEvent) => void) => {
+        listener = nextListener;
+        return () => {};
+      },
+      listAgents: () => [agent],
+      listBackgroundWorkActivity: () => backgroundWork,
+      getAgent: (agentId: string) => (agentId === agent.id ? agent : null),
+    },
+  });
+
+  await session.handleMessage({
+    type: "fetch_workspaces_request",
+    requestId: "background-work-workspace-status",
+    subscribe: { subscriptionId: "background-work-workspace-status" },
+  });
+  expect(findByType(emitted, "fetch_workspaces_response")?.payload.entries[0]?.status).toBe("done");
+  emitted.length = 0;
+
+  const item = {
+    id: "bash-1",
+    kind: "shell",
+    description: "npx vitest run",
+    startedAt: "2026-08-01T10:01:00.000Z",
+  };
+  backgroundWork = [{ agentId: agent.id, startedAt: item.startedAt }];
+  listener?.({ type: "background_work", agentId: agent.id, items: [item] });
+  await waitForWorkspaceUpdate(
+    emitted,
+    (message) =>
+      message.payload.kind === "upsert" && message.payload.workspace.status === "running",
+    "background work starts",
+  );
+
+  backgroundWork = [];
+  listener?.({ type: "background_work", agentId: agent.id, items: [] });
+  await waitForWorkspaceUpdate(
+    emitted,
+    (message) => message.payload.kind === "upsert" && message.payload.workspace.status === "done",
+    "background work ends",
+  );
 });
 
 test("title-only terminal change does not build workspace descriptors or emit workspace_update", async () => {
