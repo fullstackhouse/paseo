@@ -1016,6 +1016,44 @@ function hideAlerts() {
 }
 ```
 
+### 工作区行项 {#workspace-row-items}
+
+`addWorkspaceRowItem({ id, title, icon, Component })` 在侧边栏每个工作区标题下方那一行添加一个项，位于该行自带的项（主机、拉取请求、检查、服务、标签）之后。`title` 和 `icon` 用于侧边栏 **Show** 菜单中该项的开关。项默认可见。
+
+`Component` 在插件所在主机的每个工作区行上各渲染一次，接收 `PluginWorkspaceRowItemProps`：`theme`、`host`、`layout` 和 `workspaceId`。渲染 `@getpaseo/plugin/client/ui` 中的 `WorkspaceRowBadge`，或在对该工作区无话可说时返回 `null`：
+
+| 属性                 | 含义                                                                    |
+| -------------------- | ----------------------------------------------------------------------- |
+| `icon`               | 可选。任意 [图标](#icons) 形式，按该行字形大小绘制。                    |
+| `label`              | 可选。一个简短的词。既没有 `icon` 也没有 `label` 的徽章不绘制任何内容。 |
+| `tone`               | `"muted"`（默认）、`"success"`、`"warning"`、`"danger"` 或 `"info"`。   |
+| `accessibilityLabel` | 默认为 `label`，其次为该项的 `title`。                                  |
+
+徽章自己绘制该行的 `·` 分隔符，因此返回 `null` 不会留下空隙。每一行都会渲染该组件，所以应在各行之间共享一个查询，而不是按工作区分别获取：插件的 React Query 客户端由它在同一主机上的所有组件共享。
+
+```tsx
+import type { PluginWorkspaceRowItemProps } from "@getpaseo/plugin/client";
+import { useRpc } from "@getpaseo/plugin/client";
+import { WorkspaceRowBadge } from "@getpaseo/plugin/client/ui";
+import { useQuery } from "@tanstack/react-query";
+
+function ReviewState({ workspaceId }: PluginWorkspaceRowItemProps) {
+  const list = useRpc(reviewStates);
+  const { data } = useQuery({
+    queryKey: ["review-states"],
+    queryFn: () => list({}),
+    refetchInterval: 5000,
+  });
+  const state = data?.[workspaceId];
+  if (!state) return null;
+  return <WorkspaceRowBadge icon="Eye" label={state.label} tone="warning" />;
+}
+
+client.addWorkspaceRowItem({ id: "review", title: "Review", icon: "Eye", Component: ReviewState });
+```
+
+早于此 API 的主机没有 `addWorkspaceRowItem`；调用前先检查它是否存在。
+
 ## 宿主 UI {#host-ui}
 
 在客户端代码中从 `@getpaseo/plugin/client/ui` 导入由 Paseo 提供的 UI。下面的示例会打开一个受控的弹窗、渲染一个宿主图标，并用 toast 确认操作：
