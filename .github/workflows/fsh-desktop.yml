@@ -1,0 +1,51 @@
+# FSH fork: build an unsigned (ad-hoc signed) macOS arm64 DMG of the `fsh`
+# branch and attach it to a GitHub Release on fullstackhouse/paseo.
+#
+# No latest-mac.yml is published, so the in-app updater finds no channel and
+# stays quiet — an ad-hoc signed app can't auto-update anyway. Install a new
+# build by downloading the DMG again.
+name: FSH desktop build
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  macos-arm64:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: package-lock.json
+
+      - name: Install JS dependencies
+        run: node scripts/npm-retry.mjs ci
+
+      - name: Build desktop app
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+          NODE_OPTIONS: --max-old-space-size=4096
+        run: |
+          npm run build:desktop -- --publish never --mac dmg --arm64 \
+            -c.mac.identity=- \
+            -c.mac.notarize=false \
+            -c.publish.owner=fullstackhouse
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          version="$(node -p 'require("./packages/desktop/package.json").version')"
+          tag="fsh-${version}-$(git rev-parse --short HEAD)"
+          gh release create "$tag" packages/desktop/release/*.dmg \
+            --target "$GITHUB_SHA" \
+            --title "Paseo ${version} (FSH ${GITHUB_SHA::7})" \
+            --notes "Upstream Paseo ${version} plus the FSH patches on \`fsh\` ($(git log -1 --format=%h)). Unsigned: after copying to Applications, run \`xattr -cr /Applications/Paseo.app\` once."
