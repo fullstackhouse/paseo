@@ -1,5 +1,7 @@
 # CLAUDE.md
 
+> **FSH fork** of getpaseo/paseo, branch `fsh`. Read [FSH.md](./FSH.md) before working here: which patches are carried, where PRs go, how builds ship.
+
 Paseo is a mobile app for monitoring and controlling your local AI coding agents from anywhere. Your dev environment, in your pocket. Connects directly to your actual development environment — your code stays on your machine.
 
 **Supported agents:** Claude Code, Codex, GitHub Copilot, OpenCode, Pi, Antigravity, and Muse Code.
