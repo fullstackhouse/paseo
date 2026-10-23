@@ -68,6 +68,18 @@ export type ProviderSubagentWorkspaceActivity = Pick<
   "parentAgentId" | "status" | "updatedAt"
 >;
 
+/** An agent with live background work (a background shell, a monitor). */
+export interface AgentBackgroundWorkActivity {
+  agentId: string;
+  startedAt: string;
+}
+
+/** Work an agent runs after its turn ends; its workspace stays running until it stops. */
+interface BackgroundActivity {
+  agentId: string;
+  changedAtIso: string;
+}
+
 export interface WorkspaceDirectoryDeps {
   logger: pino.Logger;
   projectRegistry: {
@@ -79,6 +91,7 @@ export interface WorkspaceDirectoryDeps {
   listAgentPayloads(): Promise<AgentSnapshotPayload[]>;
   workspaceLastUserMessageTimes(): Promise<ReadonlyMap<string, string>>;
   listProviderSubagentActivity(): Promise<ProviderSubagentWorkspaceActivity[]>;
+  listAgentBackgroundWorkActivity(): Promise<AgentBackgroundWorkActivity[]>;
   listTerminalActivityContributions(): Promise<
     Array<{ cwd: string; workspaceId?: string; activity: TerminalActivity | null }>
   >;
@@ -221,6 +234,7 @@ export class WorkspaceDirectory {
       agents,
       lastUserMessageTimes,
       providerSubagentActivity,
+      backgroundWorkActivity,
       persistedWorkspaces,
       persistedProjects,
       terminalContributions,
@@ -228,6 +242,7 @@ export class WorkspaceDirectory {
       this.deps.listAgentPayloads(),
       this.deps.workspaceLastUserMessageTimes(),
       this.deps.listProviderSubagentActivity(),
+      this.deps.listAgentBackgroundWorkActivity(),
       this.deps.workspaceRegistry.list(),
       this.deps.projectRegistry.list(),
       this.deps.listTerminalActivityContributions(),
@@ -280,9 +295,20 @@ export class WorkspaceDirectory {
       terminalContributions,
       descriptorsByWorkspaceId,
     );
-    this.applyProviderSubagentContributions({
+    this.applyBackgroundActivityContributions({
       activeAgents,
-      providerSubagentActivity,
+      backgroundActivity: [
+        ...providerSubagentActivity
+          .filter((subagent) => subagent.status === "running")
+          .map((subagent) => ({
+            agentId: subagent.parentAgentId,
+            changedAtIso: subagent.updatedAt,
+          })),
+        ...backgroundWorkActivity.map((work) => ({
+          agentId: work.agentId,
+          changedAtIso: work.startedAt,
+        })),
+      ],
       descriptorsByWorkspaceId,
       activityEntriesByWorkspaceId,
     });
@@ -318,25 +344,22 @@ export class WorkspaceDirectory {
     return descriptorsByWorkspaceId;
   }
 
-  private applyProviderSubagentContributions(params: {
+  private applyBackgroundActivityContributions(params: {
     activeAgents: AgentSnapshotPayload[];
-    providerSubagentActivity: ProviderSubagentWorkspaceActivity[];
+    backgroundActivity: BackgroundActivity[];
     descriptorsByWorkspaceId: Map<string, WorkspaceDescriptorPayload>;
     activityEntriesByWorkspaceId: Map<string, WorkspaceBucketTimestampEntry[]>;
   }): void {
     const {
       activeAgents,
-      providerSubagentActivity,
+      backgroundActivity,
       descriptorsByWorkspaceId,
       activityEntriesByWorkspaceId,
     } = params;
     const activeAgentsById = new Map(activeAgents.map((agent) => [agent.id, agent] as const));
 
-    for (const subagent of providerSubagentActivity) {
-      if (subagent.status !== "running") {
-        continue;
-      }
-      const parent = activeAgentsById.get(subagent.parentAgentId);
+    for (const activity of backgroundActivity) {
+      const parent = activeAgentsById.get(activity.agentId);
       if (!parent) {
         continue;
       }
@@ -356,7 +379,7 @@ export class WorkspaceDirectory {
         descriptor.status = "running";
       }
       const entries = activityEntriesByWorkspaceId.get(workspaceId) ?? [];
-      entries.push({ bucket: "running", changedAtIso: subagent.updatedAt });
+      entries.push({ bucket: "running", changedAtIso: activity.changedAtIso });
       activityEntriesByWorkspaceId.set(workspaceId, entries);
     }
   }

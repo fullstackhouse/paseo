@@ -9,6 +9,8 @@ temporary by design: every patch is meant to go upstream and then drop out of `f
 - getpaseo/paseo#7514: chat links to folders outside the workspace open in the file manager
 - getpaseo/paseo#7692: Cmd+Shift+[ / ] for previous/next tab on macOS desktop
 - getpaseo/paseo#7645: plugins can add items to sidebar workspace rows
+- getpaseo/paseo#6220: clients and plugins can see an agent's background work
+- FSH-only (not upstream yet): an idle agent's background work (a background shell, a `Monitor` watch) keeps its workspace in Working instead of Done
 
 Keep this list in sync with what's merged into `fsh`.
 
