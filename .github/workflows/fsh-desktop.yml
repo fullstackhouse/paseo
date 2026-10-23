@@ -1,4 +1,4 @@
-# FSH fork: build an unsigned (ad-hoc signed) macOS arm64 DMG of the `fsh`
+# FSH fork: on every push to `fsh`, build an unsigned (ad-hoc signed) macOS arm64 DMG of the `fsh`
 # branch and attach it to a GitHub Release on fullstackhouse/paseo.
 #
 # No latest-mac.yml is published, so the in-app updater finds no channel and
@@ -7,6 +7,9 @@
 name: FSH desktop build
 
 on:
+  push:
+    branches: [fsh]
+    paths-ignore: [FSH.md]
   workflow_dispatch:
 
 permissions:
