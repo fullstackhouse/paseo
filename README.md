@@ -1,3 +1,5 @@
+> **FSH fork.** This is the Full Stack House fork of Paseo. Install, patches and plugins: [FSH.md](./FSH.md).
+
 <p align="center">
   <img src="packages/website/public/logo.svg" width="64" height="64" alt="Paseo logo">
 </p>
