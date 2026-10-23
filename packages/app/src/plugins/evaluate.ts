@@ -36,6 +36,7 @@ import type {
   PluginScreenContribution,
   PluginSidebarItemContribution,
   PluginWorkspacePanelContribution,
+  PluginWorkspaceRowItemContribution,
 } from "./types";
 import type { ComponentType } from "react";
 import { parsePluginIcon, parseSerializablePluginIcon } from "./icons";
@@ -125,6 +126,7 @@ export function runPluginClientBundle(
     settingsScreens: [],
     sidebarItems: { header: [], footer: [] },
     legacySidebarItems: [],
+    workspaceRowItems: [],
     filePanels: [],
     workspacePanels: [],
     commandCenterItems: [],
@@ -140,6 +142,7 @@ export function runPluginClientBundle(
     header: new Set(),
     footer: new Set(),
   };
+  const workspaceRowItemIds = new Set<string>();
   const filePanelIds = new Set<string>();
   const workspacePanelIds = new Set<string>();
   const commandCenterItemIds = new Set<string>();
@@ -269,6 +272,23 @@ export function runPluginClientBundle(
     },
     addSidebarFooterItem(contribution: PluginSidebarItemContribution) {
       return addSidebarItem("footer", contribution);
+    },
+    addWorkspaceRowItem(contribution: PluginWorkspaceRowItemContribution) {
+      const itemId = requireId(contribution.id, "workspace row item id");
+      if (workspaceRowItemIds.has(itemId))
+        throw new Error(`Duplicate workspace row item: ${itemId}`);
+      const title = normalizePluginText(contribution.title);
+      if (!title) throw new Error(`Workspace row item ${itemId} has no title`);
+      const icon = parsePluginIcon(`Workspace row item ${itemId}`, contribution.icon);
+      if (!isComponentType(contribution.Component)) {
+        throw new Error(`Workspace row item ${itemId} is not a component`);
+      }
+      workspaceRowItemIds.add(itemId);
+      return register(
+        collector.workspaceRowItems,
+        { id: itemId, title, icon, Component: contribution.Component },
+        () => workspaceRowItemIds.delete(itemId),
+      );
     },
     // COMPAT(pluginSidebarAliases): added in v0.11.0, remove after 2027-03-29
     // Titled by its id; a legacy item pointing at it lends the header its own title instead.
@@ -579,6 +599,7 @@ export function runPluginClientBundle(
     settingsScreens: collector.settingsScreens,
     sidebarItems: collector.sidebarItems,
     legacySidebarItems: collector.legacySidebarItems,
+    workspaceRowItems: collector.workspaceRowItems,
     filePanels: collector.filePanels,
     workspacePanels: collector.workspacePanels as EvaluatedPlugin["workspacePanels"],
     commandCenterItems: collector.commandCenterItems,
