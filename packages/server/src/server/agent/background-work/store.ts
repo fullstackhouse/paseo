@@ -46,6 +46,17 @@ export class AgentBackgroundWorkStore {
     return [...(this.items.get(agentId) ?? [])];
   }
 
+  /** Agents with at least one live item, each with the start of its oldest item. */
+  listActive(): Array<{ agentId: string; startedAt: string }> {
+    return Array.from(this.items, ([agentId, items]) => ({
+      agentId,
+      startedAt: items.reduce(
+        (oldest, item) => (item.startedAt < oldest ? item.startedAt : oldest),
+        items[0].startedAt,
+      ),
+    }));
+  }
+
   clear(agentId: string): AgentBackgroundWorkItem[] | null {
     return this.apply(agentId, []);
   }

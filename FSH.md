@@ -5,6 +5,8 @@
 - getpaseo/paseo#7514 — open chat links to folders outside the workspace
 - getpaseo/paseo#7692 — Cmd+Shift+[ / ] for previous/next tab on macOS
 - getpaseo/paseo#7645 — plugins can add items to sidebar workspace rows
+- getpaseo/paseo#6220 — expose agent background work to clients and plugins
+- FSH patch (not upstream yet) — an idle agent's background work keeps its workspace in Working, not Done
 
 ## Install (macOS, Apple Silicon)
 

@@ -1231,6 +1231,7 @@ export class Session {
       listAgentPayloads: () => this.listAgentPayloads({ includeBackground: true }),
       workspaceLastUserMessageTimes: () => this.agentDirectory.workspaceLastUserMessageTimes(),
       listProviderSubagentActivity: async () => this.agentManager.listProviderSubagentActivity(),
+      listAgentBackgroundWorkActivity: async () => this.agentManager.listBackgroundWorkActivity(),
       listTerminalActivityContributions: () => this.listTerminalActivityContributions(),
       isProviderVisibleToClient: (provider) => this.isProviderVisibleToClient(provider),
       buildWorkspaceDescriptor: (input) => this.buildWorkspaceDescriptor(input),
@@ -2012,6 +2013,7 @@ export class Session {
             type: "agent.background_work.update",
             payload: { agentId: event.agentId, items: event.items },
           });
+          this.emitBackgroundWorkWorkspaceUpdate(event.agentId);
           return;
         }
 
@@ -2084,6 +2086,20 @@ export class Session {
       // listings see them; everything else above filters them out.
       { replayState: false, includeInternal: true },
     );
+  }
+
+  // Background work keeps an idle agent's workspace running, so its status changes with it.
+  private emitBackgroundWorkWorkspaceUpdate(agentId: string): void {
+    const agent = this.agentManager.getAgent(agentId);
+    if (!agent?.workspaceId) {
+      return;
+    }
+    void this.emitWorkspaceUpdateForWorkspaceId(agent.workspaceId).catch((error) => {
+      this.sessionLogger.error(
+        { err: error, agentId, workspaceId: agent.workspaceId },
+        "Failed to emit background work workspace update",
+      );
+    });
   }
 
   private emitProviderSubagentWorkspaceUpdate(event: ProviderSubagentManagerEvent): void {

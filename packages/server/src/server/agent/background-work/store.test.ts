@@ -81,4 +81,24 @@ describe("AgentBackgroundWorkStore", () => {
 
     expect(store.list("agent-a")).toHaveLength(1);
   });
+  test("lists each agent with live work once, with its oldest start", () => {
+    const store = new AgentBackgroundWorkStore();
+    store.apply("agent-a", [{ id: "bash-1", kind: "shell", description: null }], T0);
+    store.apply(
+      "agent-a",
+      [
+        { id: "bash-1", kind: "shell", description: null },
+        { id: "bash-2", kind: "shell", description: null },
+      ],
+      T1,
+    );
+    store.apply("agent-b", [{ id: "bash-3", kind: "shell", description: null }], T1);
+    store.apply("agent-c", [{ id: "bash-4", kind: "shell", description: null }], T0);
+    store.clear("agent-c");
+
+    expect(store.listActive()).toEqual([
+      { agentId: "agent-a", startedAt: T0 },
+      { agentId: "agent-b", startedAt: T1 },
+    ]);
+  });
 });

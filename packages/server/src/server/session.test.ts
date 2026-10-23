@@ -396,6 +396,7 @@ function createSessionForTest(options: SessionForTestOptions = {}): Session {
     agentManager: asAgentManager({
       listAgents: vi.fn(() => []),
       listProviderSubagentActivity: vi.fn(() => []),
+      listBackgroundWorkActivity: vi.fn(() => []),
       subscribe: vi.fn(() => () => {}),
       ...options.agentManager,
     }),
@@ -6020,6 +6021,7 @@ test("never pushes background work to an old app", async () => {
     messages,
     targetedMessages,
     agentManager: {
+      getAgent: vi.fn(() => null),
       subscribe: vi.fn((listener: (event: AgentManagerEvent) => void) => {
         agentEventListeners.push(listener);
         return () => {};
@@ -6051,6 +6053,7 @@ test("pushes background work only to clients that subscribed to it", async () =>
   const session = createSessionForTest({
     messages,
     agentManager: {
+      getAgent: vi.fn(() => null),
       subscribe: vi.fn((listener: (event: AgentManagerEvent) => void) => {
         agentEventListeners.push(listener);
         return () => {};

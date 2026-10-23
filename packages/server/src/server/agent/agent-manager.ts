@@ -1248,6 +1248,13 @@ export class AgentManager {
     return this.backgroundWork.list(agentId);
   }
 
+  listBackgroundWorkActivity(): Array<{ agentId: string; startedAt: string }> {
+    return this.backgroundWork.listActive().filter(({ agentId }) => {
+      const agent = this.agents.get(agentId);
+      return agent !== undefined && !agent.internal;
+    });
+  }
+
   private clearBackgroundWork(agentId: string): void {
     const items = this.backgroundWork.clear(agentId);
     if (items) this.dispatch({ type: "background_work", agentId, items });
