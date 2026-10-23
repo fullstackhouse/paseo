@@ -17,7 +17,7 @@ No auto-update: reinstall from Releases. Back to upstream: install from paseo.sh
 ## Maintain
 
 - Refresh: rebuild `fsh` from `upstream/main` and re-merge open PRs; drop merged ones.
-- Build: run the **FSH desktop build** workflow on `fsh` (Actions → Run workflow).
+- Build: every push to `fsh` builds and publishes a release (or Actions → FSH desktop build → Run workflow).
 
 Upstream workflows are disabled on this fork (they trigger on `main` / `v*` tags and need upstream secrets).
 Only **FSH desktop build** stays enabled. Release tags are `fsh-*`, which no upstream trigger matches.
