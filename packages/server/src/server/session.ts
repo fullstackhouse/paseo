@@ -16,6 +16,7 @@ import { isAbsolute } from "node:path";
 import { CreationService, type CreatedAgent } from "./creation/index.js";
 import type { CreationSnapshot, AgentCreateRequest } from "@getpaseo/protocol/messages";
 import type { MessageReceipts } from "./message-receipts/index.js";
+import type { AgentBackgroundWorkItem } from "./agent/background-work/store.js";
 import equal from "fast-deep-equal";
 import { WorkspaceSetupObservation } from "./workspace-setup-observation.js";
 import { SessionDelivery, type OwnedSubscription } from "./session/owned-subscriptions/index.js";
@@ -1240,6 +1241,7 @@ export class Session {
       listAgentPayloads: () => this.listAgentPayloads({ includeBackground: true }),
       workspaceLastUserMessageTimes: () => this.agentDirectory.workspaceLastUserMessageTimes(),
       listProviderSubagentActivity: async () => this.agentManager.listProviderSubagentActivity(),
+      listAgentBackgroundWorkActivity: async () => this.agentManager.listBackgroundWorkActivity(),
       listTerminalActivityContributions: () => this.listTerminalActivityContributions(),
       isProviderVisibleToClient: (provider) => this.isProviderVisibleToClient(provider),
       buildWorkspaceDescriptor: (input) => this.buildWorkspaceDescriptor(input),
@@ -1712,7 +1714,8 @@ export class Session {
       this.wantsEvent("agent_attention_required") ||
       this.wantsEvent("agent_permission_request") ||
       this.wantsEvent("agent_permission_resolved") ||
-      this.wantsEvent("agent.provider_subagents.update");
+      this.wantsEvent("agent.provider_subagents.update") ||
+      this.wantsEvent("agent.background_work.update");
     if (agents && !this.unsubscribeAgentEvents) this.subscribeToAgentEvents();
     if (!agents) {
       this.unsubscribeAgentEvents?.();
@@ -2015,6 +2018,15 @@ export class Session {
           return;
         }
 
+        if (event.type === "background_work") {
+          this.emit({
+            type: "agent.background_work.update",
+            payload: { agentId: event.agentId, items: event.items },
+          });
+          this.emitBackgroundWorkWorkspaceUpdate(event.agentId);
+          return;
+        }
+
         if (
           this.voiceSessions.isActiveForAgent(event.agentId) &&
           event.event.type === "permission_requested" &&
@@ -2084,6 +2096,20 @@ export class Session {
       // listings see them; everything else above filters them out.
       { replayState: false, includeInternal: true },
     );
+  }
+
+  // Background work keeps an idle agent's workspace running, so its status changes with it.
+  private emitBackgroundWorkWorkspaceUpdate(agentId: string): void {
+    const agent = this.agentManager.getAgent(agentId);
+    if (!agent?.workspaceId) {
+      return;
+    }
+    void this.emitWorkspaceUpdateForWorkspaceId(agent.workspaceId).catch((error) => {
+      this.sessionLogger.error(
+        { err: error, agentId, workspaceId: agent.workspaceId },
+        "Failed to emit background work workspace update",
+      );
+    });
   }
 
   private emitProviderSubagentWorkspaceUpdate(event: ProviderSubagentManagerEvent): void {
@@ -2782,6 +2808,8 @@ export class Session {
         return this.handleAgentTimelineListPromptsRequest(msg, source);
       case "agent.provider_subagents.list.request":
         return this.handleProviderSubagentListRequest(msg);
+      case "agent.background_work.list.request":
+        return this.handleAgentBackgroundWorkListRequest(msg);
       case "agent.provider_subagents.timeline.get.request":
         return this.handleProviderSubagentTimelineRequest(msg, source);
       case "session.events.set_subscription.request": {
@@ -8053,6 +8081,48 @@ export class Session {
     }
   }
 
+  private async handleAgentBackgroundWorkListRequest(
+    msg: Extract<SessionInboundMessage, { type: "agent.background_work.list.request" }>,
+  ): Promise<void> {
+    try {
+      this.emit({
+        type: "agent.background_work.list.response",
+        payload: {
+          requestId: msg.requestId,
+          agentId: msg.agentId,
+          items: await this.readAgentBackgroundWork(msg.agentId),
+          error: null,
+        },
+      });
+    } catch (error) {
+      this.emit({
+        type: "agent.background_work.list.response",
+        payload: {
+          requestId: msg.requestId,
+          agentId: msg.agentId,
+          items: [],
+          error: error instanceof Error ? error.message : String(error),
+        },
+      });
+    }
+  }
+
+  // Background work lives only in memory, so an agent that is not loaded has none.
+  // Answering from storage keeps a read from resuming a dormant agent.
+  private async readAgentBackgroundWork(agentId: string): Promise<AgentBackgroundWorkItem[]> {
+    if (this.agentManager.getAgent(agentId)) {
+      return this.agentManager.listAgentBackgroundWork(agentId);
+    }
+    const record = await this.agentStorage.get(agentId);
+    if (!record || record.internal) {
+      throw new Error(`Unknown agent '${agentId}'`);
+    }
+    if (record.archivedAt) {
+      throw new Error(`Agent is archived: ${agentId}`);
+    }
+    return [];
+  }
+
   private async handleProviderSubagentTimelineRequest(
     msg: Extract<SessionInboundMessage, { type: "agent.provider_subagents.timeline.get.request" }>,
     source?: object,
@@ -8774,6 +8844,7 @@ function sessionEventCategory(message: SessionOutboundMessage): SessionEventSubs
     case "script_status_update":
     case "workspace_setup_progress":
     case "agent.provider_subagents.update":
+    case "agent.background_work.update":
     case "terminal_attention_required":
     case "activity_log":
     case "hub.execution.agent.update":
@@ -8812,6 +8883,9 @@ function legacyWantsEvent(
       return !capabilities.has(CLIENT_CAPS.explicitEventSubscriptions);
     case "agent.provider_subagents.update":
       return capabilities.has(CLIENT_CAPS.providerSubagents);
+    // Old apps parse outbound messages strictly and do not know this type.
+    case "agent.background_work.update":
+      return false;
     default:
       return true;
   }

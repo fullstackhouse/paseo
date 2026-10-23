@@ -205,6 +205,7 @@ function createSessionForWorkspaceGitWatchTests(options?: {
       subscribe: () => () => {},
       listAgents: () => [],
       listProviderSubagentActivity: () => [],
+      listBackgroundWorkActivity: () => [],
       getAgent: () => null,
     }),
     agentStorage: createStub<SessionOptions["agentStorage"]>({
