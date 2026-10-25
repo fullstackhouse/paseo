@@ -22,6 +22,18 @@ Keep this list in sync with what's merged into `fsh`.
 
 There's no auto-update: install new builds from Releases. To go back to upstream, install from paseo.sh.
 
+A DMG built before the `hardenedRuntime=false` fix dies at launch on macOS 26 with
+`Library not loaded: @rpath/Electron Framework.framework/Electron Framework` and
+`different Team IDs`. Download a newer DMG, or re-sign the installed copy ad-hoc:
+
+```bash
+codesign --force --deep --sign - /Applications/Paseo.app
+```
+
+That drops hardened runtime, which is what blocked the load. It also drops the
+entitlements, including `com.apple.security.device.audio-input` — so prefer a newer
+DMG if you use voice input.
+
 ## FSH plugins
 
 These work on upstream Paseo too (0.12+, plugins enabled on the daemon). Install each one on every daemon you use:
