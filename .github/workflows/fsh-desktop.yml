@@ -4,6 +4,13 @@
 # No latest-mac.yml is published, so the in-app updater finds no channel and
 # stays quiet — an ad-hoc signed app can't auto-update anyway. Install a new
 # build by downloading the DMG again.
+#
+# hardenedRuntime must be off. Upstream enables it (packages/desktop/electron-builder.yml)
+# because upstream signs with a real Developer ID, so every nested binary shares one Team
+# ID and library validation passes. Ad-hoc signatures carry no Team ID, so on macOS 26 the
+# main binary is refused its own Electron Framework ("different Team IDs") and the app dies
+# at launch in dyld. The runner below is macOS 14, which does not enforce this, so the
+# packaged-app smoke test cannot catch it — keep the flag rather than relying on the gate.
 name: FSH desktop build
 
 on:
@@ -42,6 +49,7 @@ jobs:
           npm run build:desktop -- --publish never --mac dmg --arm64 \
             -c.mac.identity=- \
             -c.mac.notarize=false \
+            -c.mac.hardenedRuntime=false \
             -c.publish.owner=fullstackhouse
 
       - name: Upload smoke diagnostics
