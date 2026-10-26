@@ -967,6 +967,13 @@ export const es: TranslationResources = {
           title: "Ir al archivo",
         },
         binaryFile: "archivo binario",
+        image: {
+          before: "Antes",
+          after: "Después",
+          loading: "Cargando imagen…",
+          tooLarge: "Imagen demasiado grande para previsualizar",
+          loadFailed: "No se pudo cargar la imagen",
+        },
         tooLarge: "La diferencia es demasiado grande para mostrarse",
         previewTooLargeTitle: "Este diff es demasiado grande para previsualizarlo",
         previewTooLargeDescription: "Reduce la comparación para previsualizarla aquí",

@@ -8,6 +8,7 @@ import type {
   BranchSuggestionsRequest,
   CheckoutCommitsListRequest,
   CheckoutCommitFileDiffRequest,
+  CheckoutDiffImageGetRequest,
   CheckoutRefreshRequest,
   CheckoutRenameBranchRequest,
   CheckoutStatusRequest,
@@ -52,6 +53,7 @@ import {
   pushCurrentBranch,
   listCheckoutCommits,
   getCommitFileDiff,
+  getCheckoutDiffImage,
 } from "../../../utils/checkout-git.js";
 import { runGitCommand } from "../../../utils/run-git-command.js";
 import { expandTilde } from "../../../utils/path.js";
@@ -307,6 +309,39 @@ export class CheckoutSession {
       this.host.emit({
         type: "checkout.commits.file_diff.response",
         payload: { cwd, sha, path, file: null, error: toCheckoutError(error), requestId },
+      });
+    }
+  }
+
+  async handleDiffImageRequest(msg: CheckoutDiffImageGetRequest): Promise<void> {
+    const { cwd, path, oldPath, source, requestId } = msg;
+
+    try {
+      if (source.kind === "commit") assertSafeGitRef(source.sha, "commit");
+      for (const candidate of oldPath === undefined ? [path] : [path, oldPath]) {
+        if (
+          candidate.length === 0 ||
+          isAbsolute(candidate) ||
+          candidate.split(/[\\/]/).includes("..")
+        ) {
+          throw new Error(`Invalid path: ${candidate}`);
+        }
+      }
+      const image = await getCheckoutDiffImage({
+        cwd: expandTilde(cwd),
+        path,
+        oldPath,
+        source,
+        context: { paseoHome: this.paseoHome, worktreesRoot: this.worktreesRoot },
+      });
+      this.host.emit({
+        type: "checkout.diff.image.get.response",
+        payload: { cwd, path, old: image.old, new: image.new, error: null, requestId },
+      });
+    } catch (error) {
+      this.host.emit({
+        type: "checkout.diff.image.get.response",
+        payload: { cwd, path, old: null, new: null, error: toCheckoutError(error), requestId },
       });
     }
   }

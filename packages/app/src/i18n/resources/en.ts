@@ -942,6 +942,13 @@ export const en = {
           title: "Jump to file",
         },
         binaryFile: "Binary file",
+        image: {
+          before: "Before",
+          after: "After",
+          loading: "Loading image…",
+          tooLarge: "Image too large to preview",
+          loadFailed: "Couldn't load image",
+        },
         tooLarge: "Diff too large to display",
         previewTooLargeTitle: "This diff is too large to preview",
         previewTooLargeDescription: "Narrow the comparison to preview it here",

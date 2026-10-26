@@ -951,6 +951,13 @@ export const ru: TranslationResources = {
           title: "Перейти к файлу",
         },
         binaryFile: "Бинарный файл",
+        image: {
+          before: "До",
+          after: "После",
+          loading: "Загрузка изображения…",
+          tooLarge: "Изображение слишком большое для предпросмотра",
+          loadFailed: "Не удалось загрузить изображение",
+        },
         tooLarge: "Дифф слишком велик для отображения",
         previewTooLargeTitle: "Этот дифф слишком велик для предварительного просмотра",
         previewTooLargeDescription: "Сузьте диапазон сравнения, чтобы просмотреть дифф здесь",

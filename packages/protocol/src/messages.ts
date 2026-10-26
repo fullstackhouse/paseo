@@ -2362,6 +2362,20 @@ export const CheckoutCommitFileDiffRequestSchema = z.object({
   requestId: z.string(),
 });
 
+export const CheckoutDiffImageSourceSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("working"), compare: CheckoutDiffCompareSchema }),
+  z.object({ kind: z.literal("commit"), sha: z.string() }),
+]);
+
+export const CheckoutDiffImageGetRequestSchema = z.object({
+  type: z.literal("checkout.diff.image.get.request"),
+  cwd: z.string(),
+  path: z.string(),
+  oldPath: z.string().optional(),
+  source: CheckoutDiffImageSourceSchema,
+  requestId: z.string(),
+});
+
 const GitHubRepoSegmentSchema = z.string().regex(/^[A-Za-z0-9._-]+$/);
 
 const CheckoutCheckDetailsRequestPayloadSchema = z.object({
@@ -3373,6 +3387,7 @@ export const SessionInboundMessageSchema = z.discriminatedUnion("type", [
   CheckoutGithubSetAutoMergeRequestSchema,
   CheckoutCommitsListRequestSchema,
   CheckoutCommitFileDiffRequestSchema,
+  CheckoutDiffImageGetRequestSchema,
   CheckoutForgeGetCheckDetailsRequestSchema,
   CheckoutGithubGetCheckDetailsRequestSchema,
   CheckoutPrStatusRequestSchema,
@@ -3814,6 +3829,8 @@ export const ServerInfoStatusPayloadSchema = z
         // COMPAT(checkoutDiscardChanges): added in v0.3.0, remove gate after 2027-02-08.
         checkoutDiscardChanges: z.boolean().optional(),
         checkoutDiffAll: z.boolean().optional(),
+        // COMPAT(checkoutDiffImages): added in FSH fork, remove gate after 2027-04-26.
+        checkoutDiffImages: z.boolean().optional(),
         // COMPAT(agentProfiles): added in v0.3.2, remove gate after 2027-02-11.
         // An older daemon parses its persisted config strictly, so writing
         // agentProfiles to one is silently dropped. The client hides the feature
@@ -5689,6 +5706,30 @@ export const CheckoutCommitsListResponseSchema = z.object({
   }),
 });
 
+const CheckoutDiffImageSideSchema = z.discriminatedUnion("status", [
+  z.object({
+    status: z.literal("ok"),
+    mimeType: z.string(),
+    content: z.string(),
+    size: z.number(),
+  }),
+  z.object({ status: z.literal("missing") }),
+  z.object({ status: z.literal("too_large"), size: z.number() }),
+]);
+
+export const CheckoutDiffImageGetResponseSchema = z.object({
+  type: z.literal("checkout.diff.image.get.response"),
+  payload: z.object({
+    cwd: z.string(),
+    path: z.string(),
+    // Base64 content per side; null when the request failed.
+    old: CheckoutDiffImageSideSchema.nullable(),
+    new: CheckoutDiffImageSideSchema.nullable(),
+    error: CheckoutErrorSchema.nullable(),
+    requestId: z.string(),
+  }),
+});
+
 export const CheckoutCommitFileDiffResponseSchema = z.object({
   type: z.literal("checkout.commits.file_diff.response"),
   payload: z.object({
@@ -7133,6 +7174,7 @@ export const SessionOutboundMessageSchema = z.discriminatedUnion("type", [
   CheckoutGithubSetAutoMergeResponseSchema,
   CheckoutCommitsListResponseSchema,
   CheckoutCommitFileDiffResponseSchema,
+  CheckoutDiffImageGetResponseSchema,
   CheckoutForgeGetCheckDetailsResponseSchema,
   CheckoutGithubGetCheckDetailsResponseSchema,
   CheckoutPrStatusResponseSchema,
@@ -7498,6 +7540,10 @@ export type CheckoutCommitsListRequest = z.infer<typeof CheckoutCommitsListReque
 export type CheckoutCommitsListResponse = z.infer<typeof CheckoutCommitsListResponseSchema>;
 export type CheckoutCommitFileDiffRequest = z.infer<typeof CheckoutCommitFileDiffRequestSchema>;
 export type CheckoutCommitFileDiffResponse = z.infer<typeof CheckoutCommitFileDiffResponseSchema>;
+export type CheckoutDiffImageSource = z.infer<typeof CheckoutDiffImageSourceSchema>;
+export type CheckoutDiffImageGetRequest = z.infer<typeof CheckoutDiffImageGetRequestSchema>;
+export type CheckoutDiffImageGetResponse = z.infer<typeof CheckoutDiffImageGetResponseSchema>;
+export type CheckoutDiffImageSide = z.infer<typeof CheckoutDiffImageSideSchema>;
 export type ParsedDiffFile = z.infer<typeof ParsedDiffFileSchema>;
 export type CheckoutPrCreateRequest = z.infer<typeof CheckoutPrCreateRequestSchema>;
 export type CheckoutPrCreateResponse = z.infer<typeof CheckoutPrCreateResponseSchema>;

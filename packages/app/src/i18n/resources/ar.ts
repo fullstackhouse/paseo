@@ -934,6 +934,13 @@ export const ar: TranslationResources = {
           title: "الانتقال إلى ملف",
         },
         binaryFile: "ملف ثنائي",
+        image: {
+          before: "قبل",
+          after: "بعد",
+          loading: "جارٍ تحميل الصورة…",
+          tooLarge: "الصورة كبيرة جدًا للمعاينة",
+          loadFailed: "تعذّر تحميل الصورة",
+        },
         tooLarge: "الفرق كبير جدًا بحيث لا يمكن عرضه",
         previewTooLargeTitle: "هذا الفرق كبير جدًا بحيث لا يمكن معاينته",
         previewTooLargeDescription: "ضيّق نطاق المقارنة لمعاينتها هنا",

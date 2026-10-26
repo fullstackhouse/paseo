@@ -12,6 +12,7 @@ temporary by design: every patch is meant to go upstream and then drop out of `f
 - getpaseo/paseo#6220: clients and plugins can see an agent's background work
 - FSH-only (not upstream yet): an idle agent's background work (a background shell, a `Monitor` watch) keeps its workspace in Working instead of Done
 - FSH-only (not upstream yet): host setting for the mode an agent switches to after plan approval, per provider (Claude, Codex), under host Settings → Agents. Applies to approvals from the app, MCP and CLI
+- FSH-only (not upstream yet): changed images in the Changes diff and commit diffs show a before/after preview instead of "Binary file" (PNG, JPEG, GIF, WebP, BMP up to 8 MB per side). getpaseo/paseo#1813 tried this upstream and was closed; discussion getpaseo/paseo#5689 tracks it
 
 Keep this list in sync with what's merged into `fsh`.
 
