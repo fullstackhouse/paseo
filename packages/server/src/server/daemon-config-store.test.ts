@@ -479,6 +479,34 @@ describe("DaemonConfigStore", () => {
     });
   });
 
+  test("patch persists and clears provider plan approval mode", async () => {
+    const paseoHome = mkdtempSync(path.join(tmpdir(), "paseo-daemon-config-store-"));
+    tempDirs.push(paseoHome);
+    const store = new DaemonConfigStore(paseoHome, {
+      mcp: { injectIntoAgents: true },
+      browserTools: { enabled: false },
+      providers: {},
+      metadataGeneration: { providers: [] },
+      autoArchiveAfterMerge: false,
+      enableTerminalAgentHooks: false,
+      appendSystemPrompt: "",
+    });
+
+    await store.patch({ providers: { codex: { planApprovalModeId: "full-access" } } });
+
+    expect(store.get().providers.codex?.planApprovalModeId).toBe("full-access");
+    expect(loadPersistedConfig(paseoHome).agents?.providers?.codex).toEqual({
+      planApprovalModeId: "full-access",
+    });
+
+    await store.patch({ providers: { codex: { planApprovalModeId: null } } });
+
+    expect(store.get().providers.codex?.planApprovalModeId).toBeNull();
+    expect(loadPersistedConfig(paseoHome).agents?.providers?.codex).toEqual({
+      planApprovalModeId: null,
+    });
+  });
+
   test("patch removes provider entries from config.json", async () => {
     const paseoHome = mkdtempSync(path.join(tmpdir(), "paseo-daemon-config-store-"));
     tempDirs.push(paseoHome);

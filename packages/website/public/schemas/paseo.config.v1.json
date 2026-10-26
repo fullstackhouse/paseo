@@ -514,6 +514,16 @@
               },
               "order": {
                 "type": "number"
+              },
+              "planApprovalModeId": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
               }
             }
           }

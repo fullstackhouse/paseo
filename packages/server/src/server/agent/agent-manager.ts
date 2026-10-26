@@ -346,6 +346,7 @@ export interface AgentManagerOptions {
   paseoToolsEnabled?: boolean;
   paseoToolCatalogFactory?: PaseoToolCatalogFactory;
   resolvePaseoToolPolicy?: (provider: AgentProvider) => ProviderPaseoToolsPolicy | undefined;
+  resolvePlanApprovalModeId?: (provider: AgentProvider) => string | null | undefined;
   appendSystemPrompt?: string;
   agentStreamCoalesceWindowMs?: number;
   rescueTimeouts?: AgentManagerRescueTimeouts;
@@ -791,6 +792,7 @@ export class AgentManager {
   private readonly resolvePaseoToolPolicy: (
     provider: AgentProvider,
   ) => ProviderPaseoToolsPolicy | undefined;
+  private readonly resolvePlanApprovalModeId: AgentManagerOptions["resolvePlanApprovalModeId"];
   private appendSystemPrompt: string;
   private onAgentAttention?: AgentAttentionCallback;
   private onAgentArchived?: AgentArchivedCallback;
@@ -813,6 +815,7 @@ export class AgentManager {
     this.mcpAuthToken = options?.mcpAuthToken ?? null;
     this.configurePaseoTools(options);
     this.resolvePaseoToolPolicy = options.resolvePaseoToolPolicy ?? (() => undefined);
+    this.resolvePlanApprovalModeId = options.resolvePlanApprovalModeId;
     this.appendSystemPrompt = options.appendSystemPrompt ?? "";
     this.logger = options.logger.child({ module: "agent", component: "agent-manager" });
     this.rescueTimeouts = {
@@ -3341,7 +3344,10 @@ export class AgentManager {
     agent.inFlightPermissionResponses.add(requestId);
 
     try {
-      const result = await agent.session.respondToPermission(requestId, response);
+      const result = await agent.session.respondToPermission(
+        requestId,
+        this.withPlanApprovalMode(agent, requestId, response),
+      );
       agent.pendingPermissions.delete(requestId);
 
       try {
@@ -3365,6 +3371,22 @@ export class AgentManager {
       agent.inFlightPermissionResponses.delete(requestId);
       agent.bufferedPermissionResolutions.delete(requestId);
     }
+  }
+
+  private withPlanApprovalMode(
+    agent: LiveManagedAgent,
+    requestId: string,
+    response: AgentPermissionResponse,
+  ): AgentPermissionResponse {
+    if (
+      response.behavior !== "allow" ||
+      response.modeId ||
+      agent.pendingPermissions.get(requestId)?.kind !== "plan"
+    ) {
+      return response;
+    }
+    const modeId = this.resolvePlanApprovalModeId?.(agent.provider);
+    return modeId ? { ...response, modeId } : response;
   }
 
   async cancelAgentRun(agentId: string): Promise<AgentRunCancellationResult> {
