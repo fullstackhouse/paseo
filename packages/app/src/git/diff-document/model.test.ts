@@ -71,6 +71,29 @@ function input(overrides: Partial<BuildDiffDocumentModelInput> = {}): BuildDiffD
 }
 
 describe("diff document model", () => {
+  it("reserves a preview row for binary images only when previews are on", () => {
+    const binary = (path: string): ParsedDiffFile => ({
+      ...file(path),
+      status: "binary",
+      hunks: [],
+    });
+    const files = [binary("shots/home.png"), binary("fonts/inter.woff2")];
+
+    const withPreview = buildDiffDocumentModel(input({ files, imagePreviewHeight: 320 }));
+    expect(withPreview.rows.map((row) => row.kind === "status" && [row.image, row.height])).toEqual(
+      [
+        [true, 320],
+        [false, 42],
+      ],
+    );
+
+    const withoutPreview = buildDiffDocumentModel(input({ files }));
+    expect(withoutPreview.rows.map((row) => row.kind === "status" && row.image)).toEqual([
+      false,
+      false,
+    ]);
+  });
+
   it("preserves shaped wrap breaks when joining makes a longer prefix narrower", () => {
     const measure = (text: string) => {
       if (text === "لا") return 30;

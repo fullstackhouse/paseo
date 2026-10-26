@@ -44,6 +44,8 @@ import {
 } from "@/git/use-pr-status-query";
 import { CommitsSection } from "@/git/commits-section/commits-section";
 import { useAppSettings } from "@/hooks/use-settings";
+import { useHostFeature } from "@/runtime/host-features";
+import type { DiffImagePreviewSource } from "@/git/diff-document/types";
 import { useChangesPreferences } from "@/hooks/use-changes-preferences";
 import {
   DropdownMenu,
@@ -1711,6 +1713,14 @@ export function ChangesSurface({
     },
     [onSelectDiffFile, presentation],
   );
+  const imagePreviewSupported = useHostFeature(serverId, "checkoutDiffImages");
+  const imagePreview = useMemo<DiffImagePreviewSource | undefined>(
+    () =>
+      imagePreviewSupported && cwd
+        ? { serverId, cwd, source: { kind: "working", compare: { mode: diffMode, baseRef } } }
+        : undefined,
+    [baseRef, cwd, diffMode, imagePreviewSupported, serverId],
+  );
   const workingMode = useMemo(
     () => ({
       kind: "working" as const,
@@ -1821,6 +1831,7 @@ export function ChangesSurface({
           )}
           collapseState={collapseState}
           displayPreferences={sharedDisplayPreferences}
+          imagePreview={imagePreview}
           mode={workingMode}
         />
       </DiffBodyContent>

@@ -41,6 +41,9 @@ const fileChanges = {
   status: (value) => {
     value.status = "binary";
   },
+  revision: (value) => {
+    value.revision = "c0ffee 1700000000000:42";
+  },
   isNew: (value) => {
     value.isNew = true;
   },
