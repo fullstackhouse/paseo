@@ -19,6 +19,34 @@ async function daemon(
   cleanup.push(() => instance.close());
   return instance;
 }
+/**
+ * Holds agent message batches until released. Batching flushes after two quiet seconds of
+ * wall-clock time, and a cold CLI spawn on a slow runner can take longer than that.
+ */
+function heldAgentMessageSchedule() {
+  const held = new Set<() => void>();
+  let scheduled = 0;
+  let released = false;
+  return {
+    scheduled: () => scheduled,
+    release() {
+      released = true;
+      for (const callback of held) {
+        held.delete(callback);
+        callback();
+      }
+    },
+    schedule(delayMs: number, callback: () => void): () => void {
+      scheduled += 1;
+      if (released) {
+        const timer = setTimeout(callback, delayMs);
+        return () => clearTimeout(timer);
+      }
+      held.add(callback);
+      return () => held.delete(callback);
+    },
+  };
+}
 async function api(instance: TestPaseoDaemon) {
   const client = createHostClient(`127.0.0.1:${instance.port}`, {
     clientId: crypto.randomUUID(),
@@ -1508,10 +1536,12 @@ test(
     const parentPrompts: string[] = [];
     const childStarted = Promise.withResolvers<void>();
     const finishChild = Promise.withResolvers<void>();
+    const parentBatch = heldAgentMessageSchedule();
     cleanup.push(async () => {
       finishChild.resolve();
     });
     const a = await daemon({
+      agentMessageSchedule: parentBatch.schedule,
       agentClients: createTestAgentClients({
         onStartTurn: (prompt, config) => {
           if (config.title === "Batch parent")
@@ -1629,7 +1659,14 @@ test(
         .sort();
     };
     expect(await receiptStates()).toEqual(["pending", "pending"]);
+    const scheduledBeforeFinish = parentBatch.scheduled();
     finishChild.resolve();
+    // The finish notification joins the held batch; only then does the quiet window elapse.
+    await expect
+      .poll(() => parentBatch.scheduled(), { timeout: 10000 })
+      .toBeGreaterThan(scheduledBeforeFinish);
+    expect(parentPrompts).toEqual([]);
+    parentBatch.release();
     await expect.poll(() => parentPrompts, { timeout: 10000 }).toHaveLength(1);
     expect(parentPrompts[0]).toContain("REMOTE_REPORT &lt;ready&gt;");
     expect(parentPrompts[0]).toContain("LOCAL_CLI_REPORT");
