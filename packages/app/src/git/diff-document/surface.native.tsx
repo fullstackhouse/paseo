@@ -582,7 +582,12 @@ function NativeImageOverlays({
           zIndex: 6,
         })}
       >
-        <DiffImagePreview preview={preview} path={file.path} oldPath={file.file.oldPath} />
+        <DiffImagePreview
+          preview={preview}
+          path={file.path}
+          oldPath={file.file.oldPath}
+          revision={file.file.revision}
+        />
       </View>,
     ];
   });

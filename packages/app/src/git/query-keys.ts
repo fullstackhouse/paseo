@@ -139,6 +139,7 @@ export function checkoutDiffImageQueryKey(
   source: string,
   path: string,
   oldPath: string | undefined,
+  revision: string | undefined,
 ) {
-  return ["checkoutDiffImage", serverId, cwd, source, path, oldPath ?? ""] as const;
+  return ["checkoutDiffImage", serverId, cwd, source, path, oldPath ?? "", revision ?? ""] as const;
 }

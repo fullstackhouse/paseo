@@ -2778,6 +2778,9 @@ const ParsedDiffFileSchema = z.object({
   deletions: z.number(),
   hunks: z.array(DiffHunkSchema),
   status: z.enum(["ok", "too_large", "binary"]).optional(),
+  // Set on binary images: changes whenever either side's content does, so the diff updates
+  // and the preview refetches when an image is rewritten in place.
+  revision: z.string().optional(),
 });
 
 const FileExplorerEntrySchema = z.object({
@@ -3829,7 +3832,7 @@ export const ServerInfoStatusPayloadSchema = z
         // COMPAT(checkoutDiscardChanges): added in v0.3.0, remove gate after 2027-02-08.
         checkoutDiscardChanges: z.boolean().optional(),
         checkoutDiffAll: z.boolean().optional(),
-        // COMPAT(checkoutDiffImages): added in FSH fork, remove gate after 2027-04-26.
+        // COMPAT(checkoutDiffImages): added in v0.13.0 (FSH fork), remove gate after 2027-04-26.
         checkoutDiffImages: z.boolean().optional(),
         // COMPAT(agentProfiles): added in v0.3.2, remove gate after 2027-02-11.
         // An older daemon parses its persisted config strictly, so writing

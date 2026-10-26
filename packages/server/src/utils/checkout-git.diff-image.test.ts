@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSyn
 import { tmpdir } from "os";
 import { join } from "path";
 import { afterEach, describe, expect, it } from "vitest";
-import { getCheckoutDiffImage } from "./checkout-git.js";
+import { getCheckoutDiff, getCheckoutDiffImage } from "./checkout-git.js";
 
 const tempDirs: string[] = [];
 
@@ -121,6 +121,69 @@ describe("getCheckoutDiffImage", () => {
     expect(
       await getCheckoutDiffImage({ cwd: repoDir, path: "link.png", source: uncommitted }),
     ).toEqual({ old: { status: "missing" }, new: { status: "missing" } });
+  });
+
+  it("does not follow a symlinked parent directory", async () => {
+    const repoDir = initRepo();
+    writeFileSync(join(repoDir, "README.md"), "x\n");
+    commitAll(repoDir, "initial");
+    const outsideDir = join(repoDir, "..", "outside");
+    mkdirSync(outsideDir);
+    writeFileSync(join(outsideDir, "secret.png"), NEW_PNG);
+    symlinkSync(outsideDir, join(repoDir, "assets"));
+
+    expect(
+      await getCheckoutDiffImage({ cwd: repoDir, path: "assets/secret.png", source: uncommitted }),
+    ).toEqual({ old: { status: "missing" }, new: { status: "missing" } });
+  });
+
+  it("treats a directory named like an image as missing", async () => {
+    const repoDir = initRepo();
+    mkdirSync(join(repoDir, "icons.png"));
+    writeFileSync(join(repoDir, "icons.png", "a.txt"), "x\n");
+    commitAll(repoDir, "initial");
+
+    expect(
+      await getCheckoutDiffImage({ cwd: repoDir, path: "icons.png", source: uncommitted }),
+    ).toEqual({ old: { status: "missing" }, new: { status: "missing" } });
+  });
+
+  it("compares the merge base to HEAD in base mode", async () => {
+    const repoDir = initRepo();
+    writeFileSync(join(repoDir, "shot.png"), OLD_PNG);
+    commitAll(repoDir, "initial");
+    git(["checkout", "-q", "-b", "feature"], repoDir);
+    writeFileSync(join(repoDir, "shot.png"), NEW_PNG);
+    commitAll(repoDir, "update");
+    // Uncommitted bytes must not leak into a HEAD comparison.
+    writeFileSync(join(repoDir, "shot.png"), Buffer.from([0x89, 0x50]));
+
+    expect(
+      await getCheckoutDiffImage({
+        cwd: repoDir,
+        path: "shot.png",
+        source: { kind: "working", compare: { mode: "base", baseRef: "main" } },
+      }),
+    ).toEqual({ old: ok(OLD_PNG), new: ok(NEW_PNG) });
+  });
+
+  it("changes the diff's image revision when an image is rewritten in place", async () => {
+    const repoDir = initRepo();
+    writeFileSync(join(repoDir, "shot.png"), OLD_PNG);
+    commitAll(repoDir, "initial");
+    const compare = { mode: "uncommitted", includeStructured: true } as const;
+    const revisionOf = async () =>
+      (await getCheckoutDiff(repoDir, compare)).structured?.find((file) => file.path === "shot.png")
+        ?.revision;
+
+    writeFileSync(join(repoDir, "shot.png"), NEW_PNG);
+    const first = await revisionOf();
+    writeFileSync(join(repoDir, "shot.png"), Buffer.concat([NEW_PNG, NEW_PNG]));
+    const second = await revisionOf();
+
+    expect(first).toEqual(expect.any(String));
+    expect(second).toEqual(expect.any(String));
+    expect(second).not.toBe(first);
   });
 
   it("reports images over the size cap without reading them", async () => {

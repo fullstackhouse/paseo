@@ -1,12 +1,13 @@
 import { MAX_RELAY_WEBSOCKET_MESSAGE_BYTES } from "@getpaseo/protocol/websocket-message-limit";
 import { getDiffImageMimeType } from "@getpaseo/protocol/diff-image";
-import { resolve, dirname, basename, relative, isAbsolute } from "path";
-import { existsSync, realpathSync } from "fs";
+import { resolve, dirname, basename, relative, isAbsolute, sep } from "path";
+import { constants as fsConstants, existsSync, realpathSync } from "fs";
 import {
   open as openFile,
   readFile,
   stat as statFile,
   lstat,
+  realpath,
   mkdtemp,
   copyFile,
   rm,
@@ -2813,12 +2814,27 @@ async function readDiffImageAtRef(
   }
   if (!Number.isFinite(size)) return { status: "missing" };
   if (size > DIFF_IMAGE_MAX_BYTES) return { status: "too_large", size };
-  const { stdout } = await runGitCommandBytes(["cat-file", "blob", spec], {
-    cwd,
-    envOverlay: READ_ONLY_GIT_ENV,
-    maxOutputBytes: DIFF_IMAGE_MAX_BYTES + 1,
-  });
-  return { status: "ok", mimeType, content: stdout.toString("base64"), size: stdout.byteLength };
+  try {
+    const { stdout } = await runGitCommandBytes(["cat-file", "blob", spec], {
+      cwd,
+      envOverlay: READ_ONLY_GIT_ENV,
+      maxOutputBytes: DIFF_IMAGE_MAX_BYTES + 1,
+    });
+    return { status: "ok", mimeType, content: stdout.toString("base64"), size: stdout.byteLength };
+  } catch {
+    // The entry exists but is not a blob, e.g. a directory or submodule named like an image.
+    return { status: "missing" };
+  }
+}
+
+const DIFF_IMAGE_OPEN_FLAGS =
+  process.platform === "win32"
+    ? fsConstants.O_RDONLY
+    : fsConstants.O_RDONLY | fsConstants.O_NOFOLLOW;
+
+function isOutsideRoot(root: string, candidate: string): boolean {
+  const relativePath = relative(root, candidate);
+  return relativePath === ".." || relativePath.startsWith(`..${sep}`) || isAbsolute(relativePath);
 }
 
 async function readDiffImageFromWorkingTree(
@@ -2826,22 +2842,40 @@ async function readDiffImageFromWorkingTree(
   path: string,
 ): Promise<CheckoutDiffImageSide> {
   const mimeType = getDiffImageMimeType(path);
-  const absolutePath = resolve(worktreeRoot, path);
-  const relativePath = relative(worktreeRoot, absolutePath);
-  if (!mimeType || relativePath.startsWith("..") || isAbsolute(relativePath)) {
-    return { status: "missing" };
-  }
-  let metadata;
+  const requestedPath = resolve(worktreeRoot, path);
+  if (!mimeType || isOutsideRoot(worktreeRoot, requestedPath)) return { status: "missing" };
+  let handle;
   try {
-    metadata = await lstat(absolutePath);
+    // A symlink anywhere on the path could lead outside the worktree, and the diff shows a
+    // link as a link, not an image. The canonical path must match the lexical one.
+    const canonicalRoot = await realpath(worktreeRoot);
+    const canonicalPath = await realpath(requestedPath);
+    if (canonicalPath !== resolve(canonicalRoot, relative(worktreeRoot, requestedPath))) {
+      return { status: "missing" };
+    }
+    handle = await openFile(canonicalPath, DIFF_IMAGE_OPEN_FLAGS);
   } catch {
     return { status: "missing" };
   }
-  // A symlink could point outside the worktree; the diff shows it as a link, not an image.
-  if (!metadata.isFile()) return { status: "missing" };
-  if (metadata.size > DIFF_IMAGE_MAX_BYTES) return { status: "too_large", size: metadata.size };
-  const content = await readFile(absolutePath);
-  return { status: "ok", mimeType, content: content.toString("base64"), size: content.byteLength };
+  try {
+    // Size and bytes come from the open handle, so a file replaced or grown after the
+    // checks above can neither escape them nor exceed the cap.
+    const metadata = await handle.stat();
+    if (!metadata.isFile()) return { status: "missing" };
+    if (metadata.size > DIFF_IMAGE_MAX_BYTES) return { status: "too_large", size: metadata.size };
+    const buffer = Buffer.alloc(DIFF_IMAGE_MAX_BYTES + 1);
+    let length = 0;
+    while (length < buffer.length) {
+      const { bytesRead } = await handle.read(buffer, length, buffer.length - length, length);
+      if (bytesRead === 0) break;
+      length += bytesRead;
+    }
+    if (length > DIFF_IMAGE_MAX_BYTES) return { status: "too_large", size: length };
+    const content = buffer.subarray(0, length);
+    return { status: "ok", mimeType, content: content.toString("base64"), size: length };
+  } finally {
+    await handle.close();
+  }
 }
 
 /**
@@ -2876,11 +2910,11 @@ export async function getCheckoutDiffImage({
   }
   const previousPath = oldPath ?? path;
   const refs = await resolveCheckoutDiffRefs(worktreeRoot, source.compare, context);
+  // No base ref means the diff itself is empty; there is nothing to compare.
+  if (!refs) return { old: { status: "missing" }, new: { status: "missing" } };
   const [oldSide, newSide] = await Promise.all([
-    refs
-      ? readDiffImageAtRef(worktreeRoot, refs.baseRef, previousPath)
-      : Promise.resolve<CheckoutDiffImageSide>({ status: "missing" }),
-    refs?.targetRef
+    readDiffImageAtRef(worktreeRoot, refs.baseRef, previousPath),
+    refs.targetRef
       ? readDiffImageAtRef(worktreeRoot, refs.targetRef, path)
       : readDiffImageFromWorkingTree(worktreeRoot, path),
   ]);
@@ -3782,9 +3816,57 @@ async function readCheckoutDiff(
   }
 
   if (compare.includeStructured) {
-    return { diff: diffText, structured: structured.files };
+    return {
+      diff: diffText,
+      structured: await withDiffImageRevisions(cwd, effectiveRefsForDiff, structured.files),
+    };
   }
   return { diff: diffText };
+}
+
+/**
+ * Binary placeholders carry no content, so an image rewritten in place yields an identical
+ * diff. Stamp each image with its refs' commits and, for the working tree, its file stat.
+ */
+async function withDiffImageRevisions(
+  cwd: string,
+  refs: CheckoutDiffRefs,
+  files: ParsedDiffFile[],
+): Promise<ParsedDiffFile[]> {
+  const images = files.filter(
+    (file) => file.status === "binary" && getDiffImageMimeType(file.path) !== null,
+  );
+  if (images.length === 0) return files;
+  const refNames = getCheckoutDiffRefArgs(refs);
+  let refOids = refNames;
+  try {
+    const { stdout } = await runGitCommand(["rev-parse", ...refNames], {
+      cwd,
+      envOverlay: READ_ONLY_GIT_ENV,
+    });
+    refOids = stdout.trim().split("\n");
+  } catch {
+    // Keep the names; the stat part still tracks working-tree rewrites.
+  }
+  const revisions = new Map<ParsedDiffFile, string>();
+  await Promise.all(
+    images.map(async (file) => {
+      let stamp = "";
+      if (!refs.targetRef) {
+        try {
+          const metadata = await lstat(resolve(cwd, file.path));
+          stamp = `${metadata.mtimeMs}:${metadata.size}`;
+        } catch {
+          stamp = "missing";
+        }
+      }
+      revisions.set(file, [...refOids, stamp].join(" "));
+    }),
+  );
+  return files.map((file) => {
+    const revision = revisions.get(file);
+    return revision === undefined ? file : { ...file, revision };
+  });
 }
 
 export async function commitChanges(

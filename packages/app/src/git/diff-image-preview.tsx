@@ -12,16 +12,19 @@ import type { DiffImagePreviewSource } from "./diff-document/types";
 /** Height the diff document reserves for a before/after image preview row. */
 export const DIFF_IMAGE_PREVIEW_HEIGHT = 320;
 
-const IMAGE_STALE_TIME_MS = 30_000;
+// Image bytes are large; drop them soon after the row scrolls away.
+const IMAGE_GC_TIME_MS = 30_000;
 
 interface DiffImagePreviewProps {
   preview: DiffImagePreviewSource;
   path: string;
   oldPath?: string;
+  /** Changes with the image content in working diffs; commit diffs are fixed by their sha. */
+  revision?: string;
 }
 
 /** GitHub-style 2-up view of a changed image: before on the left, after on the right. */
-export function DiffImagePreview({ preview, path, oldPath }: DiffImagePreviewProps) {
+export function DiffImagePreview({ preview, path, oldPath, revision }: DiffImagePreviewProps) {
   const { t } = useTranslation();
   const client = useHostRuntimeClient(preview.serverId);
   const isConnected = useHostRuntimeIsConnected(preview.serverId);
@@ -32,6 +35,7 @@ export function DiffImagePreview({ preview, path, oldPath }: DiffImagePreviewPro
       JSON.stringify(preview.source),
       path,
       oldPath,
+      revision,
     ),
     queryFn: () => {
       if (!client) throw new Error("Host disconnected");
@@ -44,18 +48,21 @@ export function DiffImagePreview({ preview, path, oldPath }: DiffImagePreviewPro
     },
     enabled: Boolean(client) && isConnected,
     dataShape: "value",
-    staleTimeMs: IMAGE_STALE_TIME_MS,
-    // Image bytes are large; drop them soon after the row scrolls away.
-    gcTime: IMAGE_STALE_TIME_MS,
+    // The key pins the content (revision or commit sha), so a cached result never goes stale.
+    immutableWhen: () => true,
+    gcTime: IMAGE_GC_TIME_MS,
   });
 
-  if (query.error) {
+  if (query.error || (!query.data && !isConnected)) {
     return <Message text={t("workspace.git.diff.image.loadFailed")} />;
   }
   if (!query.data) {
     return <Message text={t("workspace.git.diff.image.loading")} />;
   }
   const { old: before, new: after } = query.data;
+  if (before.status === "missing" && after.status === "missing") {
+    return <Message text={t("workspace.git.diff.binaryFile")} />;
+  }
   return (
     <View style={styles.container}>
       {before.status === "missing" ? null : (
@@ -84,7 +91,7 @@ function ImageSide({ label, side }: { label: string; side: PresentImageSide }) {
       </Text>
       <View style={styles.frame}>
         {source ? (
-          <SizedImage source={source} />
+          <SizedImage source={source} label={label} />
         ) : (
           <Text style={styles.message}>{t("workspace.git.diff.image.tooLarge")}</Text>
         )}
@@ -93,25 +100,41 @@ function ImageSide({ label, side }: { label: string; side: PresentImageSide }) {
   );
 }
 
+type MeasuredImage =
+  | { status: "measuring" }
+  | { status: "ready"; width: number; height: number }
+  | { status: "failed" };
+
 /** Shows the image at its natural size, scaled down (never up) to fit the frame. */
-function SizedImage({ source }: { source: { uri: string } }) {
-  const [size, setSize] = useState<{ width: number; height: number } | null>(null);
+function SizedImage({ source, label }: { source: { uri: string }; label: string }) {
+  const { t } = useTranslation();
+  const [measured, setMeasured] = useState<MeasuredImage>({ status: "measuring" });
   useEffect(() => {
     let active = true;
+    setMeasured({ status: "measuring" });
     Image.getSize(
       source.uri,
       (width, height) => {
-        if (active && width > 0 && height > 0) setSize({ width, height });
+        if (active) setMeasured({ status: "ready", width, height });
       },
-      () => undefined,
+      () => {
+        if (active) setMeasured({ status: "failed" });
+      },
     );
     return () => {
       active = false;
     };
   }, [source.uri]);
-  const image = <Image source={source} style={styles.image} resizeMode="contain" />;
-  if (!size) return image;
-  return <View style={styles.naturalBox(size.width, size.height)}>{image}</View>;
+  if (measured.status === "failed") {
+    return <Text style={styles.message}>{t("workspace.git.diff.image.loadFailed")}</Text>;
+  }
+  // Rendering only once measured keeps the image from flashing at the frame's size first.
+  if (measured.status === "measuring") return null;
+  return (
+    <View style={styles.naturalBox(measured.width, measured.height)}>
+      <Image source={source} style={styles.image} resizeMode="contain" accessibilityLabel={label} />
+    </View>
+  );
 }
 
 function Message({ text }: { text: string }) {
