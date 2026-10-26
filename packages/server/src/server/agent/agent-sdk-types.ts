@@ -143,6 +143,7 @@ export interface ProviderSnapshotEntry {
   description?: string;
   iconSvg?: string;
   defaultModeId?: string | null;
+  supportsPlanApproval?: boolean;
 }
 
 export interface AgentCreateConfigParent {
@@ -526,6 +527,7 @@ export type AgentPermissionResponse =
       selectedActionId?: string;
       updatedInput?: AgentMetadata;
       updatedPermissions?: AgentPermissionUpdate[];
+      modeId?: string;
     }
   | {
       behavior: "deny";
