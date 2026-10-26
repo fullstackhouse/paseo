@@ -5,6 +5,7 @@ const withAndroidAsyncStorageSize = require("./plugins/with-android-async-storag
 const withAndroidOptionalCamera = require("./plugins/with-android-optional-camera");
 const withAndroidProfileable = require("./plugins/with-android-profileable");
 const withFdroidAutolinking = require("./plugins/with-fdroid-autolinking");
+const withFshReleaseSigning = require("./plugins/with-fsh-release-signing");
 const withPasteInput = require("./plugins/with-paste-input");
 const withAndroidScroll = require("./modules/paseo-scroll/app.plugin");
 const { getNativeReleaseVersion } = require("./native-release-version");
@@ -92,6 +93,13 @@ const variants = {
       fallbackRelativePath: "./.secrets/GoogleService-Info.debug.plist",
     }),
   },
+};
+
+// FSH fork: our own sideloaded Android build, installable next to the store app.
+// No Google services: it is always built with PASEO_FDROID_BUILD=1 (see fsh-android.yml).
+variants.fsh = {
+  name: "Paseo FSH",
+  packageId: "house.fullstack.paseo",
 };
 
 const variant = variants[appVariant] ?? variants.production;
@@ -182,6 +190,7 @@ export default {
         },
       ],
       ...buildProfile.fdroidPlugins,
+      ...(appVariant === "fsh" ? [withFshReleaseSigning] : []),
       ...(isProfileBuild || isWatchdogBuild ? [withAndroidProfileable] : []),
     ],
     experiments: {
