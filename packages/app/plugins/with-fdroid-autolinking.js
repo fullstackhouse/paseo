@@ -69,6 +69,7 @@ function withFdroidAutolinking(config) {
       const expo = packageJson.expo ?? {};
       const autolinking = expo.autolinking ?? {};
       const android = autolinking.android ?? {};
+      const overlayRoot = path.join(modConfig.modRequest.platformProjectRoot, "fdroid-autolinking");
       const fdroidPackageJson = {
         ...packageJson,
         expo: {
@@ -78,12 +79,18 @@ function withFdroidAutolinking(config) {
             android: {
               ...android,
               buildFromSource: [".*"],
+              // The overlay becomes autolinking's project root, so the app's own native
+              // modules (./modules, e.g. paseo-scroll) must be pointed at explicitly or they
+              // are never linked and MainApplication's registration fails to compile.
+              nativeModulesDir: path.relative(
+                overlayRoot,
+                path.join(modConfig.modRequest.projectRoot, "modules"),
+              ),
               exclude: EXCLUDED_ANDROID_MODULES,
             },
           },
         },
       };
-      const overlayRoot = path.join(modConfig.modRequest.platformProjectRoot, "fdroid-autolinking");
 
       await fs.mkdir(overlayRoot, { recursive: true });
       await fs.writeFile(

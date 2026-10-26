@@ -1,0 +1,138 @@
+# FSH fork: our own Android app, sideloaded, built here instead of on Expo's build service.
+#
+# - Pull requests into `fsh`: build the APK and keep it as a workflow artifact (a gate).
+# - Pushes to `fsh`: build and publish it on a GitHub Release (`fsh-android-*`).
+#
+# Variant `fsh` (packages/app/app.config.js): package `house.fullstack.paseo`, so it installs next
+# to the store app. Always the F-Droid flavour: no Google services, no expo-notifications, no
+# camera. So no push notifications and no QR pairing; hosts are added by address.
+#
+# Signed with FSH's own key (plugins/with-fsh-release-signing.js), backed up in GCP Secret
+# Manager as paseo-android-keystore{,-password}. Android only installs an update signed with the
+# same key, so losing it means every phone uninstalls and reinstalls.
+name: FSH Android build
+
+on:
+  push:
+    branches: [fsh]
+    paths-ignore: [FSH.md]
+  pull_request:
+    branches: [fsh]
+    paths:
+      - packages/app/**
+      - packages/client/**
+      - packages/protocol/**
+      - packages/plugin/**
+      - package-lock.json
+      - .github/workflows/fsh-android.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: fsh-android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: package-lock.json
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('package-lock.json', 'packages/app/app.config.js') }}
+          restore-keys: gradle-${{ runner.os }}-
+
+      - name: Install JS dependencies
+        run: node scripts/npm-retry.mjs ci
+
+      - name: Build app dependencies
+        run: npm run build:app-deps
+
+      - name: Prebuild Android
+        working-directory: packages/app
+        env:
+          APP_VARIANT: fsh
+          PASEO_FDROID_BUILD: "1"
+        run: npx expo prebuild --platform android --no-install
+
+      - name: Decode signing key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.PASEO_ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          set -euo pipefail
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "::error::PASEO_ANDROID_KEYSTORE_BASE64 is not set"
+            exit 1
+          fi
+          printf '%s' "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/fsh-paseo.p12"
+          echo "PASEO_ANDROID_KEYSTORE=$RUNNER_TEMP/fsh-paseo.p12" >> "$GITHUB_ENV"
+
+      - name: Build APK
+        working-directory: packages/app/android
+        env:
+          APP_VARIANT: fsh
+          PASEO_FDROID_BUILD: "1"
+          PASEO_ANDROID_KEYSTORE_PASSWORD: ${{ secrets.PASEO_ANDROID_KEYSTORE_PASSWORD }}
+          PASEO_ANDROID_KEY_PASSWORD: ${{ secrets.PASEO_ANDROID_KEYSTORE_PASSWORD }}
+          PASEO_ANDROID_KEY_ALIAS: fsh-paseo
+        # arm64 only: every phone we use is 64-bit ARM, and one ABI halves the build.
+        run: |
+          ./gradlew assembleRelease --no-daemon --max-workers=4 \
+            -PreactNativeArchitectures=arm64-v8a
+
+      - name: Verify signature
+        run: |
+          set -euo pipefail
+          apk=packages/app/android/app/build/outputs/apk/release/app-release.apk
+          apksigner="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)/apksigner"
+          "$apksigner" verify --print-certs "$apk" | tee "$RUNNER_TEMP/certs.txt"
+          # Refuse to ship anything signed with the template's shared debug key.
+          if grep -q "CN=Android Debug" "$RUNNER_TEMP/certs.txt"; then
+            echo "::error::APK is signed with the debug key"
+            exit 1
+          fi
+          version="$(node -p 'require("./packages/app/package.json").version')"
+          echo "APK_VERSION=$version" >> "$GITHUB_ENV"
+          echo "APK_PATH=$RUNNER_TEMP/paseo-fsh-${version}-${GITHUB_SHA::7}-arm64.apk" >> "$GITHUB_ENV"
+          cp "$apk" "$RUNNER_TEMP/paseo-fsh-${version}-${GITHUB_SHA::7}-arm64.apk"
+
+      - name: Upload artifact
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: paseo-fsh-apk
+          path: ${{ env.APK_PATH }}
+          retention-days: 7
+
+      - name: Publish release
+        if: github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          tag="fsh-android-${APK_VERSION}-${GITHUB_SHA::7}"
+          gh release create "$tag" "$APK_PATH" \
+            --target "$GITHUB_SHA" \
+            --latest=false \
+            --title "Paseo Android ${APK_VERSION} (FSH ${GITHUB_SHA::7})" \
+            --notes "Android APK of \`fsh\` ($(git log -1 --format=%h)), package \`house.fullstack.paseo\`, signed with the FSH key. Install by hand or track with Obtainium. No push notifications."
