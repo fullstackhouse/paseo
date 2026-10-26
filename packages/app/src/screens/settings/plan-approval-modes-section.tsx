@@ -19,7 +19,8 @@ export function PlanApprovalModesSection({ serverId }: { serverId: string }) {
   const { entries } = useProvidersSnapshot(serverId);
 
   const providers = (entries ?? []).filter(
-    (entry) => entry.enabled && getImplementationModes(entry).length > 0,
+    (entry) =>
+      entry.enabled && entry.supportsPlanApproval && getImplementationModes(entry).length > 0,
   );
   if (!isConnected || providers.length === 0) {
     return null;

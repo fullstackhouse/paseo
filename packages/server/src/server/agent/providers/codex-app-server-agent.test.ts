@@ -6633,6 +6633,7 @@ describe("Codex app-server provider", () => {
   test.each([
     ["full-access", "full-access"],
     ["unknown", "auto"],
+    ["constructor", "auto"],
   ])(
     "approving a synthetic Codex plan permission with modeId %s enters %s",
     async (modeId, expected) => {

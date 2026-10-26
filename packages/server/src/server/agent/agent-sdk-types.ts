@@ -137,6 +137,7 @@ export interface ProviderSnapshotEntry {
   description?: string;
   iconSvg?: string;
   defaultModeId?: string | null;
+  supportsPlanApproval?: boolean;
 }
 
 export interface AgentCreateConfigParent {

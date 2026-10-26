@@ -4814,7 +4814,7 @@ export class CodexAppServerAgentSession implements AgentSession {
     const { requestId, response, pending, pendingRequest } = params;
     let followUpPrompt: string | undefined;
     if (response.behavior === "allow") {
-      if (response.modeId && response.modeId in MODE_PRESETS) {
+      if (response.modeId && Object.hasOwn(MODE_PRESETS, response.modeId)) {
         this.applyMode(response.modeId);
       }
       followUpPrompt = this.preparePlanImplementation({
