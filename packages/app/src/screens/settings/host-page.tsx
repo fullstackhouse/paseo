@@ -50,6 +50,7 @@ import {
   useHosts,
 } from "@/runtime/host-runtime";
 import { ProvidersSection } from "@/screens/settings/providers-section";
+import { PlanApprovalModesSection } from "@/screens/settings/plan-approval-modes-section";
 import { HostUsageSection } from "@/usage";
 import { HostAppearanceSection } from "@/screens/settings/host-appearance-section";
 import { SettingsSection } from "@/components/settings/headings/settings-section";
@@ -297,6 +298,7 @@ export function HostAgentsPage({ serverId }: { serverId: string }) {
           <Text style={styles.emptyText}>{t("settings.host.agents.unavailable")}</Text>
         </View>
       )}
+      <PlanApprovalModesSection serverId={serverId} />
       <AgentSkillsSection serverId={serverId} />
       <AgentProfilesSection serverId={serverId} />
     </View>

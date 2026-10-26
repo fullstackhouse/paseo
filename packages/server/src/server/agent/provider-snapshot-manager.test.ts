@@ -382,6 +382,26 @@ describe("ProviderSnapshotManager public surface", () => {
     }
   });
 
+  test("getSnapshot flags providers that support plan approval, including derived ones", () => {
+    const manager = new ProviderSnapshotManager({
+      logger: createTestLogger(),
+      providerOverrides: {
+        "qwen-codex": { extends: "codex", label: "Qwen Code", enabled: true },
+      },
+    });
+    try {
+      const snapshot = manager.getSnapshot("/tmp/project").records.map(({ entry }) => entry);
+      const supportsPlanApproval = (provider: string) =>
+        snapshot.find((entry) => entry.provider === provider)?.supportsPlanApproval;
+      expect(supportsPlanApproval("claude")).toBe(true);
+      expect(supportsPlanApproval("codex")).toBe(true);
+      expect(supportsPlanApproval("qwen-codex")).toBe(true);
+      expect(supportsPlanApproval("opencode")).toBeUndefined();
+    } finally {
+      manager.destroy();
+    }
+  });
+
   test("providerOverrides with enabled:false marks the provider as unavailable without probing", async () => {
     const isAvailable = vi.fn(async () => true);
     const fetchCatalog = vi.fn(async () => ({

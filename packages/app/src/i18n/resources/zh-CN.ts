@@ -2499,6 +2499,12 @@ export const zhCN: TranslationResources = {
       },
     },
     host: {
+      planApprovalMode: {
+        title: "批准计划后的模式",
+        description: "批准计划后代理切换到的模式",
+        providerDefault: "提供方默认",
+        updateFailed: "无法更新批准后的模式",
+      },
       password: {
         guidance: "移除此主机，然后使用此守护进程要求的密码重新添加。",
       },

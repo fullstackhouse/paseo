@@ -2563,6 +2563,12 @@ export const ar: TranslationResources = {
       },
     },
     host: {
+      planApprovalMode: {
+        title: "الوضع بعد الموافقة على الخطة",
+        description: "الوضع الذي ينتقل إليه الوكيل عند الموافقة على خطته",
+        providerDefault: "افتراضي المزوّد",
+        updateFailed: "تعذّر تحديث الوضع بعد الموافقة",
+      },
       password: {
         guidance: "أزل هذا المضيف ثم أضفه مرة أخرى بكلمة المرور التي يطلبها هذا الخادم.",
       },

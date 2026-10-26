@@ -2583,6 +2583,12 @@ export const fr: TranslationResources = {
       },
     },
     host: {
+      planApprovalMode: {
+        title: "Mode après approbation du plan",
+        description: "Mode dans lequel l’agent passe quand vous approuvez son plan",
+        providerDefault: "Par défaut du fournisseur",
+        updateFailed: "Impossible de mettre à jour le mode après approbation",
+      },
       password: {
         guidance:
           "Supprimez cet hôte puis ajoutez-le à nouveau avec le mot de passe demandé par ce daemon.",

@@ -90,3 +90,28 @@ test.each([
     await plan.session.close();
   }
 });
+
+test.each([
+  ["default", "implement", "bypassPermissions", "bypassPermissions"],
+  ["acceptEdits", "implement", "default", "default"],
+  ["auto", "implement_resume", "default", "auto"],
+  ["default", "implement", "plan", "acceptEdits"],
+  ["default", "implement", "unknown", "acceptEdits"],
+] as const)(
+  "approving from %s with %s and modeId %s enters %s",
+  async (mode, action, modeId, expected) => {
+    const plan = await createPlanApproval(mode);
+    try {
+      await plan.session.respondToPermission(plan.request.id, {
+        behavior: "allow",
+        selectedActionId: action,
+        modeId,
+      });
+      await expect(plan.resolution).resolves.toMatchObject({ behavior: "allow" });
+      expect(plan.sdkMode()).toBe(expected);
+      expect(await plan.session.getCurrentMode()).toBe(expected);
+    } finally {
+      await plan.session.close();
+    }
+  },
+);

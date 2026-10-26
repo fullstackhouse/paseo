@@ -2563,6 +2563,12 @@ export const ptBR: TranslationResources = {
       },
     },
     host: {
+      planApprovalMode: {
+        title: "Modo após aprovar o plano",
+        description: "Modo para o qual o agente muda quando você aprova o plano",
+        providerDefault: "Padrão do provedor",
+        updateFailed: "Não foi possível atualizar o modo após aprovação",
+      },
       password: {
         guidance: "Remova este host e adicione-o novamente com a senha que este daemon pede.",
       },

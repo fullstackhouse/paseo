@@ -77,6 +77,8 @@ export interface ProviderDefinition extends AgentProviderDefinition {
    */
   derivedFromProviderId: string | null;
   supportsExactMcpPreapproval: boolean;
+  /** Emits `plan` permissions and applies the `modeId` of an approval. */
+  supportsPlanApproval: boolean;
   applyToolPolicy: (
     config: AgentSessionConfig,
     toolPolicy: ToolPolicy | undefined,
@@ -147,12 +149,13 @@ interface ResolvedProvider {
 
 interface ProviderContract {
   supportsExactMcpPreapproval: boolean;
+  supportsPlanApproval?: boolean;
   applyToolPolicy?: (provider: string, toolPolicy: ToolPolicy) => ToolPolicy;
 }
 
 const PROVIDER_CONTRACTS: Record<string, ProviderContract> = {
-  claude: { supportsExactMcpPreapproval: true },
-  codex: { supportsExactMcpPreapproval: true },
+  claude: { supportsExactMcpPreapproval: true, supportsPlanApproval: true },
+  codex: { supportsExactMcpPreapproval: true, supportsPlanApproval: true },
   opencode: { supportsExactMcpPreapproval: true },
 };
 
@@ -649,6 +652,7 @@ function createRegistryEntry(
     enabled: resolved.enabled,
     derivedFromProviderId: resolved.derivedFromProviderId,
     supportsExactMcpPreapproval: resolved.contract.supportsExactMcpPreapproval,
+    supportsPlanApproval: resolved.contract.supportsPlanApproval ?? false,
     applyToolPolicy: (config, toolPolicy) => {
       if (toolPolicy && !resolved.contract.supportsExactMcpPreapproval) {
         throw new ToolPolicyUnsupportedError(provider);

@@ -2549,6 +2549,12 @@ export const ja: TranslationResources = {
       },
     },
     host: {
+      planApprovalMode: {
+        title: "プラン承認後のモード",
+        description: "プランを承認したときにエージェントが切り替わるモード",
+        providerDefault: "プロバイダーの既定",
+        updateFailed: "承認後のモードを更新できません",
+      },
       password: {
         guidance:
           "このホストを削除し、このデーモンが求めるパスワードを入力して追加し直してください。",

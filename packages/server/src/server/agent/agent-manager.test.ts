@@ -40,6 +40,7 @@ import type {
   AgentLaunchContext,
   AgentPromptInput,
   AgentProvider,
+  AgentPermissionResponse,
   AgentPersistenceHandle,
   AgentRunOptions,
   AgentResumeSessionOptions,
@@ -9587,6 +9588,52 @@ test("respondToPermission updates currentModeId after plan approval", async () =
   const reloaded = await manager.reloadAgentSession(snapshot.id);
   expect(reloaded.config.modeId).toBe("acceptEdits");
   expect(client.resumedModeId).toBe("acceptEdits");
+});
+
+test.each([
+  ["fills the host plan approval mode", { behavior: "allow" }, "plan", "full-access"],
+  ["keeps an explicit modeId", { behavior: "allow", modeId: "read-only" }, "plan", "read-only"],
+  ["skips non-plan requests", { behavior: "allow" }, "tool", undefined],
+  ["skips denials", { behavior: "deny" }, "plan", undefined],
+] as const)("respondToPermission %s", async (_name, response, kind, expectedModeId) => {
+  const workdir = mkdtempSync(join(tmpdir(), "agent-manager-test-"));
+  const responses: AgentPermissionResponse[] = [];
+
+  class RecordingPermissionSession extends TestAgentSession {
+    override async respondToPermission(
+      _requestId: string,
+      next: AgentPermissionResponse,
+    ): Promise<void> {
+      responses.push(next);
+    }
+  }
+
+  class RecordingPermissionClient extends TestAgentClient {
+    override async createSession(config: AgentSessionConfig): Promise<AgentSession> {
+      return new RecordingPermissionSession(config);
+    }
+  }
+
+  const manager = new AgentManager({
+    clients: { codex: new RecordingPermissionClient() },
+    registry: new AgentStorage(join(workdir, "agents"), logger),
+    logger,
+    resolvePlanApprovalModeId: (provider) => (provider === "codex" ? "full-access" : undefined),
+  });
+  const snapshot = await manager.createAgent({ provider: "codex", cwd: workdir }, undefined, {
+    workspaceId: undefined,
+  });
+  manager.getAgent(snapshot.id)!.pendingPermissions.set("perm-1", {
+    id: "perm-1",
+    provider: "codex",
+    name: "CodexPlanApproval",
+    kind,
+  });
+
+  await manager.respondToPermission(snapshot.id, "perm-1", response);
+
+  expect(responses).toHaveLength(1);
+  expect((responses[0] as { modeId?: string }).modeId).toBe(expectedModeId);
 });
 
 test("respondToPermission refreshes features and runtime info after provider-managed plan approval", async () => {

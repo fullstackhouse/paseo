@@ -2581,6 +2581,12 @@ export const es: TranslationResources = {
       },
     },
     host: {
+      planApprovalMode: {
+        title: "Modo tras aprobar el plan",
+        description: "Modo al que cambia el agente cuando apruebas su plan",
+        providerDefault: "Predeterminado del proveedor",
+        updateFailed: "No se pudo actualizar el modo tras aprobar",
+      },
       password: {
         guidance: "Elimina este host y vuelve a añadirlo con la contraseña que pide este daemon.",
       },

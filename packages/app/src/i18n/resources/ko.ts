@@ -2537,6 +2537,12 @@ export const ko: TranslationResources = {
       },
     },
     host: {
+      planApprovalMode: {
+        title: "계획 승인 후 모드",
+        description: "계획을 승인하면 에이전트가 전환하는 모드",
+        providerDefault: "공급자 기본값",
+        updateFailed: "승인 후 모드를 업데이트할 수 없습니다",
+      },
       password: {
         guidance: "이 호스트를 제거한 뒤 이 데몬이 요구하는 비밀번호로 다시 추가하세요.",
       },

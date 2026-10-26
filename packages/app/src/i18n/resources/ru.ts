@@ -2568,6 +2568,12 @@ export const ru: TranslationResources = {
       },
     },
     host: {
+      planApprovalMode: {
+        title: "Режим после одобрения плана",
+        description: "Режим, в который агент переходит после одобрения плана",
+        providerDefault: "По умолчанию у провайдера",
+        updateFailed: "Не удалось обновить режим после одобрения",
+      },
       password: {
         guidance:
           "Удалите этот хост и добавьте его снова с паролем, который запрашивает этот демон.",

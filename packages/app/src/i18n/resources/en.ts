@@ -2650,6 +2650,12 @@ export const en = {
       },
     },
     host: {
+      planApprovalMode: {
+        title: "Mode after plan approval",
+        description: "Mode the agent switches to when you approve its plan",
+        providerDefault: "Provider default",
+        updateFailed: "Unable to update plan approval mode",
+      },
       password: {
         guidance: "Remove this host and add it again with the password this daemon asks for.",
       },
