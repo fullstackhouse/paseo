@@ -6630,6 +6630,47 @@ describe("Codex app-server provider", () => {
     });
   });
 
+  test.each([
+    ["full-access", "full-access"],
+    ["unknown", "auto"],
+  ])(
+    "approving a synthetic Codex plan permission with modeId %s enters %s",
+    async (modeId, expected) => {
+      const session = createSession({
+        modeId: "auto",
+        featureValues: { plan_mode: true },
+      });
+      const events: AgentStreamEvent[] = [];
+      session.subscribe((event) => events.push(event));
+
+      asInternals(session).handleNotification("turn/started", {
+        turn: { id: "turn-plan-mode" },
+      });
+      asInternals(session).handleNotification("turn/plan/updated", {
+        plan: [{ step: "Implement the flow", status: "pending" }],
+      });
+      asInternals(session).handleNotification("turn/completed", {
+        turn: { status: "completed", error: null },
+      });
+
+      const request = events.find(
+        (event): event is Extract<AgentStreamEvent, { type: "permission_requested" }> =>
+          event.type === "permission_requested" && event.request.kind === "plan",
+      );
+      if (!request) {
+        throw new Error("Expected synthetic plan approval permission");
+      }
+
+      await session.respondToPermission(request.request.id, {
+        behavior: "allow",
+        selectedActionId: "implement",
+        modeId,
+      });
+
+      expect(await session.getCurrentMode()).toBe(expected);
+    },
+  );
+
   test("approving a synthetic Codex plan permission keeps fast mode disabled when it started disabled", async () => {
     const session = createSession({
       featureValues: { plan_mode: true, fast_mode: false },

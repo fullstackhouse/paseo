@@ -4614,13 +4614,17 @@ export class CodexAppServerAgentSession implements AgentSession {
 
   async setMode(modeId: string): Promise<void | AgentProviderNotice> {
     validateCodexMode(modeId);
+    this.applyMode(modeId);
+    if (this.activeForegroundTurnId) {
+      return MODE_APPLIES_NEXT_TURN_NOTICE;
+    }
+  }
+
+  private applyMode(modeId: string): void {
     this.currentMode = modeId;
     this.hasWorkflowModeOverride = true;
     this.config.modeId = modeId;
     this.cachedRuntimeInfo = null;
-    if (this.activeForegroundTurnId) {
-      return MODE_APPLIES_NEXT_TURN_NOTICE;
-    }
   }
 
   async setModel(modelId: string | null): Promise<void> {
@@ -4810,6 +4814,9 @@ export class CodexAppServerAgentSession implements AgentSession {
     const { requestId, response, pending, pendingRequest } = params;
     let followUpPrompt: string | undefined;
     if (response.behavior === "allow") {
+      if (response.modeId && response.modeId in MODE_PRESETS) {
+        this.applyMode(response.modeId);
+      }
       followUpPrompt = this.preparePlanImplementation({
         planText: pending.plan?.text ?? pendingRequest?.metadata?.planText,
       });

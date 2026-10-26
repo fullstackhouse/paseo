@@ -488,6 +488,8 @@ export const AgentPermissionResponseSchema: z.ZodType<AgentPermissionResponse> =
       selectedActionId: z.string().optional(),
       updatedInput: z.record(z.string(), z.unknown()).optional(),
       updatedPermissions: z.array(AgentPermissionUpdateSchema).optional(),
+      // COMPAT(planApprovalMode): added in v0.13.0, optional forever as old clients omit it.
+      modeId: z.string().optional(),
     }),
     z.object({
       behavior: z.literal("deny"),
@@ -3654,6 +3656,8 @@ export const ServerInfoStatusPayloadSchema = z
         workspaceSetupRun: z.boolean().optional(),
         // COMPAT(workspaceTerminals): added in v0.8.0, remove gate after 2027-09-05.
         workspaceTerminals: z.boolean().optional(),
+        // COMPAT(planApprovalMode): added in v0.13.0, remove gate after 2027-04-26.
+        planApprovalMode: z.boolean().optional(),
         // COMPAT(checkoutForgeSetAutoMerge): added in v0.2.0-beta.1. Remove the
         // feature gate and checkoutGithubSetAutoMerge fallback after 2027-01-17
         // once the supported daemon floor is >= v0.2.0.

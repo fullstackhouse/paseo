@@ -476,6 +476,7 @@ export type AgentPermissionResponse =
       selectedActionId?: string;
       updatedInput?: AgentMetadata;
       updatedPermissions?: AgentPermissionUpdate[];
+      modeId?: string;
     }
   | {
       behavior: "deny";

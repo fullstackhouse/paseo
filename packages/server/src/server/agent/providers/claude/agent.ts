@@ -2874,7 +2874,11 @@ class ClaudeAgentSession implements AgentSession {
         const shouldResumePriorMode =
           selectedActionId === "implement_resume" &&
           (resumeMode === "bypassPermissions" || resumeMode === "auto");
-        const targetMode: PermissionMode = shouldResumePriorMode ? resumeMode : "acceptEdits";
+        const requestedMode =
+          isPermissionMode(response.modeId) && response.modeId !== "plan"
+            ? response.modeId
+            : "acceptEdits";
+        const targetMode: PermissionMode = shouldResumePriorMode ? resumeMode : requestedMode;
         await this.setMode(targetMode);
         this.pushToolCall(
           mapClaudeCompletedToolCall({
