@@ -960,6 +960,13 @@ export const fr: TranslationResources = {
           title: "Aller au fichier",
         },
         binaryFile: "Fichier binaire",
+        image: {
+          before: "Avant",
+          after: "Après",
+          loading: "Chargement de l'image…",
+          tooLarge: "Image trop volumineuse pour l'aperçu",
+          loadFailed: "Impossible de charger l'image",
+        },
         tooLarge: "Diff trop volumineux pour être affiché",
         previewTooLargeTitle: "Ce diff est trop volumineux pour être prévisualisé",
         previewTooLargeDescription: "Réduisez la comparaison pour le prévisualiser ici",

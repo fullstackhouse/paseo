@@ -20,6 +20,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
 import { InlineReviewThread } from "@/review";
+import { DIFF_IMAGE_PREVIEW_HEIGHT, DiffImagePreview } from "../diff-image-preview";
 import { useKeyboardShift } from "@/keyboard/shift";
 import { inlineUnistylesStyle } from "@/styles/unistyles-inline-style";
 import { DocumentFileHeader } from "./document-file-header";
@@ -67,6 +68,7 @@ import {
 import type {
   DiffDocumentModel,
   DiffFileSection,
+  DiffImagePreviewSource,
   DiffSurfaceProps,
   DiffTypography,
   TextMeasurer,
@@ -108,8 +110,10 @@ export function DiffSurface(props: DiffSurfaceProps) {
     [family, typography.size],
   );
   const reviewActions = props.mode.kind === "working" ? props.mode.reviewActions : undefined;
+  const imagePreviewHeight = props.imagePreview ? DIFF_IMAGE_PREVIEW_HEIGHT : undefined;
   const model = useMemo(() => {
     const dependencies = [
+      imagePreviewHeight,
       props.displayPreferences.layout,
       props.displayPreferences.wrapLines,
       viewport.width,
@@ -137,6 +141,7 @@ export function DiffSurface(props: DiffSurfaceProps) {
         binary: t("workspace.git.diff.binaryFile"),
         tooLarge: t("workspace.git.diff.tooLarge"),
       },
+      imagePreviewHeight,
       materializationWindow: diffMaterializationWindow(fileWindowTop, viewport.height),
       reuseFrom,
     });
@@ -146,6 +151,7 @@ export function DiffSurface(props: DiffSurfaceProps) {
     };
     return next;
   }, [
+    imagePreviewHeight,
     measurement,
     fileWindowTop,
     props.collapsedFilePaths,
@@ -309,6 +315,13 @@ export function DiffSurface(props: DiffSurfaceProps) {
           />
         ))}
         <NativeReviewOverlays model={model} mode={props.mode} />
+        {props.imagePreview ? (
+          <NativeImageOverlays
+            files={interactionFiles}
+            model={model}
+            preview={props.imagePreview}
+          />
+        ) : null}
         <Animated.View pointerEvents="none" style={keyboardSpacerStyle} />
       </AnimatedScrollView>
     </View>
@@ -542,6 +555,42 @@ function NativeReviewOverlays({
         </View>,
       ];
     });
+  });
+}
+
+function NativeImageOverlays({
+  files,
+  model,
+  preview,
+}: {
+  files: readonly DiffFileSection[];
+  model: DiffDocumentModel;
+  preview: DiffImagePreviewSource;
+}) {
+  return files.flatMap((file) => {
+    const row = model.rows[file.rowStart];
+    if (file.isCollapsed || row?.kind !== "status" || !row.image) return [];
+    return [
+      <View
+        key={`${file.path}:image`}
+        style={inlineUnistylesStyle<ViewStyle>({
+          position: "absolute",
+          top: row.top,
+          left: 0,
+          width: model.viewportWidth,
+          height: row.height,
+          // Above the slab layer, below the sticky file header.
+          zIndex: 4,
+        })}
+      >
+        <DiffImagePreview
+          preview={preview}
+          path={file.path}
+          oldPath={file.file.oldPath}
+          revision={file.file.revision}
+        />
+      </View>,
+    ];
   });
 }
 

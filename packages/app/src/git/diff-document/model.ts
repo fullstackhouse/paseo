@@ -1,5 +1,6 @@
 import { lineNumberGutterWidth } from "@/components/code-insets";
 import { findClusterBreak } from "@marijn/find-cluster-break";
+import { getDiffImageMimeType } from "@getpaseo/protocol/diff-image";
 import {
   buildSplitDiffRows,
   buildUnifiedDiffLines,
@@ -218,7 +219,12 @@ function appendNewFileRows(candidate: {
   gutterWidth: number;
 }): FileRowsResult {
   if (candidate.file.status === "binary" || candidate.file.status === "too_large") {
-    const height = candidate.input.typography.lineHeight + 24;
+    const previewHeight =
+      candidate.file.status === "binary" && getDiffImageMimeType(candidate.file.path)
+        ? candidate.input.imagePreviewHeight
+        : undefined;
+    const image = previewHeight !== undefined;
+    const height = previewHeight ?? candidate.input.typography.lineHeight + 24;
     candidate.rows.push({
       kind: "status",
       index: candidate.rows.length,
@@ -230,6 +236,7 @@ function appendNewFileRows(candidate: {
         candidate.file.status === "binary"
           ? candidate.input.labels.binary
           : candidate.input.labels.tooLarge,
+      image,
     });
     return {
       bottom: candidate.bodyTop + height + DIFF_BODY_BORDER_HEIGHT,

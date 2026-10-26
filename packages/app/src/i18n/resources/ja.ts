@@ -947,6 +947,13 @@ export const ja: TranslationResources = {
           title: "ファイルへ移動",
         },
         binaryFile: "バイナリファイル",
+        image: {
+          before: "変更前",
+          after: "変更後",
+          loading: "画像を読み込み中…",
+          tooLarge: "画像が大きすぎてプレビューできません",
+          loadFailed: "画像を読み込めませんでした",
+        },
         tooLarge: "差分が大きすぎて表示できません",
         previewTooLargeTitle: "この差分は大きすぎるためプレビューできません",
         previewTooLargeDescription: "比較範囲を狭めると、ここでプレビューできます",

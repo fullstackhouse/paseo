@@ -33,9 +33,11 @@ import { paintWebFileHeader, paintWebViewport } from "./paint.web";
 import { hasPointerDragStarted } from "./pointer-gesture";
 import { createMeasuredAdvances } from "./text-measurement";
 import { retainDiffViewport } from "./viewport";
+import { DIFF_IMAGE_PREVIEW_HEIGHT, DiffImagePreview } from "../diff-image-preview";
 import type {
   DiffHit,
   DiffFileSection,
+  DiffImagePreviewSource,
   DiffSelection,
   DiffSurfaceProps,
   DiffTypography,
@@ -159,6 +161,7 @@ export function DiffSurface(props: DiffSurfaceProps) {
   const measurement =
     readyTypographyResource === typographyResource ? typographyResource.measureText : null;
   const reviewActions = props.mode.kind === "working" ? props.mode.reviewActions : undefined;
+  const imagePreviewHeight = props.imagePreview ? DIFF_IMAGE_PREVIEW_HEIGHT : undefined;
   const model = useMemo(() => {
     if (!loadedTypography || !measurement) {
       return emptyDiffDocumentModel({
@@ -182,11 +185,13 @@ export function DiffSurface(props: DiffSurfaceProps) {
         binary: t("workspace.git.diff.binaryFile"),
         tooLarge: t("workspace.git.diff.tooLarge"),
       },
+      imagePreviewHeight,
       materializationWindow: diffMaterializationWindow(fileWindowTop, viewport.height),
     });
     return next;
   }, [
     fileWindowTop,
+    imagePreviewHeight,
     measurement,
     props.collapsedFilePaths,
     props.displayPreferences.layout,
@@ -585,7 +590,7 @@ export function DiffSurface(props: DiffSurfaceProps) {
       if (
         target instanceof Element &&
         target.closest(
-          '[data-diff-header="true"], [data-diff-review="true"], [role="menuitem"], button, input, textarea',
+          '[data-diff-header="true"], [data-diff-review="true"], [data-diff-image="true"], [role="menuitem"], button, input, textarea',
         )
       )
         return;
@@ -845,6 +850,9 @@ export function DiffSurface(props: DiffSurfaceProps) {
                 onScroll={handleHorizontalScroll}
               />
             ))}
+          {props.imagePreview ? (
+            <WebImageOverlays files={interactionFiles} model={model} preview={props.imagePreview} />
+          ) : null}
           {props.mode.kind === "working" && reviewActions
             ? model.rows.map((row) => {
                 if (row.kind !== "line" || row.reviewHeight === 0) return null;
@@ -1028,6 +1036,61 @@ function preventDocumentMouseSelection(event: React.MouseEvent): void {
   window.getSelection()?.removeAllRanges();
 }
 
+function WebImageOverlays({
+  files,
+  model,
+  preview,
+}: {
+  files: readonly DiffFileSection[];
+  model: ReturnType<typeof buildDiffDocumentModel>;
+  preview: DiffImagePreviewSource;
+}) {
+  return files.map((file) => {
+    const row = model.rows[file.rowStart];
+    if (file.isCollapsed || row?.kind !== "status" || !row.image) return null;
+    return (
+      <WebImageOverlay
+        key={`${file.path}:image`}
+        path={file.path}
+        top={row.top}
+        width={model.viewportWidth}
+        height={row.height}
+      >
+        <DiffImagePreview
+          preview={preview}
+          path={file.path}
+          oldPath={file.file.oldPath}
+          revision={file.file.revision}
+        />
+      </WebImageOverlay>
+    );
+  });
+}
+
+function WebImageOverlay({
+  path,
+  top,
+  width,
+  height,
+  children,
+}: {
+  path: string;
+  top: number;
+  width: number;
+  height: number;
+  children: React.ReactNode;
+}) {
+  const style = useMemo<React.CSSProperties>(
+    () => ({ ...IMAGE_STYLE, top, width, height }),
+    [height, top, width],
+  );
+  return (
+    <div data-diff-image="true" data-diff-image-path={path} style={style}>
+      {children}
+    </div>
+  );
+}
+
 function WebReviewThread({
   target,
   actions,
@@ -1124,6 +1187,13 @@ const BODY_MARKER_STYLE: React.CSSProperties = {
   left: 0,
   right: 0,
   pointerEvents: "none",
+};
+// Above the canvas (a later sibling at the same level), below the sticky header layers.
+const IMAGE_STYLE: React.CSSProperties = {
+  position: "absolute",
+  left: 0,
+  zIndex: 1,
+  display: "flex",
 };
 const REVIEW_STYLE: React.CSSProperties = { position: "absolute", zIndex: 4, userSelect: "text" };
 const CANVAS_STYLE: React.CSSProperties = {

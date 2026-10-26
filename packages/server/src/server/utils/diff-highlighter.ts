@@ -27,6 +27,8 @@ export interface ParsedDiffFile {
   deletions: number;
   hunks: DiffHunk[];
   status?: "ok" | "too_large" | "binary";
+  /** Identifies both sides' content for a binary image, so a rewrite changes the diff. */
+  revision?: string;
 }
 
 interface HighlightDiffWithFileContentOptions {

@@ -56,6 +56,8 @@ import type {
   CheckoutStatusResponse,
   CheckoutCommit,
   ParsedDiffFile,
+  CheckoutDiffImageSide,
+  CheckoutDiffImageSource,
   CheckoutCommitResponse,
   CheckoutMergeResponse,
   CheckoutMergeFromBaseResponse,
@@ -4633,6 +4635,33 @@ export class DaemonClient {
       throw new Error(payload.error.message);
     }
     return { file: payload.file };
+  }
+
+  async getCheckoutDiffImage(
+    input: {
+      cwd: string;
+      path: string;
+      oldPath?: string;
+      source: CheckoutDiffImageSource;
+    },
+    requestId?: string,
+  ): Promise<{ old: CheckoutDiffImageSide; new: CheckoutDiffImageSide }> {
+    const payload =
+      await this.sendNamespacedCorrelatedSessionRequest<"checkout.diff.image.get.response">({
+        requestId,
+        message: {
+          type: "checkout.diff.image.get.request",
+          cwd: input.cwd,
+          path: input.path,
+          oldPath: input.oldPath,
+          source: input.source,
+        },
+        timeout: 60000,
+      });
+    if (payload.error || !payload.old || !payload.new) {
+      throw new Error(payload.error?.message ?? "Image diff unavailable");
+    }
+    return { old: payload.old, new: payload.new };
   }
 
   async checkoutPrCreate(

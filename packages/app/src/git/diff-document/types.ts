@@ -1,9 +1,18 @@
-import type { ParsedDiffFile } from "@getpaseo/protocol/messages";
+import type { CheckoutDiffImageSource, ParsedDiffFile } from "@getpaseo/protocol/messages";
 import type { InlineReviewActions } from "@/review";
 import type { ReviewableDiffTarget } from "@/utils/diff-layout";
 
+/** Where the diff pane loads both sides of a changed image from. */
+export interface DiffImagePreviewSource {
+  serverId: string;
+  cwd: string;
+  source: CheckoutDiffImageSource;
+}
+
 interface DiffDocumentBaseProps {
   files: ParsedDiffFile[];
+  /** Set when the host can serve image bytes; binary images then render as previews. */
+  imagePreview?: DiffImagePreviewSource;
   /** Scrollable space kept below the last line so a floating control never traps content. */
   contentInsetBottom?: number;
   displayPreferences: {
@@ -135,6 +144,8 @@ export interface DiffStatusRow {
   top: number;
   height: number;
   label: string;
+  /** The row reserves room for a before/after preview instead of painting its label. */
+  image: boolean;
 }
 
 export type DiffRow = DiffLineRow | DiffStatusRow;
@@ -184,6 +195,8 @@ export interface BuildDiffDocumentModelInput {
   palette: DiffPalette;
   reviewActions?: InlineReviewActions;
   labels: { binary: string; tooLarge: string };
+  /** Height of an image preview row; image previews are off when absent. */
+  imagePreviewHeight?: number;
   materializationWindow?: { top: number; height: number };
   /** A geometry-compatible model whose unchanged file measurements may be reused. */
   reuseFrom?: readonly DiffDocumentModel[];

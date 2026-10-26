@@ -1,11 +1,26 @@
 import { MAX_RELAY_WEBSOCKET_MESSAGE_BYTES } from "@getpaseo/protocol/websocket-message-limit";
-import { resolve, dirname, basename } from "path";
-import { existsSync, realpathSync } from "fs";
-import { open as openFile, readFile, stat as statFile, mkdtemp, copyFile, rm } from "fs/promises";
+import { getDiffImageMimeType } from "@getpaseo/protocol/diff-image";
+import { resolve, dirname, basename, relative, isAbsolute, sep } from "path";
+import { constants as fsConstants, existsSync, realpathSync } from "fs";
+import {
+  open as openFile,
+  readFile,
+  stat as statFile,
+  lstat,
+  realpath,
+  mkdtemp,
+  copyFile,
+  rm,
+} from "fs/promises";
 import { tmpdir } from "node:os";
 import { setImmediate } from "node:timers/promises";
 import { TTLCache } from "@isaacs/ttlcache";
-import type { CheckoutCommit, CheckoutCommitFile } from "@getpaseo/protocol/messages";
+import type {
+  CheckoutCommit,
+  CheckoutCommitFile,
+  CheckoutDiffImageSide,
+  CheckoutDiffImageSource,
+} from "@getpaseo/protocol/messages";
 import { parseGitHubRemoteIdentity, parseGitRemoteLocation } from "@getpaseo/protocol/git-remote";
 import { maxSecuredPlaintextByteLength } from "@getpaseo/relay";
 import type { Logger } from "pino";
@@ -31,7 +46,7 @@ import {
   ForgeCommandError,
 } from "../services/forge-cli-command.js";
 import { parseGitRevParsePath, resolveGitRevParsePath } from "./git-rev-parse-path.js";
-import { runGitCommand, type RunGitCommand } from "./run-git-command.js";
+import { runGitCommand, runGitCommandBytes, type RunGitCommand } from "./run-git-command.js";
 import { readGitFileContents } from "./git-file-contents.js";
 import { unquoteGitPath } from "./git-quoted-path.js";
 import { isPaseoOwnedWorktreeCwd, resolvePaseoWorktreesBaseRoot } from "./worktree.js";
@@ -2770,6 +2785,148 @@ export async function getCommitFileDiff({
   return file;
 }
 
+// Both sides travel base64-encoded in one response, so two maximum-size images
+// stay below the relay's encrypted frame limit.
+const DIFF_IMAGE_MAX_BYTES = 8 * 1024 * 1024;
+
+export interface CheckoutDiffImage {
+  old: CheckoutDiffImageSide;
+  new: CheckoutDiffImageSide;
+}
+
+async function readDiffImageAtRef(
+  cwd: string,
+  ref: string,
+  path: string,
+): Promise<CheckoutDiffImageSide> {
+  const mimeType = getDiffImageMimeType(path);
+  if (!mimeType) return { status: "missing" };
+  const spec = `${ref}:${path}`;
+  let size: number;
+  try {
+    const { stdout } = await runGitCommand(["cat-file", "-s", spec], {
+      cwd,
+      envOverlay: READ_ONLY_GIT_ENV,
+    });
+    size = Number.parseInt(stdout.trim(), 10);
+  } catch {
+    return { status: "missing" };
+  }
+  if (!Number.isFinite(size)) return { status: "missing" };
+  if (size > DIFF_IMAGE_MAX_BYTES) return { status: "too_large", size };
+  try {
+    const { stdout, truncated } = await runGitCommandBytes(["cat-file", "blob", spec], {
+      cwd,
+      envOverlay: READ_ONLY_GIT_ENV,
+      maxOutputBytes: DIFF_IMAGE_MAX_BYTES + 1,
+    });
+    // A symbolic ref can move between the size check and the read.
+    if (truncated) return { status: "too_large", size: stdout.byteLength };
+    return { status: "ok", mimeType, content: stdout.toString("base64"), size: stdout.byteLength };
+  } catch {
+    // The entry exists but is not a blob, e.g. a directory or submodule named like an image.
+    return { status: "missing" };
+  }
+}
+
+// O_NONBLOCK keeps a FIFO named like an image from parking a libuv thread; it has no effect
+// on regular files.
+const DIFF_IMAGE_OPEN_FLAGS =
+  process.platform === "win32"
+    ? fsConstants.O_RDONLY
+    : fsConstants.O_RDONLY | fsConstants.O_NOFOLLOW | fsConstants.O_NONBLOCK;
+
+function isOutsideRoot(root: string, candidate: string): boolean {
+  const relativePath = relative(root, candidate);
+  return relativePath === ".." || relativePath.startsWith(`..${sep}`) || isAbsolute(relativePath);
+}
+
+async function readDiffImageFromWorkingTree(
+  worktreeRoot: string,
+  path: string,
+): Promise<CheckoutDiffImageSide> {
+  const mimeType = getDiffImageMimeType(path);
+  const requestedPath = resolve(worktreeRoot, path);
+  if (!mimeType || isOutsideRoot(worktreeRoot, requestedPath)) return { status: "missing" };
+  let handle;
+  try {
+    // A symlink anywhere on the path could lead outside the worktree, and the diff shows a
+    // link as a link, not an image. The canonical path must match the lexical one.
+    const canonicalRoot = await realpath(worktreeRoot);
+    const canonicalPath = await realpath(requestedPath);
+    if (canonicalPath !== resolve(canonicalRoot, relative(worktreeRoot, requestedPath))) {
+      return { status: "missing" };
+    }
+    handle = await openFile(canonicalPath, DIFF_IMAGE_OPEN_FLAGS);
+  } catch {
+    return { status: "missing" };
+  }
+  try {
+    // Size and bytes come from the open handle, so a file grown after the checks above cannot
+    // exceed the cap. O_NOFOLLOW covers only the last component: a parent directory swapped
+    // for a symlink between realpath and open is not caught.
+    const metadata = await handle.stat();
+    if (!metadata.isFile()) return { status: "missing" };
+    if (metadata.size > DIFF_IMAGE_MAX_BYTES) return { status: "too_large", size: metadata.size };
+    // One byte past the stat size detects a file that grew after the stat.
+    const buffer = Buffer.alloc(metadata.size + 1);
+    let length = 0;
+    while (length < buffer.length) {
+      const { bytesRead } = await handle.read(buffer, length, buffer.length - length, length);
+      if (bytesRead === 0) break;
+      length += bytesRead;
+    }
+    if (length > metadata.size) return { status: "too_large", size: length };
+    const content = buffer.subarray(0, length);
+    return { status: "ok", mimeType, content: content.toString("base64"), size: length };
+  } finally {
+    await handle.close();
+  }
+}
+
+/**
+ * Reads both sides of a changed image for the diff pane. Working diffs resolve
+ * the same refs as {@link getCheckoutDiff}; commit diffs compare to the first parent.
+ */
+export async function getCheckoutDiffImage({
+  cwd,
+  path,
+  oldPath,
+  source,
+  context,
+}: {
+  cwd: string;
+  path: string;
+  oldPath?: string;
+  source: CheckoutDiffImageSource;
+  context?: CheckoutContext;
+}): Promise<CheckoutDiffImage> {
+  if (!getDiffImageMimeType(path)) {
+    throw new Error(`Not a supported image: ${path}`);
+  }
+  const worktreeRoot = await requireGitWorktreeRoot(cwd);
+  if (source.kind === "commit") {
+    // Commit file lists carry no rename source, so resolve it the way getCommitFileDiff does.
+    const previousPath = oldPath ?? (await getCommitRenames(worktreeRoot, source.sha)).get(path);
+    const [oldSide, newSide] = await Promise.all([
+      readDiffImageAtRef(worktreeRoot, `${source.sha}^`, previousPath ?? path),
+      readDiffImageAtRef(worktreeRoot, source.sha, path),
+    ]);
+    return { old: oldSide, new: newSide };
+  }
+  const previousPath = oldPath ?? path;
+  const refs = await resolveCheckoutDiffRefs(worktreeRoot, source.compare, context);
+  // No base ref means the diff itself is empty; there is nothing to compare.
+  if (!refs) return { old: { status: "missing" }, new: { status: "missing" } };
+  const [oldSide, newSide] = await Promise.all([
+    readDiffImageAtRef(worktreeRoot, refs.baseRef, previousPath),
+    refs.targetRef
+      ? readDiffImageAtRef(worktreeRoot, refs.targetRef, path)
+      : readDiffImageFromWorkingTree(worktreeRoot, path),
+  ]);
+  return { old: oldSide, new: newSide };
+}
+
 export interface CheckoutShortstat {
   additions: number;
   deletions: number;
@@ -3665,9 +3822,59 @@ async function readCheckoutDiff(
   }
 
   if (compare.includeStructured) {
-    return { diff: diffText, structured: structured.files };
+    return {
+      diff: diffText,
+      structured: await withDiffImageRevisions(cwd, effectiveRefsForDiff, structured.files),
+    };
   }
   return { diff: diffText };
+}
+
+/**
+ * Binary placeholders carry no content, so an image rewritten in place yields an identical
+ * diff. Stamp each image with its refs' commits and, for the working tree, its file stat.
+ */
+async function withDiffImageRevisions(
+  cwd: string,
+  refs: CheckoutDiffRefs,
+  files: ParsedDiffFile[],
+): Promise<ParsedDiffFile[]> {
+  const images = files.filter(
+    (file) => file.status === "binary" && getDiffImageMimeType(file.path) !== null,
+  );
+  if (images.length === 0) return files;
+  const refNames = getCheckoutDiffRefArgs(refs);
+  let refOids: string[];
+  try {
+    const { stdout } = await runGitCommand(["rev-parse", ...refNames], {
+      cwd,
+      envOverlay: READ_ONLY_GIT_ENV,
+    });
+    refOids = stdout.trim().split("\n");
+  } catch {
+    // Without commit ids a stamp could outlive a moved ref; leave the images unstamped.
+    return files;
+  }
+  const revisions = new Map<ParsedDiffFile, string>();
+  await Promise.all(
+    images.map(async (file) => {
+      let stamp = "";
+      if (!refs.targetRef) {
+        try {
+          const metadata = await lstat(resolve(cwd, file.path));
+          // ctime and inode change even when a tool preserves mtime and size.
+          stamp = `${metadata.mtimeMs}:${metadata.ctimeMs}:${metadata.ino}:${metadata.size}`;
+        } catch {
+          stamp = "missing";
+        }
+      }
+      revisions.set(file, [...refOids, stamp].join(" "));
+    }),
+  );
+  return files.map((file) => {
+    const revision = revisions.get(file);
+    return revision === undefined ? file : { ...file, revision };
+  });
 }
 
 export async function commitChanges(

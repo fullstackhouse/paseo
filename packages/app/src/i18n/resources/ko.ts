@@ -941,6 +941,13 @@ export const ko: TranslationResources = {
           title: "파일로 이동",
         },
         binaryFile: "바이너리 파일",
+        image: {
+          before: "변경 전",
+          after: "변경 후",
+          loading: "이미지 불러오는 중…",
+          tooLarge: "이미지가 너무 커서 미리 볼 수 없습니다",
+          loadFailed: "이미지를 불러올 수 없습니다",
+        },
         tooLarge: "표시하기에 diff가 너무 큽니다",
         previewTooLargeTitle: "Diff가 너무 커서 미리 볼 수 없습니다",
         previewTooLargeDescription: "여기에서 미리 보려면 비교 범위를 좁히세요.",

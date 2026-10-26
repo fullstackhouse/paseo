@@ -926,6 +926,13 @@ export const zhCN: TranslationResources = {
           title: "跳转到文件",
         },
         binaryFile: "二进制文件",
+        image: {
+          before: "之前",
+          after: "之后",
+          loading: "正在加载图片…",
+          tooLarge: "图片过大，无法预览",
+          loadFailed: "无法加载图片",
+        },
         tooLarge: "Diff 过大，无法显示",
         previewTooLargeTitle: "此 diff 过大，无法预览",
         previewTooLargeDescription: "缩小比较范围即可在此预览",
