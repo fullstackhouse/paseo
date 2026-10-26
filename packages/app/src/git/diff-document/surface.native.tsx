@@ -579,7 +579,8 @@ function NativeImageOverlays({
           left: 0,
           width: model.viewportWidth,
           height: row.height,
-          zIndex: 6,
+          // Above the slab layer, below the sticky file header.
+          zIndex: 4,
         })}
       >
         <DiffImagePreview

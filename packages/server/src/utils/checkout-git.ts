@@ -2829,10 +2829,12 @@ async function readDiffImageAtRef(
   }
 }
 
+// O_NONBLOCK keeps a FIFO named like an image from parking a libuv thread; it has no effect
+// on regular files.
 const DIFF_IMAGE_OPEN_FLAGS =
   process.platform === "win32"
     ? fsConstants.O_RDONLY
-    : fsConstants.O_RDONLY | fsConstants.O_NOFOLLOW;
+    : fsConstants.O_RDONLY | fsConstants.O_NOFOLLOW | fsConstants.O_NONBLOCK;
 
 function isOutsideRoot(root: string, candidate: string): boolean {
   const relativePath = relative(root, candidate);
@@ -2860,8 +2862,9 @@ async function readDiffImageFromWorkingTree(
     return { status: "missing" };
   }
   try {
-    // Size and bytes come from the open handle, so a file replaced or grown after the
-    // checks above can neither escape them nor exceed the cap.
+    // Size and bytes come from the open handle, so a file grown after the checks above cannot
+    // exceed the cap. O_NOFOLLOW covers only the last component: a parent directory swapped
+    // for a symlink between realpath and open is not caught.
     const metadata = await handle.stat();
     if (!metadata.isFile()) return { status: "missing" };
     if (metadata.size > DIFF_IMAGE_MAX_BYTES) return { status: "too_large", size: metadata.size };
@@ -3859,7 +3862,8 @@ async function withDiffImageRevisions(
       if (!refs.targetRef) {
         try {
           const metadata = await lstat(resolve(cwd, file.path));
-          stamp = `${metadata.mtimeMs}:${metadata.size}`;
+          // ctime and inode change even when a tool preserves mtime and size.
+          stamp = `${metadata.mtimeMs}:${metadata.ctimeMs}:${metadata.ino}:${metadata.size}`;
         } catch {
           stamp = "missing";
         }

@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { copyFile, mkdir } from "node:fs/promises";
+import { copyFile, mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { type Page } from "@playwright/test";
 import { buildHostWorkspaceRoute } from "../../src/utils/host-routes";
@@ -72,4 +72,27 @@ test("changed images render before/after previews that follow rewrites", async (
   );
   await expect(modified.getByText("After · 18.1 KB")).toBeVisible({ timeout: 30_000 });
   await expect(modified.getByRole("img", { name: "After" })).toBeVisible();
+});
+
+test("image previews say when an image is too large or cannot be decoded", async ({ page }) => {
+  const workspace = await createImageWorkspace();
+  await writeFile(
+    path.join(workspace.repoPath, "screens/huge.png"),
+    Buffer.alloc(8 * 1024 * 1024 + 1),
+  );
+  // NUL bytes make git treat it as binary; no platform decodes it as an image.
+  await writeFile(
+    path.join(workspace.repoPath, "screens/broken.png"),
+    Buffer.from([0x00, 0xff, 0x00, 0xfe]),
+  );
+  await page.setViewportSize({ width: 1400, height: 2000 });
+  await page.goto(buildHostWorkspaceRoute(getServerId(), workspace.id));
+  await waitForWorkspaceTabsVisible(page);
+  await openChangesPanel(page, 60_000);
+
+  await expect(
+    preview(page, "screens/huge.png").getByText("Image too large to preview"),
+  ).toBeVisible({ timeout: 30_000 });
+  await expect(preview(page, "screens/huge.png").getByText("After · 8.0 MB")).toBeVisible();
+  await expect(preview(page, "screens/broken.png").getByText("Couldn't load image")).toBeVisible();
 });

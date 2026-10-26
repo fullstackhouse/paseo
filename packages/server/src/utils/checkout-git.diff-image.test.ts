@@ -110,7 +110,7 @@ describe("getCheckoutDiffImage", () => {
     ).toEqual({ old: { status: "missing" }, new: ok(NEW_PNG) });
   });
 
-  it("does not follow a working-tree symlink", async () => {
+  it.skipIf(process.platform === "win32")("does not follow a working-tree symlink", async () => {
     const repoDir = initRepo();
     writeFileSync(join(repoDir, "README.md"), "x\n");
     commitAll(repoDir, "initial");
@@ -123,19 +123,40 @@ describe("getCheckoutDiffImage", () => {
     ).toEqual({ old: { status: "missing" }, new: { status: "missing" } });
   });
 
-  it("does not follow a symlinked parent directory", async () => {
-    const repoDir = initRepo();
-    writeFileSync(join(repoDir, "README.md"), "x\n");
-    commitAll(repoDir, "initial");
-    const outsideDir = join(repoDir, "..", "outside");
-    mkdirSync(outsideDir);
-    writeFileSync(join(outsideDir, "secret.png"), NEW_PNG);
-    symlinkSync(outsideDir, join(repoDir, "assets"));
+  it.skipIf(process.platform === "win32")(
+    "does not follow a symlinked parent directory",
+    async () => {
+      const repoDir = initRepo();
+      writeFileSync(join(repoDir, "README.md"), "x\n");
+      commitAll(repoDir, "initial");
+      const outsideDir = join(repoDir, "..", "outside");
+      mkdirSync(outsideDir);
+      writeFileSync(join(outsideDir, "secret.png"), NEW_PNG);
+      symlinkSync(outsideDir, join(repoDir, "assets"));
 
-    expect(
-      await getCheckoutDiffImage({ cwd: repoDir, path: "assets/secret.png", source: uncommitted }),
-    ).toEqual({ old: { status: "missing" }, new: { status: "missing" } });
-  });
+      expect(
+        await getCheckoutDiffImage({
+          cwd: repoDir,
+          path: "assets/secret.png",
+          source: uncommitted,
+        }),
+      ).toEqual({ old: { status: "missing" }, new: { status: "missing" } });
+    },
+  );
+
+  it.skipIf(process.platform === "win32")(
+    "does not block on a FIFO named like an image",
+    async () => {
+      const repoDir = initRepo();
+      writeFileSync(join(repoDir, "README.md"), "x\n");
+      commitAll(repoDir, "initial");
+      execFileSync("mkfifo", [join(repoDir, "pipe.png")]);
+
+      expect(
+        await getCheckoutDiffImage({ cwd: repoDir, path: "pipe.png", source: uncommitted }),
+      ).toEqual({ old: { status: "missing" }, new: { status: "missing" } });
+    },
+  );
 
   it("treats a directory named like an image as missing", async () => {
     const repoDir = initRepo();

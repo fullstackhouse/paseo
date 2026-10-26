@@ -1188,10 +1188,11 @@ const BODY_MARKER_STYLE: React.CSSProperties = {
   right: 0,
   pointerEvents: "none",
 };
+// Above the canvas (a later sibling at the same level), below the sticky header layers.
 const IMAGE_STYLE: React.CSSProperties = {
   position: "absolute",
   left: 0,
-  zIndex: 3,
+  zIndex: 1,
   display: "flex",
 };
 const REVIEW_STYLE: React.CSSProperties = { position: "absolute", zIndex: 4, userSelect: "text" };

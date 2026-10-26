@@ -7,6 +7,7 @@ import { useFetchQuery } from "@/data/query";
 import { useHostRuntimeClient, useHostRuntimeIsConnected } from "@/runtime/host-runtime";
 import type { Theme } from "@/styles/theme";
 import { inlineUnistylesStyle } from "@/styles/unistyles-inline-style";
+import { formatFileSize } from "@/utils/format-file-size";
 import { checkoutDiffImageQueryKey } from "./query-keys";
 import type { DiffImagePreviewSource } from "./diff-document/types";
 
@@ -52,6 +53,8 @@ export function DiffImagePreview({ preview, path, oldPath, revision }: DiffImage
     // A revision or a commit sha pins the content, so that result never goes stale.
     immutableWhen: () => revision !== undefined || preview.source.kind === "commit",
     gcTime: IMAGE_GC_TIME_MS,
+    // Failures are deterministic (unsupported file, missing ref); show them without the retry wait.
+    retry: false,
   });
 
   if (query.error || (!query.data && !isConnected)) {
@@ -88,7 +91,7 @@ function ImageSide({ label, side }: { label: string; side: PresentImageSide }) {
   return (
     <View style={styles.side}>
       <Text style={styles.label} numberOfLines={1}>
-        {`${label} · ${formatBytes(side.size)}`}
+        {`${label} · ${formatFileSize(side.size)}`}
       </Text>
       <View style={styles.frame}>
         {source ? (
@@ -149,12 +152,6 @@ function Message({ text }: { text: string }) {
       <Text style={styles.message}>{text}</Text>
     </View>
   );
-}
-
-function formatBytes(size: number): string {
-  if (size < 1024) return `${size} B`;
-  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
-  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 const styles = StyleSheet.create((theme: Theme) => ({
