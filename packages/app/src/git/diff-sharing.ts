@@ -53,6 +53,7 @@ function equalFile(left: ParsedDiffFile, right: ParsedDiffFile): boolean {
     left.path !== right.path ||
     left.oldPath !== right.oldPath ||
     left.status !== right.status ||
+    left.revision !== right.revision ||
     left.isNew !== right.isNew ||
     left.isDeleted !== right.isDeleted ||
     left.additions !== right.additions ||
