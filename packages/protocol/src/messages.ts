@@ -172,6 +172,7 @@ const MutableDaemonProviderConfigSchema = z
     paseoTools: ProviderPaseoToolsPolicySchema.optional(),
     enabled: z.boolean().optional(),
     additionalModels: z.array(MutableDaemonProviderModelSchema).optional(),
+    planApprovalModeId: z.string().nullable().optional(),
   })
   .passthrough();
 
@@ -380,6 +381,7 @@ export const ProviderSnapshotEntrySchema = z.object({
   description: z.string().optional(),
   iconSvg: z.string().optional(),
   defaultModeId: z.string().nullable().optional(),
+  supportsPlanApproval: z.boolean().optional(),
 });
 
 export const CompactProviderSnapshotModelSchema = AgentModelDefinitionSchema.omit({
@@ -506,6 +508,7 @@ export const AgentPermissionResponseSchema: z.ZodType<AgentPermissionResponse> =
       selectedActionId: z.string().optional(),
       updatedInput: z.record(z.string(), z.unknown()).optional(),
       updatedPermissions: z.array(AgentPermissionUpdateSchema).optional(),
+      modeId: z.string().optional(),
     }),
     z.object({
       behavior: z.literal("deny"),
