@@ -2247,11 +2247,6 @@ export const zhCN: TranslationResources = {
         description: "内置终端缓冲区保留的行数",
         accessibilityLabel: "终端回滚行数",
       },
-      planApprovalMode: {
-        title: "批准计划后的模式",
-        description: "批准计划后代理切换到的模式",
-        providerDefault: "提供方默认",
-      },
       autoExpandReasoning: {
         label: "始终展开推理过程",
         description: "默认情况下完全展开 AI 的思考和推理过程",
@@ -2504,6 +2499,12 @@ export const zhCN: TranslationResources = {
       },
     },
     host: {
+      planApprovalMode: {
+        title: "批准计划后的模式",
+        description: "批准计划后代理切换到的模式",
+        providerDefault: "提供方默认",
+        updateFailed: "无法更新批准后的模式",
+      },
       password: {
         guidance: "移除此主机，然后使用此守护进程要求的密码重新添加。",
       },

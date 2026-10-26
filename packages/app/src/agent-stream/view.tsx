@@ -1398,7 +1398,6 @@ function PermissionRequestCard({
 
   const { request } = permission;
   const isPlanRequest = request.kind === "plan";
-  const planApprovalModes = useSettings((settings) => settings.planApprovalModes);
   const title = isPlanRequest
     ? t("agentStream.permission.plan")
     : (request.title ?? request.name ?? t("agentStream.permission.required"));
@@ -1499,14 +1498,9 @@ function PermissionRequestCard({
     (action: AgentPermissionAction) => {
       setRespondingActionId(action.id);
       if (action.behavior === "allow") {
-        const modeId =
-          isPlanRequest && action.intent !== "implement_resume"
-            ? planApprovalModes[permission.request.provider]
-            : undefined;
         handleResponse({
           behavior: "allow",
           selectedActionId: action.id,
-          ...(modeId ? { modeId } : {}),
         });
         return;
       }
@@ -1516,7 +1510,7 @@ function PermissionRequestCard({
         message: "Denied by user",
       });
     },
-    [handleResponse, isPlanRequest, permission.request.provider, planApprovalModes],
+    [handleResponse],
   );
 
   const optionsContainerStyle = useMemo(

@@ -63,6 +63,7 @@ export const ProviderOverrideSchema = z.object({
   paseoTools: ProviderPaseoToolsPolicySchema.optional(),
   enabled: z.boolean().optional(),
   order: z.number().optional(),
+  planApprovalModeId: z.string().nullable().optional(),
 });
 
 const BUILTIN_PROVIDER_IDS = ["claude", "codex", "copilot", "opencode", "pi", "omp"] as const;
