@@ -132,3 +132,14 @@ function isCheckoutQueryKey(key: readonly unknown[]): key is CheckoutQueryKey {
     typeof key[2] === "string"
   );
 }
+
+export function checkoutDiffImageQueryKey(
+  serverId: string,
+  cwd: string,
+  source: string,
+  path: string,
+  oldPath: string | undefined,
+  revision: string | undefined,
+) {
+  return ["checkoutDiffImage", serverId, cwd, source, path, oldPath ?? "", revision ?? ""] as const;
+}

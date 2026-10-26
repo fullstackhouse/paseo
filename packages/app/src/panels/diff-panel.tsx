@@ -22,6 +22,8 @@ import type { WorkspaceTabTarget } from "@/workspace-tabs/model";
 import { defaultChangesState, changesStateSchema } from "@/panels/changes/state";
 import { usePanelState } from "@/panels/use-panel-state";
 import { RenderProfile } from "@/utils/render-profiler";
+import { useHostFeature } from "@/runtime/host-features";
+import type { DiffImagePreviewSource } from "@/git/diff-document/types";
 
 const ThemedFileDiff = withUnistyles(FileDiff);
 const ThemedGitCommitHorizontal = withUnistyles(GitCommitHorizontal);
@@ -161,6 +163,14 @@ function CommitDiffPanel() {
     enabled: Boolean(cwd),
   });
   const mode = useMemo(() => ({ kind: "commit" as const }), []);
+  const imagePreviewSupported = useHostFeature(serverId, "checkoutDiffImages");
+  const imagePreview = useMemo<DiffImagePreviewSource | undefined>(
+    () =>
+      imagePreviewSupported && cwd
+        ? { serverId, cwd, source: { kind: "commit", sha: target.sha } }
+        : undefined,
+    [cwd, imagePreviewSupported, serverId, target.sha],
+  );
 
   let body: ReactNode;
   if (!cwd) {
@@ -185,6 +195,7 @@ function CommitDiffPanel() {
       <DiffDocument
         files={files}
         displayPreferences={panelPreferences.displayPreferences}
+        imagePreview={imagePreview}
         mode={mode}
       />
     );
