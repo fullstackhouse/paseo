@@ -53,8 +53,9 @@ export function DiffImagePreview({ preview, path, oldPath, revision }: DiffImage
     // A revision or a commit sha pins the content, so that result never goes stale.
     immutableWhen: () => revision !== undefined || preview.source.kind === "commit",
     gcTime: IMAGE_GC_TIME_MS,
-    // Failures are deterministic (unsupported file, missing ref); show them without the retry wait.
-    retry: false,
+    // One retry covers a dropped connection or a slow relay; server errors are deterministic,
+    // so a longer retry loop would only delay the message.
+    retry: 1,
   });
 
   if (query.error || (!query.data && !isConnected)) {
