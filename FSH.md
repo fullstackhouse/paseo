@@ -19,6 +19,8 @@ Keep this list in sync with what's merged into `fsh`.
 1. Download the DMG from the latest [release](https://github.com/fullstackhouse/paseo/releases/latest).
 2. Drag Paseo to Applications. It replaces upstream Paseo, and your settings and hosts are kept.
 3. The build is unsigned, so run once: `xattr -cr /Applications/Paseo.app`
+4. In the app, **Settings → Integrations** → install the `paseo` CLI. The plugin steps below need it.
+5. Install at least one agent CLI (Claude Code, Codex) and `gh`, both signed in. Paseo runs them; it doesn't ship one.
 
 There's no auto-update: install new builds from Releases. To go back to upstream, install from paseo.sh.
 
@@ -36,7 +38,7 @@ DMG if you use voice input.
 
 ## FSH plugins
 
-These work on upstream Paseo too (0.12+, plugins enabled on the daemon). Install each one on every daemon you use:
+These work on upstream Paseo too (0.12+). First turn on **Settings → Plugins → Enable plugins** on the daemon, then install each plugin on every daemon you use:
 
 ```bash
 git clone git@github.com:fullstackhouse/<plugin>.git
