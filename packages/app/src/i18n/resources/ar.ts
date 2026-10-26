@@ -2308,6 +2308,11 @@ export const ar: TranslationResources = {
         description: "يتم الاحتفاظ بالخطوط في المخزن المؤقت الطرفي المدمج",
         accessibilityLabel: "خطوط التمرير Terminal",
       },
+      planApprovalMode: {
+        title: "الوضع بعد الموافقة على الخطة",
+        description: "الوضع الذي ينتقل إليه الوكيل عند الموافقة على خطته",
+        providerDefault: "افتراضي المزوّد",
+      },
       autoExpandReasoning: {
         label: "عرض التفكير دائماً",
         description: "إظهار تفكير الوكيل وخطوات الاستدلال بشكل كامل بشكل افتراضي",

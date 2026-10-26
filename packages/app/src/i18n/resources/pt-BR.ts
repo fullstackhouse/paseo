@@ -2306,6 +2306,11 @@ export const ptBR: TranslationResources = {
         description: "Linhas mantidas no buffer do terminal integrado",
         accessibilityLabel: "Linhas do scrollback do terminal",
       },
+      planApprovalMode: {
+        title: "Modo após aprovar o plano",
+        description: "Modo para o qual o agente muda quando você aprova o plano",
+        providerDefault: "Padrão do provedor",
+      },
       autoExpandReasoning: {
         label: "Sempre expandir raciocínio",
         description:

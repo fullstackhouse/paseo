@@ -2396,6 +2396,11 @@ export const en = {
         description: "Lines kept in the built-in terminal buffer",
         accessibilityLabel: "Terminal scrollback lines",
       },
+      planApprovalMode: {
+        title: "Mode after plan approval",
+        description: "Mode the agent switches to when you approve its plan",
+        providerDefault: "Provider default",
+      },
       autoExpandReasoning: {
         label: "Always expand reasoning",
         description: "Show agent thinking and chain-of-thought blocks fully expanded by default",

@@ -2323,6 +2323,11 @@ export const es: TranslationResources = {
         description: "Líneas mantenidas en el búfer de terminal incorporado",
         accessibilityLabel: "Líneas del historial de terminal",
       },
+      planApprovalMode: {
+        title: "Modo tras aprobar el plan",
+        description: "Modo al que cambia el agente cuando apruebas su plan",
+        providerDefault: "Predeterminado del proveedor",
+      },
       autoExpandReasoning: {
         label: "Siempre expandir razonamiento",
         description:

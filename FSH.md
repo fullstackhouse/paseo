@@ -11,6 +11,7 @@ temporary by design: every patch is meant to go upstream and then drop out of `f
 - getpaseo/paseo#7645: plugins can add items to sidebar workspace rows
 - getpaseo/paseo#6220: clients and plugins can see an agent's background work
 - FSH-only (not upstream yet): an idle agent's background work (a background shell, a `Monitor` watch) keeps its workspace in Working instead of Done
+- FSH-only (not upstream yet): Settings → Chat → Mode after plan approval, per provider (Claude, Codex), stored on the device
 
 Keep this list in sync with what's merged into `fsh`.
 

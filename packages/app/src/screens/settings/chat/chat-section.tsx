@@ -9,6 +9,7 @@ import {
 } from "@/components/settings";
 import { isNative } from "@/constants/platform";
 import { useAppSettings, type AppSettings } from "@/hooks/use-settings";
+import { PlanApprovalSection } from "@/screens/settings/chat/plan-approval-section";
 
 const TOOL_CALL_DETAIL_LEVELS: readonly AppSettings["toolCallDetailLevel"][] = [
   "detailed",
@@ -69,6 +70,7 @@ export function ChatSection() {
           )}
         </SettingsCard>
       </SettingsSection>
+      <PlanApprovalSection />
     </View>
   );
 }

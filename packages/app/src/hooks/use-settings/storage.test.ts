@@ -71,6 +71,28 @@ describe("loadAppSettingsFromStorage", () => {
     },
   );
 
+  it("persists plan approval modes by provider", async () => {
+    const deps = makeDeps();
+    const queryClient = new QueryClient();
+    const planApprovalModes = { claude: "bypassPermissions", codex: "full-access" };
+    await saveAppSettings({ queryClient, deps, updates: { planApprovalModes } });
+    expect((await loadAppSettingsFromStorage(deps)).planApprovalModes).toEqual(planApprovalModes);
+  });
+
+  it.each([undefined, null, "invalid", { claude: 42 }])(
+    "defaults malformed plan approval modes without discarding other settings: %j",
+    async (planApprovalModes) => {
+      const deps = makeDeps({
+        storage: createInMemoryKeyValueStorage({
+          [APP_SETTINGS_KEY]: JSON.stringify({ planApprovalModes, vimKeybindings: true }),
+        }),
+      });
+      const settings = await loadAppSettingsFromStorage(deps);
+      expect(settings.planApprovalModes).toEqual({});
+      expect(settings.vimKeybindings).toBe(true);
+    },
+  );
+
   it("preserves a persisted steer send behavior", async () => {
     const deps = makeDeps({
       storage: createInMemoryKeyValueStorage({

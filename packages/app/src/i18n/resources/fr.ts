@@ -2322,6 +2322,11 @@ export const fr: TranslationResources = {
         description: "Lignes conservées dans le tampon du terminal intégré",
         accessibilityLabel: "Lignes d’historique du terminal",
       },
+      planApprovalMode: {
+        title: "Mode après approbation du plan",
+        description: "Mode dans lequel l’agent passe quand vous approuvez son plan",
+        providerDefault: "Par défaut du fournisseur",
+      },
       autoExpandReasoning: {
         label: "Toujours afficher le raisonnement",
         description: "Afficher par défaut le raisonnement de l’agent entièrement déplié",

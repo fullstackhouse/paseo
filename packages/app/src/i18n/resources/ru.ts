@@ -2308,6 +2308,11 @@ export const ru: TranslationResources = {
         description: "Количество строк, сохраняемых во встроенном буфере терминала",
         accessibilityLabel: "Количество строк в буфере прокрутки терминала",
       },
+      planApprovalMode: {
+        title: "Режим после одобрения плана",
+        description: "Режим, в который агент переходит после одобрения плана",
+        providerDefault: "По умолчанию у провайдера",
+      },
       autoExpandReasoning: {
         label: "Всегда разворачивать размышления",
         description:
