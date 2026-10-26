@@ -14,6 +14,7 @@ temporary by design: every patch is meant to go upstream and then drop out of `f
 - FSH-only (not upstream yet): host setting for the mode an agent switches to after plan approval, per provider (Claude, Codex), under host Settings → Agents. Applies to approvals from the app, MCP and CLI
 - FSH-only (not upstream yet): changed images in the Changes diff and commit diffs show a before/after preview instead of "Binary file" (PNG, JPEG, GIF, WebP, BMP up to 8 MB per side). getpaseo/paseo#1813 tried this upstream and was closed; discussion getpaseo/paseo#5689 tracks it
 - getpaseo/paseo#7955 (cherry-picked, merged upstream): retry brief Windows file locks during atomic writes. Drop at the next refresh
+- FSH-only (upstreamable): F-Droid builds link the app's own native modules (`packages/app/modules`); before, `paseo-scroll` was never linked and the build failed to compile
 - FSH-only (not upstream yet): the connected-hosts batching test holds the parent's batch with an injected scheduler instead of racing the 2-second quiet window against a cold CLI spawn
 
 Keep this list in sync with what's merged into `fsh`.
@@ -40,6 +41,24 @@ That drops hardened runtime, which is what blocked the load. It also drops the
 entitlements, including `com.apple.security.device.audio-input` — so prefer a newer
 DMG if you use voice input.
 
+## Install the Android app
+
+Our own build of the mobile app, from `fsh`: package `house.fullstack.paseo`, installs next to
+the store app. It is built without Google services, so it has **no push notifications** and no
+QR pairing.
+
+1. Download `paseo-fsh-*-arm64.apk` from the newest `fsh-android-*`
+   [release](https://github.com/fullstackhouse/paseo/releases), or let
+   [Obtainium](https://github.com/ImranR98/Obtainium) track this repo (APK filter `paseo-fsh-.*\.apk`).
+2. Allow installs from that app when Android asks.
+3. Add hosts as a direct connection: e.g. `jaceks-macbook-pro.tailc790a0.ts.net`, port `443`,
+   SSL on, plus the daemon password. Tailscale must be on.
+
+Every build is signed with the FSH key (GCP Secret Manager: `paseo-android-keystore`,
+`paseo-android-keystore-password`; GitHub secrets `PASEO_ANDROID_KEYSTORE_BASE64`,
+`PASEO_ANDROID_KEYSTORE_PASSWORD`). Android only accepts updates signed with the same key, so
+never rotate it casually.
+
 ## FSH plugins
 
 These work on upstream Paseo too (0.12+). First turn on **Settings → Plugins → Enable plugins** on the daemon, then install each plugin on every daemon you use:
@@ -64,8 +83,10 @@ Agents that already existed when a plugin was installed don't get its MCP tools.
 - **FSH-only change**: open a PR against `fsh` on this repo. CI runs on it.
 - **Refresh**: recreate `fsh` from `upstream/main`, re-merge the still-open patches, drop the ones
   upstream merged, and keep the `fsh`-only commits (this file, the pointers at the top of
-  `README.md` / `CLAUDE.md`, `.github/workflows/fsh-desktop.yml`).
-- **Build**: every push to `fsh` (except edits to this file) builds the DMG and publishes a release.
+  `README.md` / `CLAUDE.md`, `.github/workflows/fsh-desktop.yml`, `.github/workflows/fsh-android.yml`,
+  the `fsh` variant in `packages/app/app.config.js` and `plugins/with-fsh-release-signing.js`).
+- **Build**: every push to `fsh` (except edits to this file) builds the DMG and the Android APK
+  and publishes a release for each (`fsh-*`, `fsh-android-*`).
   The build runs upstream's packaged-app smoke test first. You can also start it by hand:
   Actions → FSH desktop build → Run workflow.
 - **Upstream workflows**: they trigger on pushes to `main` and on `v*` tags, and need upstream's
