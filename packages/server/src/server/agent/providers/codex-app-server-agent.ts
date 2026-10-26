@@ -4816,6 +4816,11 @@ export class CodexAppServerAgentSession implements AgentSession {
     if (response.behavior === "allow") {
       if (response.modeId && Object.hasOwn(MODE_PRESETS, response.modeId)) {
         this.applyMode(response.modeId);
+      } else if (response.modeId) {
+        this.logger.warn(
+          { modeId: response.modeId },
+          "Ignoring unknown plan approval mode, keeping the current mode",
+        );
       }
       followUpPrompt = this.preparePlanImplementation({
         planText: pending.plan?.text ?? pendingRequest?.metadata?.planText,
