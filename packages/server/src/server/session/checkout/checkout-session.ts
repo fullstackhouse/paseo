@@ -317,7 +317,11 @@ export class CheckoutSession {
     const { cwd, path, oldPath, source, requestId } = msg;
 
     try {
-      if (source.kind === "commit") assertSafeGitRef(source.sha, "commit");
+      if (source.kind === "commit") {
+        assertSafeGitRef(source.sha, "commit");
+        // git would read a leading dash as an option.
+        if (source.sha.startsWith("-")) throw new Error(`Invalid commit: ${source.sha}`);
+      }
       for (const candidate of oldPath === undefined ? [path] : [path, oldPath]) {
         if (
           candidate.length === 0 ||

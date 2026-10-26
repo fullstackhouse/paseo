@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
-import { Image, Text, View } from "react-native";
+import { Image, Text, View, type ViewStyle } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { useTranslation } from "react-i18next";
 import type { CheckoutDiffImageSide } from "@getpaseo/protocol/messages";
 import { useFetchQuery } from "@/data/query";
 import { useHostRuntimeClient, useHostRuntimeIsConnected } from "@/runtime/host-runtime";
 import type { Theme } from "@/styles/theme";
+import { inlineUnistylesStyle } from "@/styles/unistyles-inline-style";
 import { checkoutDiffImageQueryKey } from "./query-keys";
 import type { DiffImagePreviewSource } from "./diff-document/types";
 
@@ -48,8 +49,8 @@ export function DiffImagePreview({ preview, path, oldPath, revision }: DiffImage
     },
     enabled: Boolean(client) && isConnected,
     dataShape: "value",
-    // The key pins the content (revision or commit sha), so a cached result never goes stale.
-    immutableWhen: () => true,
+    // A revision or a commit sha pins the content, so that result never goes stale.
+    immutableWhen: () => revision !== undefined || preview.source.kind === "commit",
     gcTime: IMAGE_GC_TIME_MS,
   });
 
@@ -131,7 +132,12 @@ function SizedImage({ source, label }: { source: { uri: string }; label: string 
   // Rendering only once measured keeps the image from flashing at the frame's size first.
   if (measured.status === "measuring") return null;
   return (
-    <View style={styles.naturalBox(measured.width, measured.height)}>
+    <View
+      style={[
+        styles.naturalBox,
+        inlineUnistylesStyle<ViewStyle>({ width: measured.width, height: measured.height }),
+      ]}
+    >
       <Image source={source} style={styles.image} resizeMode="contain" accessibilityLabel={label} />
     </View>
   );
@@ -180,12 +186,10 @@ const styles = StyleSheet.create((theme: Theme) => ({
     width: "100%",
     height: "100%",
   },
-  naturalBox: (width: number, height: number) => ({
-    width,
-    height,
+  naturalBox: {
     maxWidth: "100%",
     maxHeight: "100%",
-  }),
+  },
 
   message: {
     fontSize: theme.fontSize.sm,

@@ -1051,6 +1051,7 @@ function WebImageOverlays({
     return (
       <WebImageOverlay
         key={`${file.path}:image`}
+        path={file.path}
         top={row.top}
         width={model.viewportWidth}
         height={row.height}
@@ -1067,11 +1068,13 @@ function WebImageOverlays({
 }
 
 function WebImageOverlay({
+  path,
   top,
   width,
   height,
   children,
 }: {
+  path: string;
   top: number;
   width: number;
   height: number;
@@ -1082,7 +1085,7 @@ function WebImageOverlay({
     [height, top, width],
   );
   return (
-    <div data-diff-image="true" style={style}>
+    <div data-diff-image="true" data-diff-image-path={path} style={style}>
       {children}
     </div>
   );

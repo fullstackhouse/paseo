@@ -2815,11 +2815,13 @@ async function readDiffImageAtRef(
   if (!Number.isFinite(size)) return { status: "missing" };
   if (size > DIFF_IMAGE_MAX_BYTES) return { status: "too_large", size };
   try {
-    const { stdout } = await runGitCommandBytes(["cat-file", "blob", spec], {
+    const { stdout, truncated } = await runGitCommandBytes(["cat-file", "blob", spec], {
       cwd,
       envOverlay: READ_ONLY_GIT_ENV,
       maxOutputBytes: DIFF_IMAGE_MAX_BYTES + 1,
     });
+    // A symbolic ref can move between the size check and the read.
+    if (truncated) return { status: "too_large", size: stdout.byteLength };
     return { status: "ok", mimeType, content: stdout.toString("base64"), size: stdout.byteLength };
   } catch {
     // The entry exists but is not a blob, e.g. a directory or submodule named like an image.
@@ -2863,14 +2865,15 @@ async function readDiffImageFromWorkingTree(
     const metadata = await handle.stat();
     if (!metadata.isFile()) return { status: "missing" };
     if (metadata.size > DIFF_IMAGE_MAX_BYTES) return { status: "too_large", size: metadata.size };
-    const buffer = Buffer.alloc(DIFF_IMAGE_MAX_BYTES + 1);
+    // One byte past the stat size detects a file that grew after the stat.
+    const buffer = Buffer.alloc(metadata.size + 1);
     let length = 0;
     while (length < buffer.length) {
       const { bytesRead } = await handle.read(buffer, length, buffer.length - length, length);
       if (bytesRead === 0) break;
       length += bytesRead;
     }
-    if (length > DIFF_IMAGE_MAX_BYTES) return { status: "too_large", size: length };
+    if (length > metadata.size) return { status: "too_large", size: length };
     const content = buffer.subarray(0, length);
     return { status: "ok", mimeType, content: content.toString("base64"), size: length };
   } finally {
@@ -3838,7 +3841,7 @@ async function withDiffImageRevisions(
   );
   if (images.length === 0) return files;
   const refNames = getCheckoutDiffRefArgs(refs);
-  let refOids = refNames;
+  let refOids: string[];
   try {
     const { stdout } = await runGitCommand(["rev-parse", ...refNames], {
       cwd,
@@ -3846,7 +3849,8 @@ async function withDiffImageRevisions(
     });
     refOids = stdout.trim().split("\n");
   } catch {
-    // Keep the names; the stat part still tracks working-tree rewrites.
+    // Without commit ids a stamp could outlive a moved ref; leave the images unstamped.
+    return files;
   }
   const revisions = new Map<ParsedDiffFile, string>();
   await Promise.all(

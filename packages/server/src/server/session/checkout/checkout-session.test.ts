@@ -554,6 +554,7 @@ describe("CheckoutSession", () => {
       { path: "shot.png", oldPath: "../old.png" },
       { path: "shot.png", oldPath: "/etc/old.png" },
       { path: "shot.png", sha: "HEAD@{1}" },
+      { path: "shot.png", sha: "-h" },
     ])("rejects $path $oldPath $sha before reading anything", async ({ path, oldPath, sha }) => {
       const { checkout, emitted } = makeCheckoutSession();
 
