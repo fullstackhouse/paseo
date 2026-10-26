@@ -495,6 +495,8 @@ export interface PaseoDaemonDependencies {
   hubRelationshipClock?: HubRelationshipClock;
   hubRelationshipRetryPolicy?: HubRelationshipRetryPolicy;
   createHubDaemonId?: () => string;
+  /** Replaces the agent message batching timer; tests use it to release a batch on demand. */
+  agentMessageSchedule?: (delayMs: number, callback: () => void) => () => void;
   serverFeatureOverrides?: {
     daemonStatusRpc?: boolean;
     relayConfig?: boolean;
@@ -1765,6 +1767,7 @@ export async function createPaseoDaemon(
                 daemonStatusRpc: dependencies.serverFeatureOverrides?.daemonStatusRpc,
                 relayConfig: dependencies.serverFeatureOverrides?.relayConfig,
                 startPaused: true,
+                agentMessageSchedule: dependencies.agentMessageSchedule,
               },
               workspaceAutoName,
               workspaceRuntimeStore,

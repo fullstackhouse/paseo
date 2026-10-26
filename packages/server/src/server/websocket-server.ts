@@ -178,6 +178,7 @@ interface WebSocketServerConfig {
   daemonStatusRpc?: boolean;
   relayConfig?: boolean;
   startPaused?: boolean;
+  agentMessageSchedule?: (delayMs: number, callback: () => void) => () => void;
 }
 
 type WebSocketRuntimeMetrics = SessionRuntimeMetrics & CheckoutDiffMetrics;
@@ -708,6 +709,7 @@ export class VoiceAssistantWebSocketServer {
     this.agentManager = agentManager;
     this.agentStorage = agentStorage;
     this.agentMessages = createAgentMessageDelivery({
+      schedule: wsConfig.agentMessageSchedule,
       dispatch: async (batch) => {
         const { disposition } = await sendPreparedPromptToAgent({
           agentManager,
