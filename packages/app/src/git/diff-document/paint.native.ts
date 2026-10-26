@@ -399,7 +399,7 @@ function paintNativeRange(input: PaintNativeRangeInput): void {
     if (!row) continue;
     const y = row.top - input.scrollTop;
     if (row.kind === "status") {
-      if (paintsFixedContent) {
+      if (paintsFixedContent && !row.image) {
         input.canvas.drawText(
           row.label,
           12,

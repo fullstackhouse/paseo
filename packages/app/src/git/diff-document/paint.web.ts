@@ -74,8 +74,10 @@ export function paintWebViewport(input: PaintWebViewportInput): void {
     if (!row) continue;
     const y = row.top - input.scrollTop;
     if (row.kind === "status") {
-      context.fillStyle = input.palette.foregroundMuted;
-      context.fillText(row.label, 12, y + input.model.lineHeight + 6);
+      if (!row.image) {
+        context.fillStyle = input.palette.foregroundMuted;
+        context.fillText(row.label, 12, y + input.model.lineHeight + 6);
+      }
       continue;
     }
     paintLine({

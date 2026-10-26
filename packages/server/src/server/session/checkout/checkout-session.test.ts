@@ -545,6 +545,82 @@ describe("CheckoutSession", () => {
     });
   });
 
+  describe("diff images", () => {
+    it.each([
+      { path: "../outside.png" },
+      { path: "/etc/outside.png" },
+      { path: "a\\..\\b.png" },
+      { path: "" },
+      { path: "shot.png", oldPath: "../old.png" },
+      { path: "shot.png", oldPath: "/etc/old.png" },
+      { path: "shot.png", sha: "HEAD@{1}" },
+      { path: "shot.png", sha: "-h" },
+    ])("rejects $path $oldPath $sha before reading anything", async ({ path, oldPath, sha }) => {
+      const { checkout, emitted } = makeCheckoutSession();
+
+      await checkout.handleDiffImageRequest({
+        type: "checkout.diff.image.get.request",
+        cwd: "/tmp/not-read",
+        path,
+        oldPath,
+        source: sha
+          ? { kind: "commit", sha }
+          : { kind: "working", compare: { mode: "uncommitted" } },
+        requestId: "image-1",
+      });
+
+      expect(emitted).toEqual([
+        {
+          type: "checkout.diff.image.get.response",
+          payload: expect.objectContaining({
+            old: null,
+            new: null,
+            error: expect.objectContaining({ message: expect.stringMatching(/^Invalid /) }),
+            requestId: "image-1",
+          }),
+        },
+      ]);
+    });
+
+    it("returns both sides of a changed image", async () => {
+      const cwd = realpathSync(mkdtempSync(join(tmpdir(), "checkout-session-image-")));
+      try {
+        execFileSync("git", ["init", "-q"], { cwd });
+        execFileSync("git", ["config", "user.email", "test@example.com"], { cwd });
+        execFileSync("git", ["config", "user.name", "Test User"], { cwd });
+        writeFileSync(join(cwd, "shot.png"), Buffer.from([1, 2, 3]));
+        execFileSync("git", ["add", "shot.png"], { cwd });
+        execFileSync("git", ["commit", "-qm", "initial"], { cwd });
+        writeFileSync(join(cwd, "shot.png"), Buffer.from([4, 5]));
+        const { checkout, emitted } = makeCheckoutSession();
+
+        await checkout.handleDiffImageRequest({
+          type: "checkout.diff.image.get.request",
+          cwd,
+          path: "shot.png",
+          source: { kind: "working", compare: { mode: "uncommitted" } },
+          requestId: "image-2",
+        });
+
+        expect(emitted).toEqual([
+          {
+            type: "checkout.diff.image.get.response",
+            payload: {
+              cwd,
+              path: "shot.png",
+              old: { status: "ok", mimeType: "image/png", content: "AQID", size: 3 },
+              new: { status: "ok", mimeType: "image/png", content: "BAU=", size: 2 },
+              error: null,
+              requestId: "image-2",
+            },
+          },
+        ]);
+      } finally {
+        rmSync(cwd, { recursive: true, force: true });
+      }
+    });
+  });
+
   describe("diff subscriptions", () => {
     it("opens a subscription, streams updates tagged with the id, and tears down on unsubscribe", async () => {
       const { subscriber, subscriptions } = createFakeDiffSubscriber({
