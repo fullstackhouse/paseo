@@ -56,6 +56,7 @@ QR pairing.
    source URL `https://github.com/fullstackhouse/paseo`, **Filter release titles by regular
    expression** `^Paseo Android \d`, **Filter APKs by regular expression** `paseo-fsh-.*-arm64\.apk`.
    The title filter matters: most releases here are desktop DMGs with no APK.
+
 2. Allow installs from that app when Android asks.
 3. Add hosts as a direct connection: e.g. `jaceks-macbook-pro.tailc790a0.ts.net`, port `443`,
    SSL on, plus the daemon password. Tailscale must be on.
