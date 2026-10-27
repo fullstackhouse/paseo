@@ -943,6 +943,12 @@ export const ru: TranslationResources = {
           unpushedCommits: "Неотправленных коммитов: {{count}}",
         },
       },
+      sync: {
+        uncommitted: "Незакоммиченные изменения",
+        unpushed: "Неотправленные коммиты: {{number}}",
+        behind: "Отстаёт от {{upstream}}: {{number}}",
+        remote: "удалённого репозитория",
+      },
       diff: {
         openChangesTab: "Открыть вкладку «Изменения»",
         openDiffTab: "Открыть вкладку «Дифф»",

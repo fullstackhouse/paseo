@@ -934,6 +934,12 @@ export const en = {
           unpushedCommits: "{{count}} unpushed commits",
         },
       },
+      sync: {
+        uncommitted: "Uncommitted changes",
+        unpushed: "Unpushed commits: {{number}}",
+        behind: "Behind {{upstream}}: {{number}}",
+        remote: "remote",
+      },
       diff: {
         openChangesTab: "Open Changes tab",
         openDiffTab: "Open Diff tab",

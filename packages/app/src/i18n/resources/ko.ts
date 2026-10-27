@@ -933,6 +933,12 @@ export const ko: TranslationResources = {
           unpushedCommits: "푸시되지 않은 커밋 {{count}}개",
         },
       },
+      sync: {
+        uncommitted: "커밋되지 않은 변경 사항",
+        unpushed: "푸시되지 않은 커밋: {{number}}",
+        behind: "{{upstream}}보다 뒤처짐: {{number}}",
+        remote: "원격",
+      },
       diff: {
         openChangesTab: "변경사항 탭 열기",
         openDiffTab: "Diff 탭 열기",

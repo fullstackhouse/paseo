@@ -949,6 +949,12 @@ export const ptBR: TranslationResources = {
           unpushedCommits: "{{count}} commits não enviados",
         },
       },
+      sync: {
+        uncommitted: "Alterações não commitadas",
+        unpushed: "Commits não enviados: {{number}}",
+        behind: "Atrás de {{upstream}}: {{number}}",
+        remote: "remoto",
+      },
       diff: {
         openChangesTab: "Abrir a aba Alterações",
         openDiffTab: "Abrir a aba Diff",

@@ -959,6 +959,12 @@ export const es: TranslationResources = {
           unpushedCommits: "Confirmaciones no enviadas de{{count}}",
         },
       },
+      sync: {
+        uncommitted: "Cambios sin confirmar",
+        unpushed: "Commits sin enviar: {{number}}",
+        behind: "Por detrás de {{upstream}}: {{number}}",
+        remote: "remoto",
+      },
       diff: {
         openChangesTab: "Abrir la pestaña Cambios",
         openDiffTab: "Abrir la pestaña Diferencia",

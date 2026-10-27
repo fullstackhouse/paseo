@@ -190,6 +190,36 @@ describe("git-actions-policy", () => {
     expect(actions.primary).toMatchObject({ id: "pull", label: "Pull" });
   });
 
+  it("prioritizes pull and push when the branch is ahead of and behind origin", () => {
+    const actions = buildGitActions(
+      createInput({
+        hasRemote: true,
+        aheadOfOrigin: 1,
+        behindOfOrigin: 327,
+      }),
+    );
+
+    expect(actions.primary).toMatchObject({ id: "pull-and-push", label: "Pull and push" });
+    expect(actionsWithoutPrimary(actions).map((action) => action.id)).toEqual([
+      "pull",
+      "push",
+      "archive-workspace",
+    ]);
+  });
+
+  it("keeps commit ahead of pull and push when a diverged branch has uncommitted changes", () => {
+    const actions = buildGitActions(
+      createInput({
+        hasRemote: true,
+        hasUncommittedChanges: true,
+        aheadOfOrigin: 1,
+        behindOfOrigin: 327,
+      }),
+    );
+
+    expect(actions.primary?.id).toBe("commit");
+  });
+
   it("drops a promoted remote action from the remaining menu actions", () => {
     const pull = buildGitActions(createInput({ hasRemote: true, behindOfOrigin: 2 }));
     expect(pull.primary?.id).toBe("pull");

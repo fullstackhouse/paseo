@@ -918,6 +918,12 @@ export const zhCN: TranslationResources = {
           unpushedCommits: "{{count}} 个未 push 的 commit",
         },
       },
+      sync: {
+        uncommitted: "未提交的更改",
+        unpushed: "未推送的提交：{{number}}",
+        behind: "落后于 {{upstream}}：{{number}}",
+        remote: "远程",
+      },
       diff: {
         openChangesTab: "打开“更改”标签页",
         openDiffTab: "打开 Diff 标签页",

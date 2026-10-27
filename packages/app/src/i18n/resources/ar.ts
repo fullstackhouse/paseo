@@ -926,6 +926,12 @@ export const ar: TranslationResources = {
           unpushedCommits: "التزامات{{count}}غير المدفوعة",
         },
       },
+      sync: {
+        uncommitted: "تغييرات غير مُودَعة",
+        unpushed: "إيداعات غير مدفوعة: {{number}}",
+        behind: "متأخر عن {{upstream}}: {{number}}",
+        remote: "المستودع البعيد",
+      },
       diff: {
         openChangesTab: "فتح علامة تبويب التغييرات",
         openDiffTab: "فتح علامة تبويب الفرق",

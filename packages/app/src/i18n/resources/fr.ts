@@ -952,6 +952,12 @@ export const fr: TranslationResources = {
           unpushedCommits: "{{count}} commits non poussés",
         },
       },
+      sync: {
+        uncommitted: "Modifications non validées",
+        unpushed: "Commits non poussés : {{number}}",
+        behind: "En retard sur {{upstream}} : {{number}}",
+        remote: "distant",
+      },
       diff: {
         openChangesTab: "Ouvrir l’onglet Modifications",
         openDiffTab: "Ouvrir l’onglet Diff",
