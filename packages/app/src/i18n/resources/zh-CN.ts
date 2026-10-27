@@ -1220,6 +1220,7 @@ export const zhCN: TranslationResources = {
       createConfirm: "创建分类",
       rename: "重命名分类",
       renameConfirm: "保存",
+      nameTaken: "名称已被使用。",
       delete: "删除分类",
       deleteTitle: "删除分类？",
       deleteMessage: "“{{name}}”中的项目将变为未分类。",

@@ -1236,6 +1236,7 @@ export const en = {
       createConfirm: "Create category",
       rename: "Rename category",
       renameConfirm: "Save",
+      nameTaken: "Name already in use.",
       delete: "Delete category",
       deleteTitle: "Delete category?",
       deleteMessage: 'Projects in "{{name}}" become uncategorized.',

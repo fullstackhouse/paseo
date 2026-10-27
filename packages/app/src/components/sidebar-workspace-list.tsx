@@ -154,6 +154,11 @@ import { useHostBadges } from "@/hosts/use-host-badges";
 import { useSidebarRowItems } from "@/components/sidebar/display-preferences/model";
 import { PullRequestStateIcon } from "@/git/pull-request-state-icon";
 import { ProjectCategorySubTrigger, useProjectCategoryMenuPages } from "@/projects/categories/menu";
+import {
+  ALL_PROJECT_CATEGORIES,
+  resolveProjectCategorySelection,
+} from "@/projects/categories/model";
+import { useProjectCategoriesStore } from "@/projects/categories/store";
 
 const workspaceKeyExtractor = (workspace: SidebarWorkspacePlacement) => workspace.workspaceKey;
 
@@ -2112,6 +2117,9 @@ function ProjectModeList({
 }) {
   const { t } = useTranslation();
   const hasActiveHostFilter = useSidebarViewStore((state) => state.hostFilters.length > 0);
+  const hasActiveProjectCategory = useProjectCategoriesStore(
+    (state) => resolveProjectCategorySelection(state) !== ALL_PROJECT_CATEGORIES,
+  );
   const [creatingWorkspaceIds, setCreatingWorkspaceIds] = useState<Set<string>>(() => new Set());
   const creatingWorkspaceTimeoutsRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(
     new Map(),
@@ -2415,10 +2423,12 @@ function ProjectModeList({
         sidebar is genuinely empty, where a section heading would sit over nothing.
         Every filter that can empty this branch needs a term here: a project filter pinned to a
         project whose chats are all pinned leaves `unpinnedProjects` empty, and without its term
-        the header would go with it, taking the only route back to the filter page. */}
+        the header would go with it, taking the only route back to the filter page. The header
+        also holds the project category switcher, the only way back out of a category. */}
       {unpinnedProjects.length > 0 ||
       hasActiveHostFilter ||
       hasActiveProjectFilter ||
+      hasActiveProjectCategory ||
       sidebarFilterEmpty
         ? listHeaderComponent
         : null}

@@ -1235,6 +1235,7 @@ export const ko: TranslationResources = {
       createConfirm: "카테고리 만들기",
       rename: "카테고리 이름 바꾸기",
       renameConfirm: "저장",
+      nameTaken: "이미 사용 중인 이름입니다.",
       delete: "카테고리 삭제",
       deleteTitle: "카테고리를 삭제할까요?",
       deleteMessage: '"{{name}}"의 프로젝트는 미분류가 됩니다.',

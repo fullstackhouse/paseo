@@ -1241,6 +1241,7 @@ export const ja: TranslationResources = {
       createConfirm: "カテゴリを作成",
       rename: "カテゴリ名を変更",
       renameConfirm: "保存",
+      nameTaken: "この名前は使用中です。",
       delete: "カテゴリを削除",
       deleteTitle: "カテゴリを削除しますか？",
       deleteMessage: "「{{name}}」のプロジェクトは未分類になります。",

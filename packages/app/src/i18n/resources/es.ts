@@ -1264,6 +1264,7 @@ export const es: TranslationResources = {
       createConfirm: "Crear categoría",
       rename: "Renombrar categoría",
       renameConfirm: "Guardar",
+      nameTaken: "Ese nombre ya existe.",
       delete: "Eliminar categoría",
       deleteTitle: "¿Eliminar categoría?",
       deleteMessage: 'Los proyectos de "{{name}}" quedarán sin categoría.',

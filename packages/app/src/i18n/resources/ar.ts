@@ -1228,6 +1228,7 @@ export const ar: TranslationResources = {
       createConfirm: "إنشاء فئة",
       rename: "إعادة تسمية الفئة",
       renameConfirm: "حفظ",
+      nameTaken: "الاسم مستخدم بالفعل.",
       delete: "حذف الفئة",
       deleteTitle: "حذف الفئة؟",
       deleteMessage: 'ستصبح المشاريع في "{{name}}" بدون فئة.',

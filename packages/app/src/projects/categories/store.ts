@@ -17,7 +17,8 @@ import {
 interface ProjectCategoriesStore extends ProjectCategoriesState {
   /** Returns the new category's id, or the existing one's when the name is taken. */
   createCategory: (name: string) => string | null;
-  renameCategory: (id: string, name: string) => void;
+  /** False when the name is blank or another category has it, and nothing changed. */
+  renameCategory: (id: string, name: string) => boolean;
   deleteCategory: (id: string) => void;
   assignProject: (viewKey: string, categoryId: string | null) => void;
   select: (selection: ProjectCategorySelection) => void;
@@ -53,8 +54,13 @@ export const useProjectCategoriesStore = create<ProjectCategoriesStore>()(
         set(result.state);
         return result.categoryId;
       },
-      renameCategory: (id, name) =>
-        set((state) => renameProjectCategory(pickState(state), { id, name })),
+      renameCategory: (id, name) => {
+        const before = pickState(get());
+        const after = renameProjectCategory(before, { id, name });
+        if (after === before) return false;
+        set(after);
+        return true;
+      },
       deleteCategory: (id) => set((state) => deleteProjectCategory(pickState(state), id)),
       assignProject: (viewKey, categoryId) =>
         set((state) => assignProjectCategory(pickState(state), { viewKey, categoryId })),

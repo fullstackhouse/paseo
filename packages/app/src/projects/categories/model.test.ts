@@ -7,6 +7,7 @@ import {
   assignProjectCategory,
   createProjectCategoryMatcher,
   deleteProjectCategory,
+  isProjectCategoryNameTaken,
   projectCategoryOf,
   renameProjectCategory,
   resolveProjectCategorySelection,
@@ -54,6 +55,18 @@ describe("renameProjectCategory", () => {
   it("refuses a name another category already has", () => {
     const before = withCategories();
     expect(renameProjectCategory(before, { id: "cat_work", name: "personal" })).toBe(before);
+  });
+});
+
+describe("isProjectCategoryNameTaken", () => {
+  it("matches another category's name ignoring case and spacing", () => {
+    expect(isProjectCategoryNameTaken(withCategories().categories, " personal ", "cat_work")).toBe(
+      true,
+    );
+  });
+
+  it("does not count the category being renamed", () => {
+    expect(isProjectCategoryNameTaken(withCategories().categories, "WORK", "cat_work")).toBe(false);
   });
 });
 

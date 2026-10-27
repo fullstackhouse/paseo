@@ -1254,6 +1254,7 @@ export const ptBR: TranslationResources = {
       createConfirm: "Criar categoria",
       rename: "Renomear categoria",
       renameConfirm: "Salvar",
+      nameTaken: "Esse nome já existe.",
       delete: "Excluir categoria",
       deleteTitle: "Excluir categoria?",
       deleteMessage: 'Os projetos em "{{name}}" ficarão sem categoria.',

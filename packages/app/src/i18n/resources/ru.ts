@@ -1245,6 +1245,7 @@ export const ru: TranslationResources = {
       createConfirm: "Создать категорию",
       rename: "Переименовать категорию",
       renameConfirm: "Сохранить",
+      nameTaken: "Это имя уже занято.",
       delete: "Удалить категорию",
       deleteTitle: "Удалить категорию?",
       deleteMessage: "Проекты из «{{name}}» останутся без категории.",

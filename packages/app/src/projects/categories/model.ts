@@ -70,15 +70,23 @@ export function addProjectCategory(
   };
 }
 
+/** Whether a category other than `exceptId` already has this name, ignoring case. */
+export function isProjectCategoryNameTaken(
+  categories: readonly ProjectCategory[],
+  name: string,
+  exceptId: string,
+): boolean {
+  const clash = findCategoryByName(categories, normalizeProjectCategoryName(name));
+  return clash !== undefined && clash.id !== exceptId;
+}
+
 /** Renaming onto another category's name is refused rather than merging the two. */
 export function renameProjectCategory(
   state: ProjectCategoriesState,
   input: { id: string; name: string },
 ): ProjectCategoriesState {
   const name = normalizeProjectCategoryName(input.name);
-  if (!name) return state;
-  const clash = findCategoryByName(state.categories, name);
-  if (clash && clash.id !== input.id) return state;
+  if (!name || isProjectCategoryNameTaken(state.categories, name, input.id)) return state;
   return {
     ...state,
     categories: state.categories.map((category) =>

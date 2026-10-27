@@ -4,6 +4,7 @@ import { Text, type PressableStateCallbackType } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { ChevronDown, Folders, Plus } from "lucide-react-native";
 import {
+  MenuHint,
   MenuItem,
   MenuRoot,
   MenuSeparator,
@@ -20,6 +21,7 @@ import { confirmDialog } from "@/utils/confirm-dialog";
 import {
   ALL_PROJECT_CATEGORIES,
   UNCATEGORIZED_PROJECTS,
+  isProjectCategoryNameTaken,
   normalizeProjectCategoryName,
   projectCategoryOf,
   resolveProjectCategorySelection,
@@ -326,19 +328,29 @@ function SwitcherCreatePage(): ReactElement {
 function SwitcherRenamePage({ category }: { category: ProjectCategory }): ReactElement {
   const { t } = useTranslation();
   const menu = useMenuContext("SwitcherRenamePage");
+  const categories = useProjectCategoriesStore((state) => state.categories);
   const renameCategory = useProjectCategoriesStore((state) => state.renameCategory);
   const submit = useCallback(
     (name: string) => {
-      renameCategory(category.id, name);
-      menu.goBack();
+      if (renameCategory(category.id, name)) menu.goBack();
     },
     [category.id, menu, renameCategory],
+  );
+  // Creating with a taken name reuses that category, which is what you meant. Renaming onto one
+  // would have to merge two categories, so it is refused here, before Save, rather than after.
+  const nameError = useCallback(
+    (name: string) =>
+      isProjectCategoryNameTaken(categories, name, category.id)
+        ? t("sidebar.categories.nameTaken")
+        : null,
+    [categories, category.id, t],
   );
   return (
     <CategoryNameForm
       initialValue={category.name}
       confirmLabel={t("sidebar.categories.renameConfirm")}
       onSubmit={submit}
+      nameError={nameError}
       testIDPrefix="sidebar-project-category-rename"
     />
   );
@@ -348,19 +360,24 @@ function CategoryNameForm({
   initialValue = "",
   confirmLabel,
   onSubmit,
+  nameError,
   testIDPrefix,
 }: {
   initialValue?: string;
   confirmLabel: string;
   onSubmit: (name: string) => void;
+  /** Why the typed name can't be used, or `null` when it can. */
+  nameError?: (name: string) => string | null;
   testIDPrefix: string;
 }): ReactElement {
   const { t } = useTranslation();
   const [name, setName] = useState(initialValue);
   const normalized = normalizeProjectCategoryName(name);
+  const error = normalized && nameError ? nameError(normalized) : null;
+  const canSubmit = normalized.length > 0 && error === null;
   const submit = useCallback(() => {
-    if (normalized) onSubmit(normalized);
-  }, [normalized, onSubmit]);
+    if (canSubmit) onSubmit(normalized);
+  }, [canSubmit, normalized, onSubmit]);
   return (
     <>
       <MenuTextField
@@ -373,13 +390,14 @@ function CategoryNameForm({
       />
       <MenuSeparator />
       <MenuItem
-        disabled={!normalized}
+        disabled={!canSubmit}
         closeOnSelect={false}
         onSelect={submit}
         testID={`${testIDPrefix}-submit`}
       >
         {confirmLabel}
       </MenuItem>
+      {error ? <MenuHint testID={`${testIDPrefix}-error`}>{error}</MenuHint> : null}
     </>
   );
 }
