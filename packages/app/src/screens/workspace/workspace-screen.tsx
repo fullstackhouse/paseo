@@ -184,6 +184,8 @@ import { SheetPaneHostProvider, type SheetPaneHost } from "@/screens/workspace/s
 import { SheetTabs } from "@/screens/workspace/sheet-tabs";
 import type { PaneHost } from "@/panels/panel-manifest";
 import { WorkspaceFocusProvider } from "@/workspace/focus";
+import { useWorkspaceArchive } from "@/workspace/use-workspace-archive";
+import { redirectIfArchivingActiveWorkspace } from "@/utils/sidebar-workspace-archive-redirect";
 import { DiffDocumentWorkspaceCacheProvider } from "@/git/diff-document/workspace-cache";
 import type { NewTabSelection } from "@/workspace-tabs/new-tab";
 import {
@@ -469,6 +471,43 @@ function useCloseTabs(): UseCloseTabsResult {
   return { closingTabIds, closeTab };
 }
 
+/** Archive for the header ⋯ menu — the same flow, risk warning and redirect as the sidebar row. */
+function useWorkspaceHeaderArchive(input: {
+  serverId: string;
+  workspace: WorkspaceDescriptor | null | undefined;
+}) {
+  const { serverId, workspace } = input;
+  const [isHiding, setIsHiding] = useState(false);
+  const workspaceId = workspace?.id ?? "";
+  const redirectAfterArchive = useCallback(() => {
+    redirectIfArchivingActiveWorkspace({
+      serverId,
+      workspaceId,
+      activeWorkspaceSelection: { serverId, workspaceId },
+    });
+  }, [serverId, workspaceId]);
+  const controller = useWorkspaceArchive({
+    serverId,
+    workspaceId,
+    workspaceKind: workspace?.workspaceKind ?? "directory",
+    name: workspace?.name ?? "",
+    isDirty: workspace?.gitRuntime?.isDirty ?? null,
+    aheadOfOrigin: workspace?.gitRuntime?.aheadOfOrigin ?? null,
+    diffStat: workspace?.diffStat ?? null,
+    onArchiveStarted: redirectAfterArchive,
+    onSetHiding: setIsHiding,
+  });
+  const isArchiving = workspace?.archivingAt != null || isHiding;
+  const { archive } = controller;
+  const handleArchive = useCallback(() => {
+    if (!workspace || isArchiving) {
+      return;
+    }
+    archive();
+  }, [archive, isArchiving, workspace]);
+  return { isArchiving, archiveDisabled: !workspace, handleArchive };
+}
+
 interface WorkspaceHeaderTitleBarProps {
   isLoading: boolean;
   title: string;
@@ -479,10 +518,13 @@ interface WorkspaceHeaderTitleBarProps {
   showWorkspaceSetup: boolean;
   importAgentDisabled: boolean;
   copyPathDisabled: boolean;
+  archiveDisabled: boolean;
+  isArchiving: boolean;
   onOpenImportSheet: () => void;
   onCopyWorkspacePath: () => void;
   onCopyBranchName: () => void;
   onOpenSetupTab: () => void;
+  onArchiveWorkspace: () => void;
 }
 
 function WorkspaceHeaderTitleBar({
@@ -495,10 +537,13 @@ function WorkspaceHeaderTitleBar({
   showWorkspaceSetup,
   importAgentDisabled,
   copyPathDisabled,
+  archiveDisabled,
+  isArchiving,
   onOpenImportSheet,
   onCopyWorkspacePath,
   onCopyBranchName,
   onOpenSetupTab,
+  onArchiveWorkspace,
 }: WorkspaceHeaderTitleBarProps) {
   return (
     <View style={styles.headerTitleContainer}>
@@ -522,10 +567,13 @@ function WorkspaceHeaderTitleBar({
           showWorkspaceSetup={showWorkspaceSetup}
           importAgentDisabled={importAgentDisabled}
           copyPathDisabled={copyPathDisabled}
+          archiveDisabled={archiveDisabled}
+          isArchiving={isArchiving}
           onOpenImportSheet={onOpenImportSheet}
           onCopyWorkspacePath={onCopyWorkspacePath}
           onCopyBranchName={onCopyBranchName}
           onOpenSetupTab={onOpenSetupTab}
+          onArchiveWorkspace={onArchiveWorkspace}
         />
       </View>
     </View>
@@ -2213,6 +2261,11 @@ function WorkspaceScreenContent({
     }
   }, [currentBranchName, toast, t]);
 
+  const headerArchive = useWorkspaceHeaderArchive({
+    serverId: normalizedServerId,
+    workspace: workspaceDescriptor,
+  });
+
   const handleOpenSetupTab = useCallback(() => {
     if (!persistenceKey) {
       return;
@@ -3311,10 +3364,13 @@ function WorkspaceScreenContent({
                 showWorkspaceSetup={showWorkspaceSetup}
                 importAgentDisabled={!canOpenImportSheet}
                 copyPathDisabled={!workspaceDirectory}
+                archiveDisabled={headerArchive.archiveDisabled}
+                isArchiving={headerArchive.isArchiving}
                 onOpenImportSheet={openImportSheet}
                 onCopyWorkspacePath={handleCopyWorkspacePath}
                 onCopyBranchName={handleCopyBranchName}
                 onOpenSetupTab={handleOpenSetupTab}
+                onArchiveWorkspace={headerArchive.handleArchive}
               />
             </>
           }
@@ -3327,6 +3383,9 @@ function WorkspaceScreenContent({
       handleCopyBranchName,
       handleCopyWorkspacePath,
       handleOpenSetupTab,
+      headerArchive.archiveDisabled,
+      headerArchive.handleArchive,
+      headerArchive.isArchiving,
       headerRight,
       isWorkspaceHeaderLoading,
       normalizedServerId,
@@ -3402,12 +3461,15 @@ function WorkspaceScreenContent({
             createTerminalDisabled={createTerminalDisabled}
             importAgentDisabled={!canOpenImportSheet}
             copyPathDisabled={!workspaceDirectory}
+            archiveDisabled={headerArchive.archiveDisabled}
+            isArchiving={headerArchive.isArchiving}
             onCreateTerminalWithProfile={handleCreateTerminalWithProfile}
             onCreateBrowser={handleCreateBrowserTab}
             onOpenImportSheet={openImportSheet}
             onCopyWorkspacePath={handleCopyWorkspacePath}
             onCopyBranchName={handleCopyBranchName}
             onOpenSetupTab={handleOpenSetupTab}
+            onArchiveWorkspace={headerArchive.handleArchive}
           />
         </CompactWorkspaceHeader>
       ) : null,
@@ -3435,6 +3497,9 @@ function WorkspaceScreenContent({
       handleCreateTerminalWithProfile,
       handleOpenSetupTab,
       handleReloadAgent,
+      headerArchive.archiveDisabled,
+      headerArchive.handleArchive,
+      headerArchive.isArchiving,
       handleRenameTab,
       handleSelectSwitcherTab,
       handleToggleExplorerSidebar,

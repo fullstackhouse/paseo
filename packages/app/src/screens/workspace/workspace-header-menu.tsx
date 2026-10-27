@@ -2,7 +2,14 @@ import React, { useCallback, useMemo } from "react";
 import { View } from "react-native";
 import { useRouter, type Href } from "expo-router";
 import { useTranslation } from "react-i18next";
-import { Copy, Ellipsis, Globe, Import as ImportIcon, Settings } from "lucide-react-native";
+import {
+  Archive,
+  Copy,
+  Ellipsis,
+  Globe,
+  Import as ImportIcon,
+  Settings,
+} from "lucide-react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import type { TerminalProfile } from "@getpaseo/protocol/messages";
 import {
@@ -33,6 +40,7 @@ import {
 } from "@/screens/workspace/scripts";
 import { usePluginWorkspaceMenu } from "@/plugins";
 
+const ThemedArchive = withUnistyles(Archive);
 const ThemedEllipsis = withUnistyles(Ellipsis);
 const ThemedCopy = withUnistyles(Copy);
 const ThemedGlobe = withUnistyles(Globe);
@@ -45,6 +53,7 @@ const MENU_NEW_BROWSER_ICON = <ThemedGlobe size={16} uniProps={mutedColorMapping
 const MENU_IMPORT_ICON = <ThemedImport size={16} uniProps={mutedColorMapping} />;
 const MENU_COPY_ICON = <ThemedCopy size={16} uniProps={mutedColorMapping} />;
 const MENU_SETTINGS_ICON = <ThemedSettings size={16} uniProps={mutedColorMapping} />;
+const MENU_ARCHIVE_ICON = <ThemedArchive size={16} uniProps={mutedColorMapping} />;
 function WorkspaceHeaderMenuTriggerIcon() {
   return (
     <ThemedEllipsis
@@ -80,10 +89,13 @@ export interface WorkspaceHeaderWorkspaceActions {
   showWorkspaceSetup: boolean;
   importAgentDisabled: boolean;
   copyPathDisabled: boolean;
+  archiveDisabled: boolean;
+  isArchiving: boolean;
   onOpenImportSheet: () => void;
   onCopyWorkspacePath: () => void;
   onCopyBranchName: () => void;
   onOpenSetupTab: () => void;
+  onArchiveWorkspace: () => void;
 }
 
 function WorkspaceHeaderWorkspaceActionItems({
@@ -91,10 +103,13 @@ function WorkspaceHeaderWorkspaceActionItems({
   showWorkspaceSetup,
   importAgentDisabled,
   copyPathDisabled,
+  archiveDisabled,
+  isArchiving,
   onOpenImportSheet,
   onCopyWorkspacePath,
   onCopyBranchName,
   onOpenSetupTab,
+  onArchiveWorkspace,
 }: WorkspaceHeaderWorkspaceActions) {
   const { t } = useTranslation();
   return (
@@ -136,6 +151,17 @@ function WorkspaceHeaderWorkspaceActionItems({
           </DropdownMenuItem>
         </>
       ) : null}
+      <DropdownMenuSeparator />
+      <DropdownMenuItem
+        testID="workspace-header-archive"
+        leading={MENU_ARCHIVE_ICON}
+        disabled={archiveDisabled}
+        status={isArchiving ? "pending" : "idle"}
+        pendingLabel={t("sidebar.workspace.actions.archiving")}
+        onSelect={onArchiveWorkspace}
+      >
+        {t("sidebar.workspace.actions.archiveWorkspace")}
+      </DropdownMenuItem>
     </>
   );
 }
