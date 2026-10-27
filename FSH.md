@@ -21,13 +21,29 @@ Keep this list in sync with what's merged into `fsh`.
 
 ## Install the desktop app (macOS, Apple Silicon)
 
-1. Download the DMG from the latest [release](https://github.com/fullstackhouse/paseo/releases/latest).
-2. Drag Paseo to Applications. It replaces upstream Paseo, and your settings and hosts are kept.
-3. The build is unsigned, so run once: `xattr -cr /Applications/Paseo.app`
-4. In the app, **Settings → Integrations** → install the `paseo` CLI. The plugin steps below need it.
-5. Install at least one agent CLI (Claude Code, Codex) and `gh`, both signed in. Paseo runs them; it doesn't ship one.
+Install with Homebrew from [fullstackhouse/homebrew-tap](https://github.com/fullstackhouse/homebrew-tap). The cask
+follows the latest FSH release within 30 minutes, links the `paseo` CLI, and clears the quarantine flag the unsigned
+build needs cleared.
 
-There's no auto-update: install new builds from Releases. To go back to upstream, install from paseo.sh.
+```bash
+brew tap fullstackhouse/tap
+brew trust --cask fullstackhouse/tap/paseo-fsh   # Homebrew 7 asks before running third-party casks
+brew install --cask paseo-fsh
+```
+
+If Homebrew's upstream `paseo` cask is installed, run `brew uninstall --cask paseo` first. Its uninstall hook quits
+Paseo and stops the daemon, so do it when no agent is mid-turn. Your `~/.paseo` data and hosts are kept. Leaving the
+upstream cask installed is not an option: `brew upgrade` would replace the FSH build with upstream Paseo.
+
+Update with `brew upgrade --cask paseo-fsh`, then quit Paseo (⌘Q) and reopen it. Paseo runs the daemon your agents
+live in, so choose a moment when none is mid-turn. There's no in-app auto-update: that needs a Developer ID signed build.
+
+Without Homebrew: download the DMG from the latest [release](https://github.com/fullstackhouse/paseo/releases/latest),
+drag Paseo to Applications, run `xattr -cr /Applications/Paseo.app`, and install the CLI from **Settings →
+Integrations**.
+
+Then install at least one agent CLI (Claude Code, Codex) and `gh`, both signed in. Paseo runs them; it doesn't ship
+one. To go back to upstream, `brew uninstall --cask paseo-fsh && brew install --cask paseo`.
 
 A DMG built before the `hardenedRuntime=false` fix dies at launch on macOS 26 with
 `Library not loaded: @rpath/Electron Framework.framework/Electron Framework` and
