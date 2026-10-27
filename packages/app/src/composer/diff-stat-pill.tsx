@@ -1,26 +1,24 @@
 import { memo, useCallback, useMemo, useState, type ReactElement } from "react";
-import { Pressable, Text } from "react-native";
-import { StyleSheet } from "react-native-unistyles";
+import { Pressable } from "react-native";
 import { useTranslation } from "react-i18next";
 import { DiffStat } from "@/components/diff-stat";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { composerPillStyles } from "@/composer/pill-styles";
-import {
-  useVisibleWorkspaceDiffStat,
-  useWorkspaceGitSyncSummary,
-} from "@/composer/workspace-diff-stat";
+import { useVisibleWorkspaceDiffStat, useWorkspaceGitSync } from "@/composer/workspace-diff-stat";
+import { GitSyncCountsText, GitSyncSummaryText } from "@/git/sync-indicator";
+import type { GitSyncModel } from "@/git/sync-summary";
 
 interface ComposerDiffStatPillProps {
   additions: number;
   deletions: number;
-  syncSummary?: string[];
+  sync?: GitSyncModel | null;
   onPress: () => void;
 }
 
 export function ComposerDiffStatPill({
   additions,
   deletions,
-  syncSummary = [],
+  sync = null,
   onPress,
 }: ComposerDiffStatPillProps) {
   const { t } = useTranslation();
@@ -36,25 +34,26 @@ export function ComposerDiffStatPill({
     <Pressable
       testID="composer-diff-stat-pill"
       accessibilityRole="button"
-      accessibilityLabel={t("workspace.git.diff.openChangesTab")}
+      accessibilityLabel={[t("workspace.git.diff.openChangesTab"), ...(sync?.summary ?? [])].join(
+        ", ",
+      )}
       onPress={onPress}
       onHoverIn={handleHoverIn}
       onHoverOut={handleHoverOut}
       style={bodyStyle}
     >
       <DiffStat additions={additions} deletions={deletions} />
+      {sync?.counts ? <GitSyncCountsText counts={sync.counts} /> : null}
     </Pressable>
   );
-  if (syncSummary.length === 0) {
+  if (!sync) {
     return pill;
   }
   return (
     <Tooltip delayDuration={300}>
       <TooltipTrigger asChild>{pill}</TooltipTrigger>
       <TooltipContent side="top">
-        <Text style={styles.tooltipText} testID="composer-diff-stat-sync-summary">
-          {syncSummary.join("\n")}
-        </Text>
+        <GitSyncSummaryText summary={sync.summary} testID="composer-diff-stat-sync-summary" />
       </TooltipContent>
     </Tooltip>
   );
@@ -70,7 +69,7 @@ export const WorkspaceDiffStatPill = memo(function WorkspaceDiffStatPill({
   onPress: () => void;
 }): ReactElement | null {
   const diffStat = useVisibleWorkspaceDiffStat(serverId, workspaceId);
-  const syncSummary = useWorkspaceGitSyncSummary(serverId, workspaceId);
+  const sync = useWorkspaceGitSync(serverId, workspaceId);
   if (!diffStat) {
     return null;
   }
@@ -78,15 +77,8 @@ export const WorkspaceDiffStatPill = memo(function WorkspaceDiffStatPill({
     <ComposerDiffStatPill
       additions={diffStat.additions}
       deletions={diffStat.deletions}
-      syncSummary={syncSummary}
+      sync={sync}
       onPress={onPress}
     />
   );
 });
-
-const styles = StyleSheet.create((theme) => ({
-  tooltipText: {
-    fontSize: theme.fontSize.sm,
-    color: theme.colors.foreground,
-  },
-}));

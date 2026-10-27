@@ -12,6 +12,16 @@ export interface GitSyncCounts {
   behind: number;
 }
 
+export interface GitSyncModel {
+  counts: GitSyncCounts | null;
+  summary: string[];
+}
+
+export function buildGitSyncModel(facts: GitSyncFacts, t: TFunction): GitSyncModel | null {
+  const summary = buildGitSyncSummary(facts, t);
+  return summary.length > 0 ? { counts: getGitSyncCounts(facts), summary } : null;
+}
+
 export function getGitSyncCounts(facts: GitSyncFacts): GitSyncCounts | null {
   const ahead = facts.aheadOfOrigin ?? 0;
   const behind = facts.behindOfOrigin ?? 0;

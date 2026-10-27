@@ -5,7 +5,7 @@ import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { useSessionStore, type WorkspaceDescriptor } from "@/stores/session-store";
 import { seedSessionWorkspaces } from "@/test/seed-session";
-import { useWorkspaceGitSyncSummary, useWorkspaceHasDiffStat } from "./workspace-diff-stat";
+import { useWorkspaceGitSync, useWorkspaceHasDiffStat } from "./workspace-diff-stat";
 
 const SERVER_ID = "diff-stat-pill";
 const WORKSPACE_ID = "workspace";
@@ -82,7 +82,7 @@ function setGitRuntime(gitRuntime: WorkspaceDescriptor["gitRuntime"]): void {
   });
 }
 
-describe("useWorkspaceGitSyncSummary", () => {
+describe("useWorkspaceGitSync", () => {
   beforeEach(() => {
     useSessionStore.getState().initializeSession(SERVER_ID, null as unknown as DaemonClient);
     seedSessionWorkspaces(SERVER_ID, new Map([[WORKSPACE_ID, workspace]]));
@@ -93,10 +93,13 @@ describe("useWorkspaceGitSyncSummary", () => {
   });
 
   it("says a clean diff total is unpushed commits, not uncommitted work", () => {
-    const { result } = renderHook(() => useWorkspaceGitSyncSummary(SERVER_ID, WORKSPACE_ID));
-    expect(result.current).toEqual([]);
+    const { result } = renderHook(() => useWorkspaceGitSync(SERVER_ID, WORKSPACE_ID));
+    expect(result.current).toBeNull();
 
     act(() => setGitRuntime({ isDirty: false, aheadOfOrigin: 1, behindOfOrigin: 327 }));
-    expect(result.current).toEqual(["Unpushed commits: 1", "Behind remote: 327"]);
+    expect(result.current).toEqual({
+      counts: { ahead: 1, behind: 327 },
+      summary: ["Unpushed commits: 1", "Behind remote: 327"],
+    });
   });
 });

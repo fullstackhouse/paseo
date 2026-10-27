@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { i18n } from "@/i18n/i18next";
 
-import { buildGitSyncSummary, getGitSyncCounts } from "./sync-summary";
+import { buildGitSyncModel, buildGitSyncSummary, getGitSyncCounts } from "./sync-summary";
 
 const t = i18n.t.bind(i18n);
 
@@ -40,5 +40,15 @@ describe("git sync summary", () => {
       ahead: 1,
       behind: 327,
     });
+  });
+
+  it("explains a dirty in-sync branch without arrow counts", () => {
+    expect(buildGitSyncModel({ isDirty: true, aheadOfOrigin: 0, behindOfOrigin: 0 }, t)).toEqual({
+      counts: null,
+      summary: ["Uncommitted changes"],
+    });
+    expect(
+      buildGitSyncModel({ isDirty: false, aheadOfOrigin: 0, behindOfOrigin: 0 }, t),
+    ).toBeNull();
   });
 });
