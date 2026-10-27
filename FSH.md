@@ -48,8 +48,15 @@ the store app. It is built without Google services, so it has **no push notifica
 QR pairing.
 
 1. On the phone, open **[paseo-fsh-arm64.apk](https://github.com/fullstackhouse/paseo/releases/download/fsh-android-latest/paseo-fsh-arm64.apk)**,
-   a link that always serves the newest build. To get updates automatically, let
-   [Obtainium](https://github.com/ImranR98/Obtainium) track this repo (APK filter `paseo-fsh-.*\.apk`).
+   a link that always serves the newest build, or scan:
+
+   <img src="docs/fsh/android-apk-qr.png" width="160" alt="QR code: Paseo FSH Android APK">
+
+   **Automatic updates:** install [Obtainium](https://github.com/ImranR98/Obtainium) and add an app:
+   source URL `https://github.com/fullstackhouse/paseo`, **Filter release titles by regular
+   expression** `^Paseo Android \d`, **Filter APKs by regular expression** `paseo-fsh-.*-arm64\.apk`.
+   The title filter matters: most releases here are desktop DMGs with no APK.
+
 2. Allow installs from that app when Android asks.
 3. Add hosts as a direct connection: e.g. `jaceks-macbook-pro.tailc790a0.ts.net`, port `443`,
    SSL on, plus the daemon password. Tailscale must be on.
@@ -85,7 +92,7 @@ Agents that already existed when a plugin was installed don't get its MCP tools.
   upstream merged, and keep the `fsh`-only commits (this file, the pointers at the top of
   `README.md` / `CLAUDE.md`, `.github/workflows/fsh-desktop.yml`, `.github/workflows/fsh-android.yml`,
   the `fsh` variant in `packages/app/app.config.js` and `plugins/with-fsh-release-signing.js`).
-- **Build**: every push to `fsh` (except edits to this file) builds the DMG and the Android APK
+- **Build**: every push to `fsh` (except edits to this file, `README.md` or `docs/fsh/`) builds the DMG and the Android APK
   and publishes a release for each (`fsh-*`, `fsh-android-*`).
   The build runs upstream's packaged-app smoke test first. You can also start it by hand:
   Actions → FSH desktop build → Run workflow.

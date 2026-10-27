@@ -16,7 +16,7 @@ name: FSH desktop build
 on:
   push:
     branches: [fsh]
-    paths-ignore: [FSH.md]
+    paths-ignore: [FSH.md, README.md, "docs/fsh/**"]
   workflow_dispatch:
 
 permissions:
