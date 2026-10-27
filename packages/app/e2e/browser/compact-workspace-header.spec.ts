@@ -190,3 +190,22 @@ test("compact header menu runs, shows, and stops workspace scripts", async ({ pa
     await workspace.cleanup();
   }
 });
+
+test("compact header menu archives the workspace", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const workspace = await openNamedWorkspace(page, labels.short);
+  try {
+    await openCompactWorkspaceMenu(page);
+    await menuRow(page, "Archive workspace").click();
+
+    await expect(page).not.toHaveURL(new RegExp(workspace.workspaceId), { timeout: 30_000 });
+    await expect
+      .poll(async () => {
+        const result = await workspace.client.fetchWorkspaces();
+        return result.entries.some((entry) => entry.id === workspace.workspaceId);
+      })
+      .toBe(false);
+  } finally {
+    await workspace.cleanup();
+  }
+});
