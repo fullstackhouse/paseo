@@ -136,3 +136,26 @@ jobs:
             --latest=false \
             --title "Paseo Android ${APK_VERSION} (FSH ${GITHUB_SHA::7})" \
             --notes "Android APK of \`fsh\` ($(git log -1 --format=%h)), package \`house.fullstack.paseo\`, signed with the FSH key. Install by hand or track with Obtainium. No push notifications."
+
+      # A link that never changes, for phones: always the newest APK under one name.
+      #   https://github.com/fullstackhouse/paseo/releases/download/fsh-android-latest/paseo-fsh-arm64.apk
+      # A separate release, because GitHub's own "latest" stays on the desktop DMG.
+      - name: Update stable download link
+        if: github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          stable="$RUNNER_TEMP/paseo-fsh-arm64.apk"
+          cp "$APK_PATH" "$stable"
+          notes="Always the newest Android build of \`fsh\`. Now: ${APK_VERSION}, commit ${GITHUB_SHA::7}. Install link: https://github.com/${GITHUB_REPOSITORY}/releases/download/fsh-android-latest/paseo-fsh-arm64.apk"
+          if gh release view fsh-android-latest >/dev/null 2>&1; then
+            gh release upload fsh-android-latest "$stable" --clobber
+            gh release edit fsh-android-latest --notes "$notes"
+          else
+            gh release create fsh-android-latest "$stable" \
+              --target "$GITHUB_SHA" \
+              --latest=false \
+              --title "Paseo Android (FSH, newest build)" \
+              --notes "$notes"
+          fi
