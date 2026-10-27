@@ -47,8 +47,8 @@ Our own build of the mobile app, from `fsh`: package `house.fullstack.paseo`, in
 the store app. It is built without Google services, so it has **no push notifications** and no
 QR pairing.
 
-1. Download `paseo-fsh-*-arm64.apk` from the newest `fsh-android-*`
-   [release](https://github.com/fullstackhouse/paseo/releases), or let
+1. On the phone, open **[paseo-fsh-arm64.apk](https://github.com/fullstackhouse/paseo/releases/download/fsh-android-latest/paseo-fsh-arm64.apk)**,
+   a link that always serves the newest build. To get updates automatically, let
    [Obtainium](https://github.com/ImranR98/Obtainium) track this repo (APK filter `paseo-fsh-.*\.apk`).
 2. Allow installs from that app when Android asks.
 3. Add hosts as a direct connection: e.g. `jaceks-macbook-pro.tailc790a0.ts.net`, port `443`,
