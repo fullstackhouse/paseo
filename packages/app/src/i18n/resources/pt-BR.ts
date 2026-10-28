@@ -2921,6 +2921,8 @@ export const ptBR: TranslationResources = {
     project: {
       noEditableTarget: "Este projeto não pode ser editado neste host.",
       backToProjects: "Voltar para projetos",
+      removeHint:
+        "Remove este projeto do Paseo neste host. Os arquivos no disco não são alterados.",
       edit: {
         title: "Editar projeto",
         name: "Nome",

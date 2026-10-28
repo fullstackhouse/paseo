@@ -99,6 +99,18 @@ function createCoreDeps(options?: {
   };
 }
 
+// No caller override: the default branch comes from the repository, as in production.
+function createRepoDefaultCoreDeps() {
+  const { resolveDefaultBranch: _override, ...deps } = createCoreDeps();
+  return {
+    ...deps,
+    workspaceGitService: {
+      ...deps.workspaceGitService,
+      resolveDefaultBranch: async () => "main",
+    },
+  };
+}
+
 function createGitRepo(): { tempDir: string; repoDir: string; paseoHome: string } {
   const tempDir = realpathSync(mkdtempSync(path.join(tmpdir(), "worktree-core-test-")));
   const repoDir = path.join(tempDir, "repo");
@@ -370,6 +382,19 @@ function createForkGitHubPrRemoteRepo(): {
   return { tempDir, repoDir, headRemoteDir, paseoHome };
 }
 
+function commitFile(cwd: string, content: string, message: string): void {
+  writeFileSync(path.join(cwd, "README.md"), content);
+  execFileSync("git", ["add", "README.md"], { cwd, stdio: "pipe" });
+  execFileSync("git", ["-c", "commit.gpgsign=false", "commit", "-m", message], {
+    cwd,
+    stdio: "pipe",
+  });
+}
+
+function revParse(cwd: string, ref: string): string {
+  return execFileSync("git", ["rev-parse", ref], { cwd, stdio: "pipe" }).toString().trim();
+}
+
 function getBranchUpstream(cwd: string): string | null {
   const result = spawnSync("git", ["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"], {
     cwd,
@@ -440,6 +465,65 @@ describe.skipIf(isPlatform("win32"))("worktree-core POSIX-only", () => {
         branchName: "no-upstream-feature",
       });
       expect(getBranchUpstream(result.worktree.worktreePath)).toBeNull();
+    });
+
+    test("branches off origin's default branch when no base is given", async () => {
+      const { tempDir, repoDir, paseoHome } = createGitRepoWithOriginMain();
+      cleanupPaths.push(tempDir);
+      commitFile(repoDir, "unpushed\n", "unpushed local commit");
+
+      const result = await createCoreWorktree(
+        { cwd: repoDir, worktreeSlug: "default-base", action: "branch-off", paseoHome },
+        createRepoDefaultCoreDeps(),
+      );
+
+      expect(result.intent).toEqual({
+        kind: "branch-off",
+        baseBranch: "refs/remotes/origin/main",
+        branchName: "default-base",
+      });
+      expect(revParse(result.worktree.worktreePath, "HEAD")).toBe(
+        revParse(repoDir, "refs/remotes/origin/main"),
+      );
+    });
+
+    test("branches off the remote the default branch tracks when no base is given", async () => {
+      const { tempDir, repoDir, paseoHome } = createGitRepoWithOriginMain();
+      cleanupPaths.push(tempDir);
+      const upstreamDir = path.join(tempDir, "upstream.git");
+      execFileSync("git", ["clone", "--bare", repoDir, upstreamDir], { stdio: "pipe" });
+      execFileSync("git", ["remote", "add", "upstream", upstreamDir], {
+        cwd: repoDir,
+        stdio: "pipe",
+      });
+      execFileSync("git", ["fetch", "upstream"], { cwd: repoDir, stdio: "pipe" });
+      execFileSync("git", ["branch", "--set-upstream-to=upstream/main", "main"], {
+        cwd: repoDir,
+        stdio: "pipe",
+      });
+
+      const result = await createCoreWorktree(
+        { cwd: repoDir, worktreeSlug: "fork-default-base", paseoHome },
+        createRepoDefaultCoreDeps(),
+      );
+
+      expect(result.intent).toEqual({
+        kind: "branch-off",
+        baseBranch: "refs/remotes/upstream/main",
+        branchName: "fork-default-base",
+      });
+    });
+
+    test("uses a caller-chosen base verbatim", async () => {
+      const { tempDir, repoDir, paseoHome } = createGitRepoWithOriginMain();
+      cleanupPaths.push(tempDir);
+
+      const result = await createCoreWorktree(
+        { cwd: repoDir, worktreeSlug: "chosen-base", paseoHome },
+        createCoreDeps(),
+      );
+
+      expect(result.intent).toMatchObject({ kind: "branch-off", baseBranch: "main" });
     });
 
     test("creates a branch-off worktree with a mnemonic slug when no slug is supplied", async () => {

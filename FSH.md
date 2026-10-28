@@ -18,57 +18,34 @@ temporary by design: every patch is meant to go upstream and then drop out of `f
 - FSH-only (not upstream yet): the connected-hosts batching test holds the parent's batch with an injected scheduler instead of racing the 2-second quiet window against a cold CLI spawn
 - FSH-only (upstreamable): hovering a sidebar workspace row shows an Archive button beside its menu, so archiving takes one click. Off by default; turn it on under Show > Archive button in the sidebar's display menu. Desktop and web only; touch keeps the menu
 - FSH-only (not upstream yet): project categories. Put each project in a category from its menu, then pick a category in the Workspaces header so the sidebar shows only that category's projects. Categories are stored per device
+- FSH-only (not upstream yet): docs and a `paseo-run` skill for running a branch, or testing a plugin, next to the Paseo you work in
+- FSH-only (not upstream yet): new workspaces branch off the repo's default branch, not whatever branch the source checkout is on. The daemon picks the ref: the default branch's upstream (any remote), then origin's copy, then local
+- FSH-only (not upstream yet): remove a project from its settings page (Settings → Projects → project → Danger zone), not just from the sidebar menu
 
 Keep this list in sync with what's merged into `fsh`.
 
-## Install the desktop app (macOS, Apple Silicon)
+## Install the desktop app and plugins (macOS, Apple Silicon)
 
-Requires macOS 13 (Ventura) or newer on Apple Silicon. Install with Homebrew from
-[fullstackhouse/homebrew-tap](https://github.com/fullstackhouse/homebrew-tap) — that repo's README covers the tap
-itself (trust, signing, how bumps work); this section is the only place with the install steps. The cask follows the
-latest FSH release within 30 minutes, links the `paseo` CLI, and clears the quarantine flag the unsigned build needs
-cleared.
+Requires macOS 13 (Ventura) or newer on Apple Silicon. One script installs the latest FSH release, links the `paseo`
+CLI, and installs or updates the [FSH plugins](#fsh-plugins). Run it again to update:
 
 ```bash
-brew tap fullstackhouse/tap
-brew trust --cask fullstackhouse/tap/paseo-fsh   # one-off, per machine
-brew install --cask paseo-fsh
+curl -fsSL https://raw.githubusercontent.com/fullstackhouse/paseo/fsh/scripts/install-fsh.sh | bash
 ```
 
-Homebrew 6 and newer will not load a third-party tap until you trust it, and trust is recorded per machine — so a new
-laptop needs that middle line again. Skip it and you get `Refusing to load cask fullstackhouse/tap/paseo-fsh from
-untrusted tap`, not a prompt.
+When a newer build is out, the script quits Paseo and stops the daemon before swapping the app, so run it when no agent
+is mid-turn. It asks first; `--yes` skips the question. Every FSH build reports the same `0.13.0-beta.1`, so neither
+the app nor the daemon notices a swap underneath it — that's why the script stops both. It records the installed
+release tag in `~/.paseo/fsh-release` and does nothing when that matches the latest (`--force` reinstalls).
 
-Already have Paseo.app from a DMG? `brew install --cask --adopt paseo-fsh` takes over the existing copy instead of
-refusing.
+It also removes the Homebrew `paseo-fsh` or upstream `paseo` cask if either is installed, since `brew upgrade` would put
+its own build back. Your `~/.paseo` data and hosts are kept. Plugins you installed from a local directory are left
+alone. `--no-plugins` skips the plugin step.
 
-If Homebrew's upstream `paseo` cask is installed, run `brew uninstall --cask paseo` first. Its uninstall hook quits
-Paseo and stops the daemon, so do it when no agent is mid-turn. Your `~/.paseo` data and hosts are kept. Leaving the
-upstream cask installed is not an option: `brew upgrade` would replace the FSH build with upstream Paseo.
-
-Update with `brew upgrade --cask paseo-fsh`, then **quit Paseo (⌘Q) and reopen it** when no agent is mid-turn. The
-quit is not optional housekeeping: unlike the upstream cask, `paseo-fsh` has no `uninstall` stanza, so the upgrade
-swaps the app on disk and leaves the old build running, indefinitely.
-
-Nothing in the UI or the CLI will tell you. Every FSH build reports the same `0.13.0-beta.1` from `paseo --version`
-and `paseo status` — the part that identifies the build is the commit sha in the _cask_ version
-(`0.13.0-beta.1-28159c2`), which the app itself never sees. To check whether you are running what is on disk, compare
-the inode the process executes against the file:
-
-```bash
-lsof -p "$(pgrep -f 'Paseo.app/Contents/MacOS/Paseo')" | awk '$4=="txt" && /MacOS\/Paseo/ {print $(NF-1)}'
-stat -f %i /Applications/Paseo.app/Contents/MacOS/Paseo
-```
-
-Two different numbers mean the app was replaced underneath the running copy: quit and reopen. There's no in-app
-auto-update either, so this is the whole update path — that needs a Developer ID signed build.
-
-Without Homebrew: download the DMG from the latest [release](https://github.com/fullstackhouse/paseo/releases/latest),
-drag Paseo to Applications, run `xattr -cr /Applications/Paseo.app`, and install the CLI from **Settings →
-Integrations**.
+There's no in-app auto-update; that needs a Developer ID signed build.
 
 Then install at least one agent CLI (Claude Code, Codex) and `gh`, both signed in. Paseo runs them; it doesn't ship
-one. To go back to upstream, `brew uninstall --cask paseo-fsh && brew install --cask paseo`.
+one.
 
 A DMG built before the `hardenedRuntime=false` fix dies at launch on macOS 26 with
 `Library not loaded: @rpath/Electron Framework.framework/Electron Framework` and
@@ -109,11 +86,11 @@ never rotate it casually.
 
 ## FSH plugins
 
-These work on upstream Paseo too (0.12+). First turn on **Settings → Plugins → Enable plugins** on the daemon, then install each plugin on every daemon you use:
+These work on upstream Paseo too (0.12+). The [install script](#install-the-desktop-app-and-plugins-macos-apple-silicon) enables plugins and installs all of them on the local daemon. On another daemon:
 
 ```bash
-git clone git@github.com:fullstackhouse/<plugin>.git
-cd <plugin> && npm install && paseo plugin install "$PWD"
+paseo daemon config set pluginsEnabled true && paseo daemon reload
+paseo plugin install git:fullstackhouse/<plugin>
 paseo plugin ls   # should show "running"
 ```
 
@@ -131,7 +108,7 @@ Agents that already existed when a plugin was installed don't get its MCP tools.
 - **FSH-only change**: open a PR against `fsh` on this repo. CI runs on it.
 - **Refresh**: recreate `fsh` from `upstream/main`, re-merge the still-open patches, drop the ones
   upstream merged, and keep the `fsh`-only commits (this file, the pointers at the top of
-  `README.md` / `CLAUDE.md`, `.github/workflows/fsh-desktop.yml`, `.github/workflows/fsh-android.yml`,
+  `README.md` / `CLAUDE.md`, `.github/workflows/fsh-desktop.yml`, `.github/workflows/fsh-android.yml`, `scripts/install-fsh.sh`,
   the `fsh` variant in `packages/app/app.config.js` and `plugins/with-fsh-release-signing.js`).
 - **Build**: every push to `fsh` (except edits to this file, `README.md` or `docs/fsh/`) builds the DMG and the Android APK
   and publishes a release for each (`fsh-*`, `fsh-android-*`).

@@ -2931,6 +2931,7 @@ export const ru: TranslationResources = {
     project: {
       noEditableTarget: "Этот проект нельзя редактировать на этом хосте.",
       backToProjects: "Вернуться к проектам",
+      removeHint: "Удаляет этот проект из Paseo на этом хосте. Файлы на диске не изменяются.",
       edit: {
         title: "Изменить проект",
         name: "Название",

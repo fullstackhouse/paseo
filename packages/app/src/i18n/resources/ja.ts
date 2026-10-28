@@ -2908,6 +2908,8 @@ export const ja: TranslationResources = {
     project: {
       noEditableTarget: "このホストではこのプロジェクトを編集できません。",
       backToProjects: "プロジェクトに戻る",
+      removeHint:
+        "このホストの Paseo からこのプロジェクトを削除します。ディスク上のファイルは変更されません。",
       edit: {
         title: "プロジェクトを編集",
         name: "名前",
