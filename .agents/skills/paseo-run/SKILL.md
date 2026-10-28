@@ -1,5 +1,5 @@
 ---
-name: run-paseo
+name: paseo-run
 description: Run this Paseo branch as a second Paseo (own daemon + desktop window) next to the one the user works in, with their real config and plugins, to see or verify a change. Use when asked to run, try, test, or screenshot a Paseo change locally, or to test a Paseo plugin against this branch.
 user-invocable: true
 ---
