@@ -86,6 +86,24 @@ plugin before compiling and starting from disk. A failed reload stays failed; Pa
 the old code. Use `enable`, `disable`, and `remove` to manage one plugin. Removing a directory source
 never deletes it. The global `pluginsEnabled` switch remains available.
 
+### Test a plugin change
+
+Reloading a plugin on the daemon you work from swaps it under your running agents. Test a plugin worktree on a throwaway daemon started by the installed `paseo` CLI instead. Copy your config so the other plugins and providers match, give it a free port, and leave the relay off:
+
+```bash
+H="$PWD/.dev/paseo-home"   # keep it out of git
+mkdir -p "$H"
+node -e 'const fs=require("fs");const c=JSON.parse(fs.readFileSync(process.argv[1]));c.daemon={...c.daemon,listen:"127.0.0.1:6790"};delete c.daemon.relay;fs.writeFileSync(process.argv[2]+"/config.json",JSON.stringify(c,null,2))' ~/.paseo/config.json "$H"
+paseo daemon start --home "$H"
+paseo plugin remove my-plugin --home "$H"    # only if your config already has this ID
+paseo plugin install "$PWD" --home "$H"
+paseo plugin ls --home "$H"
+```
+
+Install refuses an ID that is already configured, which is why the copied entry is removed first. After each edit run `paseo plugin reload my-plugin --home "$H"`. To see the UI, use **Add host** in your main app with `localhost:6790` and the password from your config. Run `paseo daemon stop --home "$H"` when done.
+
+To test a Paseo change together with a plugin, run the Paseo branch as described in [Test a change next to your main Paseo](development.md#test-a-change-next-to-your-main-paseo) and install the plugin worktree into that daemon with `npm run cli -- plugin install <dir>`.
+
 ## Client translations
 
 Plugin runtime translations follow the connected app, so never send a daemon locale through RPCs or add plugin resources to the app catalog. The installation owns the translation engine; native portal bridges must carry it alongside RPC and client-state contexts. Keep host label resolution at presentation time so language changes preserve the installation lifetime.

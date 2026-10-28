@@ -395,6 +395,23 @@ cleanup, and final crash output. Reload, disable, and process failure retain the
 plugin clears it; restarting the daemon clears the in-memory tail. Structured copies also go to the
 daemon log. Never log credentials or other secrets.
 
+### Test without touching the daemon you run on
+
+When you edit a plugin from a Paseo workspace, the daemon on `6767` runs your own agent. Reloading the plugin there swaps it under every running agent. Test the plugin worktree on a throwaway daemon with a copy of the user's config instead:
+
+```bash
+H="$PWD/.dev/paseo-home"   # keep it out of git
+mkdir -p "$H"
+node -e 'const fs=require("fs");const c=JSON.parse(fs.readFileSync(process.argv[1]));c.daemon={...c.daemon,listen:"127.0.0.1:6790"};delete c.daemon.relay;fs.writeFileSync(process.argv[2]+"/config.json",JSON.stringify(c,null,2))' ~/.paseo/config.json "$H"
+paseo daemon start --home "$H"
+paseo plugin remove my-plugin --home "$H"    # only if the copied config already has this ID
+paseo plugin install "$PWD" --home "$H"
+paseo plugin reload my-plugin --home "$H"    # after each edit
+paseo daemon stop --home "$H"                # when done
+```
+
+Pick another port if `6790` is taken. The user sees the UI by adding `localhost:6790` with **Add host** in their app; the password is the one in their config. Install into the main daemon only when the user asks.
+
 ## Add a composer attachment source
 
 Define a search RPC and declarative source in `shared/`, handle it on the server, and register it on
