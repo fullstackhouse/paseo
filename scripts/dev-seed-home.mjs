@@ -6,6 +6,7 @@ import { cpSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { seedDesktopProfile } from "./dev-seed-desktop-profile.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const source = resolve(process.argv[2] ?? join(homedir(), ".paseo"));
@@ -35,3 +36,5 @@ if (existsSync(projects)) {
 }
 
 console.log(`Seeded ${target} from ${source}. Restart the dev daemon to load it.`);
+
+await seedDesktopProfile({ root, ...(process.argv[3] ? { sourceProfile: process.argv[3] } : {}) });

@@ -75,7 +75,7 @@ In Paseo-managed worktree services, use the injected service environment rather 
 When you work on Paseo from a Paseo workspace, run the branch as a second Paseo beside the one you use. The branch gets its own daemon, port, home, and Electron window; the main daemon on `6767` and its agents are untouched.
 
 ```bash
-npm run dev:seed-home                      # your providers, profiles, plugins and projects
+npm run dev:seed-home                      # your daemon config, projects and desktop preferences
 paseo script start daemon
 paseo script start desktop                 # opens a window labelled with the branch name
 paseo plugin ls --home .dev/paseo-home     # talk to this worktree's daemon
@@ -86,7 +86,9 @@ paseo plugin ls --home .dev/paseo-home     # talk to this worktree's daemon
 - Projects and workspaces point at your real checkouts and worktrees. Archiving a workspace in the dev Paseo removes the real worktree. Agents and plugin data are not copied; directory plugins run from the same paths as on your main daemon.
 - Inside a Paseo terminal, `PASEO_HOME` is the main daemon's home, so `npm run cli` and a bare `paseo` talk to your main daemon. Pass `--home .dev/paseo-home`.
 - The `daemon` script picks a new port on every start and `desktop` reads it at launch. After restarting `daemon`, restart `desktop`.
-- Metro logs a `Web ERROR` about `RCTAnimation` and `useNativeDriver`, and the window toasts "React does not recognize the `uniProps` prop" from Unistyles. Both are dev-only warnings.
+- Seeding also snapshots your installed desktop profile's appearance, fonts, shortcuts, editor choice, sidebar preferences, window geometry and notification sound. The launcher imports these into its isolated profile before the app loads, once per snapshot and Metro origin. Dev preference changes survive restarts on the same origin; re-run `dev:seed-home` to refresh from the main app.
+- The source desktop profile defaults to your platform's `Paseo` application-data folder. Override it with `PASEO_DEV_SOURCE_DESKTOP_PROFILE`. Host connections, credentials, drafts, browser sessions and workspace navigation are excluded because they belong to the main daemon. The main app's live profile is never opened for writing.
+- Verify a fresh window reload has no React prop warnings; dismissing a toast does not verify a fix.
 - Stop both scripts when you are done. The desktop window holds the worktree's single-instance lock until then.
 
 To try a plugin change, see [Test a plugin change](plugins.md#test-a-plugin-change).
