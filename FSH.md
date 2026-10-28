@@ -20,6 +20,7 @@ temporary by design: every patch is meant to go upstream and then drop out of `f
 - FSH-only (not upstream yet): docs and a `paseo-run` skill for running a branch, or testing a plugin, next to the Paseo you work in
 - FSH-only (not upstream yet): new workspaces branch off the repo's default branch, not whatever branch the source checkout is on. The daemon picks the ref: the default branch's upstream (any remote), then origin's copy, then local
 - FSH-only (not upstream yet): remove a project from its settings page (Settings → Projects → project → Danger zone), not just from the sidebar menu
+- FSH-only: the desktop app's update callout installs new FSH builds through `scripts/install-fsh.sh` (see Install below)
 
 Keep this list in sync with what's merged into `fsh`.
 
@@ -41,7 +42,12 @@ It also removes the Homebrew `paseo-fsh` or upstream `paseo` cask if either is i
 its own build back. Your `~/.paseo` data and hosts are kept. Plugins you installed from a local directory are left
 alone. `--no-plugins` skips the plugin step.
 
-There's no in-app auto-update; that needs a Developer ID signed build.
+Once installed, Paseo checks every 30 minutes whether GitHub's latest release is newer than its own build (`fshBuild`,
+the release tag stamped into the app). If it is, an **Update available** callout appears at the bottom of the sidebar.
+**Install & restart** runs this script with `--yes` in the background and writes its output to `fsh-update.log` in
+the app's log folder (`~/Library/Logs/Paseo`). Settings → App updates runs the same check. If the app was replaced on
+disk some other way, the callout offers a plain restart. Builds from before this updater have no stamp, so run the
+script by hand once.
 
 Then install at least one agent CLI (Claude Code, Codex) and `gh`, both signed in. Paseo runs them; it doesn't ship
 one.
