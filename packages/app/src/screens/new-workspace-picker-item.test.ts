@@ -311,6 +311,16 @@ describe("buildPickerOptionData", () => {
   });
 });
 
+describe("buildPickerOptionData default branch", () => {
+  it("adds a marked default row that says it is the default", () => {
+    const baseItem = defaultBasePickerItem({ currentBranch: "feature-x", baseRef: "main" });
+    const data = buildPickerOptionData({ branchDetails: [mainRow], prItems: [], baseItem });
+
+    expect(data.options[0]?.label).toBe("main (default)");
+    expect(data.selectedOptionId).toBe(data.options[0]?.id);
+  });
+});
+
 describe("defaultBasePickerItem", () => {
   it("uses origin when the current branch tracks origin", () => {
     expect(
@@ -341,27 +351,21 @@ describe("defaultBasePickerItem", () => {
     expect(defaultBasePickerItem({ currentBranch: null })).toBeNull();
   });
 
-  it("uses origin's default branch when on another branch", () => {
-    expect(
-      defaultBasePickerItem({
-        currentBranch: "feature-x",
-        upstreamRef: "refs/remotes/origin/feature-x",
-        baseRef: "main",
-        hasRemote: true,
-      }),
-    ).toMatchObject({ refName: "refs/remotes/origin/main", name: "main" });
-  });
-
-  it("uses the local default branch when there is no remote", () => {
-    expect(
-      defaultBasePickerItem({ currentBranch: "feature-x", baseRef: "main", hasRemote: false }),
-    ).toMatchObject({ refName: "refs/heads/main", name: "main" });
+  it("leaves the default branch to the daemon when on another branch", () => {
+    const item = defaultBasePickerItem({
+      currentBranch: "feature-x",
+      upstreamRef: "refs/remotes/origin/feature-x",
+      baseRef: "main",
+    });
+    expect(item).toMatchObject({ kind: "default-branch", name: "main" });
+    expect(pickerItemToCheckoutRequest(item)).toEqual({ action: "branch-off" });
   });
 
   it("uses the default branch from detached HEAD", () => {
-    expect(
-      defaultBasePickerItem({ currentBranch: null, baseRef: "main", hasRemote: true }),
-    ).toMatchObject({ refName: "refs/remotes/origin/main", name: "main" });
+    expect(defaultBasePickerItem({ currentBranch: null, baseRef: "main" })).toMatchObject({
+      kind: "default-branch",
+      name: "main",
+    });
   });
 
   it("keeps the exact upstream when on the default branch", () => {
@@ -370,9 +374,19 @@ describe("defaultBasePickerItem", () => {
         currentBranch: "main",
         upstreamRef: "refs/remotes/upstream/main",
         baseRef: "main",
-        hasRemote: true,
       }),
     ).toMatchObject({ refName: "refs/remotes/upstream/main", name: "main" });
+  });
+
+  it("ignores a Paseo worktree's own base", () => {
+    expect(
+      defaultBasePickerItem({
+        currentBranch: "feature-x",
+        upstreamRef: null,
+        baseRef: "dev",
+        isPaseoOwnedWorktree: true,
+      }),
+    ).toMatchObject({ kind: "branch", refName: "refs/heads/feature-x" });
   });
 });
 
