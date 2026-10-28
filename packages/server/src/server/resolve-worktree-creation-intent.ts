@@ -29,6 +29,8 @@ export interface ResolveWorktreeCreationIntentDeps {
   forge: string;
   forgeService: ForgeService;
   resolveDefaultBranch: (repoRoot: string) => Promise<string>;
+  // FSH: the exact ref to branch off when none was given. Falls back to the default branch name.
+  resolveDefaultBaseRef?: (repoRoot: string) => Promise<string>;
 }
 
 export class MissingCheckoutTargetError extends Error {
@@ -72,7 +74,7 @@ export async function resolveWorktreeCreationIntent(
   if (input.action === "branch-off") {
     return {
       kind: "branch-off",
-      baseBranch: input.refName?.trim() || (await resolveDefaultBranch(repoRoot, deps)),
+      baseBranch: input.refName?.trim() || (await resolveDefaultBaseRef(repoRoot, deps)),
       branchName: input.branchName ?? input.worktreeSlug ?? "worktree",
     };
   }
@@ -121,7 +123,7 @@ export async function resolveWorktreeCreationIntent(
 
   return {
     kind: "branch-off",
-    baseBranch: await resolveDefaultBranch(repoRoot, deps),
+    baseBranch: await resolveDefaultBaseRef(repoRoot, deps),
     branchName: input.branchName ?? input.worktreeSlug ?? "worktree",
   };
 }
@@ -259,6 +261,15 @@ async function resolveDefaultBranch(
     throw new Error("Unable to resolve repository default branch");
   }
   return baseBranch;
+}
+
+async function resolveDefaultBaseRef(
+  repoRoot: string,
+  deps: ResolveWorktreeCreationIntentDeps,
+): Promise<string> {
+  return deps.resolveDefaultBaseRef
+    ? deps.resolveDefaultBaseRef(repoRoot)
+    : resolveDefaultBranch(repoRoot, deps);
 }
 
 async function resolvePrHeadRef(params: {
