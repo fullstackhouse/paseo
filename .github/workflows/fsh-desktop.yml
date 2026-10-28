@@ -75,6 +75,16 @@ jobs:
           <a href="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/commit/$(git rev-parse HEAD)">Commit ${sha}</a>
           </div>
           EOF
+          # Append to upstream's mac.extraResources: a -c.mac.extraResources override replaces the list
+          # and drops the bundled CLI shim.
+          node -e '
+            const fs = require("fs");
+            const yaml = require(require.resolve("js-yaml", { paths: [require.resolve("app-builder-lib")] }));
+            const file = "packages/desktop/electron-builder.yml";
+            const config = yaml.load(fs.readFileSync(file, "utf8"));
+            config.mac.extraResources.push({ from: "Credits.html", to: "Credits.html" });
+            fs.writeFileSync(file, yaml.dump(config, { lineWidth: -1 }));
+          '
 
       - name: Build desktop app
         env:
@@ -84,16 +94,14 @@ jobs:
           PASEO_DESKTOP_SMOKE_ARTIFACT_DIR: ${{ runner.temp }}/desktop-smoke
           NODE_OPTIONS: --max-old-space-size=4096
         run: |
-          version="$(node -p 'require("./packages/desktop/package.json").version')"
           npm run build:desktop -- --publish never --mac dmg --arm64 \
-            "-c.extraMetadata.fshBuild=${version}-$(git rev-parse --short HEAD)" \
+            "-c.extraMetadata.fshBuild=${FSH_VERSION}-${FSH_SHA}" \
             -c.mac.identity=- \
             -c.mac.notarize=false \
             -c.mac.hardenedRuntime=false \
             -c.publish.owner=fullstackhouse \
             -c.buildVersion="fsh.${FSH_SHA}" \
-            -c.copyright="Copyright © $(date +%Y) Mohamed Boudra · FSH build by Full Stack House" \
-            -c.mac.extraResources=Credits.html
+            -c.copyright="Copyright © $(date +%Y) Mohamed Boudra · FSH build by Full Stack House"
 
       - name: Upload smoke diagnostics
         if: failure()
