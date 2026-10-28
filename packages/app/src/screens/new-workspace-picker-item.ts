@@ -20,6 +20,9 @@ export type PickerItem =
       accessibilityLabel: string;
       divergenceLabel?: string;
       committerDate?: number;
+      // FSH: the repository default branch row. Branching off it leaves the exact ref to the
+      // daemon, since the app can't see which remote the default branch tracks.
+      daemonResolvesRef?: boolean;
     }
   | {
       kind: "github-pr";
@@ -42,6 +45,7 @@ export const DEFAULT_REF_ACTION: Record<PickerItem["kind"], RefAction> = {
 
 const BRANCH_OPTION_PREFIX = "branch:";
 const PR_OPTION_PREFIX = "github-pr:";
+const DEFAULT_BRANCH_OPTION_ID = "default-branch";
 const REMOTE_TRACKING_PREFIX = "refs/remotes/";
 
 export function branchPickerOptionId(refName: string): string {
@@ -137,6 +141,10 @@ export function buildBranchPickerItems(details: readonly BranchPickerDetail[]): 
 export interface BaseRefCheckoutStatus {
   currentBranch: string | null;
   upstreamRef?: string | null;
+  // The repository default branch for a regular checkout. A Paseo worktree reports the base it
+  // was cut from instead, which is not what the daemon resolves, so it is ignored there.
+  baseRef?: string | null;
+  isPaseoOwnedWorktree?: boolean;
 }
 
 // Display only. The exact ref is what every request carries; this is just how a ref reads in
@@ -166,11 +174,25 @@ function refQualifier(refName: string): string | null {
 // row, the trigger label, and the created ref all read this; computing it twice is how the
 // picker once showed local main while branching off something else.
 //
-// The upstream wins when the branch has one, because branching off the local ref silently
-// carries unpushed commits into the new workspace. The daemon sends the resolved ref rather
-// than a remote name, so a fork tracking upstream/main branches from upstream/main.
+// FSH: new workspaces branch off the repository default branch, whatever the source checkout
+// happens to be on. The daemon picks the exact ref: the branch's own upstream, then origin's
+// copy, then the local branch, so unpushed local commits stay out of the new workspace.
+//
+// On the default branch itself, the upstream wins when the branch has one, for the same
+// reason. The daemon sends the resolved ref rather than a remote name, so a fork tracking
+// upstream/main branches from upstream/main.
 export function defaultBasePickerItem(status: BaseRefCheckoutStatus): PickerItem | null {
   const currentBranch = status.currentBranch;
+  const defaultBranch = status.isPaseoOwnedWorktree ? null : status.baseRef;
+  if (defaultBranch && defaultBranch !== currentBranch) {
+    return {
+      kind: "branch",
+      name: defaultBranch,
+      refName: `refs/heads/${defaultBranch}`,
+      daemonResolvesRef: true,
+      accessibilityLabel: `${defaultBranch}, default branch`,
+    };
+  }
   if (!currentBranch) return null;
   // COMPAT(checkoutUpstreamRef): added in v0.2.6, remove after 2027-02-01 once the daemon
   // floor sends upstreamRef. Daemons that predate it omit the field, which lands on the
@@ -195,9 +217,9 @@ export function pickerItemToCheckoutRequest(
   switch (item.kind) {
     case "branch":
       // A checkout works on the local branch; both the origin row and the local row stand for it.
-      return action === "checkout"
-        ? { action, refName: branchNameFromRef(item.refName) }
-        : { action, refName: item.refName };
+      if (action === "checkout") return { action, refName: branchNameFromRef(item.refName) };
+      // FSH: the default-branch row leaves the exact ref to the daemon.
+      return item.daemonResolvesRef ? { action } : { action, refName: item.refName };
     case "github-pr": {
       const headRefName = item.item.headRefName?.trim();
       const forge = item.item.forge ?? "github";
@@ -265,9 +287,12 @@ export function prPickerOptionId(number: number): string {
 }
 
 export function pickerOptionId(item: PickerItem): string {
-  return item.kind === "branch"
-    ? branchPickerOptionId(item.refName)
-    : prPickerOptionId(item.item.number);
+  switch (item.kind) {
+    case "branch":
+      return item.daemonResolvesRef ? DEFAULT_BRANCH_OPTION_ID : branchPickerOptionId(item.refName);
+    case "github-pr":
+      return prPickerOptionId(item.item.number);
+  }
 }
 
 function formatPrLabel(item: Pick<ForgeSearchItem, "forge" | "number" | "title">): string {
@@ -276,7 +301,7 @@ function formatPrLabel(item: Pick<ForgeSearchItem, "forge" | "number" | "title">
 }
 
 export function pickerItemLabel(item: PickerItem): string {
-  return item.kind === "branch" ? item.name : formatPrLabel(item.item);
+  return item.kind === "github-pr" ? formatPrLabel(item.item) : item.name;
 }
 
 export interface PickerOptionData {
@@ -351,9 +376,9 @@ export function buildPickerOptionData(input: {
 // Two rows reading "main" would be a coin flip for the user, so the added row says where its
 // ref lives. Only when it collides — a lone row needs no qualifier.
 function disambiguate(item: PickerItem, existing: readonly TimedOption[]): PickerItem {
-  if (item.kind !== "branch") return item;
+  if (item.kind === "github-pr") return item;
   if (!existing.some((entry) => entry.option.label === item.name)) return item;
-  const qualifier = refQualifier(item.refName);
+  const qualifier = item.daemonResolvesRef ? "default" : refQualifier(item.refName);
   if (!qualifier) return item;
   const name = `${item.name} (${qualifier})`;
   return {
