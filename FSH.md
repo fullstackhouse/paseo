@@ -50,7 +50,7 @@ quit is not optional housekeeping: unlike the upstream cask, `paseo-fsh` has no 
 swaps the app on disk and leaves the old build running, indefinitely.
 
 Nothing in the UI or the CLI will tell you. Every FSH build reports the same `0.13.0-beta.1` from `paseo --version`
-and `paseo status` — the part that identifies the build is the commit sha in the *cask* version
+and `paseo status` — the part that identifies the build is the commit sha in the _cask_ version
 (`0.13.0-beta.1-28159c2`), which the app itself never sees. To check whether you are running what is on disk, compare
 the inode the process executes against the file:
 
