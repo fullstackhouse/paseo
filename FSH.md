@@ -122,5 +122,7 @@ Agents that already existed when a plugin was installed don't get its MCP tools.
   and publishes a release for each (`fsh-*`, `fsh-android-*`).
   The build runs upstream's packaged-app smoke test first. You can also start it by hand:
   Actions → FSH desktop build → Run workflow.
+  A PR that changes `fsh-desktop.yml`, or a manual run on another branch, builds the DMG as a run artifact
+  (`paseo-fsh-<sha>-dmg`) instead of a release, since `install-fsh.sh` installs the latest release.
 - **Upstream workflows**: they trigger on pushes to `main` and on `v*` tags, and need upstream's
   secrets. Don't push `main` or `v*` tags here. Our release tags are `fsh-*`.

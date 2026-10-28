@@ -12,12 +12,18 @@
 # main binary is refused its own Electron Framework ("different Team IDs") and the app dies
 # at launch in dyld. The runner below is macOS 14, which does not enforce this, so the
 # packaged-app smoke test cannot catch it — keep the flag rather than relying on the gate.
+#
+# Only `fsh` publishes a release: install-fsh.sh installs GitHub's "latest" release, so a release
+# from any other ref would reach every install. PRs that touch this workflow, and manual runs on
+# other branches, upload the DMG as a run artifact instead.
 name: FSH desktop build
 
 on:
   push:
     branches: [fsh]
     paths-ignore: [FSH.md, README.md, "docs/fsh/**"]
+  pull_request:
+    paths: [.github/workflows/fsh-desktop.yml]
   workflow_dispatch:
 
 permissions:
@@ -26,8 +32,13 @@ permissions:
 jobs:
   macos-arm64:
     runs-on: macos-14
+    env:
+      FSH_PUBLISH: ${{ github.ref == 'refs/heads/fsh' }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Build the PR branch itself, not GitHub's merge commit, so the stamped sha is one you can find.
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -48,14 +59,20 @@ jobs:
           version="$(node -p 'require("./packages/desktop/package.json").version')"
           sha="$(git rev-parse --short HEAD)"
           tag="fsh-${version}-${sha}"
+          run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          if [[ "$FSH_PUBLISH" == "true" ]]; then
+            build_link="<a href=\"${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases/tag/${tag}\">Release ${tag}</a>"
+          else
+            build_link="<a href=\"${run_url}\">Test build (run ${GITHUB_RUN_ID})</a>"
+          fi
           echo "FSH_SHA=${sha}" >> "$GITHUB_ENV"
           echo "FSH_VERSION=${version}" >> "$GITHUB_ENV"
           echo "FSH_TAG=${tag}" >> "$GITHUB_ENV"
           cat > packages/desktop/Credits.html <<EOF
           <div style="font: 11px -apple-system, sans-serif; text-align: center">
           Built $(date -u '+%Y-%m-%d %H:%M UTC')<br>
-          <a href="https://github.com/fullstackhouse/paseo/releases/tag/${tag}">Release ${tag}</a> ·
-          <a href="https://github.com/fullstackhouse/paseo/commit/${GITHUB_SHA}">Commit ${sha}</a>
+          ${build_link} ·
+          <a href="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/commit/$(git rev-parse HEAD)">Commit ${sha}</a>
           </div>
           EOF
 
@@ -87,7 +104,17 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
+      - name: Upload test DMG
+        if: env.FSH_PUBLISH != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: paseo-fsh-${{ env.FSH_SHA }}-dmg
+          path: packages/desktop/release/*.dmg
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Publish release
+        if: env.FSH_PUBLISH == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
