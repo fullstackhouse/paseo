@@ -26,6 +26,7 @@ import {
   type AppUpdateCheckIntent,
   type AppReleaseChannel,
 } from "../features/auto-updater.js";
+import { createElectronFshUpdater } from "../features/fsh-updater-electron.js";
 import {
   getBundledCliShimPath,
   getCliInstallStatus,
@@ -399,6 +400,11 @@ async function resolveRequestedReleaseChannel(
 // ---------------------------------------------------------------------------
 
 export function createDaemonCommandHandlers(): Record<string, DesktopCommandHandler> {
+  const fshUpdater = createElectronFshUpdater({
+    stopDaemon: async () => {
+      await stopDesktopDaemon("app_update");
+    },
+  });
   return {
     ...createDesktopSettingsCommandHandlers({ settingsStore: getDesktopSettingsStore() }),
     desktop_get_runtime_info: () => ({
@@ -450,6 +456,7 @@ export function createDaemonCommandHandlers(): Record<string, DesktopCommandHand
       if (sessionId) closeLocalTransportSession(sessionId);
     },
     check_app_update: async (args) => {
+      if (fshUpdater) return fshUpdater.check();
       const currentVersion = resolveDesktopAppVersion();
       return checkForAppUpdate({
         currentVersion,
@@ -458,6 +465,7 @@ export function createDaemonCommandHandlers(): Record<string, DesktopCommandHand
       });
     },
     install_app_update: async (args) => {
+      if (fshUpdater) return fshUpdater.install();
       const currentVersion = resolveDesktopAppVersion();
       return downloadAndInstallUpdate(
         { currentVersion, releaseChannel: await resolveRequestedReleaseChannel(args) },
