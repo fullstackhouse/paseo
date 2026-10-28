@@ -2945,6 +2945,8 @@ export const fr: TranslationResources = {
     project: {
       noEditableTarget: "Ce projet n’est pas modifiable sur cet hôte.",
       backToProjects: "Retour aux projets",
+      removeHint:
+        "Retire ce projet de Paseo sur cet hôte. Les fichiers sur le disque ne sont pas modifiés.",
       edit: {
         title: "Modifier le projet",
         name: "Nom",

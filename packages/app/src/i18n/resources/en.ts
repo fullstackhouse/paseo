@@ -3006,6 +3006,7 @@ export const en = {
     project: {
       noEditableTarget: "This project isn't editable on this host.",
       backToProjects: "Back to projects",
+      removeHint: "Removes this project from Paseo on this host. Files on disk are not changed.",
       edit: {
         title: "Edit project",
         name: "Name",

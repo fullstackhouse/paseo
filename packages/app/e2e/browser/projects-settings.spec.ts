@@ -38,6 +38,7 @@ import {
   openProjectEditSheet,
   openProjectSettings,
   openProjects,
+  removeProjectFromSettings,
   removeProjectScript,
   restorePaseoConfig,
   returnToProjectsList,
@@ -324,6 +325,17 @@ test.describe("Projects settings", () => {
     await saveProjectEdits(page);
 
     await expectProjectEditFailed(page, "URL must use HTTP or HTTPS without credentials");
+  });
+
+  test("removes a project from its settings page", async ({ page, editableProject }) => {
+    await openProjects(page);
+    await openProjectSettings(page, editableProject.name);
+    await removeProjectFromSettings(page);
+
+    await expect(page).toHaveURL(buildProjectsSettingsRoute(getServerId()));
+    await expect(
+      page.getByRole("button", { name: `Edit ${editableProject.name}`, exact: true }),
+    ).toHaveCount(0, { timeout: 30_000 });
   });
 });
 

@@ -2845,6 +2845,7 @@ export const zhCN: TranslationResources = {
     project: {
       noEditableTarget: "此项目无法在这个 Host 上编辑。",
       backToProjects: "返回 Projects",
+      removeHint: "在这个 Host 上从 Paseo 移除此项目。磁盘上的文件不会改动。",
       edit: {
         title: "编辑 Project",
         name: "名称",
