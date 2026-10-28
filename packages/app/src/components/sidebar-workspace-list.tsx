@@ -152,7 +152,10 @@ import { OpenInFileManagerMenuItem } from "@/workspace/open-in-file-manager/menu
 import { useLocalDaemonServerId } from "@/hooks/use-is-local-daemon";
 import type { HostBadgeModel } from "@/hosts/appearance";
 import { useHostBadges } from "@/hosts/use-host-badges";
-import { useSidebarRowItems } from "@/components/sidebar/display-preferences/model";
+import {
+  useSidebarArchiveButton,
+  useSidebarRowItems,
+} from "@/components/sidebar/display-preferences/model";
 import { PullRequestStateIcon } from "@/git/pull-request-state-icon";
 import { ProjectCategorySubTrigger, useProjectCategoryMenuPages } from "@/projects/categories/menu";
 import {
@@ -657,10 +660,12 @@ function WorkspaceRowRightGroup({
   const workspacePath = workspace.workspaceDirectory ?? workspace.projectRootPath;
   const { t } = useTranslation();
   const trailing = useSidebarWorkspaceTrailing();
+  const archiveButtonEnabled = useSidebarArchiveButton();
   const showShortcut = showShortcutBadge && shortcutNumber !== null;
   const {
     trailingPresentation,
     showKebab: showKebabInSlot,
+    showArchiveButton,
     showScrim,
     renderSlot,
     reserveSlotWidth,
@@ -668,6 +673,7 @@ function WorkspaceRowRightGroup({
     workspace,
     trailing,
     hasArchiveAction: Boolean(onArchive),
+    archiveButtonEnabled,
     isHovered,
     isTouchPlatform,
     showShortcut,
@@ -687,6 +693,8 @@ function WorkspaceRowRightGroup({
           <SidebarWorkspaceTrailingActionOverlay
             visible={kebab.showKebab}
             scrimBackdrop={showScrim ? backdrop : undefined}
+            onArchiveButtonPress={showArchiveButton ? onArchive : undefined}
+            archiveButtonTestID={`sidebar-workspace-archive-button-${workspace.workspaceKey}`}
           >
             {onArchive ? (
               <SidebarWorkspaceMenu

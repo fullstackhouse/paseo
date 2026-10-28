@@ -30,6 +30,8 @@ import { StatusRing } from "@/components/status-ring";
 import { resolveSidebarWorkspacePrimaryLabel } from "@/components/sidebar/sidebar-workspace-title";
 import { DensityIcon } from "@/components/ui/density-icon";
 import { TrailingActionScrim } from "@/components/ui/trailing-action-scrim";
+import { shouldShowSidebarArchiveButton } from "@/components/sidebar/archive-button-visibility";
+import { SidebarWorkspaceArchiveButton } from "@/components/sidebar/sidebar-workspace-archive-button";
 import { useWorkspaceLabelDefinitions } from "@/workspace-labels";
 
 const needsInputColorMapping = (theme: Theme) => ({
@@ -331,6 +333,9 @@ export const sidebarWorkspaceRowStyles = StyleSheet.create((theme) => ({
     position: "absolute",
     top: 0,
     right: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
   },
 }));
 
@@ -358,6 +363,7 @@ export function resolveTrailingActionVisibility({
   workspace,
   trailing,
   hasArchiveAction,
+  archiveButtonEnabled,
   isHovered,
   isTouchPlatform,
   showShortcut,
@@ -365,12 +371,15 @@ export function resolveTrailingActionVisibility({
   workspace: SidebarWorkspaceEntry;
   trailing: SidebarWorkspaceTrailing;
   hasArchiveAction: boolean;
+  /** The user's Show > Archive button preference. */
+  archiveButtonEnabled: boolean;
   isHovered: boolean;
   isTouchPlatform: boolean;
   showShortcut: boolean;
 }): {
   trailingPresentation: SidebarWorkspaceTrailingPresentation;
   showKebab: boolean;
+  showArchiveButton: boolean;
   showScrim: boolean;
   renderSlot: boolean;
   reserveSlotWidth: boolean;
@@ -385,6 +394,12 @@ export function resolveTrailingActionVisibility({
   return {
     trailingPresentation,
     showKebab,
+    showArchiveButton: shouldShowSidebarArchiveButton({
+      enabled: archiveButtonEnabled,
+      showKebab,
+      isHovered,
+      isTouchPlatform,
+    }),
     // The scrim paints the row's own hover background, so it can only be drawn on a hovered
     // row — over an unhovered one the gradient fades to the wrong color. That is also why
     // touch, which shows the kebab without ever hovering, never gets one.
@@ -436,23 +451,44 @@ export function SidebarWorkspaceTrailingActionBase({
 export function SidebarWorkspaceTrailingActionOverlay({
   visible,
   scrimBackdrop,
+  onArchiveButtonPress,
+  archiveButtonTestID,
   children,
 }: {
   visible: boolean;
   /** Fade the row into the kebab when something (the diff stat) is still rendered behind it. */
   scrimBackdrop?: SidebarSurfaceBackdrop;
+  /** Present → a one-click Archive button sits before the kebab. */
+  onArchiveButtonPress?: () => void;
+  archiveButtonTestID?: string;
   children: ReactNode;
 }) {
   if (!visible || !children) return null;
   return (
     <>
       {scrimBackdrop ? (
-        <TrailingActionScrim backdrop={scrimBackdrop} testID="sidebar-workspace-trailing-scrim" />
+        <TrailingActionScrim
+          backdrop={scrimBackdrop}
+          width={onArchiveButtonPress ? ARCHIVE_BUTTON_SCRIM_WIDTH : undefined}
+          testID="sidebar-workspace-trailing-scrim"
+        />
       ) : null}
-      <View style={sidebarWorkspaceRowStyles.trailingActionOverlay}>{children}</View>
+      <View style={sidebarWorkspaceRowStyles.trailingActionOverlay}>
+        {onArchiveButtonPress ? (
+          <SidebarWorkspaceArchiveButton
+            onArchive={onArchiveButtonPress}
+            testID={archiveButtonTestID}
+          />
+        ) : null}
+        {children}
+      </View>
     </>
   );
 }
+
+// Two controls instead of one: the scrim's solid part has to cover both, or the diff stat shows
+// through between them.
+const ARCHIVE_BUTTON_SCRIM_WIDTH = 72;
 
 // The status dot centres on the title's first line, so both share its line height.
 const TITLE_LINE_HEIGHT = 20;

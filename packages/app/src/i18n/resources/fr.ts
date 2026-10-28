@@ -1235,6 +1235,7 @@ export const fr: TranslationResources = {
         labels: "Libellés",
         diff: "Statistiques du diff",
         timestamp: "Dernière activité",
+        archiveButton: "Bouton Archiver",
       },
       checks: {
         iconAndText: "Icône et texte",
