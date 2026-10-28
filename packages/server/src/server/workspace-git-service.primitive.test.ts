@@ -320,6 +320,7 @@ interface CreateServiceOptions {
   getCheckoutSnapshotFacts?: ReturnType<typeof vi.fn>;
   getCheckoutStatus?: ReturnType<typeof vi.fn>;
   getCheckoutShortstat?: ReturnType<typeof vi.fn>;
+  getCheckoutShortstatSince?: ReturnType<typeof vi.fn>;
   getCheckoutWorktreeState?: ReturnType<typeof vi.fn>;
   getPullRequestStatus?: ReturnType<typeof vi.fn>;
   getCheckoutDiff?: ReturnType<typeof vi.fn>;
@@ -2258,6 +2259,143 @@ describe("WorkspaceGitServiceImpl D2 read methods", () => {
     service.onWorkspaceStateMayHaveChanged("/unknown/cwd");
 
     expect(github.invalidate).not.toHaveBeenCalled();
+    service.dispose();
+  });
+});
+
+const MERGED_HEAD_SHA = "1111111111111111111111111111111111111111";
+
+function createMergedPullRequestStatusResult(
+  overrides?: Partial<NonNullable<PullRequestStatusResult["status"]>>,
+): PullRequestStatusResult {
+  const result = createPullRequestStatusResult();
+  if (!result.status) throw new Error("Expected pull request status");
+  return {
+    ...result,
+    status: {
+      ...result.status,
+      state: "merged",
+      isMerged: true,
+      headSha: MERGED_HEAD_SHA,
+      ...overrides,
+    },
+  };
+}
+
+describe("WorkspaceGitServiceImpl diff stat after the PR was merged", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  test("counts only changes since the merged PR's head commit", async () => {
+    const getCheckoutShortstatSince = vi.fn(async () => ({ diffStat: null }));
+    const service = createService({
+      getPullRequestStatus: vi.fn(async () => createMergedPullRequestStatusResult()),
+      getCheckoutShortstatSince,
+    });
+
+    const snapshot = await service.getSnapshot(REPO_CWD, { force: true, reason: "test" });
+
+    expect(getCheckoutShortstatSince).toHaveBeenCalledWith(
+      REPO_CWD,
+      MERGED_HEAD_SHA,
+      expect.anything(),
+    );
+    expect(snapshot.git.diffStat).toBeNull();
+    service.dispose();
+  });
+
+  test("keeps post-merge changes in the count", async () => {
+    const service = createService({
+      getPullRequestStatus: vi.fn(async () => createMergedPullRequestStatusResult()),
+      getCheckoutShortstatSince: vi.fn(async () => ({
+        diffStat: { additions: 4, deletions: 2 },
+      })),
+    });
+
+    const snapshot = await service.getSnapshot(REPO_CWD, { force: true, reason: "test" });
+
+    expect(snapshot.git.diffStat).toEqual({ additions: 4, deletions: 2 });
+    service.dispose();
+  });
+
+  test("keeps the merge-base count when the merged head is not in the branch history", async () => {
+    const service = createService({
+      getPullRequestStatus: vi.fn(async () => createMergedPullRequestStatusResult()),
+      getCheckoutShortstatSince: vi.fn(async () => null),
+    });
+
+    const snapshot = await service.getSnapshot(REPO_CWD, { force: true, reason: "test" });
+
+    expect(snapshot.git.diffStat).toEqual({ additions: 1, deletions: 0 });
+    service.dispose();
+  });
+
+  test.each([
+    ["the PR is open", { state: "open", isMerged: false }],
+    ["the forge reports no head commit", { headSha: undefined }],
+  ])("keeps the merge-base count when %s", async (_label, overrides) => {
+    const getCheckoutShortstatSince = vi.fn(async () => ({ diffStat: null }));
+    const service = createService({
+      getPullRequestStatus: vi.fn(async () => createMergedPullRequestStatusResult(overrides)),
+      getCheckoutShortstatSince,
+    });
+
+    const snapshot = await service.getSnapshot(REPO_CWD, { force: true, reason: "test" });
+
+    expect(getCheckoutShortstatSince).not.toHaveBeenCalled();
+    expect(snapshot.git.diffStat).toEqual({ additions: 1, deletions: 0 });
+    service.dispose();
+  });
+
+  test("recounts when a PR status poll reports the merge", async () => {
+    let pollStatus: ((status: CurrentPullRequestStatus | null) => void) | null = null;
+    const github = {
+      ...createGitHubServiceStub(),
+      retainCurrentPullRequestStatusPoll: vi.fn(
+        (options: { onStatus: (status: CurrentPullRequestStatus | null) => void }) => {
+          pollStatus = options.onStatus;
+          return { unsubscribe: vi.fn() };
+        },
+      ),
+    };
+    const getCheckoutShortstatSince = vi.fn(async () => ({ diffStat: null }));
+    const listener = vi.fn();
+    const service = createService({ github, getCheckoutShortstatSince });
+    const subscription = service.registerWorkspace({ cwd: REPO_CWD }, listener);
+    await vi.waitFor(() => {
+      expect(pollStatus).not.toBeNull();
+    });
+
+    pollStatus?.(
+      createCurrentPullRequestStatus({
+        url: "https://github.com/acme/repo/pull/123",
+        state: "merged",
+        isMerged: true,
+        headSha: MERGED_HEAD_SHA,
+      }),
+    );
+    await vi.advanceTimersByTimeAsync(1_000);
+    await flushPromises();
+
+    expect(getCheckoutShortstatSince).toHaveBeenCalledWith(
+      REPO_CWD,
+      MERGED_HEAD_SHA,
+      expect.anything(),
+    );
+    expect(listener).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        git: expect.objectContaining({ diffStat: null }),
+        forge: expect.objectContaining({
+          pullRequest: expect.objectContaining({ isMerged: true }),
+        }),
+      }),
+    );
+    subscription.unsubscribe();
     service.dispose();
   });
 });

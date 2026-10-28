@@ -3049,26 +3049,62 @@ async function getCheckoutShortstatUncached(
     if (!mergeBase) {
       return null;
     }
-
-    const [{ stdout }, untrackedAdditions] = await Promise.all([
-      getRunGitCommand(context)(["diff", "--shortstat", mergeBase], {
-        cwd,
-        envOverlay: READ_ONLY_GIT_ENV,
-      }),
-      countUntrackedAdditions(cwd, context, options?.throwOnGitError),
-    ]);
-
-    const tracked = parseCheckoutShortstat(stdout);
-
-    if (tracked) {
-      return { additions: tracked.additions + untrackedAdditions, deletions: tracked.deletions };
-    }
-    if (untrackedAdditions > 0) {
-      return { additions: untrackedAdditions, deletions: 0 };
-    }
-    return null;
+    return await getShortstatAgainst(cwd, mergeBase, context, options?.throwOnGitError);
   } catch (error) {
     return handleShortstatGitError(error, options?.throwOnGitError);
+  }
+}
+
+/** Tracked changes from `base` to the working tree, plus untracked files. */
+async function getShortstatAgainst(
+  cwd: string,
+  base: string,
+  context?: CheckoutContext,
+  throwOnGitError?: boolean,
+): Promise<CheckoutShortstat | null> {
+  const [{ stdout }, untrackedAdditions] = await Promise.all([
+    getRunGitCommand(context)(["diff", "--shortstat", base], {
+      cwd,
+      envOverlay: READ_ONLY_GIT_ENV,
+    }),
+    countUntrackedAdditions(cwd, context, throwOnGitError),
+  ]);
+
+  const tracked = parseCheckoutShortstat(stdout);
+
+  if (tracked) {
+    return { additions: tracked.additions + untrackedAdditions, deletions: tracked.deletions };
+  }
+  if (untrackedAdditions > 0) {
+    return { additions: untrackedAdditions, deletions: 0 };
+  }
+  return null;
+}
+
+/**
+ * Diff stat of everything after `baseSha` — later commits, uncommitted and untracked changes.
+ * Squash and rebase merges never make the branch's commits ancestors of the base branch, so a
+ * merged PR's head commit is the only baseline that drops the already-merged work.
+ * Returns `null` when `baseSha` is unknown locally or not in HEAD's history (the branch was
+ * rebased or reset after the merge); callers keep the merge-base stat then.
+ */
+export async function getCheckoutShortstatSince(
+  cwd: string,
+  baseSha: string,
+  context?: CheckoutContext,
+): Promise<{ diffStat: CheckoutShortstat | null } | null> {
+  try {
+    await getRunGitCommand(context)(["merge-base", "--is-ancestor", baseSha, "HEAD"], {
+      cwd,
+      envOverlay: READ_ONLY_GIT_ENV,
+    });
+  } catch {
+    return null;
+  }
+  try {
+    return { diffStat: await getShortstatAgainst(cwd, baseSha, context) };
+  } catch {
+    return null;
   }
 }
 
@@ -4376,6 +4412,8 @@ export interface PullRequestStatus {
   state: string;
   baseRefName: string;
   headRefName: string;
+  /** Head commit the forge reports for the PR; for a merged PR, the commit that was merged. */
+  headSha?: string;
   isMerged: boolean;
   isDraft?: boolean;
   mergeable?: PullRequestMergeable;
