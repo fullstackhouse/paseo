@@ -153,6 +153,12 @@ import type { HostBadgeModel } from "@/hosts/appearance";
 import { useHostBadges } from "@/hosts/use-host-badges";
 import { useSidebarRowItems } from "@/components/sidebar/display-preferences/model";
 import { PullRequestStateIcon } from "@/git/pull-request-state-icon";
+import { ProjectCategorySubTrigger, useProjectCategoryMenuPages } from "@/projects/categories/menu";
+import {
+  ALL_PROJECT_CATEGORIES,
+  resolveProjectCategorySelection,
+} from "@/projects/categories/model";
+import { useProjectCategoriesStore } from "@/projects/categories/store";
 
 const workspaceKeyExtractor = (workspace: SidebarWorkspacePlacement) => workspace.workspaceKey;
 
@@ -485,6 +491,7 @@ function ProjectKebabMenu({
   removeProjectStatus: "idle" | "pending" | "success";
 }) {
   const { t } = useTranslation();
+  const pages = useProjectCategoryMenuPages(projectViewKey);
   return (
     <DropdownMenu compactMode="sheet">
       <DropdownMenuTrigger
@@ -496,7 +503,12 @@ function ProjectKebabMenu({
       >
         {renderKebabTriggerIcon}
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" width={220} sheetTitle={t("sidebar.project.actions.menu")}>
+      <DropdownMenuContent
+        align="end"
+        width={220}
+        pages={pages}
+        sheetTitle={t("sidebar.project.actions.menu")}
+      >
         <ProjectMenuItems
           surface="dropdown"
           projectViewKey={projectViewKey}
@@ -580,6 +592,7 @@ function ProjectMenuItems({
           {t("sidebar.project.actions.openNewWindow")}
         </ProjectMenuItem>
       ) : null}
+      <ProjectCategorySubTrigger projectViewKey={projectViewKey} />
       <OpenInFileManagerMenuItem
         surface={surface}
         path={projectPath}
@@ -877,6 +890,7 @@ function ProjectHeaderRow({
   const localDaemonServerId = useLocalDaemonServerId();
   const projectPath = resolveSidebarProjectLocalPath(project, localDaemonServerId);
   const settingsTarget = project.hosts[0] ?? null;
+  const categoryPages = useProjectCategoryMenuPages(project.viewKey);
   const handleBeginWorkspaceSetup = useCallback(() => {
     if (!worktreeTarget) {
       return;
@@ -1033,6 +1047,7 @@ function ProjectHeaderRow({
       <ContextMenuContent
         align="start"
         width={220}
+        pages={categoryPages}
         testID={`sidebar-project-context-menu-${project.viewKey}`}
       >
         <ProjectMenuItems
@@ -2102,6 +2117,9 @@ function ProjectModeList({
 }) {
   const { t } = useTranslation();
   const hasActiveHostFilter = useSidebarViewStore((state) => state.hostFilters.length > 0);
+  const hasActiveProjectCategory = useProjectCategoriesStore(
+    (state) => resolveProjectCategorySelection(state) !== ALL_PROJECT_CATEGORIES,
+  );
   const [creatingWorkspaceIds, setCreatingWorkspaceIds] = useState<Set<string>>(() => new Set());
   const creatingWorkspaceTimeoutsRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(
     new Map(),
@@ -2405,10 +2423,12 @@ function ProjectModeList({
         sidebar is genuinely empty, where a section heading would sit over nothing.
         Every filter that can empty this branch needs a term here: a project filter pinned to a
         project whose chats are all pinned leaves `unpinnedProjects` empty, and without its term
-        the header would go with it, taking the only route back to the filter page. */}
+        the header would go with it, taking the only route back to the filter page. The header
+        also holds the project category switcher, the only way back out of a category. */}
       {unpinnedProjects.length > 0 ||
       hasActiveHostFilter ||
       hasActiveProjectFilter ||
+      hasActiveProjectCategory ||
       sidebarFilterEmpty
         ? listHeaderComponent
         : null}

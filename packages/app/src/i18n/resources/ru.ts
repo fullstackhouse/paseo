@@ -1240,6 +1240,22 @@ export const ru: TranslationResources = {
         all: "Все проекты",
       },
     },
+    categories: {
+      label: "Категория",
+      switcher: "Категория проекта",
+      all: "Все проекты",
+      uncategorized: "Без категории",
+      none: "Нет",
+      create: "Новая категория",
+      name: "Название категории",
+      createConfirm: "Создать категорию",
+      rename: "Переименовать категорию",
+      renameConfirm: "Сохранить",
+      nameTaken: "Это имя уже занято.",
+      delete: "Удалить категорию",
+      deleteTitle: "Удалить категорию?",
+      deleteMessage: "Проекты из «{{name}}» останутся без категории.",
+    },
     filterEmpty: {
       title: "Нет подходящих рабочих пространств",
       description:

@@ -1252,6 +1252,22 @@ export const fr: TranslationResources = {
         all: "Tous les projets",
       },
     },
+    categories: {
+      label: "Catégorie",
+      switcher: "Catégorie de projet",
+      all: "Tous les projets",
+      uncategorized: "Sans catégorie",
+      none: "Aucune",
+      create: "Nouvelle catégorie",
+      name: "Nom de la catégorie",
+      createConfirm: "Créer la catégorie",
+      rename: "Renommer la catégorie",
+      renameConfirm: "Enregistrer",
+      nameTaken: "Ce nom existe déjà.",
+      delete: "Supprimer la catégorie",
+      deleteTitle: "Supprimer la catégorie ?",
+      deleteMessage: "Les projets de « {{name}} » n'auront plus de catégorie.",
+    },
     filterEmpty: {
       title: "Aucun espace de travail ne correspond",
       description:
