@@ -28,6 +28,7 @@ import {
   getCurrentBranch,
   getCheckoutDiff,
   getCheckoutShortstat,
+  getCheckoutShortstatSince,
   getPullRequestStatus,
   getCheckoutStatus,
   checkoutResolvedBranch,
@@ -1239,6 +1240,66 @@ const x = 1;
     const shortstat = await getCheckoutShortstat(repoDir);
 
     expect(shortstat).toEqual({ additions: 1, deletions: 0 });
+  });
+
+  describe("after the branch's PR was squash-merged", () => {
+    let mergedHeadSha: string;
+
+    beforeEach(() => {
+      const { cloneDir } = setupRemoteTrackingMain(repoDir, tempDir);
+      execFileSync("git", ["checkout", "-b", "feature"], { cwd: repoDir });
+      commitFile(repoDir, "feature.txt", "one\ntwo\n", "feature one");
+      commitFile(repoDir, "feature-2.txt", "three\n", "feature two");
+      mergedHeadSha = execFileSync("git", ["rev-parse", "HEAD"], { cwd: repoDir })
+        .toString()
+        .trim();
+      execFileSync("git", ["push", "origin", "feature"], { cwd: repoDir });
+      execFileSync("git", ["fetch", "origin"], { cwd: cloneDir });
+      execFileSync("git", ["merge", "--squash", "origin/feature"], { cwd: cloneDir });
+      execFileSync("git", ["-c", "commit.gpgsign=false", "commit", "-m", "squash"], {
+        cwd: cloneDir,
+      });
+      execFileSync("git", ["push", "origin", "main"], { cwd: cloneDir });
+      execFileSync("git", ["fetch", "origin"], { cwd: repoDir });
+    });
+
+    it("still counts the merged work against the merge-base", async () => {
+      expect(await getCheckoutShortstat(repoDir)).toEqual({ additions: 3, deletions: 0 });
+    });
+
+    it("reports nothing since the merged head when the branch is unchanged", async () => {
+      expect(await getCheckoutShortstatSince(repoDir, mergedHeadSha)).toEqual({ diffStat: null });
+    });
+
+    it("counts uncommitted and untracked changes made after the merge", async () => {
+      writeFileSync(join(repoDir, "feature.txt"), "one\ntwo\nfour\n");
+      writeFileSync(join(repoDir, "untracked.txt"), "five\n");
+
+      expect(await getCheckoutShortstatSince(repoDir, mergedHeadSha)).toEqual({
+        diffStat: { additions: 2, deletions: 0 },
+      });
+    });
+
+    it("counts commits made after the merge", async () => {
+      commitFile(repoDir, "after.txt", "after\n", "after merge");
+
+      expect(await getCheckoutShortstatSince(repoDir, mergedHeadSha)).toEqual({
+        diffStat: { additions: 1, deletions: 0 },
+      });
+    });
+
+    it("returns null when the merged head is no longer in the branch history", async () => {
+      execFileSync("git", ["reset", "--hard", "origin/main"], { cwd: repoDir });
+      commitFile(repoDir, "rewritten.txt", "rewritten\n", "rewritten");
+
+      expect(await getCheckoutShortstatSince(repoDir, mergedHeadSha)).toBeNull();
+    });
+
+    it("returns null when the merged head is unknown locally", async () => {
+      expect(
+        await getCheckoutShortstatSince(repoDir, "0123456789abcdef0123456789abcdef01234567"),
+      ).toBeNull();
+    });
   });
 
   it("includes untracked file lines in shortstat additions", async () => {

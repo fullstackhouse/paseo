@@ -18,6 +18,7 @@ import {
   getCheckoutRefDerivedState,
   getCheckoutSnapshotFacts,
   getCheckoutShortstat,
+  getCheckoutShortstatSince,
   getCheckoutStatus,
   getCheckoutWorktreeState,
   getPullRequestStatus,
@@ -190,6 +191,7 @@ export interface WorkspaceGitRuntimeSnapshot {
       state: string;
       baseRefName: string;
       headRefName: string;
+      headSha?: string;
       isMerged: boolean;
       isDraft?: boolean;
       mergeable?: PullRequestMergeable;
@@ -366,6 +368,7 @@ interface WorkspaceGitServiceDependencies {
   getCheckoutRefDerivedState: typeof getCheckoutRefDerivedState;
   getCheckoutStatus: typeof getCheckoutStatus;
   getCheckoutShortstat: typeof getCheckoutShortstat;
+  getCheckoutShortstatSince: typeof getCheckoutShortstatSince;
   getCheckoutWorktreeState: typeof getCheckoutWorktreeState;
   getCheckoutDiff: typeof getCheckoutDiff;
   getPullRequestStatus: typeof getPullRequestStatus;
@@ -430,6 +433,8 @@ interface WorkspaceGitTarget {
   latestGitLoadedAtMs: number | null;
   latestForge: WorkspaceGitRuntimeSnapshot["forge"] | null;
   latestForgeLoadedAtMs: number | null;
+  /** Diff stat since the merged PR's head commit; replaces `latestGit.diffStat` while it matches. */
+  mergedPullRequestDiffStat: MergedPullRequestDiffStat | null;
   latestSnapshot: WorkspaceGitRuntimeSnapshot | null;
   latestSnapshotLoadedAtMs: number | null;
   latestFacts: CheckoutSnapshotFacts | null;
@@ -440,6 +445,13 @@ interface WorkspaceGitTarget {
   observationSetupPromise: Promise<void> | null;
   observationSetupComplete: boolean;
   closed: boolean;
+}
+
+interface MergedPullRequestDiffStat {
+  headSha: string;
+  /** False when the head commit is missing locally or not in HEAD's history. */
+  applies: boolean;
+  diffStat: WorkspaceGitRuntimeSnapshot["git"]["diffStat"];
 }
 
 interface RepoGitTarget {
@@ -559,6 +571,7 @@ function buildDefaultWorkspaceGitServiceDeps(
     getCheckoutRefDerivedState,
     getCheckoutStatus,
     getCheckoutShortstat,
+    getCheckoutShortstatSince,
     getCheckoutWorktreeState,
     getCheckoutDiff,
     getPullRequestStatus,
@@ -1211,6 +1224,7 @@ export class WorkspaceGitServiceImpl implements WorkspaceGitService {
       latestGitLoadedAtMs: null,
       latestForge: null,
       latestForgeLoadedAtMs: null,
+      mergedPullRequestDiffStat: null,
       latestSnapshot: null,
       latestSnapshotLoadedAtMs: null,
       latestFacts: null,
@@ -3217,6 +3231,18 @@ export class WorkspaceGitServiceImpl implements WorkspaceGitService {
     request: WorkspaceGitRefreshRequest,
     runRefreshGitCommand: RunGitCommand,
   ): Promise<WorkspaceGitRuntimeSnapshot> {
+    await this.refreshSnapshotParts(target, request, runRefreshGitCommand);
+    await this.refreshMergedPullRequestDiffStat(target, runRefreshGitCommand);
+    const snapshot = this.combineSnapshot(target);
+    target.latestSnapshotLoadedAtMs = this.deps.now().getTime();
+    return snapshot;
+  }
+
+  private async refreshSnapshotParts(
+    target: WorkspaceGitTarget,
+    request: WorkspaceGitRefreshRequest,
+    runRefreshGitCommand: RunGitCommand,
+  ): Promise<void> {
     let facts = target.latestFacts;
     if (request.movedRemoteRefs.size > 0 && !request.refreshStructure && !request.refreshWorktree) {
       if (facts?.isGit && target.latestGit?.isGit) {
@@ -3227,7 +3253,7 @@ export class WorkspaceGitServiceImpl implements WorkspaceGitService {
             request.movedRemoteRefs,
             runRefreshGitCommand,
           );
-          return this.combineSnapshot(target);
+          return;
         } catch (error) {
           this.logger.debug(
             { err: error, cwd: target.cwd, movedRemoteRefs: [...request.movedRemoteRefs] },
@@ -3244,7 +3270,7 @@ export class WorkspaceGitServiceImpl implements WorkspaceGitService {
         },
         runRefreshGitCommand,
       );
-      return this.combineSnapshot(target);
+      return;
     }
     if (request.refreshStructure || !facts || !target.latestGit) {
       facts = await this.refreshGitSnapshot(target, request, runRefreshGitCommand);
@@ -3257,10 +3283,27 @@ export class WorkspaceGitServiceImpl implements WorkspaceGitService {
     if (request.includeForge) {
       await this.refreshForgeSnapshot(target, request, facts, runRefreshGitCommand);
     }
+  }
 
-    const snapshot = this.combineSnapshot(target);
-    target.latestSnapshotLoadedAtMs = this.deps.now().getTime();
-    return snapshot;
+  private async refreshMergedPullRequestDiffStat(
+    target: WorkspaceGitTarget,
+    runRefreshGitCommand: RunGitCommand,
+  ): Promise<void> {
+    const headSha = getMergedPullRequestHeadSha(target.latestForge);
+    if (!headSha || !target.latestGit?.isGit) {
+      target.mergedPullRequestDiffStat = null;
+      return;
+    }
+    target.lastShellOutAtMs = this.deps.now().getTime();
+    const result = await this.deps.getCheckoutShortstatSince(target.cwd, headSha, {
+      paseoHome: this.paseoHome,
+      worktreesRoot: this.worktreesRoot,
+      logger: this.logger,
+      runGitCommand: runRefreshGitCommand,
+    });
+    target.mergedPullRequestDiffStat = result
+      ? { headSha, applies: true, diffStat: result.diffStat }
+      : { headSha, applies: false, diffStat: null };
   }
 
   private async refreshRefDerivedSnapshot(
@@ -3437,9 +3480,15 @@ export class WorkspaceGitServiceImpl implements WorkspaceGitService {
       return target.latestSnapshot ?? buildNotGitSnapshot(target.cwd);
     }
 
+    const merged = target.mergedPullRequestDiffStat;
+    const useMergedDiffStat =
+      merged?.applies === true &&
+      merged.headSha === getMergedPullRequestHeadSha(target.latestForge);
     return {
       cwd: target.cwd,
-      git: target.latestGit,
+      git: useMergedDiffStat
+        ? { ...target.latestGit, diffStat: merged.diffStat }
+        : target.latestGit,
       forge: target.latestForge ?? buildForgeUnavailableSnapshot(),
     };
   }
@@ -3480,6 +3529,13 @@ export class WorkspaceGitServiceImpl implements WorkspaceGitService {
     this.rememberSnapshot(target, this.combineSnapshot(target), {
       forceEmit: false,
     });
+    const mergedHeadSha = getMergedPullRequestHeadSha(github);
+    if (mergedHeadSha && mergedHeadSha !== target.mergedPullRequestDiffStat?.headSha) {
+      this.scheduleWorkspaceRefresh(target, {
+        scope: "worktree",
+        reason: "forge-pr-merged",
+      });
+    }
   }
 
   private rememberSnapshot(
@@ -3826,6 +3882,13 @@ async function loadForgeSnapshot(options: {
       message: error instanceof Error ? error.message : String(error),
     });
   }
+}
+
+function getMergedPullRequestHeadSha(
+  forge: WorkspaceGitRuntimeSnapshot["forge"] | null,
+): string | null {
+  const pullRequest = forge?.pullRequest;
+  return pullRequest?.isMerged && pullRequest.headSha ? pullRequest.headSha : null;
 }
 
 function buildForgeSnapshot(
