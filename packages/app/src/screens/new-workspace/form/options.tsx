@@ -126,7 +126,7 @@ export function RefOption({
   );
   if (!item) return <View key={option.id} />;
 
-  const isBranch = item.kind === "branch";
+  const isBranch = item.kind !== "github-pr";
   return (
     <ComboboxItem
       testID={
