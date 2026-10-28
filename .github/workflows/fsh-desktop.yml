@@ -13,9 +13,11 @@
 # at launch in dyld. The runner below is macOS 14, which does not enforce this, so the
 # packaged-app smoke test cannot catch it — keep the flag rather than relying on the gate.
 #
-# Only `fsh` publishes a release: install-fsh.sh installs GitHub's "latest" release, so a release
-# from any other ref would reach every install. PRs that touch this workflow, and manual runs on
-# other branches, upload the DMG as a run artifact instead.
+# Only `fsh` publishes a normal release: install-fsh.sh and the in-app updater install GitHub's
+# "latest" release, so a normal release from any other ref would reach every install. A PR with
+# the `deploy` label, or a manual run on another branch, publishes a prerelease instead
+# (`fsh-pr<N>-<sha>` / `fsh-test-<sha>`): a DMG link to test, which "latest" never points at.
+# Closing the PR deletes its prereleases.
 name: FSH desktop build
 
 on:
@@ -23,17 +25,27 @@ on:
     branches: [fsh]
     paths-ignore: [FSH.md, README.md, "docs/fsh/**"]
   pull_request:
-    paths: [.github/workflows/fsh-desktop.yml]
+    types: [opened, synchronize, reopened, labeled, closed]
   workflow_dispatch:
 
 permissions:
   contents: write
 
+concurrency:
+  group: fsh-desktop-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   macos-arm64:
+    if: >-
+      github.event_name != 'pull_request' ||
+      (github.event.action != 'closed' &&
+       contains(github.event.pull_request.labels.*.name, 'deploy') &&
+       (github.event.action != 'labeled' || github.event.label.name == 'deploy'))
     runs-on: macos-14
     env:
-      FSH_PUBLISH: ${{ github.ref == 'refs/heads/fsh' }}
+      FSH_PRERELEASE: ${{ github.ref != 'refs/heads/fsh' }}
+      FSH_PR: ${{ github.event.pull_request.number }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -58,12 +70,12 @@ jobs:
           set -euo pipefail
           version="$(node -p 'require("./packages/desktop/package.json").version')"
           sha="$(git rev-parse --short HEAD)"
-          tag="fsh-${version}-${sha}"
-          run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
-          if [[ "$FSH_PUBLISH" == "true" ]]; then
-            build_link="<a href=\"${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases/tag/${tag}\">Release ${tag}</a>"
+          if [[ "$FSH_PRERELEASE" != "true" ]]; then
+            tag="fsh-${version}-${sha}"
+          elif [[ -n "$FSH_PR" ]]; then
+            tag="fsh-pr${FSH_PR}-${sha}"
           else
-            build_link="<a href=\"${run_url}\">Test build (run ${GITHUB_RUN_ID})</a>"
+            tag="fsh-test-${sha}"
           fi
           echo "FSH_SHA=${sha}" >> "$GITHUB_ENV"
           echo "FSH_VERSION=${version}" >> "$GITHUB_ENV"
@@ -71,7 +83,7 @@ jobs:
           cat > packages/desktop/Credits.html <<EOF
           <div style="font: 11px -apple-system, sans-serif; text-align: center">
           Built $(date -u '+%Y-%m-%d %H:%M UTC')<br>
-          ${build_link} ·
+          <a href="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases/tag/${tag}">Release ${tag}</a> ·
           <a href="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/commit/$(git rev-parse HEAD)">Commit ${sha}</a>
           </div>
           EOF
@@ -112,24 +124,39 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
-      - name: Upload test DMG
-        if: env.FSH_PUBLISH != 'true'
-        uses: actions/upload-artifact@v4
-        with:
-          name: paseo-fsh-${{ env.FSH_SHA }}-dmg
-          path: packages/desktop/release/*.dmg
-          if-no-files-found: error
-          retention-days: 7
-
       - name: Publish release
-        if: env.FSH_PUBLISH == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           version="$FSH_VERSION"
           tag="$FSH_TAG"
-          gh release create "$tag" packages/desktop/release/*.dmg \
-            --target "$GITHUB_SHA" \
-            --title "Paseo ${version} (FSH ${GITHUB_SHA::7})" \
-            --notes "Upstream Paseo ${version} plus the FSH patches on \`fsh\` ($(git log -1 --format=%h)). Unsigned: after copying to Applications, run \`xattr -cr /Applications/Paseo.app\` once."
+          unsigned="Unsigned: after copying to Applications, run \`xattr -cr /Applications/Paseo.app\` once."
+          if [[ "$FSH_PRERELEASE" == "true" ]]; then
+            # Rebuilding the same commit (relabel, re-run) replaces its prerelease.
+            gh release delete "$tag" --cleanup-tag --yes 2>/dev/null || true
+            source="${FSH_PR:+PR #${FSH_PR}, }branch \`${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}\`"
+            gh release create "$tag" packages/desktop/release/*.dmg \
+              --target "$(git rev-parse HEAD)" \
+              --prerelease --latest=false \
+              --title "Paseo ${version} test build (${source//\`/} ${FSH_SHA})" \
+              --notes "Test build of ${source} ($(git log -1 --format=%h)). Not offered to installs or the in-app updater. ${unsigned}"
+          else
+            gh release create "$tag" packages/desktop/release/*.dmg \
+              --target "$GITHUB_SHA" \
+              --title "Paseo ${version} (FSH ${GITHUB_SHA::7})" \
+              --notes "Upstream Paseo ${version} plus the FSH patches on \`fsh\` ($(git log -1 --format=%h)). ${unsigned}"
+          fi
+
+  delete-pr-prereleases:
+    if: github.event_name == 'pull_request' && github.event.action == 'closed'
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Delete this PR's test builds
+        run: |
+          set -euo pipefail
+          gh release list --repo "$GITHUB_REPOSITORY" --limit 200 --json tagName -q '.[].tagName' |
+            grep "^fsh-pr${{ github.event.pull_request.number }}-" |
+            while read -r tag; do gh release delete "$tag" --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes; done || true
