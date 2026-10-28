@@ -340,6 +340,40 @@ describe("defaultBasePickerItem", () => {
   it("has no default for detached HEAD", () => {
     expect(defaultBasePickerItem({ currentBranch: null })).toBeNull();
   });
+
+  it("uses origin's default branch when on another branch", () => {
+    expect(
+      defaultBasePickerItem({
+        currentBranch: "feature-x",
+        upstreamRef: "refs/remotes/origin/feature-x",
+        baseRef: "main",
+        hasRemote: true,
+      }),
+    ).toMatchObject({ refName: "refs/remotes/origin/main", name: "main" });
+  });
+
+  it("uses the local default branch when there is no remote", () => {
+    expect(
+      defaultBasePickerItem({ currentBranch: "feature-x", baseRef: "main", hasRemote: false }),
+    ).toMatchObject({ refName: "refs/heads/main", name: "main" });
+  });
+
+  it("uses the default branch from detached HEAD", () => {
+    expect(
+      defaultBasePickerItem({ currentBranch: null, baseRef: "main", hasRemote: true }),
+    ).toMatchObject({ refName: "refs/remotes/origin/main", name: "main" });
+  });
+
+  it("keeps the exact upstream when on the default branch", () => {
+    expect(
+      defaultBasePickerItem({
+        currentBranch: "main",
+        upstreamRef: "refs/remotes/upstream/main",
+        baseRef: "main",
+        hasRemote: true,
+      }),
+    ).toMatchObject({ refName: "refs/remotes/upstream/main", name: "main" });
+  });
 });
 
 describe("starting-ref search", () => {

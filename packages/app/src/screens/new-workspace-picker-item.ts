@@ -128,6 +128,10 @@ export function buildBranchPickerItems(details: readonly BranchPickerDetail[]): 
 export interface BaseRefCheckoutStatus {
   currentBranch: string | null;
   upstreamRef?: string | null;
+  // The repository default branch for a regular checkout; a Paseo worktree reports the base
+  // it was cut from.
+  baseRef?: string | null;
+  hasRemote?: boolean;
 }
 
 // Display only. The exact ref is what every request carries; this is just how a ref reads in
@@ -157,11 +161,31 @@ function refQualifier(refName: string): string | null {
 // row, the trigger label, and the created ref all read this; computing it twice is how the
 // picker once showed local main while branching off something else.
 //
-// The upstream wins when the branch has one, because branching off the local ref silently
-// carries unpushed commits into the new workspace. The daemon sends the resolved ref rather
-// than a remote name, so a fork tracking upstream/main branches from upstream/main.
+// FSH: new workspaces branch off the repository default branch, whatever the source checkout
+// happens to be on. Origin's copy wins when there is a remote, so unpushed local commits stay
+// out of the new workspace.
+//
+// On the default branch itself, the upstream wins when the branch has one, for the same
+// reason. The daemon sends the resolved ref rather than a remote name, so a fork tracking
+// upstream/main branches from upstream/main.
 export function defaultBasePickerItem(status: BaseRefCheckoutStatus): PickerItem | null {
   const currentBranch = status.currentBranch;
+  const defaultBranch = status.baseRef;
+  if (defaultBranch && defaultBranch !== currentBranch) {
+    return status.hasRemote
+      ? {
+          kind: "branch",
+          name: defaultBranch,
+          refName: `refs/remotes/origin/${defaultBranch}`,
+          accessibilityLabel: `${defaultBranch}, origin branch`,
+        }
+      : {
+          kind: "branch",
+          name: defaultBranch,
+          refName: `refs/heads/${defaultBranch}`,
+          accessibilityLabel: `${defaultBranch}, local branch`,
+        };
+  }
   if (!currentBranch) return null;
   // COMPAT(checkoutUpstreamRef): added in v0.2.6, remove after 2027-02-01 once the daemon
   // floor sends upstreamRef. Daemons that predate it omit the field, which lands on the
