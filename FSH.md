@@ -17,7 +17,7 @@ temporary by design: every patch is meant to go upstream and then drop out of `f
 - FSH-only (upstreamable): F-Droid builds link the app's own native modules (`packages/app/modules`); before, `paseo-scroll` was never linked and the build failed to compile
 - FSH-only (not upstream yet): the connected-hosts batching test holds the parent's batch with an injected scheduler instead of racing the 2-second quiet window against a cold CLI spawn
 - FSH-only (not upstream yet): project categories. Put each project in a category from its menu, then pick a category in the Workspaces header so the sidebar shows only that category's projects. Categories are stored per device
-- FSH-only (upstreamable): workspace diffs show unpushed and behind counts (`↑1 ↓327`) in the composer pill and the Changes header, with a breakdown tooltip; a branch both ahead and behind its remote offers Pull and push as the primary action
+- FSH-only (upstreamable): workspace diffs show unpushed and behind counts (`↑1 ↓327`) in the composer pill and the Changes header, opening a sync card (upstream, uncommitted files, unpushed commits, commits to pull, next step); a branch both ahead and behind its remote offers Pull and push as the primary action
 
 Keep this list in sync with what's merged into `fsh`.
 
