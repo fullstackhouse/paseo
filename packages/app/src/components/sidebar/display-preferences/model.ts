@@ -2,6 +2,7 @@ import type { WorkspaceSort } from "@/projects/workspace-structure";
 import { useCallback, useMemo } from "react";
 import {
   useAppSettings,
+  useSettings,
   type SidebarWorkspaceTrailing,
   type WorkspaceTitleSource,
 } from "@/hooks/use-settings";
@@ -37,6 +38,9 @@ export interface SidebarDisplayPreferences {
   pluginRowItems: readonly PluginWorkspaceRowItemGroup[];
   isPluginRowItemVisible: (key: string) => boolean;
   togglePluginRowItem: (key: string) => void;
+  /** A one-click Archive button beside the row's menu while the row is hovered. */
+  archiveButton: boolean;
+  toggleArchiveButton: () => void;
   checksDisplay: SidebarChecksDisplay;
   setChecksDisplay: (display: SidebarChecksDisplay) => void;
   trailing: SidebarWorkspaceTrailing;
@@ -86,6 +90,7 @@ export function useSidebarDisplayPreferences(): SidebarDisplayPreferences {
       sidebarRowItems,
       sidebarChecksDisplay,
       sidebarPluginRowItems,
+      sidebarArchiveButton,
     },
     updateSettings,
   } = useAppSettings();
@@ -126,6 +131,10 @@ export function useSidebarDisplayPreferences(): SidebarDisplayPreferences {
     [updateSettings, sidebarRowItems],
   );
 
+  const toggleArchiveButton = useCallback(() => {
+    void updateSettings({ sidebarArchiveButton: !sidebarArchiveButton });
+  }, [updateSettings, sidebarArchiveButton]);
+
   const setChecksDisplay = useCallback(
     (display: SidebarChecksDisplay) => {
       void updateSettings({ sidebarChecksDisplay: display });
@@ -157,6 +166,8 @@ export function useSidebarDisplayPreferences(): SidebarDisplayPreferences {
       pluginRowItems,
       isPluginRowItemVisible,
       togglePluginRowItem,
+      archiveButton: sidebarArchiveButton,
+      toggleArchiveButton,
       checksDisplay: sidebarChecksDisplay,
       setChecksDisplay,
       trailing: sidebarWorkspaceTrailing,
@@ -185,6 +196,8 @@ export function useSidebarDisplayPreferences(): SidebarDisplayPreferences {
       pluginRowItems,
       isPluginRowItemVisible,
       togglePluginRowItem,
+      sidebarArchiveButton,
+      toggleArchiveButton,
       sidebarChecksDisplay,
       setChecksDisplay,
       sidebarWorkspaceTrailing,
@@ -232,4 +245,9 @@ export function useSidebarMetaPreferences(): {
     }),
     [sidebarRowItems, sidebarChecksDisplay],
   );
+}
+
+/** Whether rows offer the Archive button on hover. Rows subscribe to this one field. */
+export function useSidebarArchiveButton(): boolean {
+  return useSettings((settings) => settings.sidebarArchiveButton);
 }
