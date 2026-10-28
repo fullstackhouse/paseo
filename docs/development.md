@@ -70,6 +70,29 @@ PASEO_DEV_RESET_HOME=1 npm run dev            # clear and reseed the derived wor
 
 In Paseo-managed worktree services, use the injected service environment rather than hardcoded root checkout ports.
 
+### Test a change next to your main Paseo
+
+When you work on Paseo from a Paseo workspace, run the branch as a second Paseo beside the one you use. The branch gets its own daemon, port, home, and Electron window; the main daemon on `6767` and its agents are untouched.
+
+```bash
+npm run dev:seed-home                      # your daemon config, projects and desktop preferences
+paseo script start daemon
+paseo script start desktop                 # opens a window labelled with the branch name
+paseo plugin ls --home .dev/paseo-home     # talk to this worktree's daemon
+```
+
+- Seed before the first `daemon` start. Otherwise the worktree home is seeded from the source checkout's `.dev/paseo-home`, which is empty unless you develop there, so the branch starts with no projects, plugins or providers. Re-run it to pick up later changes in `~/.paseo`.
+- The seed drops `daemon.auth` and `daemon.relay`. The dev desktop app only gets a local credential from daemons it started itself, so a copied password shows "Password required" with no projects. The dev scripts rewrite `daemon.listen` and `daemon.cors` on every start.
+- Projects and workspaces point at your real checkouts and worktrees. Archiving a workspace in the dev Paseo removes the real worktree. Agents and plugin data are not copied; directory plugins run from the same paths as on your main daemon.
+- Inside a Paseo terminal, `PASEO_HOME` is the main daemon's home, so `npm run cli` and a bare `paseo` talk to your main daemon. Pass `--home .dev/paseo-home`.
+- The `daemon` script picks a new port on every start and `desktop` reads it at launch. After restarting `daemon`, restart `desktop`.
+- Seeding also snapshots your installed desktop profile's appearance, fonts, shortcuts, editor choice, sidebar preferences, window geometry and notification sound. The launcher imports these into its isolated profile before the app loads, once per snapshot and Metro origin. Dev preference changes survive restarts on the same origin; re-run `dev:seed-home` to refresh from the main app.
+- The source desktop profile defaults to your platform's `Paseo` application-data folder. Override it with `PASEO_DEV_SOURCE_DESKTOP_PROFILE`. Host connections, credentials, drafts, browser sessions and workspace navigation are excluded because they belong to the main daemon. The main app's live profile is never opened for writing.
+- Verify a fresh window reload has no React prop warnings; dismissing a toast does not verify a fix.
+- Stop both scripts when you are done. The desktop window holds the worktree's single-instance lock until then.
+
+To try a plugin change, see [Test a plugin change](plugins.md#test-a-plugin-change).
+
 ### Expo Router
 
 Route ownership, startup restore, and native blank-screen gotchas live in
