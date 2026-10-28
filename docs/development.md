@@ -75,17 +75,18 @@ In Paseo-managed worktree services, use the injected service environment rather 
 When you work on Paseo from a Paseo workspace, run the branch as a second Paseo beside the one you use. The branch gets its own daemon, port, home, and Electron window; the main daemon on `6767` and its agents are untouched.
 
 ```bash
-mkdir -p .dev/paseo-home && cp ~/.paseo/config.json .dev/paseo-home/   # your providers, profiles and plugins
+npm run dev:seed-home                      # your providers, profiles, plugins and projects
 paseo script start daemon
-paseo script start desktop
-paseo script ls                                                         # ports; the desktop window shows the branch name
-npm run cli -- plugin ls                                                # the in-repo CLI targets this worktree's daemon
+paseo script start desktop                 # opens a window labelled with the branch name
+paseo plugin ls --home .dev/paseo-home     # talk to this worktree's daemon
 ```
 
-- Copy `config.json` before the first `daemon` start. Without it the worktree home is seeded from the source checkout's `.dev/paseo-home`, which is empty unless you develop there, so the branch starts with no plugins or providers. The dev scripts rewrite `daemon.listen` and `daemon.cors` on every start; the rest of the file is yours. To pick up later edits to `~/.paseo/config.json`, copy it again and restart `daemon`.
-- Agents, workspaces and plugin data are not copied. Directory plugins run from the same paths as on your main daemon, so both daemons run the same plugin code.
-- The copied `daemon.auth.password` applies here too. The dev desktop app and `npm run cli` use the worktree's `local-credential`; `paseo --host localhost:<port>` needs `PASEO_PASSWORD`.
-- Metro logs a `Web ERROR` about `RCTAnimation` and `useNativeDriver` on start. It is a warning; the app works.
+- Seed before the first `daemon` start. Otherwise the worktree home is seeded from the source checkout's `.dev/paseo-home`, which is empty unless you develop there, so the branch starts with no projects, plugins or providers. Re-run it to pick up later changes in `~/.paseo`.
+- The seed drops `daemon.auth` and `daemon.relay`. The dev desktop app only gets a local credential from daemons it started itself, so a copied password shows "Password required" with no projects. The dev scripts rewrite `daemon.listen` and `daemon.cors` on every start.
+- Projects and workspaces point at your real checkouts and worktrees. Archiving a workspace in the dev Paseo removes the real worktree. Agents and plugin data are not copied; directory plugins run from the same paths as on your main daemon.
+- Inside a Paseo terminal, `PASEO_HOME` is the main daemon's home, so `npm run cli` and a bare `paseo` talk to your main daemon. Pass `--home .dev/paseo-home`.
+- The `daemon` script picks a new port on every start and `desktop` reads it at launch. After restarting `daemon`, restart `desktop`.
+- Metro logs a `Web ERROR` about `RCTAnimation` and `useNativeDriver`, and the window toasts "React does not recognize the `uniProps` prop" from Unistyles. Both are dev-only warnings.
 - Stop both scripts when you are done. The desktop window holds the worktree's single-instance lock until then.
 
 To try a plugin change, see [Test a plugin change](plugins.md#test-a-plugin-change).

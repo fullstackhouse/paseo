@@ -402,7 +402,7 @@ When you edit a plugin from a Paseo workspace, the daemon on `6767` runs your ow
 ```bash
 H="$PWD/.dev/paseo-home"   # keep it out of git
 mkdir -p "$H"
-node -e 'const fs=require("fs");const c=JSON.parse(fs.readFileSync(process.argv[1]));c.daemon={...c.daemon,listen:"127.0.0.1:6790"};delete c.daemon.relay;fs.writeFileSync(process.argv[2]+"/config.json",JSON.stringify(c,null,2))' ~/.paseo/config.json "$H"
+node -e 'const fs=require("fs");const c=JSON.parse(fs.readFileSync(process.argv[1]));c.daemon={...c.daemon,listen:"127.0.0.1:6790"};delete c.daemon.auth;delete c.daemon.relay;fs.writeFileSync(process.argv[2]+"/config.json",JSON.stringify(c,null,2))' ~/.paseo/config.json "$H"
 paseo daemon start --home "$H"
 paseo plugin remove my-plugin --home "$H"    # only if the copied config already has this ID
 paseo plugin install "$PWD" --home "$H"
@@ -410,7 +410,7 @@ paseo plugin reload my-plugin --home "$H"    # after each edit
 paseo daemon stop --home "$H"                # when done
 ```
 
-Pick another port if `6790` is taken. The user sees the UI by adding `localhost:6790` with **Add host** in their app; the password is the one in their config. Install into the main daemon only when the user asks.
+Pick another port if `6790` is taken. The user sees the UI by adding `localhost:6790` with **Add host** in their app (no password; the copy drops it). Install into the main daemon only when the user asks.
 
 ## Add a composer attachment source
 
