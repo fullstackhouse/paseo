@@ -1,7 +1,13 @@
 import { Text } from "react-native";
+import { useTranslation } from "react-i18next";
 import { StyleSheet } from "react-native-unistyles";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import type { GitSyncCounts } from "@/git/sync-summary";
+import { GitSyncCard } from "@/git/sync-card";
+import {
+  buildGitSyncAccessibilityLabel,
+  type GitSyncCounts,
+  type GitSyncFacts,
+} from "@/git/sync-summary";
 
 export function formatGitSyncCounts(counts: GitSyncCounts): string {
   return [
@@ -20,30 +26,38 @@ export function GitSyncCountsText({ counts }: { counts: GitSyncCounts }) {
   );
 }
 
-export function GitSyncSummaryText({ summary, testID }: { summary: string[]; testID?: string }) {
+interface GitSyncCardContentProps {
+  serverId: string;
+  cwd: string;
+  facts: GitSyncFacts;
+  side: "top" | "bottom";
+}
+
+export function GitSyncCardContent({ serverId, cwd, facts, side }: GitSyncCardContentProps) {
   return (
-    <Text style={styles.tooltipText} testID={testID}>
-      {summary.join("\n")}
-    </Text>
+    <TooltipContent side={side} style={styles.cardContent} maxWidth={320}>
+      <GitSyncCard serverId={serverId} cwd={cwd} facts={facts} />
+    </TooltipContent>
   );
 }
 
 interface GitSyncIndicatorProps {
+  serverId: string;
+  cwd: string;
+  facts: GitSyncFacts;
   counts: GitSyncCounts;
-  summary: string[];
   testID?: string;
 }
 
 // Opens on tap on mobile: hover doesn't exist there and the arrows alone don't explain themselves.
-export function GitSyncIndicator({ counts, summary, testID }: GitSyncIndicatorProps) {
+export function GitSyncIndicator({ serverId, cwd, facts, counts, testID }: GitSyncIndicatorProps) {
+  const { t } = useTranslation();
   return (
     <Tooltip delayDuration={300} enabledOnMobile>
-      <TooltipTrigger testID={testID} accessibilityLabel={summary.join(", ")}>
+      <TooltipTrigger testID={testID} accessibilityLabel={buildGitSyncAccessibilityLabel(facts, t)}>
         <GitSyncCountsText counts={counts} />
       </TooltipTrigger>
-      <TooltipContent side="bottom">
-        <GitSyncSummaryText summary={summary} />
-      </TooltipContent>
+      <GitSyncCardContent serverId={serverId} cwd={cwd} facts={facts} side="bottom" />
     </Tooltip>
   );
 }
@@ -54,8 +68,8 @@ const styles = StyleSheet.create((theme) => ({
     color: theme.colors.foregroundMuted,
     fontVariant: ["tabular-nums"],
   },
-  tooltipText: {
-    fontSize: theme.fontSize.sm,
-    color: theme.colors.foreground,
+  cardContent: {
+    paddingVertical: 0,
+    paddingHorizontal: 0,
   },
 }));

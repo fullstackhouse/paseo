@@ -1,6 +1,7 @@
 import type { TFunction } from "i18next";
 
 export interface GitSyncFacts {
+  currentBranch?: string | null;
   isDirty?: boolean | null;
   aheadOfOrigin?: number | null;
   behindOfOrigin?: number | null;
@@ -12,15 +13,7 @@ export interface GitSyncCounts {
   behind: number;
 }
 
-export interface GitSyncModel {
-  counts: GitSyncCounts | null;
-  summary: string[];
-}
-
-export function buildGitSyncModel(facts: GitSyncFacts, t: TFunction): GitSyncModel | null {
-  const summary = buildGitSyncSummary(facts, t);
-  return summary.length > 0 ? { counts: getGitSyncCounts(facts), summary } : null;
-}
+export type GitSyncNextStep = "commit" | "pullThenPush" | "pull" | "push";
 
 export function getGitSyncCounts(facts: GitSyncFacts): GitSyncCounts | null {
   const ahead = facts.aheadOfOrigin ?? 0;
@@ -28,20 +21,37 @@ export function getGitSyncCounts(facts: GitSyncFacts): GitSyncCounts | null {
   return ahead > 0 || behind > 0 ? { ahead, behind } : null;
 }
 
-// Splits a workspace diff total into where the changes live, so a clean tree with
-// unpushed commits doesn't read as uncommitted work.
-export function buildGitSyncSummary(facts: GitSyncFacts, t: TFunction): string[] {
-  const upstream =
-    facts.upstreamRef?.replace(/^refs\/remotes\//, "") || t("workspace.git.sync.remote");
-  const lines: string[] = [];
-  if (facts.isDirty) {
-    lines.push(t("workspace.git.sync.uncommitted"));
-  }
-  if ((facts.aheadOfOrigin ?? 0) > 0) {
-    lines.push(t("workspace.git.sync.unpushed", { number: facts.aheadOfOrigin }));
-  }
-  if ((facts.behindOfOrigin ?? 0) > 0) {
-    lines.push(t("workspace.git.sync.behind", { number: facts.behindOfOrigin, upstream }));
-  }
-  return lines;
+// True when the diff total needs explaining: uncommitted work, or commits that
+// differ from the upstream. A clean, in-sync branch has nothing to say.
+export function hasGitSyncDetails(facts: GitSyncFacts): boolean {
+  return Boolean(facts.isDirty) || getGitSyncCounts(facts) !== null;
+}
+
+// Matches the header's primary git action: Commit wins, then Pull and push, Pull, Push.
+export function getGitSyncNextStep(facts: GitSyncFacts): GitSyncNextStep | null {
+  if (facts.isDirty) return "commit";
+  const counts = getGitSyncCounts(facts);
+  if (!counts) return null;
+  if (counts.ahead > 0 && counts.behind > 0) return "pullThenPush";
+  return counts.behind > 0 ? "pull" : "push";
+}
+
+// The wire only carries `upstreamRef` on the workspace status; elsewhere a tracked
+// branch is assumed to follow `origin/<branch>`. Null when nothing is tracked.
+export function getGitSyncUpstreamLabel(facts: GitSyncFacts): string | null {
+  const upstream = facts.upstreamRef?.replace(/^refs\/remotes\//, "").trim();
+  if (upstream) return upstream;
+  if (facts.aheadOfOrigin == null && facts.behindOfOrigin == null) return null;
+  return facts.currentBranch ? `origin/${facts.currentBranch}` : null;
+}
+
+export function buildGitSyncAccessibilityLabel(facts: GitSyncFacts, t: TFunction): string {
+  const counts = getGitSyncCounts(facts);
+  return [
+    facts.isDirty ? t("workspace.git.sync.uncommitted") : null,
+    counts && counts.ahead > 0 ? t("workspace.git.sync.toPush", { number: counts.ahead }) : null,
+    counts && counts.behind > 0 ? t("workspace.git.sync.toPull", { number: counts.behind }) : null,
+  ]
+    .filter((part): part is string => part !== null)
+    .join(", ");
 }

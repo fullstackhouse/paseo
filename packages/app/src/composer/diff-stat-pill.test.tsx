@@ -92,14 +92,25 @@ describe("useWorkspaceGitSync", () => {
     useSessionStore.getState().clearSession(SERVER_ID);
   });
 
-  it("says a clean diff total is unpushed commits, not uncommitted work", () => {
+  it("offers the sync card for a diverged branch, with the workspace directory to query", () => {
     const { result } = renderHook(() => useWorkspaceGitSync(SERVER_ID, WORKSPACE_ID));
     expect(result.current).toBeNull();
 
-    act(() => setGitRuntime({ isDirty: false, aheadOfOrigin: 1, behindOfOrigin: 327 }));
-    expect(result.current).toEqual({
-      counts: { ahead: 1, behind: 327 },
-      summary: ["Unpushed commits: 1", "Behind remote: 327"],
-    });
+    const gitRuntime = {
+      currentBranch: "main",
+      isDirty: false,
+      aheadOfOrigin: 1,
+      behindOfOrigin: 327,
+    };
+    act(() => setGitRuntime(gitRuntime));
+    expect(result.current).toEqual({ cwd: "/repo", facts: gitRuntime });
+  });
+
+  it("offers nothing for a clean branch in sync with its upstream", () => {
+    const { result } = renderHook(() => useWorkspaceGitSync(SERVER_ID, WORKSPACE_ID));
+    act(() =>
+      setGitRuntime({ currentBranch: "main", isDirty: false, aheadOfOrigin: 0, behindOfOrigin: 0 }),
+    );
+    expect(result.current).toBeNull();
   });
 });

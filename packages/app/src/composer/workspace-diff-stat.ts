@@ -1,6 +1,5 @@
 import { useMemo } from "react";
-import { useTranslation } from "react-i18next";
-import { buildGitSyncModel, type GitSyncModel } from "@/git/sync-summary";
+import { hasGitSyncDetails, type GitSyncFacts } from "@/git/sync-summary";
 import type { WorkspaceDescriptor } from "@/stores/session-store";
 import { useWorkspaceFields } from "@/stores/session-store-hooks";
 
@@ -14,11 +13,26 @@ export function useVisibleWorkspaceDiffStat(
   return hasDiffStatChanges(diffStat) ? diffStat : null;
 }
 
-// The diff total mixes uncommitted work with unpushed commits; this says which is which.
-export function useWorkspaceGitSync(serverId: string, workspaceId: string): GitSyncModel | null {
-  const { t } = useTranslation();
+export interface WorkspaceGitSync {
+  cwd: string;
+  facts: GitSyncFacts;
+}
+
+// The diff total mixes uncommitted work with unpushed commits; the sync card says which is which.
+export function useWorkspaceGitSync(
+  serverId: string,
+  workspaceId: string,
+): WorkspaceGitSync | null {
   const gitRuntime = useWorkspaceFields(serverId, workspaceId, (workspace) => workspace.gitRuntime);
-  return useMemo(() => (gitRuntime ? buildGitSyncModel(gitRuntime, t) : null), [gitRuntime, t]);
+  const cwd = useWorkspaceFields(
+    serverId,
+    workspaceId,
+    (workspace) => workspace.workspaceDirectory,
+  );
+  return useMemo(
+    () => (gitRuntime && cwd && hasGitSyncDetails(gitRuntime) ? { cwd, facts: gitRuntime } : null),
+    [gitRuntime, cwd],
+  );
 }
 
 export function useWorkspaceHasDiffStat(serverId: string, workspaceId: string): boolean {

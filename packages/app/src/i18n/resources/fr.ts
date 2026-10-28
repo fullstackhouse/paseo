@@ -954,9 +954,17 @@ export const fr: TranslationResources = {
       },
       sync: {
         uncommitted: "Modifications non validées",
-        unpushed: "Commits non poussés : {{number}}",
-        behind: "En retard sur {{upstream}} : {{number}}",
-        remote: "distant",
+        filesUncommitted_one: "{{count}} fichier non validé",
+        filesUncommitted_other: "{{count}} fichiers non validés",
+        toPush: "{{number}} à pousser",
+        toPull: "{{number}} à tirer",
+        moreCommits: "+{{number}} de plus",
+        next: {
+          commit: "Étape suivante : valider",
+          pullThenPush: "Étape suivante : tirer, puis pousser",
+          pull: "Étape suivante : tirer",
+          push: "Étape suivante : pousser",
+        },
       },
       diff: {
         openChangesTab: "Ouvrir l’onglet Modifications",

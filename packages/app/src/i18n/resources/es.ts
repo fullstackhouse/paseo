@@ -961,9 +961,17 @@ export const es: TranslationResources = {
       },
       sync: {
         uncommitted: "Cambios sin confirmar",
-        unpushed: "Commits sin enviar: {{number}}",
-        behind: "Por detrás de {{upstream}}: {{number}}",
-        remote: "remoto",
+        filesUncommitted_one: "{{count}} archivo sin confirmar",
+        filesUncommitted_other: "{{count}} archivos sin confirmar",
+        toPush: "{{number}} por enviar",
+        toPull: "{{number}} por traer",
+        moreCommits: "+{{number}} más",
+        next: {
+          commit: "Siguiente: confirmar",
+          pullThenPush: "Siguiente: traer y luego enviar",
+          pull: "Siguiente: traer",
+          push: "Siguiente: enviar",
+        },
       },
       diff: {
         openChangesTab: "Abrir la pestaña Cambios",

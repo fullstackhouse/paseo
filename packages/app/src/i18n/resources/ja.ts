@@ -941,9 +941,17 @@ export const ja: TranslationResources = {
       },
       sync: {
         uncommitted: "未コミットの変更",
-        unpushed: "未プッシュのコミット: {{number}}",
-        behind: "{{upstream}} より遅れ: {{number}}",
-        remote: "リモート",
+        filesUncommitted_one: "未コミットのファイル {{count}} 件",
+        filesUncommitted_other: "未コミットのファイル {{count}} 件",
+        toPush: "プッシュ待ち {{number}}",
+        toPull: "プル待ち {{number}}",
+        moreCommits: "他 {{number}} 件",
+        next: {
+          commit: "次: コミット",
+          pullThenPush: "次: プルしてからプッシュ",
+          pull: "次: プル",
+          push: "次: プッシュ",
+        },
       },
       diff: {
         openChangesTab: "変更タブを開く",

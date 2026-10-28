@@ -935,9 +935,17 @@ export const ko: TranslationResources = {
       },
       sync: {
         uncommitted: "커밋되지 않은 변경 사항",
-        unpushed: "푸시되지 않은 커밋: {{number}}",
-        behind: "{{upstream}}보다 뒤처짐: {{number}}",
-        remote: "원격",
+        filesUncommitted_one: "커밋되지 않은 파일 {{count}}개",
+        filesUncommitted_other: "커밋되지 않은 파일 {{count}}개",
+        toPush: "푸시할 커밋 {{number}}개",
+        toPull: "풀할 커밋 {{number}}개",
+        moreCommits: "+{{number}}개 더",
+        next: {
+          commit: "다음: 커밋",
+          pullThenPush: "다음: 풀한 다음 푸시",
+          pull: "다음: 풀",
+          push: "다음: 푸시",
+        },
       },
       diff: {
         openChangesTab: "변경사항 탭 열기",

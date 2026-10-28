@@ -2,25 +2,32 @@ import { memo, useCallback, useMemo, useState, type ReactElement } from "react";
 import { Pressable } from "react-native";
 import { useTranslation } from "react-i18next";
 import { DiffStat } from "@/components/diff-stat";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tooltip, TooltipTrigger } from "@/components/ui/tooltip";
 import { composerPillStyles } from "@/composer/pill-styles";
-import { useVisibleWorkspaceDiffStat, useWorkspaceGitSync } from "@/composer/workspace-diff-stat";
-import { GitSyncCountsText, GitSyncSummaryText } from "@/git/sync-indicator";
-import type { GitSyncModel } from "@/git/sync-summary";
+import {
+  useVisibleWorkspaceDiffStat,
+  useWorkspaceGitSync,
+  type WorkspaceGitSync,
+} from "@/composer/workspace-diff-stat";
+import { GitSyncCardContent, GitSyncCountsText } from "@/git/sync-indicator";
+import { buildGitSyncAccessibilityLabel, getGitSyncCounts } from "@/git/sync-summary";
 
 interface ComposerDiffStatPillProps {
   additions: number;
   deletions: number;
-  sync?: GitSyncModel | null;
+  serverId: string;
+  sync?: WorkspaceGitSync | null;
   onPress: () => void;
 }
 
 export function ComposerDiffStatPill({
   additions,
   deletions,
+  serverId,
   sync = null,
   onPress,
 }: ComposerDiffStatPillProps) {
+  const counts = sync ? getGitSyncCounts(sync.facts) : null;
   const { t } = useTranslation();
   const [isHovered, setIsHovered] = useState(false);
   const handleHoverIn = useCallback(() => setIsHovered(true), []);
@@ -34,16 +41,19 @@ export function ComposerDiffStatPill({
     <Pressable
       testID="composer-diff-stat-pill"
       accessibilityRole="button"
-      accessibilityLabel={[t("workspace.git.diff.openChangesTab"), ...(sync?.summary ?? [])].join(
-        ", ",
-      )}
+      accessibilityLabel={[
+        t("workspace.git.diff.openChangesTab"),
+        sync ? buildGitSyncAccessibilityLabel(sync.facts, t) : null,
+      ]
+        .filter(Boolean)
+        .join(", ")}
       onPress={onPress}
       onHoverIn={handleHoverIn}
       onHoverOut={handleHoverOut}
       style={bodyStyle}
     >
       <DiffStat additions={additions} deletions={deletions} />
-      {sync?.counts ? <GitSyncCountsText counts={sync.counts} /> : null}
+      {counts ? <GitSyncCountsText counts={counts} /> : null}
     </Pressable>
   );
   if (!sync) {
@@ -52,9 +62,7 @@ export function ComposerDiffStatPill({
   return (
     <Tooltip delayDuration={300}>
       <TooltipTrigger asChild>{pill}</TooltipTrigger>
-      <TooltipContent side="top">
-        <GitSyncSummaryText summary={sync.summary} testID="composer-diff-stat-sync-summary" />
-      </TooltipContent>
+      <GitSyncCardContent serverId={serverId} cwd={sync.cwd} facts={sync.facts} side="top" />
     </Tooltip>
   );
 }
@@ -77,6 +85,7 @@ export const WorkspaceDiffStatPill = memo(function WorkspaceDiffStatPill({
     <ComposerDiffStatPill
       additions={diffStat.additions}
       deletions={diffStat.deletions}
+      serverId={serverId}
       sync={sync}
       onPress={onPress}
     />

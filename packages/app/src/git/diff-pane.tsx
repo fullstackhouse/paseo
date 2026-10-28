@@ -63,12 +63,7 @@ import { GitActionsSplitButton } from "@/git/actions-split-button";
 import type { GitActions } from "@/git/policy";
 import { BranchSwitcher } from "@/components/branch-switcher";
 import { GitSyncIndicator } from "@/git/sync-indicator";
-import {
-  buildGitSyncSummary,
-  getGitSyncCounts,
-  type GitSyncCounts,
-  type GitSyncFacts,
-} from "@/git/sync-summary";
+import { getGitSyncCounts, type GitSyncCounts, type GitSyncFacts } from "@/git/sync-summary";
 import { useGitActions } from "@/git/use-actions";
 import { GIT_ACTION_ICONS } from "@/git/action-icons";
 import { buildForgeSignInCommand, getForgePresentation, type Forge } from "@/git/forge";
@@ -484,7 +479,7 @@ interface ChangesRepositoryToolbarModel {
   gitActions: GitActions | null;
   pullRequest: ChangesPullRequestLinkModel | null;
   serverId: string;
-  sync: { counts: GitSyncCounts; summary: string[] } | null;
+  sync: GitSyncModel | null;
   workspaceId?: string | null;
 }
 
@@ -520,18 +515,22 @@ interface BuildChangesHeaderModelInput {
   pullRequest: PrHint | null;
   selectedDiffStat: { additions: number; deletions: number } | null;
   serverId: string;
-  sync: { counts: GitSyncCounts; summary: string[] } | null;
+  sync: GitSyncModel | null;
   workspaceId?: string | null;
+}
+
+interface GitSyncModel {
+  counts: GitSyncCounts;
+  facts: GitSyncFacts;
 }
 
 function useGitSyncModel(
   status: (GitSyncFacts & { isGit: boolean }) | null | undefined,
-  t: TFunction,
-): { counts: GitSyncCounts; summary: string[] } | null {
+): GitSyncModel | null {
   return useMemo(() => {
     const counts = status?.isGit ? getGitSyncCounts(status) : null;
-    return status && counts ? { counts, summary: buildGitSyncSummary(status, t) } : null;
-  }, [status, t]);
+    return status && counts ? { counts, facts: status } : null;
+  }, [status]);
 }
 
 function buildChangesHeaderModel(input: BuildChangesHeaderModelInput): {
@@ -678,8 +677,10 @@ function ChangesRepositoryToolbar({
         />
         {model.sync ? (
           <GitSyncIndicator
+            serverId={model.serverId}
+            cwd={model.cwd}
+            facts={model.sync.facts}
             counts={model.sync.counts}
-            summary={model.sync.summary}
             testID="changes-sync-indicator"
           />
         ) : null}
@@ -1939,7 +1940,7 @@ export function ChangesSurface({
       wrapLines,
     ],
   );
-  const syncModel = useGitSyncModel(status, t);
+  const syncModel = useGitSyncModel(status);
   const changesHeaderModel = useMemo(
     () =>
       buildChangesHeaderModel({

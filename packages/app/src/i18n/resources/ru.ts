@@ -945,9 +945,17 @@ export const ru: TranslationResources = {
       },
       sync: {
         uncommitted: "Незакоммиченные изменения",
-        unpushed: "Неотправленные коммиты: {{number}}",
-        behind: "Отстаёт от {{upstream}}: {{number}}",
-        remote: "удалённого репозитория",
+        filesUncommitted_one: "{{count}} незакоммиченный файл",
+        filesUncommitted_other: "Незакоммиченных файлов: {{count}}",
+        toPush: "К отправке: {{number}}",
+        toPull: "К получению: {{number}}",
+        moreCommits: "Ещё {{number}}",
+        next: {
+          commit: "Далее: коммит",
+          pullThenPush: "Далее: получить, затем отправить",
+          pull: "Далее: получить",
+          push: "Далее: отправить",
+        },
       },
       diff: {
         openChangesTab: "Открыть вкладку «Изменения»",

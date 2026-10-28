@@ -936,9 +936,17 @@ export const en = {
       },
       sync: {
         uncommitted: "Uncommitted changes",
-        unpushed: "Unpushed commits: {{number}}",
-        behind: "Behind {{upstream}}: {{number}}",
-        remote: "remote",
+        filesUncommitted_one: "{{count}} file uncommitted",
+        filesUncommitted_other: "{{count}} files uncommitted",
+        toPush: "{{number}} to push",
+        toPull: "{{number}} to pull",
+        moreCommits: "+{{number}} more",
+        next: {
+          commit: "Next: commit",
+          pullThenPush: "Next: pull, then push",
+          pull: "Next: pull",
+          push: "Next: push",
+        },
       },
       diff: {
         openChangesTab: "Open Changes tab",
