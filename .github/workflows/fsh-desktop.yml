@@ -1,9 +1,10 @@
 # FSH fork: on every push to `fsh`, build an unsigned (ad-hoc signed) macOS arm64 DMG of the `fsh`
 # branch and attach it to a GitHub Release on fullstackhouse/paseo.
 #
-# No latest-mac.yml is published, so the in-app updater finds no channel and
-# stays quiet — an ad-hoc signed app can't auto-update anyway. Install a new
-# build by downloading the DMG again.
+# No latest-mac.yml is published: an ad-hoc signed app can't run electron-updater. The build
+# stamps `fshBuild` (the release tag minus `fsh-`) into the app's package.json, and the app
+# updates itself by running scripts/install-fsh.sh instead
+# (packages/desktop/src/features/fsh-updater.ts).
 #
 # hardenedRuntime must be off. Upstream enables it (packages/desktop/electron-builder.yml)
 # because upstream signs with a real Developer ID, so every nested binary shares one Team
@@ -46,7 +47,9 @@ jobs:
           PASEO_DESKTOP_SMOKE_ARTIFACT_DIR: ${{ runner.temp }}/desktop-smoke
           NODE_OPTIONS: --max-old-space-size=4096
         run: |
+          version="$(node -p 'require("./packages/desktop/package.json").version')"
           npm run build:desktop -- --publish never --mac dmg --arm64 \
+            "-c.extraMetadata.fshBuild=${version}-$(git rev-parse --short HEAD)" \
             -c.mac.identity=- \
             -c.mac.notarize=false \
             -c.mac.hardenedRuntime=false \
