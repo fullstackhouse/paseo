@@ -70,6 +70,12 @@ PASEO_DEV_RESET_HOME=1 npm run dev            # clear and reseed the derived wor
 
 In Paseo-managed worktree services, use the injected service environment rather than hardcoded root checkout ports.
 
+### Previewing a branch against your main daemon
+
+The `app-main` worktree service runs the branch's web app connected to the daemon you use every day (`localhost:6767`, override with `PASEO_MAIN_DAEMON_ENDPOINT`), so you review UI changes with your real workspaces and nothing restarts. Use it for app-only changes; a branch that changes the daemon or protocol needs the `daemon` + `app` services instead.
+
+Open it through its proxy URL (`http://app-main--<branch>--<project>.localhost:6767`), not Metro's own port: the daemon accepts the web client only from a same-port `*.localhost` origin. The client has full access to that daemon, so a broken branch can act on your real agents.
+
 ### Expo Router
 
 Route ownership, startup restore, and native blank-screen gotchas live in
