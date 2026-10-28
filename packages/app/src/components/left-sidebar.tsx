@@ -72,6 +72,7 @@ import {
 import { SidebarResizeHandle } from "@/components/sidebar-resize-handle";
 import { DensityIcon } from "@/components/ui/density-icon";
 import { SidebarSectionHeader } from "@/components/sidebar/sidebar-section-header";
+import { ProjectCategorySwitcher } from "@/projects/categories/menu";
 import { Shortcut } from "@/components/ui/shortcut";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { HEADER_INNER_HEIGHT, useIsCompactFormFactor } from "@/constants/layout";
@@ -953,6 +954,7 @@ function DesktopSidebar({
 function WorkspacesSectionHeader() {
   return (
     <SidebarSectionHeader title="Workspaces">
+      <ProjectCategorySwitcher />
       <Tooltip delayDuration={300}>
         <TooltipTrigger asChild>
           <View>
