@@ -38,6 +38,9 @@ is mid-turn. It asks first; `--yes` skips the question. Every FSH build reports 
 the app nor the daemon notices a swap underneath it — that's why the script stops both. It records the installed
 release tag in `~/.paseo/fsh-release` and does nothing when that matches the latest (`--force` reinstalls).
 
+To see which build you're running, open Paseo → About Paseo: it shows the commit (`Version 0.13.0-beta.1 (fsh.<sha>)`),
+the build time, and links to the release and the commit.
+
 It also removes the Homebrew `paseo-fsh` or upstream `paseo` cask if either is installed, since `brew upgrade` would put
 its own build back. Your `~/.paseo` data and hosts are kept. Plugins you installed from a local directory are left
 alone. `--no-plugins` skips the plugin step.

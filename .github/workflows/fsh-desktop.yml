@@ -39,6 +39,26 @@ jobs:
       - name: Install JS dependencies
         run: node scripts/npm-retry.mjs ci
 
+      # The macOS About panel shows CFBundleVersion in brackets, then Credits.html, then the
+      # copyright. Upstream's defaults make every FSH build look the same, so stamp the commit,
+      # the build time and links to the release and commit.
+      - name: Stamp FSH build info
+        run: |
+          set -euo pipefail
+          version="$(node -p 'require("./packages/desktop/package.json").version')"
+          sha="$(git rev-parse --short HEAD)"
+          tag="fsh-${version}-${sha}"
+          echo "FSH_SHA=${sha}" >> "$GITHUB_ENV"
+          echo "FSH_VERSION=${version}" >> "$GITHUB_ENV"
+          echo "FSH_TAG=${tag}" >> "$GITHUB_ENV"
+          cat > packages/desktop/Credits.html <<EOF
+          <div style="font: 11px -apple-system, sans-serif; text-align: center">
+          Built $(date -u '+%Y-%m-%d %H:%M UTC')<br>
+          <a href="https://github.com/fullstackhouse/paseo/releases/tag/${tag}">Release ${tag}</a> ·
+          <a href="https://github.com/fullstackhouse/paseo/commit/${GITHUB_SHA}">Commit ${sha}</a>
+          </div>
+          EOF
+
       - name: Build desktop app
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
@@ -53,7 +73,10 @@ jobs:
             -c.mac.identity=- \
             -c.mac.notarize=false \
             -c.mac.hardenedRuntime=false \
-            -c.publish.owner=fullstackhouse
+            -c.publish.owner=fullstackhouse \
+            -c.buildVersion="fsh.${FSH_SHA}" \
+            -c.copyright="Copyright © $(date +%Y) Mohamed Boudra · FSH build by Full Stack House" \
+            -c.mac.extraResources=Credits.html
 
       - name: Upload smoke diagnostics
         if: failure()
@@ -69,8 +92,8 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          version="$(node -p 'require("./packages/desktop/package.json").version')"
-          tag="fsh-${version}-$(git rev-parse --short HEAD)"
+          version="$FSH_VERSION"
+          tag="$FSH_TAG"
           gh release create "$tag" packages/desktop/release/*.dmg \
             --target "$GITHUB_SHA" \
             --title "Paseo ${version} (FSH ${GITHUB_SHA::7})" \
