@@ -22,22 +22,45 @@ Keep this list in sync with what's merged into `fsh`.
 
 ## Install the desktop app (macOS, Apple Silicon)
 
-Install with Homebrew from [fullstackhouse/homebrew-tap](https://github.com/fullstackhouse/homebrew-tap). The cask
-follows the latest FSH release within 30 minutes, links the `paseo` CLI, and clears the quarantine flag the unsigned
-build needs cleared.
+Requires macOS 13 (Ventura) or newer on Apple Silicon. Install with Homebrew from
+[fullstackhouse/homebrew-tap](https://github.com/fullstackhouse/homebrew-tap) — that repo's README covers the tap
+itself (trust, signing, how bumps work); this section is the only place with the install steps. The cask follows the
+latest FSH release within 30 minutes, links the `paseo` CLI, and clears the quarantine flag the unsigned build needs
+cleared.
 
 ```bash
 brew tap fullstackhouse/tap
-brew trust --cask fullstackhouse/tap/paseo-fsh   # Homebrew 7 asks before running third-party casks
+brew trust --cask fullstackhouse/tap/paseo-fsh   # one-off, per machine
 brew install --cask paseo-fsh
 ```
+
+Homebrew 6 and newer will not load a third-party tap until you trust it, and trust is recorded per machine — so a new
+laptop needs that middle line again. Skip it and you get `Refusing to load cask fullstackhouse/tap/paseo-fsh from
+untrusted tap`, not a prompt.
+
+Already have Paseo.app from a DMG? `brew install --cask --adopt paseo-fsh` takes over the existing copy instead of
+refusing.
 
 If Homebrew's upstream `paseo` cask is installed, run `brew uninstall --cask paseo` first. Its uninstall hook quits
 Paseo and stops the daemon, so do it when no agent is mid-turn. Your `~/.paseo` data and hosts are kept. Leaving the
 upstream cask installed is not an option: `brew upgrade` would replace the FSH build with upstream Paseo.
 
-Update with `brew upgrade --cask paseo-fsh`, then quit Paseo (⌘Q) and reopen it. Paseo runs the daemon your agents
-live in, so choose a moment when none is mid-turn. There's no in-app auto-update: that needs a Developer ID signed build.
+Update with `brew upgrade --cask paseo-fsh`, then **quit Paseo (⌘Q) and reopen it** when no agent is mid-turn. The
+quit is not optional housekeeping: unlike the upstream cask, `paseo-fsh` has no `uninstall` stanza, so the upgrade
+swaps the app on disk and leaves the old build running, indefinitely.
+
+Nothing in the UI or the CLI will tell you. Every FSH build reports the same `0.13.0-beta.1` from `paseo --version`
+and `paseo status` — the part that identifies the build is the commit sha in the *cask* version
+(`0.13.0-beta.1-28159c2`), which the app itself never sees. To check whether you are running what is on disk, compare
+the inode the process executes against the file:
+
+```bash
+lsof -p "$(pgrep -f 'Paseo.app/Contents/MacOS/Paseo')" | awk '$4=="txt" && /MacOS\/Paseo/ {print $(NF-1)}'
+stat -f %i /Applications/Paseo.app/Contents/MacOS/Paseo
+```
+
+Two different numbers mean the app was replaced underneath the running copy: quit and reopen. There's no in-app
+auto-update either, so this is the whole update path — that needs a Developer ID signed build.
 
 Without Homebrew: download the DMG from the latest [release](https://github.com/fullstackhouse/paseo/releases/latest),
 drag Paseo to Applications, run `xattr -cr /Applications/Paseo.app`, and install the CLI from **Settings →
