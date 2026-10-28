@@ -51,6 +51,12 @@ export async function navigateToProjectSettings(page: Page, projectName: string)
   await page.getByRole("button", { name: `Edit ${projectName}`, exact: true }).click();
 }
 
+export async function removeProjectFromSettings(page: Page): Promise<void> {
+  // Removing a project raises a browser confirm; accept it.
+  page.once("dialog", (dialog) => void dialog.accept());
+  await page.getByTestId("project-remove-button").click();
+}
+
 export async function returnToProjectsList(page: Page): Promise<void> {
   await page.getByRole("button", { name: "Back to projects", exact: true }).click();
   await expect(page).toHaveURL(buildProjectsSettingsRoute(getServerId()));
