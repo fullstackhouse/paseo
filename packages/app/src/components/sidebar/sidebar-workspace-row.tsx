@@ -33,6 +33,7 @@ import {
   SidebarWorkspaceTrailingActionSlot,
 } from "@/components/sidebar/sidebar-workspace-row-content";
 import { useOpenKebabMenuVisibility } from "@/components/sidebar/use-open-kebab-menu-visibility";
+import { useSidebarArchiveButton } from "@/components/sidebar/display-preferences/model";
 import { getSidebarRowBackdrop } from "@/components/sidebar/sidebar-row-backdrop";
 import { selectWorkspaceServiceSummary } from "@/components/sidebar/workspace-meta-row";
 import {
@@ -400,10 +401,12 @@ function WorkspaceRowTrailingActions({
   onRename?: () => void;
 }) {
   const { t } = useTranslation();
+  const archiveButtonEnabled = useSidebarArchiveButton();
   const showShortcut = showShortcutBadge && shortcutNumber !== null;
   const {
     trailingPresentation,
     showKebab: showKebabInSlot,
+    showArchiveButton,
     showScrim,
     renderSlot,
     reserveSlotWidth,
@@ -411,6 +414,7 @@ function WorkspaceRowTrailingActions({
     workspace,
     trailing,
     hasArchiveAction: Boolean(onArchive),
+    archiveButtonEnabled,
     isHovered,
     isTouchPlatform,
     showShortcut,
@@ -430,6 +434,8 @@ function WorkspaceRowTrailingActions({
           <SidebarWorkspaceTrailingActionOverlay
             visible={kebab.showKebab}
             scrimBackdrop={showScrim ? backdrop : undefined}
+            onArchiveButtonPress={showArchiveButton ? onArchive : undefined}
+            archiveButtonTestID={`sidebar-workspace-archive-button-${workspace.workspaceKey}`}
           >
             {onArchive ? (
               <SidebarWorkspaceMenu

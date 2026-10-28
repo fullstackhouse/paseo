@@ -60,6 +60,7 @@ import {
   sidebarWorkspaceRowStyles,
 } from "@/components/sidebar/sidebar-workspace-row-content";
 import { useOpenKebabMenuVisibility } from "@/components/sidebar/use-open-kebab-menu-visibility";
+import { useSidebarArchiveButton } from "@/components/sidebar/display-preferences/model";
 import { getSidebarRowBackdrop } from "@/components/sidebar/sidebar-row-backdrop";
 import { getStatusDotColor } from "@/utils/status-dot-color";
 import { selectWorkspaceServiceSummary } from "@/components/sidebar/workspace-meta-row";
@@ -800,6 +801,7 @@ function StatusWorkspaceRowInnerContent({
   const isTouchPlatform = platformIsNative || isCompact;
   const [isPressed, setIsPressed] = useState(false);
   const trailing = useSidebarWorkspaceTrailing();
+  const archiveButtonEnabled = useSidebarArchiveButton();
   const {
     role: _dragRole,
     tabIndex: _dragTabIndex,
@@ -841,6 +843,7 @@ function StatusWorkspaceRowInnerContent({
         const {
           trailingPresentation,
           showKebab: showKebabInSlot,
+          showArchiveButton,
           showScrim,
           renderSlot,
           reserveSlotWidth,
@@ -848,6 +851,7 @@ function StatusWorkspaceRowInnerContent({
           workspace,
           trailing,
           hasArchiveAction: Boolean(onArchive),
+          archiveButtonEnabled,
           isHovered,
           isTouchPlatform,
           showShortcut,
@@ -920,6 +924,7 @@ function StatusWorkspaceRowInnerContent({
                     trailing={trailing}
                     trailingPresentation={trailingPresentation}
                     showKebab={showKebabInSlot}
+                    showArchiveButton={showArchiveButton}
                     showScrim={showScrim}
                     reserveSlotWidth={reserveSlotWidth}
                     isPinned={isPinned}
@@ -951,6 +956,7 @@ function StatusWorkspaceActionSlot({
   trailing,
   trailingPresentation,
   showKebab,
+  showArchiveButton,
   showScrim,
   reserveSlotWidth,
   isPinned,
@@ -971,6 +977,7 @@ function StatusWorkspaceActionSlot({
   trailing: SidebarWorkspaceTrailing;
   trailingPresentation: SidebarWorkspaceTrailingPresentation;
   showKebab: boolean;
+  showArchiveButton: boolean;
   showScrim: boolean;
   reserveSlotWidth: boolean;
   isPinned?: boolean;
@@ -995,6 +1002,8 @@ function StatusWorkspaceActionSlot({
       <SidebarWorkspaceTrailingActionOverlay
         visible={kebab.showKebab}
         scrimBackdrop={showScrim ? backdrop : undefined}
+        onArchiveButtonPress={showArchiveButton ? onArchive : undefined}
+        archiveButtonTestID={`sidebar-workspace-archive-button-${workspace.workspaceKey}`}
       >
         {kebab.showKebab && onArchive ? (
           <SidebarWorkspaceMenu
