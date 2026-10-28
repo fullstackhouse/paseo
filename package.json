@@ -37,6 +37,7 @@
   "scripts": {
     "dev": "npm run dev:server",
     "dev:win": "powershell ./scripts/dev.ps1",
+    "dev:seed-home": "node ./scripts/dev-seed-home.mjs",
     "dev:server": "cross-env PASEO_LISTEN=127.0.0.1:6768 ./scripts/dev-daemon.sh",
     "dev:server:watch": "concurrently --kill-others --names protocol,client,server --prefix-colors yellow,blue,cyan \"npm run watch:protocol\" \"npm run watch:client\" \"npm run dev:server:raw\"",
     "dev:server:raw": "npm run dev --workspace=@getpaseo/server",

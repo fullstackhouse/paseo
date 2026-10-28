@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import path from "node:path";
+import { existsSync } from "node:fs";
 import { execFileSync, spawn } from "node:child_process";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
@@ -151,6 +152,25 @@ spawnChild("metro", "npx", ["expo", "start", "--port", String(expoPort)], {
 
 try {
   await waitForMetro(expoDevUrl);
+  const preferencesPath = path.join(rootDir, ".dev", "desktop-preferences.json");
+  if (existsSync(preferencesPath)) {
+    const userDataDir = process.env.PASEO_ELECTRON_USER_DATA_DIR;
+    if (!userDataDir)
+      throw new Error("Dev desktop preference import requires an isolated userData directory");
+    const helperEnv = { ...process.env };
+    delete helperEnv.ELECTRON_RUN_AS_NODE;
+    execFileSync(
+      electron,
+      [
+        path.join(rootDir, "scripts", "dev-seed-desktop-profile-electron.cjs"),
+        "import",
+        userDataDir,
+        preferencesPath,
+        expoDevUrl,
+      ],
+      { env: helperEnv, stdio: "inherit", timeout: 30_000, killSignal: "SIGKILL" },
+    );
+  }
 } catch (error) {
   console.error(`[dev] ${error.message}`);
   exitCode = 1;
