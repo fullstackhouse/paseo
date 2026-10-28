@@ -18,6 +18,7 @@ temporary by design: every patch is meant to go upstream and then drop out of `f
 - FSH-only (not upstream yet): the connected-hosts batching test holds the parent's batch with an injected scheduler instead of racing the 2-second quiet window against a cold CLI spawn
 - FSH-only (not upstream yet): project categories. Put each project in a category from its menu, then pick a category in the Workspaces header so the sidebar shows only that category's projects. Categories are stored per device
 - FSH-only (not upstream yet): docs and a `paseo-run` skill for running a branch, or testing a plugin, next to the Paseo you work in
+- FSH-only (not upstream yet): new workspaces branch off the repo's default branch, not whatever branch the source checkout is on. The daemon picks the ref: the default branch's upstream (any remote), then origin's copy, then local
 
 Keep this list in sync with what's merged into `fsh`.
 
