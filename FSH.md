@@ -16,7 +16,7 @@ temporary by design: every patch is meant to go upstream and then drop out of `f
 - getpaseo/paseo#7955 (cherry-picked, merged upstream): retry brief Windows file locks during atomic writes. Drop at the next refresh
 - FSH-only (upstreamable): F-Droid builds link the app's own native modules (`packages/app/modules`); before, `paseo-scroll` was never linked and the build failed to compile
 - FSH-only (not upstream yet): the connected-hosts batching test holds the parent's batch with an injected scheduler instead of racing the 2-second quiet window against a cold CLI spawn
-- Fork-only (upstreamable): hovering a sidebar workspace row shows an Archive button beside its menu, so archiving takes one click. Off by default; turn it on under Show > Archive button in the sidebar's display menu. Desktop and web only; touch keeps the menu
+- FSH-only (upstreamable): hovering a sidebar workspace row shows an Archive button beside its menu, so archiving takes one click. Off by default; turn it on under Show > Archive button in the sidebar's display menu. Desktop and web only; touch keeps the menu
 - FSH-only (not upstream yet): project categories. Put each project in a category from its menu, then pick a category in the Workspaces header so the sidebar shows only that category's projects. Categories are stored per device
 
 Keep this list in sync with what's merged into `fsh`.

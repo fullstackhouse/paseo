@@ -2,7 +2,6 @@ import type { WorkspaceSort } from "@/projects/workspace-structure";
 import { useCallback, useMemo } from "react";
 import {
   useAppSettings,
-  useSettings,
   type SidebarWorkspaceTrailing,
   type WorkspaceTitleSource,
 } from "@/hooks/use-settings";
@@ -247,7 +246,7 @@ export function useSidebarMetaPreferences(): {
   );
 }
 
-/** Whether rows offer the Archive button on hover. Rows subscribe to this one field. */
+/** Whether rows offer the Archive button on hover. */
 export function useSidebarArchiveButton(): boolean {
-  return useSettings((settings) => settings.sidebarArchiveButton);
+  return useAppSettings().settings.sidebarArchiveButton;
 }
