@@ -127,6 +127,7 @@ release builds in a short-lived release workspace from `origin/main` or a releas
 ## Critical rules
 
 - **NEVER restart the main Paseo daemon on port 6767 without permission** — it manages all running agents. If you're an agent, restarting it kills your own process.
+- **Verify local dev in its actual window:** check appearance and capture fresh console errors after reload. Do not dismiss React warnings as expected dev noise without tracing their cause.
 - **NEVER assume a timeout means the service needs restarting** — timeouts can be transient.
 - **NEVER add auth checks to tests** — agent providers handle their own auth.
 - **Before changing app routes, startup routing, remembered workspace restore, or active workspace selection, read [docs/expo-router.md](docs/expo-router.md).**
