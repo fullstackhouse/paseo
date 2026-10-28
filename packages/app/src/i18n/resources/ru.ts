@@ -1223,6 +1223,7 @@ export const ru: TranslationResources = {
         labels: "Метки",
         diff: "Статистика изменений",
         timestamp: "Последняя активность",
+        archiveButton: "Кнопка архивации",
       },
       checks: {
         iconAndText: "Значок и текст",
