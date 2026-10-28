@@ -20,6 +20,8 @@ import { buildSidebarProjection } from "./sidebar-projection";
 import type { SidebarProjectIconTarget } from "@/utils/sidebar-project-row-model";
 import { filterWorkspacesByLabels, type SidebarWorkspaceGroup } from "./sidebar-labels";
 import { filterWorkspacesByProjects, resolveActiveProjectFilters } from "./sidebar-project-filter";
+import { createProjectCategoryMatcher } from "@/projects/categories/model";
+import { useProjectCategoriesStore } from "@/projects/categories/store";
 import {
   hasAuthoritativeWorkspaceLabelCatalog,
   useWorkspaceLabelProjection,
@@ -62,6 +64,20 @@ export function SidebarModelProvider({
   const labelFilter = useSidebarViewStore((state) => state.labelFilter);
   const projectFilters = useSidebarViewStore((state) => state.projectFilters);
   const reconcileLabelFilter = useSidebarViewStore((state) => state.reconcileLabelFilter);
+  const projectCategories = useProjectCategoriesStore((state) => state.categories);
+  const projectCategoryAssignments = useProjectCategoriesStore((state) => state.assignments);
+  const projectCategorySelection = useProjectCategoriesStore((state) => state.selection);
+  // Like the project filter, a membership test on the project itself: it narrows by
+  // `projectViewKey` and needs no workspace hydration.
+  const matchesProjectCategory = useMemo(
+    () =>
+      createProjectCategoryMatcher({
+        categories: projectCategories,
+        assignments: projectCategoryAssignments,
+        selection: projectCategorySelection,
+      }),
+    [projectCategories, projectCategoryAssignments, projectCategorySelection],
+  );
   const { hosts: labelHosts } = useWorkspaceLabelProjection();
   const collapsedProjectKeys = useSidebarCollapsedSectionsStore(
     (state) => state.collapsedProjectKeys,
@@ -107,13 +123,21 @@ export function SidebarModelProvider({
     const byProject = filterWorkspacesByProjects({
       workspaces: [...workspaceEntriesByKey.values()],
       projectFilters: resolvedProjectFilters,
-    });
+    }).filter(
+      (workspace) => !matchesProjectCategory || matchesProjectCategory(workspace.projectViewKey),
+    );
     const filtered = filterWorkspacesByLabels({
       workspaces: byProject.filter((workspace) => showBackground || !workspace.background),
       ...labelFilter,
     });
     return new Map(filtered.map((workspace) => [workspace.workspaceKey, workspace]));
-  }, [showBackground, labelFilter, resolvedProjectFilters, workspaceEntriesByKey]);
+  }, [
+    showBackground,
+    labelFilter,
+    resolvedProjectFilters,
+    matchesProjectCategory,
+    workspaceEntriesByKey,
+  ]);
   const visibleWorkspaceKeys = useMemo(
     () => new Set(filteredWorkspaceEntriesByKey.keys()),
     [filteredWorkspaceEntriesByKey],
@@ -127,6 +151,9 @@ export function SidebarModelProvider({
     if (hasActiveProjectFilter) {
       const included = new Set(resolvedProjectFilters);
       projects = projects.filter((project) => included.has(project.viewKey));
+    }
+    if (matchesProjectCategory) {
+      projects = projects.filter((project) => matchesProjectCategory(project.viewKey));
     }
     if (hasActiveLabelFilter || !showBackground) {
       projects = projects.flatMap((project) => {
@@ -144,6 +171,7 @@ export function SidebarModelProvider({
     hasActiveLabelFilter,
     hasActiveProjectFilter,
     resolvedProjectFilters,
+    matchesProjectCategory,
     list.projects,
     visibleWorkspaceKeys,
   ]);

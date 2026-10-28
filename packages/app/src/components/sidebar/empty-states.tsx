@@ -5,6 +5,8 @@ import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { Button } from "@/components/ui/button";
 import { useSidebarViewStore } from "@/stores/sidebar-view-store";
+import { ALL_PROJECT_CATEGORIES } from "@/projects/categories/model";
+import { useProjectCategoriesStore } from "@/projects/categories/store";
 
 function SidebarEmptyStateCard({
   testID,
@@ -40,13 +42,15 @@ export function SidebarFilterEmptyState() {
   const { t } = useTranslation();
   const clearLabelFilter = useSidebarViewStore((state) => state.clearLabelFilter);
   const clearProjectFilters = useSidebarViewStore((state) => state.clearProjectFilters);
+  const selectProjectCategory = useProjectCategoriesStore((state) => state.select);
   // Clears every filter that can empty the list, not just the one that did. The card names no
   // filter, so a Clear that undid only one of two active filters would leave it on screen looking
   // like it had failed.
   const clearFilters = useCallback(() => {
     clearLabelFilter();
     clearProjectFilters();
-  }, [clearLabelFilter, clearProjectFilters]);
+    selectProjectCategory(ALL_PROJECT_CATEGORIES);
+  }, [clearLabelFilter, clearProjectFilters, selectProjectCategory]);
 
   return (
     <SidebarEmptyStateCard
