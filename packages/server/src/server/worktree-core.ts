@@ -15,6 +15,7 @@ import {
 } from "./resolve-worktree-creation-intent.js";
 import type { ChangeRequestCheckoutSource, FirstAgentContext } from "@getpaseo/protocol/messages";
 import type { WorkspaceGitService } from "./workspace-git-service.js";
+import { resolveDefaultBranchBaseRef } from "../utils/checkout-git.js";
 import { runWithGitCommandPriority } from "../utils/run-git-command.js";
 
 export interface CreateWorktreeCoreInput {
@@ -94,6 +95,14 @@ async function createWorktreeCoreWithPriority(
     forge: forge.forge,
     forgeService: forge.service,
     resolveDefaultBranch: (root) => resolveDefaultBranch(root, deps),
+    // A caller-supplied resolveDefaultBranch is a base someone chose (legacy baseBranch, an
+    // agent's base), so it is used verbatim. Only the repository's own default gets qualified.
+    ...(deps.resolveDefaultBranch
+      ? {}
+      : {
+          resolveDefaultBaseRef: async (root: string) =>
+            resolveDefaultBranchBaseRef(root, await resolveDefaultBranch(root, deps)),
+        }),
   });
   let normalizedSlug: string;
 
