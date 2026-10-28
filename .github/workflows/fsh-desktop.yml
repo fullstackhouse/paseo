@@ -31,10 +31,6 @@ on:
 permissions:
   contents: write
 
-concurrency:
-  group: fsh-desktop-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
-
 jobs:
   macos-arm64:
     if: >-
@@ -43,6 +39,10 @@ jobs:
        contains(github.event.pull_request.labels.*.name, 'deploy') &&
        (github.event.action != 'labeled' || github.event.label.name == 'deploy'))
     runs-on: macos-14
+    # Job-level, so PR events that skip this job (other labels, close) don't cancel a running build.
+    concurrency:
+      group: fsh-desktop-${{ github.event.pull_request.number || github.ref }}
+      cancel-in-progress: ${{ github.event_name == 'pull_request' }}
     env:
       FSH_PRERELEASE: ${{ github.ref != 'refs/heads/fsh' }}
       FSH_PR: ${{ github.event.pull_request.number }}
