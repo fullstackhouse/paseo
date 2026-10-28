@@ -945,6 +945,8 @@ export const ru: TranslationResources = {
       },
       diff: {
         openChangesTab: "Открыть вкладку «Изменения»",
+        toPush: "Не отправлено: {{count}}",
+        toPull: "Не получено: {{count}}",
         openDiffTab: "Открыть вкладку «Дифф»",
         closeChangesTab: "Закрыть вкладку «Изменения»",
         jumpToFile: {

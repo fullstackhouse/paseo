@@ -5,7 +5,7 @@ import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { useSessionStore, type WorkspaceDescriptor } from "@/stores/session-store";
 import { seedSessionWorkspaces } from "@/test/seed-session";
-import { useWorkspaceHasDiffStat } from "./workspace-diff-stat";
+import { useVisibleWorkspaceChanges, useWorkspaceHasChangesPill } from "./workspace-diff-stat";
 
 const SERVER_ID = "diff-stat-pill";
 const WORKSPACE_ID = "workspace";
@@ -28,15 +28,19 @@ const workspace: WorkspaceDescriptor = {
   scripts: [],
 };
 
-function setDiffStat(diffStat: WorkspaceDescriptor["diffStat"]): void {
+function setWorkspace(overrides: Partial<WorkspaceDescriptor>): void {
   useSessionStore.getState().setWorkspaces(SERVER_ID, (workspaces) => {
     const next = new Map(workspaces);
-    next.set(WORKSPACE_ID, { ...workspace, diffStat });
+    next.set(WORKSPACE_ID, { ...workspace, ...overrides });
     return next;
   });
 }
 
-describe("useWorkspaceHasDiffStat", () => {
+function setDiffStat(diffStat: WorkspaceDescriptor["diffStat"]): void {
+  setWorkspace({ diffStat });
+}
+
+describe("useWorkspaceHasChangesPill", () => {
   beforeEach(() => {
     useSessionStore.getState().initializeSession(SERVER_ID, null as unknown as DaemonClient);
     seedSessionWorkspaces(SERVER_ID, new Map([[WORKSPACE_ID, workspace]]));
@@ -50,7 +54,7 @@ describe("useWorkspaceHasDiffStat", () => {
     let renderCount = 0;
     const { result } = renderHook(() => {
       renderCount += 1;
-      return useWorkspaceHasDiffStat(SERVER_ID, WORKSPACE_ID);
+      return useWorkspaceHasChangesPill(SERVER_ID, WORKSPACE_ID);
     });
 
     expect(result.current).toBe(false);
@@ -67,5 +71,67 @@ describe("useWorkspaceHasDiffStat", () => {
     act(() => setDiffStat(null));
     expect(result.current).toBe(false);
     expect(renderCount).toBe(3);
+  });
+});
+
+describe("useVisibleWorkspaceChanges", () => {
+  beforeEach(() => {
+    useSessionStore.getState().initializeSession(SERVER_ID, null as unknown as DaemonClient);
+    seedSessionWorkspaces(SERVER_ID, new Map([[WORKSPACE_ID, workspace]]));
+  });
+
+  afterEach(() => {
+    useSessionStore.getState().clearSession(SERVER_ID);
+  });
+
+  it("hides the pill when there is no diff and the branch is in sync", () => {
+    setWorkspace({
+      diffStat: { additions: 0, deletions: 0 },
+      gitRuntime: {
+        currentBranch: "feature",
+        baseRef: "main",
+        aheadOfOrigin: 0,
+        behindOfOrigin: 0,
+      },
+    });
+    const { result } = renderHook(() => useVisibleWorkspaceChanges(SERVER_ID, WORKSPACE_ID));
+
+    expect(result.current).toBeNull();
+  });
+
+  it("shows unpushed and unpulled commits without a diff", () => {
+    setWorkspace({
+      gitRuntime: {
+        currentBranch: "feature",
+        baseRef: "main",
+        aheadOfOrigin: 2,
+        behindOfOrigin: 1,
+      },
+    });
+    const { result } = renderHook(() => useVisibleWorkspaceChanges(SERVER_ID, WORKSPACE_ID));
+
+    expect(result.current).toEqual({
+      diffStat: null,
+      ahead: 2,
+      behind: 1,
+      currentBranch: "feature",
+      baseRef: "main",
+    });
+  });
+
+  it("treats a branch with no upstream as in sync", () => {
+    setWorkspace({
+      diffStat: { additions: 3, deletions: 1 },
+      gitRuntime: { currentBranch: "feature", aheadOfOrigin: null, behindOfOrigin: null },
+    });
+    const { result } = renderHook(() => useVisibleWorkspaceChanges(SERVER_ID, WORKSPACE_ID));
+
+    expect(result.current).toEqual({
+      diffStat: { additions: 3, deletions: 1 },
+      ahead: 0,
+      behind: 0,
+      currentBranch: "feature",
+      baseRef: null,
+    });
   });
 });

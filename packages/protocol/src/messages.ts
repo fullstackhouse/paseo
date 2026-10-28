@@ -4062,6 +4062,8 @@ const WorkspaceGitRuntimePayloadSchema = z
       .optional(),
     aheadOfOrigin: z.number().nullable().optional(),
     behindOfOrigin: z.number().nullable().optional(),
+    // Branch the diff stat and aheadBehind compare against.
+    baseRef: z.string().nullable().optional(),
   })
   .optional()
   .nullable();

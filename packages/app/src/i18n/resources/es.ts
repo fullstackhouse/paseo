@@ -961,6 +961,8 @@ export const es: TranslationResources = {
       },
       diff: {
         openChangesTab: "Abrir la pestaña Cambios",
+        toPush: "Por empujar: {{count}}",
+        toPull: "Por jalar: {{count}}",
         openDiffTab: "Abrir la pestaña Diferencia",
         closeChangesTab: "Cerrar la pestaña Cambios",
         jumpToFile: {

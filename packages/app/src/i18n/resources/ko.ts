@@ -935,6 +935,8 @@ export const ko: TranslationResources = {
       },
       diff: {
         openChangesTab: "변경사항 탭 열기",
+        toPush: "푸시 대기: {{count}}",
+        toPull: "풀 대기: {{count}}",
         openDiffTab: "Diff 탭 열기",
         closeChangesTab: "변경사항 탭 닫기",
         jumpToFile: {

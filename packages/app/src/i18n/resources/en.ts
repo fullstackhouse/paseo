@@ -936,6 +936,8 @@ export const en = {
       },
       diff: {
         openChangesTab: "Open Changes tab",
+        toPush: "To push: {{count}}",
+        toPull: "To pull: {{count}}",
         openDiffTab: "Open Diff tab",
         closeChangesTab: "Close Changes tab",
         jumpToFile: {

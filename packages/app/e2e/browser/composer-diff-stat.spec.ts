@@ -1,4 +1,5 @@
 import type { Locator } from "@playwright/test";
+import { execFileSync } from "node:child_process";
 import { writeFile } from "node:fs/promises";
 import path from "node:path";
 import { expect, test, type Page } from "../support/fixtures";
@@ -108,6 +109,53 @@ test("composer diff stat reveals Changes, then opens the diff in the configured 
       await pill.click();
       await expect(sidePane.getByTestId("working-diff-panel")).toBeVisible();
       await expect(page.getByTestId("workspace-tab-working_diff")).toHaveCount(1);
+    });
+  } finally {
+    await workspace.cleanup();
+  }
+});
+
+test("composer diff stat shows unpushed commits and the compared branches", async ({
+  page,
+}, testInfo) => {
+  const workspace = await seedMockAgentWorkspace({
+    repoPrefix: "composer-diff-stat-sync-",
+    title: "Composer diff stat sync",
+    repo: {
+      withRemote: true,
+      files: [{ path: ".gitignore", content: "/remote.git/\n" }],
+    },
+  });
+
+  try {
+    const git = (...args: string[]) =>
+      execFileSync("git", args, { cwd: workspace.cwd, stdio: "pipe" });
+    git("checkout", "-b", "feature");
+    git("push", "-u", "origin", "feature");
+    await writeFile(path.join(workspace.cwd, "feature.txt"), "one\ntwo\n");
+    git("add", "feature.txt");
+    git("-c", "commit.gpgsign=false", "commit", "-m", "feature");
+    await workspace.client.checkoutRefresh(workspace.cwd);
+
+    await page.setViewportSize({ width: 1400, height: 900 });
+    await openAgentRoute(page, {
+      workspaceId: workspace.workspaceId,
+      agentId: workspace.agentId,
+    });
+
+    const pill = composerChangesPill(page);
+    await expect(pill).toBeVisible({ timeout: 30_000 });
+    await expect(pill).toContainText("+2");
+    await expect(page.getByTestId("composer-diff-stat-pill-sync")).toHaveText("↑1", {
+      timeout: 30_000,
+    });
+
+    await pill.hover();
+    await expect(page.getByText("feature → main")).toBeVisible();
+    await expect(page.getByText("To push: 1")).toBeVisible();
+    await testInfo.attach("composer-diff-stat-sync", {
+      body: await page.screenshot(),
+      contentType: "image/png",
     });
   } finally {
     await workspace.cleanup();

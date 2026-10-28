@@ -954,6 +954,8 @@ export const fr: TranslationResources = {
       },
       diff: {
         openChangesTab: "Ouvrir l’onglet Modifications",
+        toPush: "Push en attente : {{count}}",
+        toPull: "Pull en attente : {{count}}",
         openDiffTab: "Ouvrir l’onglet Diff",
         closeChangesTab: "Fermer l’onglet Modifications",
         jumpToFile: {

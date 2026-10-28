@@ -920,6 +920,8 @@ export const zhCN: TranslationResources = {
       },
       diff: {
         openChangesTab: "打开“更改”标签页",
+        toPush: "待 Push：{{count}}",
+        toPull: "待 Pull：{{count}}",
         openDiffTab: "打开 Diff 标签页",
         closeChangesTab: "关闭“更改”标签页",
         jumpToFile: {

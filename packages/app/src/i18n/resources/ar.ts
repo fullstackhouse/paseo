@@ -928,6 +928,8 @@ export const ar: TranslationResources = {
       },
       diff: {
         openChangesTab: "فتح علامة تبويب التغييرات",
+        toPush: "بانتظار الدفع: {{count}}",
+        toPull: "بانتظار السحب: {{count}}",
         openDiffTab: "فتح علامة تبويب الفرق",
         closeChangesTab: "إغلاق علامة تبويب التغييرات",
         jumpToFile: {

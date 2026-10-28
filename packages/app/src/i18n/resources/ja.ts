@@ -941,6 +941,8 @@ export const ja: TranslationResources = {
       },
       diff: {
         openChangesTab: "変更タブを開く",
+        toPush: "未プッシュ: {{count}}",
+        toPull: "未プル: {{count}}",
         openDiffTab: "差分タブを開く",
         closeChangesTab: "変更タブを閉じる",
         jumpToFile: {

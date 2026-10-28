@@ -951,6 +951,8 @@ export const ptBR: TranslationResources = {
       },
       diff: {
         openChangesTab: "Abrir a aba Alterações",
+        toPush: "Push pendente: {{count}}",
+        toPull: "Pull pendente: {{count}}",
         openDiffTab: "Abrir a aba Diff",
         closeChangesTab: "Fechar a aba Alterações",
         jumpToFile: {
