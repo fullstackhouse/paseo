@@ -3,7 +3,7 @@
 import type { WorkspaceStateBucket } from "@getpaseo/protocol/agent-state-bucket";
 
 /** How long the local host has to stay idle before the update installs. */
-export const IDLE_INSTALL_QUIET_MS = 2 * 60 * 1000;
+export const IDLE_INSTALL_QUIET_MS = 15 * 1000;
 
 export type LocalHostActivity = "busy" | "idle" | "unknown";
 

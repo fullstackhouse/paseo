@@ -1554,7 +1554,7 @@ export const ptBR: TranslationResources = {
         restartWarning:
           "Atualizar o app vai interromper agentes em execução e fechar sessões de terminal.",
         waitingTitle: "Atualização aguardando",
-        waitingDescription: "Instala quando nenhum agente local tiver trabalhado por 2 minutos.",
+        waitingDescription: "Instala assim que nenhum agente local estiver trabalhando.",
         installWhenIdle: "Instalar quando ocioso",
         installNow: "Instalar agora",
       },
@@ -2429,7 +2429,7 @@ export const ptBR: TranslationResources = {
         readyToInstall: "Pronta para instalar: {{version}}",
         autoInstallLabel: "Instalar atualizações quando ocioso",
         autoInstallDescription:
-          "Instala e reinicia quando nenhum agente local tiver trabalhado por 2 minutos.",
+          "Instala e reinicia assim que nenhum agente local estiver trabalhando.",
         installTitle: "Instalar atualização desktop",
         installMessage: "Isso atualiza o Paseo neste computador",
         installConfirm: "Instalar atualização",

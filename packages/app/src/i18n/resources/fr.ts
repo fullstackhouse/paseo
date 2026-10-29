@@ -1558,7 +1558,7 @@ export const fr: TranslationResources = {
         restartWarning:
           "La mise à jour de l’application arrêtera les agents en cours et fermera les sessions de terminal.",
         waitingTitle: "Mise à jour en attente",
-        waitingDescription: "S'installe quand aucun agent local n'a travaillé depuis 2 minutes.",
+        waitingDescription: "S'installe dès qu'aucun agent local ne travaille.",
         installWhenIdle: "Installer au repos",
         installNow: "Installer maintenant",
       },
@@ -2445,8 +2445,7 @@ export const fr: TranslationResources = {
         label: "Mises à jour de l’application",
         readyToInstall: "Prête à installer : {{version}}",
         autoInstallLabel: "Installer les mises à jour au repos",
-        autoInstallDescription:
-          "Installe et redémarre quand aucun agent local n'a travaillé depuis 2 minutes.",
+        autoInstallDescription: "Installe et redémarre dès qu'aucun agent local ne travaille.",
         installTitle: "Installer la mise à jour de l’app de bureau",
         installMessage: "Paseo sera mis à jour sur cet ordinateur",
         installConfirm: "Installer la mise à jour",
