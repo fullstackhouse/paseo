@@ -2,6 +2,14 @@ import { en, type TranslationResources } from "./en";
 import { pluginSettings } from "./plugin-settings";
 
 export const fr: TranslationResources = {
+  interruptedAgents: {
+    title_one: "{{count}} agent a été interrompu",
+    title_other: "{{count}} agents ont été interrompus",
+    description: "Paseo a redémarré pendant leur tour : {{names}}",
+    untitled: "Agent sans titre",
+    more: "+{{count}} de plus",
+    resumeAll: "Tout reprendre",
+  },
   paneFind: {
     connectionFailure:
       "Impossible de rechercher dans cette conversation. Vérifiez la connexion à l’hôte et réessayez.",

@@ -1,4 +1,12 @@
 export const en = {
+  interruptedAgents: {
+    title_one: "{{count}} agent was interrupted",
+    title_other: "{{count}} agents were interrupted",
+    description: "Paseo restarted during their turn: {{names}}",
+    untitled: "Untitled agent",
+    more: "+{{count}} more",
+    resumeAll: "Resume all",
+  },
   paneFind: {
     connectionFailure: "Could not search this chat. Check the host connection and retry.",
     historyChangedFailure: "The chat changed while searching. Search again.",
