@@ -829,6 +829,14 @@ export const ja: TranslationResources = {
           pending_mr: "MRを作成中...",
           success_mr: "MRが作成されました",
         },
+        createPrAndMerge: {
+          label: "PRを作成してマージ",
+          pending: "エージェントに送信中...",
+          success: "エージェントに送信しました",
+          sent: "エージェントにPRの作成とマージを依頼しました",
+          label_mr: "MRを作成してマージ",
+          sent_mr: "エージェントにMRの作成とマージを依頼しました",
+        },
         mergeBranch: {
           label: "ローカルでマージ",
           pending: "マージ中...",
@@ -918,6 +926,7 @@ export const ja: TranslationResources = {
           failedPush: "プッシュに失敗しました",
           failedPullAndPush: "プル＆プッシュに失敗しました",
           failedCreatePr: "PRの作成に失敗しました",
+          failedCreatePrAndMerge: "エージェントにリクエストを送信できませんでした",
           failedMergePr: "PRのマージに失敗しました",
           failedEnableAutoMerge: "自動マージの有効化に失敗しました",
           failedDisableAutoMerge: "自動マージの無効化に失敗しました",
@@ -1229,6 +1238,7 @@ export const ja: TranslationResources = {
         labels: "ラベル",
         diff: "差分統計",
         timestamp: "最終アクティビティ",
+        archiveButton: "アーカイブボタン",
       },
       checks: {
         iconAndText: "アイコンとテキスト",
@@ -2921,6 +2931,8 @@ export const ja: TranslationResources = {
     project: {
       noEditableTarget: "このホストではこのプロジェクトを編集できません。",
       backToProjects: "プロジェクトに戻る",
+      removeHint:
+        "このホストの Paseo からこのプロジェクトを削除します。ディスク上のファイルは変更されません。",
       edit: {
         title: "プロジェクトを編集",
         name: "名前",

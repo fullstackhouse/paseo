@@ -821,6 +821,14 @@ export const zhCN: TranslationResources = {
           pending_mr: "正在创建 MR...",
           success_mr: "MR 已创建",
         },
+        createPrAndMerge: {
+          label: "创建 PR 并合并",
+          pending: "正在发送给代理...",
+          success: "已发送给代理",
+          sent: "已请代理创建并合并 PR",
+          label_mr: "创建 MR 并合并",
+          sent_mr: "已请代理创建并合并 MR",
+        },
         mergeBranch: {
           label: "本地 merge",
           pending: "正在 merge...",
@@ -897,6 +905,7 @@ export const zhCN: TranslationResources = {
           failedPush: "Push 失败",
           failedPullAndPush: "Pull 并 push 失败",
           failedCreatePr: "创建 PR 失败",
+          failedCreatePrAndMerge: "无法将请求发送给代理",
           failedMergePr: "Merge PR 失败",
           failedEnableAutoMerge: "启用 auto-merge 失败",
           failedDisableAutoMerge: "禁用 auto-merge 失败",
@@ -1208,6 +1217,7 @@ export const zhCN: TranslationResources = {
         labels: "标签",
         diff: "差异统计",
         timestamp: "最近活动",
+        archiveButton: "归档按钮",
       },
       checks: {
         iconAndText: "图标和文字",
@@ -2859,6 +2869,7 @@ export const zhCN: TranslationResources = {
     project: {
       noEditableTarget: "此项目无法在这个 Host 上编辑。",
       backToProjects: "返回 Projects",
+      removeHint: "在这个 Host 上从 Paseo 移除此项目。磁盘上的文件不会改动。",
       edit: {
         title: "编辑 Project",
         name: "名称",

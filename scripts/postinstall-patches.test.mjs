@@ -97,3 +97,49 @@ test("a missing patch-package fails the install and leaves the package in place"
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+test("Unistyles web mappings do not forward uniProps to the wrapped DOM component", async () => {
+  const { createRequire } = await import("node:module");
+  const { runInNewContext } = await import("node:vm");
+  const require = createRequire(import.meta.url);
+  const React = require("react");
+  const { renderToStaticMarkup } = require("react-dom/server");
+  const wrapperPath = path.resolve(
+    "node_modules/react-native-unistyles/lib/commonjs/core/withUnistyles/withUnistyles.js",
+  );
+  const wrapperRequire = createRequire(wrapperPath);
+  const exports = {};
+  runInNewContext(readFileSync(wrapperPath, "utf8"), {
+    exports,
+    require(id) {
+      if (id === "../getClassname") return { getClassName: () => undefined };
+      if (id === "../useProxifiedUnistyles") {
+        return {
+          useProxifiedUnistyles: () => ({
+            proxifiedTheme: { color: "white" },
+            proxifiedRuntime: {},
+          }),
+        };
+      }
+      if (id === "../warn") return { maybeWarnAboutMultipleUnistyles() {} };
+      return wrapperRequire(id);
+    },
+  });
+  let received;
+  const Icon = (props) => {
+    received = props;
+    return React.createElement("svg", props);
+  };
+  const ThemedIcon = exports.withUnistyles(Icon, () => ({ color: "black", width: 12 }));
+  renderToStaticMarkup(
+    React.createElement(ThemedIcon, {
+      uniProps: (theme) => ({ color: theme.color, width: 16 }),
+      width: 24,
+      "aria-label": "Settings",
+    }),
+  );
+  assert.equal(received.color, "white");
+  assert.equal(received.width, 24);
+  assert.equal(received["aria-label"], "Settings");
+  assert.equal(Object.hasOwn(received, "uniProps"), false);
+});

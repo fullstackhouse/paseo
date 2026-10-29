@@ -833,6 +833,14 @@ export const es: TranslationResources = {
           pending_mr: "Creando MR...",
           success_mr: "MR creado",
         },
+        createPrAndMerge: {
+          label: "Crear PR y fusionar",
+          pending: "Enviando al agente...",
+          success: "Enviado al agente",
+          sent: "Se pidió al agente crear y fusionar el PR",
+          label_mr: "Crear MR y fusionar",
+          sent_mr: "Se pidió al agente crear y fusionar el MR",
+        },
         mergeBranch: {
           label: "Fusionar localmente",
           pending: "Fusionando...",
@@ -938,6 +946,7 @@ export const es: TranslationResources = {
           failedPush: "No se pudo empujar",
           failedPullAndPush: "No se pudo tirar y empujar",
           failedCreatePr: "No se pudo crearPR",
+          failedCreatePrAndMerge: "No se pudo enviar la solicitud al agente",
           failedMergePr: "No se pudo fusionarPR",
           failedEnableAutoMerge: "No se pudo habilitar la combinación automática",
           failedDisableAutoMerge: "No se pudo deshabilitar la combinación automática",
@@ -1252,6 +1261,7 @@ export const es: TranslationResources = {
         labels: "Etiquetas",
         diff: "Estadísticas de cambios",
         timestamp: "Última actividad",
+        archiveButton: "Botón de archivar",
       },
       checks: {
         iconAndText: "Icono y texto",
@@ -2951,6 +2961,8 @@ export const es: TranslationResources = {
     project: {
       noEditableTarget: "Este proyecto no se puede editar en este host.",
       backToProjects: "Volver a proyectos",
+      removeHint:
+        "Quita este proyecto de Paseo en este host. Los archivos en disco no se modifican.",
       edit: {
         title: "Editar proyecto",
         name: "Nombre",

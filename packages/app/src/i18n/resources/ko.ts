@@ -826,6 +826,14 @@ export const ko: TranslationResources = {
           pending_mr: "MR 생성 중...",
           success_mr: "MR 생성됨",
         },
+        createPrAndMerge: {
+          label: "PR 생성 후 병합",
+          pending: "에이전트에 보내는 중...",
+          success: "에이전트에 보냄",
+          sent: "에이전트에게 PR 생성 및 병합을 요청했습니다",
+          label_mr: "MR 생성 후 병합",
+          sent_mr: "에이전트에게 MR 생성 및 병합을 요청했습니다",
+        },
         mergeBranch: {
           label: "로컬에서 병합",
           pending: "병합하는 중...",
@@ -912,6 +920,7 @@ export const ko: TranslationResources = {
           failedPush: "푸시하지 못했습니다",
           failedPullAndPush: "풀 후 푸시하지 못했습니다",
           failedCreatePr: "PR을 생성하지 못했습니다",
+          failedCreatePrAndMerge: "에이전트에 요청을 보내지 못했습니다",
           failedMergePr: "PR을 병합하지 못했습니다",
           failedEnableAutoMerge: "자동 병합을 사용 설정하지 못했습니다",
           failedDisableAutoMerge: "자동 병합을 해제하지 못했습니다",
@@ -1223,6 +1232,7 @@ export const ko: TranslationResources = {
         labels: "레이블",
         diff: "Diff 통계",
         timestamp: "마지막 활동",
+        archiveButton: "보관 버튼",
       },
       checks: {
         iconAndText: "아이콘 및 텍스트",
@@ -2907,6 +2917,8 @@ export const ko: TranslationResources = {
     project: {
       noEditableTarget: "이 호스트에서는 이 프로젝트를 편집할 수 없습니다.",
       backToProjects: "프로젝트로 돌아가기",
+      removeHint:
+        "이 호스트의 Paseo에서 이 프로젝트를 제거합니다. 디스크의 파일은 변경되지 않습니다.",
       edit: {
         title: "프로젝트 편집",
         name: "이름",

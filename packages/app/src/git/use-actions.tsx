@@ -31,6 +31,7 @@ import { type WorktreeArchiveWarningLabels } from "@/git/worktree-archive-warnin
 import { useWorkspaceArchive } from "@/workspace/use-workspace-archive";
 import { resolveWorkspaceMapKeyByIdentity } from "@/utils/workspace-identity";
 import { readValidatedString } from "@/storage/validated-storage";
+import { useCreatePrAndMerge } from "@/git/use-create-pr-and-merge";
 
 export type { GitActionId, GitAction, GitActions } from "@/git/policy";
 
@@ -307,6 +308,7 @@ function useWorkspaceScreenArchiveController({
 
   return {
     ...controller,
+    workspaceDescriptor,
     isArchiving: workspaceDescriptor?.archivingAt != null || isHidingWorkspace,
     canArchive: canArchiveWorkspace(workspaceDescriptor, archiveRisk),
   };
@@ -641,6 +643,12 @@ export function useGitActions({ serverId, cwd, icons }: UseGitActionsInput): Use
     t,
   });
 
+  const handleCreatePrAndMerge = useCreatePrAndMerge({
+    serverId,
+    workspace: archiveController.workspaceDescriptor,
+    forge,
+  });
+
   const handleArchiveWorkspace = useCallback(() => {
     archiveController.archive();
   }, [archiveController]);
@@ -734,6 +742,12 @@ export function useGitActions({ serverId, cwd, icons }: UseGitActionsInput): Use
           status: hasPullRequest ? "idle" : prCreateStatus,
           icon: prIcon,
           handler: handlePrAction,
+        },
+        "create-pr-and-merge": {
+          disabled: actionsDisabled,
+          status: "idle",
+          icon: prIcon,
+          handler: handleCreatePrAndMerge,
         },
         "merge-pr-squash": {
           disabled: isActionDisabled(actionsDisabled, mergePrStatuses.squash),
@@ -843,6 +857,7 @@ export function useGitActions({ serverId, cwd, icons }: UseGitActionsInput): Use
     handlePush,
     handlePullAndPush,
     handlePrAction,
+    handleCreatePrAndMerge,
     handleMergePr,
     handleEnablePrAutoMerge,
     handleDisablePrAutoMerge,
@@ -960,6 +975,12 @@ function getTranslatedGitActionLabels(
             pendingLabel: t("workspace.git.actions.createPr.pending", forgeVocabulary(forge)),
             successLabel: t("workspace.git.actions.createPr.success", forgeVocabulary(forge)),
           };
+    case "create-pr-and-merge":
+      return {
+        label: t("workspace.git.actions.createPrAndMerge.label", forgeVocabulary(forge)),
+        pendingLabel: t("workspace.git.actions.createPrAndMerge.pending", forgeVocabulary(forge)),
+        successLabel: t("workspace.git.actions.createPrAndMerge.success", forgeVocabulary(forge)),
+      };
     case "merge-pr-squash":
       return {
         label: t("workspace.git.actions.mergePr.squash", forgeVocabulary(forge)),

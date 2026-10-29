@@ -95,6 +95,8 @@ export interface AppSettings {
   sidebarChecksDisplay: SidebarChecksDisplay;
   /** Plugin workspace row items by `<pluginId>/<itemId>`; a missing key shows. */
   sidebarPluginRowItems: Record<string, boolean>;
+  /** A one-click Archive button beside the workspace row's menu, on hover. */
+  sidebarArchiveButton: boolean;
   /** Top-level sidebar rows in display order; empty means the default order, all visible. */
   sidebarNavItems: SidebarNavPreference[];
   /** Sidebar footer items in display order; empty means the default order, all visible. */
@@ -155,6 +157,7 @@ export const DEFAULT_CLIENT_SETTINGS: AppSettings = {
   sidebarRowItems: DEFAULT_SIDEBAR_ROW_ITEMS,
   sidebarChecksDisplay: DEFAULT_SIDEBAR_CHECKS_DISPLAY,
   sidebarPluginRowItems: {},
+  sidebarArchiveButton: false,
   sidebarNavItems: [],
   sidebarFooterItems: [],
   usage: DEFAULT_USAGE_PREFERENCES,
@@ -251,6 +254,7 @@ const StoredAppSettingsSchema = z
       .optional()
       .catch(DEFAULT_SIDEBAR_CHECKS_DISPLAY),
     sidebarPluginRowItems: z.record(z.string(), z.boolean()).catch({}),
+    sidebarArchiveButton: z.boolean().catch(false),
     sidebarNavItems: z.array(z.object({ key: z.string(), visible: z.boolean() })).catch([]),
     sidebarFooterItems: z.array(z.object({ key: z.string(), visible: z.boolean() })).catch([]),
     usage: UsagePreferencesSchema,
