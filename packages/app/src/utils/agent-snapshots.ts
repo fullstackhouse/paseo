@@ -85,6 +85,7 @@ export function projectAgentSnapshot(agent: Agent): AgentSnapshotPayload {
     attentionReason: agent.attentionReason ?? null,
     attentionTimestamp: agent.attentionTimestamp?.toISOString() ?? null,
     archivedAt: agent.archivedAt?.toISOString() ?? null,
+    interruptedAt: agent.interruptedAt?.toISOString() ?? null,
   };
 }
 
@@ -98,6 +99,7 @@ export function normalizeAgentSnapshot(snapshot: AgentSnapshotPayload, serverId:
     ? new Date(snapshot.attentionTimestamp)
     : null;
   const archivedAt = snapshot.archivedAt ? new Date(snapshot.archivedAt) : null;
+  const interruptedAt = snapshot.interruptedAt ? new Date(snapshot.interruptedAt) : null;
   const parent = getParentAddressFromLabels(snapshot.labels, serverId);
   const parentAgentId = parent?.serverId === serverId ? parent.agentId : null;
   // COMPAT(agentTurnIdentity): added in v0.2.6, remove after 2027-01-31 once daemon floor >= v0.2.6.
@@ -133,6 +135,7 @@ export function normalizeAgentSnapshot(snapshot: AgentSnapshotPayload, serverId:
     attentionReason: snapshot.attentionReason ?? null,
     attentionTimestamp,
     archivedAt,
+    interruptedAt,
     parentAgentId,
     labels: snapshot.labels,
   };
