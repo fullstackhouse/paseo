@@ -118,6 +118,8 @@ paseo workspace create \
 
 可以在应用中运行它们，也可以在自动化中用 [`paseo script`](/docs/cli#workspace-scripts) 和[工作区脚本 MCP 工具](/docs/mcp#workspace-scripts)管理它们。
 
+`command` 使用 POSIX `sh` 语法编写。每个脚本都在运行你的登录 shell 的终端中执行。如果该 shell 是 bash、zsh 或其他 POSIX shell，命令会直接输入其中，因此你的 shell 函数和别名可以使用。fish、nu、PowerShell 等其他 shell 则改由 `/bin/sh` 运行该命令。
+
 ### 普通脚本 {#plain-scripts}
 
 ```json

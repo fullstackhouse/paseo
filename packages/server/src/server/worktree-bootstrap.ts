@@ -1,6 +1,8 @@
+import { createHash } from "node:crypto";
 import type { Logger } from "pino";
 import type { TerminalManager } from "../terminal/terminal-manager.js";
 import type { TerminalSession } from "../terminal/terminal.js";
+import { resolveDefaultTerminalShell } from "../terminal/default-shell.js";
 import {
   getScriptConfigs,
   getWorktreeTerminalSpecs,
@@ -15,6 +17,7 @@ import {
 } from "../utils/worktree.js";
 import type { ServiceProxySubsystem } from "./service-proxy.js";
 import { allocateWorkspaceServicePort } from "./workspace-service-port-allocator.js";
+import { buildWorkspaceScriptInput } from "./workspace-script-input.js";
 import type { WorkspaceScriptRuntimeStore } from "./workspace-script-runtime-store.js";
 import type { ToolCallDetail } from "./agent/agent-sdk-types.js";
 import {
@@ -665,7 +668,17 @@ export async function spawnWorkspaceScript(
     if (!reusableTerminal) {
       await waitForTerminalBootstrapReadiness(terminal);
     }
-    terminal.send({ type: "input", data: `${config.command}\r` });
+    terminal.send({
+      type: "input",
+      data: buildWorkspaceScriptInput({
+        command: config.command,
+        shell: resolveDefaultTerminalShell(),
+        scriptKey: createHash("sha256")
+          .update(`${workspaceId}\0${scriptName}`)
+          .digest("hex")
+          .slice(0, 16),
+      }),
+    });
 
     logger?.info(
       {
