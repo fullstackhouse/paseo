@@ -3,6 +3,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { execFileSync } from "child_process";
 import {
+  chmodSync,
   existsSync,
   mkdtempSync,
   readFileSync,
@@ -91,6 +92,62 @@ describe.skipIf(isPlatform("win32"))("worktree-bootstrap POSIX-only", () => {
     afterEach(async () => {
       await Promise.all(realTerminalManagers.map(cleanupTerminalManager));
       rmSync(tempDir, { recursive: true, force: true });
+    });
+
+    it("runs POSIX commands when the terminal's shell doesn't speak POSIX", async () => {
+      // Stands in for fish/nu/pwsh: runs each typed line as plain argv, with no `${...}` expansion,
+      // quoting, `;` or redirects. Only a command handed to /bin/sh can produce the expected file.
+      const fakeShell = join(tempDir, "plainsh");
+      writeFileSync(
+        fakeShell,
+        [
+          `#!${process.execPath}`,
+          'const { spawnSync } = require("child_process");',
+          'require("readline").createInterface({ input: process.stdin }).on("line", (line) => {',
+          "  const argv = line.trim().split(/\\s+/).filter(Boolean);",
+          '  if (argv.length > 0) spawnSync(argv[0], argv.slice(1), { stdio: "inherit" });',
+          "});",
+          "",
+        ].join("\n"),
+      );
+      chmodSync(fakeShell, 0o755);
+      writeFileSync(
+        join(repoDir, "paseo.json"),
+        JSON.stringify({
+          scripts: {
+            api: {
+              type: "service",
+              command:
+                'OUT="${PASEO_PORT:-missing}"; printf "%s" "$OUT" > port.txt.tmp && mv port.txt.tmp port.txt; sleep 30',
+            },
+          },
+        }),
+      );
+
+      const previousShell = process.env.SHELL;
+      process.env.SHELL = fakeShell;
+      try {
+        const terminalManager = createTerminalManager();
+        realTerminalManagers.push(terminalManager);
+        await spawnWorkspaceScript({
+          repoRoot: repoDir,
+          workspaceId: repoDir,
+          projectSlug: "repo",
+          branchName: "feature-plain-shell",
+          scriptName: "api",
+          daemonPort: 6767,
+          serviceProxy: new ScriptRouteStore(),
+          runtimeStore: new WorkspaceScriptRuntimeStore(),
+          terminalManager,
+        });
+
+        const portPath = join(repoDir, "port.txt");
+        await waitForPathExists(portPath);
+        expect(readFileSync(portPath, "utf8")).toMatch(/^\d+$/);
+      } finally {
+        if (previousShell === undefined) delete process.env.SHELL;
+        else process.env.SHELL = previousShell;
+      }
     });
 
     it("injects real peer service env into terminal-backed services", async () => {

@@ -120,6 +120,8 @@ Commands run with the worktree as `cwd`. Use `$PASEO_SOURCE_CHECKOUT_PATH` to re
 
 Run them from the app, or manage them from automation with [`paseo script`](/docs/cli#workspace-scripts) and the [workspace-script MCP tools](/docs/mcp#workspace-scripts).
 
+Write `command` in POSIX `sh` syntax. Each script runs in a terminal with your login shell. If that shell is bash, zsh or another POSIX shell, the command is typed into it, so your shell functions and aliases work. Other shells, such as fish, nu or PowerShell, run it through `/bin/sh` instead.
+
 ### Plain scripts
 
 ```json
