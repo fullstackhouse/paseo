@@ -264,7 +264,7 @@ function createServer(options?: {
   };
   const logger = options?.logger ?? createLogger();
   return new VoiceAssistantWebSocketServer(
-    createStub<HTTPServer>({}),
+    createStub<HTTPServer>({ on: () => undefined }),
     createStub<pino.Logger>(logger),
     "srv_test",
     createStub<AgentManager>({

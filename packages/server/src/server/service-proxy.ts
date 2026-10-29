@@ -1,6 +1,7 @@
 import http, { createServer as createHTTPServer } from "node:http";
 import net from "node:net";
 import { connectToLocalService, requestLocalService } from "./local-service-connection.js";
+import { claimUpgradeForServiceProxy } from "./upgrade-routing.js";
 import { createHash } from "node:crypto";
 import { existsSync, unlinkSync } from "node:fs";
 import type { IncomingMessage } from "node:http";
@@ -793,6 +794,7 @@ export function createScriptProxyUpgradeHandler({
       }
       return;
     }
+    claimUpgradeForServiceProxy(req);
     proxyUpgradeRequest({ req, socket, head, route: classification.route, logger });
   };
 }

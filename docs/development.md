@@ -93,6 +93,12 @@ paseo plugin ls --home .dev/paseo-home     # talk to this worktree's daemon
 
 To try a plugin change, see [Test a plugin change](plugins.md#test-a-plugin-change).
 
+### Previewing a branch against your main daemon
+
+The `app-main` worktree service runs the branch's web app connected to the daemon you use every day (`localhost:6767`, override with `PASEO_MAIN_DAEMON_ENDPOINT`), so you review UI changes with your real workspaces and nothing restarts. Use it for app-only changes; a branch that changes the daemon or protocol needs the `daemon` + `app` services instead.
+
+Open it through its proxy URL (`http://app-main--<branch>--<project>.localhost:6767`), not Metro's own port: the daemon accepts the web client only from a same-port `*.localhost` origin. The client has full access to that daemon, so a broken branch can act on your real agents.
+
 ### Expo Router
 
 Route ownership, startup restore, and native blank-screen gotchas live in
