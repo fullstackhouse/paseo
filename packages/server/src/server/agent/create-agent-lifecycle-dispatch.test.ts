@@ -1,7 +1,11 @@
 import { expect, test } from "vitest";
 
 import type { AgentManagerEvent, AgentSubscriber } from "./agent-manager.js";
-import { registerAgentAutoArchive } from "./create-agent-lifecycle-dispatch.js";
+import type { CreatePaseoWorktreeInput } from "../paseo-worktree-service.js";
+import {
+  CreateAgentLifecycleDispatch,
+  registerAgentAutoArchive,
+} from "./create-agent-lifecycle-dispatch.js";
 
 class AgentLifecycleEvents {
   private readonly listeners = new Set<AgentSubscriber>();
@@ -44,4 +48,27 @@ test("auto-archive self-releases once and later cancellation waits harmlessly", 
 
   expect(archiveCount).toBe(1);
   expect(agents.listenerCount()).toBe(0);
+});
+
+test("a checkout-pr target checks out the PR from its project", async () => {
+  const placements: CreatePaseoWorktreeInput[] = [];
+  const dispatch = new CreateAgentLifecycleDispatch({
+    paseoHome: "/paseo-home",
+    createPaseoWorktreeWorkflow: async (input: CreatePaseoWorktreeInput) => {
+      placements.push(input);
+      return null;
+    },
+  } as unknown as ConstructorParameters<typeof CreateAgentLifecycleDispatch>[0]);
+
+  await dispatch.createWorktreeForRequest({
+    cwd: "/repo",
+    target: { mode: "checkout-pr", prNumber: 234, projectPath: "acme/app" },
+    firstAgentContext: { prompt: "" },
+  });
+
+  expect(placements[0]?.checkoutSource).toEqual({
+    kind: "change_request",
+    number: 234,
+    projectPath: "acme/app",
+  });
 });

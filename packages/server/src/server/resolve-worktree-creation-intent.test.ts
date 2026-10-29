@@ -251,6 +251,27 @@ describe("resolveWorktreeCreationIntent", () => {
     expect(intent).not.toHaveProperty("trackOriginHead");
   });
 
+  test("looks the PR up in the checkout source's project", async () => {
+    const deps = createResolverHarness();
+    const lookups: Array<{ number: number; projectPath?: string }> = [];
+    const lookup = deps.forgeService.getPullRequestCheckoutTarget;
+    deps.forgeService.getPullRequestCheckoutTarget = async (options) => {
+      lookups.push({ number: options.number, projectPath: options.projectPath });
+      return lookup(options);
+    };
+
+    await resolveWorktreeCreationIntent(
+      {
+        action: "checkout",
+        checkoutSource: { kind: "change_request", number: 234, projectPath: "acme/app" },
+      },
+      repoRoot,
+      deps,
+    );
+
+    expect(lookups).toEqual([{ number: 234, projectPath: "acme/app" }]);
+  });
+
   test("uses an explicit PR head ref without calling GitHub", async () => {
     const deps = createResolverHarness();
 
