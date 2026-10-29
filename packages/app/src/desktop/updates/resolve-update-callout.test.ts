@@ -45,6 +45,36 @@ describe("resolveUpdateCalloutDescriptor", () => {
     expect(descriptor?.dismissalKey).toBe("desktop-update:available:1.2.3");
   });
 
+  it("offers install-when-idle in place of the changelog while local agents work", () => {
+    const descriptor = resolveUpdateCalloutDescriptor(input({ localHostBusy: true }));
+
+    expect(descriptor?.actions).toEqual([
+      { role: "installWhenIdle", label: "Install when idle" },
+      { role: "install", label: "Install & restart", variant: "primary", disabled: false },
+    ]);
+  });
+
+  it("builds a waiting descriptor with changelog + install-now actions", () => {
+    const descriptor = resolveUpdateCalloutDescriptor(input({ waitingForIdle: true }));
+
+    expect(descriptor?.title).toBe("Update waiting");
+    expect(descriptor?.body).toEqual({ kind: "waiting", versionLabel: "v1.2.3" });
+    expect(descriptor?.showGiftIcon).toBe(true);
+    expect(descriptor?.actions).toEqual([
+      { role: "changelog", label: "What's new" },
+      { role: "install", label: "Install now", variant: "primary" },
+    ]);
+    // Same key as the available callout: dismissing one hides both for this version.
+    expect(descriptor?.dismissalKey).toBe("desktop-update:available:1.2.3");
+  });
+
+  it("ignores waitingForIdle once the install has started", () => {
+    const descriptor = resolveUpdateCalloutDescriptor(
+      input({ status: "installing", isInstalling: true, waitingForIdle: true }),
+    );
+    expect(descriptor?.body).toEqual({ kind: "installing" });
+  });
+
   it("normalizes a leading v in the latest version", () => {
     const descriptor = resolveUpdateCalloutDescriptor(
       input({ availableUpdate: { latestVersion: "v2.0.0" } }),
