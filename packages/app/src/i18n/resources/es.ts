@@ -1009,6 +1009,20 @@ export const es: TranslationResources = {
           unpushedCommits: "Confirmaciones no enviadas de{{count}}",
         },
       },
+      sync: {
+        uncommitted: "Cambios sin confirmar",
+        filesUncommitted_one: "{{count}} archivo sin confirmar",
+        filesUncommitted_other: "{{count}} archivos sin confirmar",
+        toPush: "{{number}} por enviar",
+        toPull: "{{number}} por traer",
+        moreCommits: "+{{number}} más",
+        next: {
+          commit: "Siguiente: confirmar",
+          pullThenPush: "Siguiente: traer y luego enviar",
+          pull: "Siguiente: traer",
+          push: "Siguiente: enviar",
+        },
+      },
       diff: {
         baseBranch: {
           title: "Rama base",

@@ -989,6 +989,20 @@ export const ja: TranslationResources = {
           unpushedCommits: "{{count}}件の未プッシュコミット",
         },
       },
+      sync: {
+        uncommitted: "未コミットの変更",
+        filesUncommitted_one: "未コミットのファイル {{count}} 件",
+        filesUncommitted_other: "未コミットのファイル {{count}} 件",
+        toPush: "プッシュ待ち {{number}}",
+        toPull: "プル待ち {{number}}",
+        moreCommits: "他 {{number}} 件",
+        next: {
+          commit: "次: コミット",
+          pullThenPush: "次: プルしてからプッシュ",
+          pull: "次: プル",
+          push: "次: プッシュ",
+        },
+      },
       diff: {
         baseBranch: {
           title: "ベースブランチ",
