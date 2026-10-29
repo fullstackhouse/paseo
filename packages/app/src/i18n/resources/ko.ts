@@ -828,25 +828,11 @@ export const ko: TranslationResources = {
         },
         createPrAndMerge: {
           label: "PR 생성 후 병합",
-          pending: "PR 생성 및 병합 중...",
-          success: "PR 병합됨",
-          autoMergeEnabled: "PR 생성됨, 자동 병합 활성화됨",
-          notReady:
-            "PR이 생성되었지만 아직 병합할 준비가 되지 않았습니다. 준비되면 메뉴에서 병합하세요.",
-          blockedConflicts: "PR이 생성되었지만 충돌이 있습니다. 충돌을 해결한 뒤 병합하세요.",
-          blockedQueue:
-            "PR이 생성되었지만 이 저장소는 병합 대기열을 사용합니다. PR 페이지에서 대기열에 추가하세요.",
-          blockedClosed: "PR이 병합되기 전에 닫혔습니다.",
+          pending: "에이전트에 보내는 중...",
+          success: "에이전트에 보냄",
+          sent: "에이전트에게 PR 생성 및 병합을 요청했습니다",
           label_mr: "MR 생성 후 병합",
-          pending_mr: "MR 생성 및 병합 중...",
-          success_mr: "MR 병합됨",
-          autoMergeEnabled_mr: "MR 생성됨, 자동 병합 활성화됨",
-          notReady_mr:
-            "MR이 생성되었지만 아직 병합할 준비가 되지 않았습니다. 준비되면 메뉴에서 병합하세요.",
-          blockedConflicts_mr: "MR이 생성되었지만 충돌이 있습니다. 충돌을 해결한 뒤 병합하세요.",
-          blockedQueue_mr:
-            "MR이 생성되었지만 이 저장소는 병합 대기열을 사용합니다. MR 페이지에서 대기열에 추가하세요.",
-          blockedClosed_mr: "MR이 병합되기 전에 닫혔습니다.",
+          sent_mr: "에이전트에게 MR 생성 및 병합을 요청했습니다",
         },
         mergeBranch: {
           label: "로컬에서 병합",
@@ -934,7 +920,7 @@ export const ko: TranslationResources = {
           failedPush: "푸시하지 못했습니다",
           failedPullAndPush: "풀 후 푸시하지 못했습니다",
           failedCreatePr: "PR을 생성하지 못했습니다",
-          failedCreatePrAndMerge: "PR을 생성하고 병합하지 못했습니다",
+          failedCreatePrAndMerge: "에이전트에 요청을 보내지 못했습니다",
           failedMergePr: "PR을 병합하지 못했습니다",
           failedEnableAutoMerge: "자동 병합을 사용 설정하지 못했습니다",
           failedDisableAutoMerge: "자동 병합을 해제하지 못했습니다",

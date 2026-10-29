@@ -31,6 +31,7 @@ import { type WorktreeArchiveWarningLabels } from "@/git/worktree-archive-warnin
 import { useWorkspaceArchive } from "@/workspace/use-workspace-archive";
 import { resolveWorkspaceMapKeyByIdentity } from "@/utils/workspace-identity";
 import { readValidatedString } from "@/storage/validated-storage";
+import { useCreatePrAndMerge } from "@/git/use-create-pr-and-merge";
 
 export type { GitActionId, GitAction, GitActions } from "@/git/policy";
 
@@ -307,6 +308,7 @@ function useWorkspaceScreenArchiveController({
 
   return {
     ...controller,
+    workspaceDescriptor,
     isArchiving: workspaceDescriptor?.archivingAt != null || isHidingWorkspace,
     canArchive: canArchiveWorkspace(workspaceDescriptor, archiveRisk),
   };
@@ -411,9 +413,6 @@ export function useGitActions({ serverId, cwd, icons }: UseGitActionsInput): Use
   const prCreateStatus = useCheckoutGitActionsStore((s) =>
     s.getStatus({ serverId, cwd, actionId: "create-pr" }),
   );
-  const createPrAndMergeStatus = useCheckoutGitActionsStore((s) =>
-    s.getStatus({ serverId, cwd, actionId: "create-pr-and-merge" }),
-  );
   const mergePrStatuses: Record<CheckoutPrMergeMethod, CheckoutGitActionStatus> = {
     squash: useCheckoutGitActionsStore((s) =>
       s.getStatus({ serverId, cwd, actionId: "merge-pr-squash" }),
@@ -451,7 +450,6 @@ export function useGitActions({ serverId, cwd, icons }: UseGitActionsInput): Use
   const runPush = useCheckoutGitActionsStore((s) => s.push);
   const runPullAndPush = useCheckoutGitActionsStore((s) => s.pullAndPush);
   const runCreatePr = useCheckoutGitActionsStore((s) => s.createPr);
-  const runCreatePrAndMerge = useCheckoutGitActionsStore((s) => s.createPrAndMerge);
   const runMergePr = useCheckoutGitActionsStore((s) => s.mergePr);
   const runEnablePrAutoMerge = useCheckoutGitActionsStore((s) => s.enablePrAutoMerge);
   const runDisablePrAutoMerge = useCheckoutGitActionsStore((s) => s.disablePrAutoMerge);
@@ -538,41 +536,6 @@ export function useGitActions({ serverId, cwd, icons }: UseGitActionsInput): Use
     forge,
     persistShipDefault,
     runCreatePr,
-    serverId,
-    t,
-    toastActionError,
-    toastActionSuccess,
-  ]);
-
-  const handleCreatePrAndMerge = useCallback(() => {
-    void persistShipDefault("pr");
-    const vocabulary = forgeVocabulary(forge);
-    void runCreatePrAndMerge({
-      serverId,
-      cwd,
-      commitFirst: hasUncommittedChanges,
-      changeRequestContext: vocabulary.context,
-    })
-      .then((outcome) => {
-        if (outcome === "merged") {
-          setPostShipArchiveSuggested(true);
-          toastActionSuccess(t("workspace.git.actions.createPrAndMerge.success", vocabulary));
-        } else if (outcome === "auto-merge-enabled") {
-          toastActionSuccess(
-            t("workspace.git.actions.createPrAndMerge.autoMergeEnabled", vocabulary),
-          );
-        }
-        return;
-      })
-      .catch((err) => {
-        toastActionError(err, t("workspace.git.actions.toasts.failedCreatePrAndMerge"));
-      });
-  }, [
-    cwd,
-    forge,
-    hasUncommittedChanges,
-    persistShipDefault,
-    runCreatePrAndMerge,
     serverId,
     t,
     toastActionError,
@@ -680,6 +643,12 @@ export function useGitActions({ serverId, cwd, icons }: UseGitActionsInput): Use
     t,
   });
 
+  const handleCreatePrAndMerge = useCreatePrAndMerge({
+    serverId,
+    workspace: archiveController.workspaceDescriptor,
+    forge,
+  });
+
   const handleArchiveWorkspace = useCallback(() => {
     archiveController.archive();
   }, [archiveController]);
@@ -775,8 +744,8 @@ export function useGitActions({ serverId, cwd, icons }: UseGitActionsInput): Use
           handler: handlePrAction,
         },
         "create-pr-and-merge": {
-          disabled: isActionDisabled(actionsDisabled, createPrAndMergeStatus),
-          status: createPrAndMergeStatus,
+          disabled: actionsDisabled,
+          status: "idle",
           icon: prIcon,
           handler: handleCreatePrAndMerge,
         },
@@ -872,7 +841,6 @@ export function useGitActions({ serverId, cwd, icons }: UseGitActionsInput): Use
     pushStatus,
     pullAndPushStatus,
     prCreateStatus,
-    createPrAndMergeStatus,
     mergePrStatuses.squash,
     mergePrStatuses.merge,
     mergePrStatuses.rebase,

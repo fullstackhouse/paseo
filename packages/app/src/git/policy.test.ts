@@ -1161,7 +1161,7 @@ describe("git-actions-policy", () => {
     });
   });
 
-  it("keeps Create PR & Merge available with only uncommitted changes, since it commits them", () => {
+  it("keeps Create PR & Merge available with only uncommitted changes, since the agent commits them", () => {
     const actions = buildGitActions(
       createInput({ hasRemote: true, isOnBaseBranch: false, hasUncommittedChanges: true }),
     );
@@ -1182,9 +1182,6 @@ describe("git-actions-policy", () => {
     );
     expect(find({ aheadCount: 1, githubFeaturesEnabled: false })).toBe(
       "Create PR isn't available right now because GitHub isn't connected",
-    );
-    expect(find({ aheadCount: 1, behindOfOrigin: 1 })).toBe(
-      "Push isn't available yet because there are newer changes to bring in first",
     );
   });
 

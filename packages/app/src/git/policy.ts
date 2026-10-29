@@ -706,12 +706,9 @@ function getCreatePrAndMergeUnavailableMessage(input: BuildGitActionsInput): str
       noun: input.forgeChangeRequestNoun,
     });
   }
-  // Local changes are committed first, so they count as something to ship.
+  // The agent commits local changes first, so they count as something to ship.
   if (input.aheadCount === 0 && !input.hasUncommittedChanges) {
     return i18n.t("workspace.git.actions.unavailable.createPrNoCommits");
-  }
-  if ((input.behindOfOrigin ?? 0) > 0) {
-    return i18n.t("workspace.git.actions.unavailable.pushBehind");
   }
   return undefined;
 }

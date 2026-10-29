@@ -831,27 +831,11 @@ export const ja: TranslationResources = {
         },
         createPrAndMerge: {
           label: "PRを作成してマージ",
-          pending: "PRを作成してマージ中...",
-          success: "PRをマージしました",
-          autoMergeEnabled: "PRを作成し、自動マージを有効にしました",
-          notReady:
-            "PRは作成されましたが、まだマージできる状態ではありません。準備ができたらメニューからマージしてください。",
-          blockedConflicts:
-            "PRは作成されましたが、コンフリクトがあります。解決してからマージしてください。",
-          blockedQueue:
-            "PRは作成されましたが、このリポジトリはマージキューを使用しています。PRのページからキューに追加してください。",
-          blockedClosed: "PRはマージされる前にクローズされました。",
+          pending: "エージェントに送信中...",
+          success: "エージェントに送信しました",
+          sent: "エージェントにPRの作成とマージを依頼しました",
           label_mr: "MRを作成してマージ",
-          pending_mr: "MRを作成してマージ中...",
-          success_mr: "MRをマージしました",
-          autoMergeEnabled_mr: "MRを作成し、自動マージを有効にしました",
-          notReady_mr:
-            "MRは作成されましたが、まだマージできる状態ではありません。準備ができたらメニューからマージしてください。",
-          blockedConflicts_mr:
-            "MRは作成されましたが、コンフリクトがあります。解決してからマージしてください。",
-          blockedQueue_mr:
-            "MRは作成されましたが、このリポジトリはマージキューを使用しています。MRのページからキューに追加してください。",
-          blockedClosed_mr: "MRはマージされる前にクローズされました。",
+          sent_mr: "エージェントにMRの作成とマージを依頼しました",
         },
         mergeBranch: {
           label: "ローカルでマージ",
@@ -942,7 +926,7 @@ export const ja: TranslationResources = {
           failedPush: "プッシュに失敗しました",
           failedPullAndPush: "プル＆プッシュに失敗しました",
           failedCreatePr: "PRの作成に失敗しました",
-          failedCreatePrAndMerge: "PRの作成とマージに失敗しました",
+          failedCreatePrAndMerge: "エージェントにリクエストを送信できませんでした",
           failedMergePr: "PRのマージに失敗しました",
           failedEnableAutoMerge: "自動マージの有効化に失敗しました",
           failedDisableAutoMerge: "自動マージの無効化に失敗しました",

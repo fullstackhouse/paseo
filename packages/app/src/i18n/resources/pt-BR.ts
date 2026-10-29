@@ -831,25 +831,11 @@ export const ptBR: TranslationResources = {
         },
         createPrAndMerge: {
           label: "Criar PR e mesclar",
-          pending: "Criando PR e mesclando...",
-          success: "PR mesclada",
-          autoMergeEnabled: "PR criada, mesclagem automática ativada",
-          notReady:
-            "A PR foi criada, mas ainda não está pronta para mesclar. Mescle pelo menu quando estiver.",
-          blockedConflicts: "A PR foi criada, mas tem conflitos. Resolva-os e depois mescle.",
-          blockedQueue:
-            "A PR foi criada, mas este repositório usa uma fila de mesclagem. Adicione-a à fila pela página da PR.",
-          blockedClosed: "A PR foi fechada antes de ser mesclada.",
+          pending: "Enviando ao agente...",
+          success: "Enviado ao agente",
+          sent: "O agente foi solicitado a criar e mesclar a PR",
           label_mr: "Criar MR e mesclar",
-          pending_mr: "Criando MR e mesclando...",
-          success_mr: "MR mesclada",
-          autoMergeEnabled_mr: "MR criada, mesclagem automática ativada",
-          notReady_mr:
-            "A MR foi criada, mas ainda não está pronta para mesclar. Mescle pelo menu quando estiver.",
-          blockedConflicts_mr: "A MR foi criada, mas tem conflitos. Resolva-os e depois mescle.",
-          blockedQueue_mr:
-            "A MR foi criada, mas este repositório usa uma fila de mesclagem. Adicione-a à fila pela página da MR.",
-          blockedClosed_mr: "A MR foi fechada antes de ser mesclada.",
+          sent_mr: "O agente foi solicitado a criar e mesclar a MR",
         },
         mergeBranch: {
           label: "Fazer merge localmente",
@@ -950,7 +936,7 @@ export const ptBR: TranslationResources = {
           failedPush: "Falha ao fazer push",
           failedPullAndPush: "Falha ao fazer pull e push",
           failedCreatePr: "Falha ao criar PR",
-          failedCreatePrAndMerge: "Falha ao criar e mesclar PR",
+          failedCreatePrAndMerge: "Não foi possível enviar a solicitação ao agente",
           failedMergePr: "Falha ao fazer merge da PR",
           failedEnableAutoMerge: "Falha ao ativar merge automático",
           failedDisableAutoMerge: "Falha ao desativar merge automático",
