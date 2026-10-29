@@ -53,6 +53,25 @@ function HostPluginUpdateCallout({
   });
   const refetchPreview = preview.refetch;
 
+  // Installs, updates and removals from the CLI or Settings change what's outdated; recheck
+  // instead of waiting for the next interval.
+  useEffect(() => {
+    if (!client || !connected || !supported) return;
+    const observation = client.observeEvents(["status.plugin_catalog_changed"]);
+    observation.subscribe({
+      snapshot: () => {},
+      update: (message) => {
+        if (message.type === "status" && message.payload.status === "plugin_catalog_changed")
+          void refetchPreview();
+      },
+    });
+    return () => {
+      void observation
+        .release()
+        .catch((error) => console.warn("[Plugin updates] Failed to release catalog feed", error));
+    };
+  }, [client, connected, supported, refetchPreview]);
+
   const apply = useMutation({
     mutationFn: async (proposals: PluginUpdateProposal[]) => {
       if (!client) throw new Error("Plugin host is offline");
