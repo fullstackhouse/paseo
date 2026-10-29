@@ -118,6 +118,7 @@ export async function resolveWorktreeCreationIntent(
       return resolvePrCheckoutIntent({
         refName: input.refName,
         changeRequestNumber: changeRequest.number,
+        projectPath: changeRequest.projectPath,
         repoRoot,
         deps,
       });
@@ -140,6 +141,7 @@ export async function resolveWorktreeCreationIntent(
     return resolvePrCheckoutIntent({
       refName: input.refName,
       changeRequestNumber: changeRequest.number,
+      projectPath: changeRequest.projectPath,
       repoRoot,
       deps,
     });
@@ -212,6 +214,7 @@ async function fetchChangeRequestHead(params: {
 interface PrCheckoutIntentParams {
   refName?: string;
   changeRequestNumber: number;
+  projectPath?: string;
   repoRoot: string;
   deps: ResolveWorktreeCreationIntentDeps;
 }
@@ -326,12 +329,14 @@ function hasCheckoutRefs(target: PullRequestCheckoutTarget): boolean {
 
 async function resolvePrCheckoutTarget(params: {
   changeRequestNumber: number;
+  projectPath?: string;
   repoRoot: string;
   deps: ResolveWorktreeCreationIntentDeps;
 }): Promise<PullRequestCheckoutTarget> {
   return params.deps.forgeService.getPullRequestCheckoutTarget({
     cwd: params.repoRoot,
     number: params.changeRequestNumber,
+    ...(params.projectPath ? { projectPath: params.projectPath } : {}),
   });
 }
 
