@@ -34,6 +34,7 @@ temporary by design: every patch is meant to go upstream and then drop out of `f
 - FSH-only (upstreamable): workspace scripts work when the daemon's shell is fish, nu or PowerShell. paseo.json commands are POSIX `sh`; for those shells Paseo runs them through `/bin/sh` instead of typing them into the shell
 
 - FSH-only (upstreamable): `paseo.json` service commands run through `bash -c '…'`, so workspace scripts start when the login shell is fish (the daemon types commands into `$SHELL`, and they use bash syntax)
+- FSH-only (upstreamable): `agents.create` with `worktree: { mode: "checkout-pr" }` takes an optional `projectPath` (`owner/name` on GitHub) naming the repo the PR lives in. Without it the daemon asks `gh repo view`, which picks the `upstream` remote over `origin` when no gh default is set, so a PR on origin was looked up in the wrong repo
 
 Keep this list in sync with what's merged into `fsh`.
 

@@ -1729,6 +1729,8 @@ export const CreateAgentWorktreeTargetSchema = z.discriminatedUnion("mode", [
   z.object({
     mode: z.literal("checkout-pr"),
     prNumber: z.number().int().positive(),
+    // The forge project the PR lives in (`owner/name` on GitHub). Defaults to the checkout's repo.
+    projectPath: z.string().min(1).optional(),
   }),
 ]);
 

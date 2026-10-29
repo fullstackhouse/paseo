@@ -812,6 +812,26 @@ describe("ForgeService", () => {
     expect(runner.calls[1]?.args).toContain("number=526");
   });
 
+  it("loads a checkout target from the given project without asking gh for the repo", async () => {
+    const runner = createRunner([pullRequestCheckoutTargetJson()]);
+    const service = createGitHubService({
+      runner: runner.runner,
+      resolveGhPath: async () => "/usr/bin/gh",
+      now: () => 100,
+    });
+
+    await service.getPullRequestCheckoutTarget({
+      cwd: "/repo",
+      number: 526,
+      projectPath: "therainisme/paseo",
+    });
+
+    expect(runner.calls).toHaveLength(1);
+    expect(runner.calls[0]?.args.slice(0, 3)).toEqual(["api", "graphql", "-f"]);
+    expect(runner.calls[0]?.args).toContain("owner=therainisme");
+    expect(runner.calls[0]?.args).toContain("name=paseo");
+  });
+
   it("populates repoOwner/repoName from a GitHub Enterprise PR URL", async () => {
     const runner = createRunner([
       currentPullRequestJson({ url: "https://github.acme.internal/acme/repo/pull/42" }),
