@@ -5,7 +5,7 @@ import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { useSessionStore, type WorkspaceDescriptor } from "@/stores/session-store";
 import { seedSessionWorkspaces } from "@/test/seed-session";
-import { useWorkspaceHasDiffStat } from "./workspace-diff-stat";
+import { useWorkspaceGitSync, useWorkspaceHasDiffStat } from "./workspace-diff-stat";
 
 const SERVER_ID = "diff-stat-pill";
 const WORKSPACE_ID = "workspace";
@@ -67,5 +67,50 @@ describe("useWorkspaceHasDiffStat", () => {
     act(() => setDiffStat(null));
     expect(result.current).toBe(false);
     expect(renderCount).toBe(3);
+  });
+});
+
+function setGitRuntime(gitRuntime: WorkspaceDescriptor["gitRuntime"]): void {
+  useSessionStore.getState().setWorkspaces(SERVER_ID, (workspaces) => {
+    const next = new Map(workspaces);
+    next.set(WORKSPACE_ID, {
+      ...workspace,
+      diffStat: { additions: 272, deletions: 114 },
+      gitRuntime,
+    });
+    return next;
+  });
+}
+
+describe("useWorkspaceGitSync", () => {
+  beforeEach(() => {
+    useSessionStore.getState().initializeSession(SERVER_ID, null as unknown as DaemonClient);
+    seedSessionWorkspaces(SERVER_ID, new Map([[WORKSPACE_ID, workspace]]));
+  });
+
+  afterEach(() => {
+    useSessionStore.getState().clearSession(SERVER_ID);
+  });
+
+  it("offers the sync card for a diverged branch, with the workspace directory to query", () => {
+    const { result } = renderHook(() => useWorkspaceGitSync(SERVER_ID, WORKSPACE_ID));
+    expect(result.current).toBeNull();
+
+    const gitRuntime = {
+      currentBranch: "main",
+      isDirty: false,
+      aheadOfOrigin: 1,
+      behindOfOrigin: 327,
+    };
+    act(() => setGitRuntime(gitRuntime));
+    expect(result.current).toEqual({ cwd: "/repo", facts: gitRuntime });
+  });
+
+  it("offers nothing for a clean branch in sync with its upstream", () => {
+    const { result } = renderHook(() => useWorkspaceGitSync(SERVER_ID, WORKSPACE_ID));
+    act(() =>
+      setGitRuntime({ currentBranch: "main", isDirty: false, aheadOfOrigin: 0, behindOfOrigin: 0 }),
+    );
+    expect(result.current).toBeNull();
   });
 });

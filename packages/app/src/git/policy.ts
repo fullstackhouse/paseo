@@ -348,7 +348,8 @@ function getPrimaryActionId(input: BuildGitActionsInput): GitActionId | null {
     return "commit";
   }
   if (canPull(input)) {
-    return "pull";
+    // A diverged branch would otherwise hide its unpushed commits behind a plain Pull.
+    return (input.aheadOfOrigin ?? 0) > 0 ? "pull-and-push" : "pull";
   }
   if (canPush(input)) {
     return "push";
