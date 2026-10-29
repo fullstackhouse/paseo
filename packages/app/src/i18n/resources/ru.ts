@@ -833,6 +833,28 @@ export const ru: TranslationResources = {
           pending_mr: "Создание MR...",
           success_mr: "MR создан",
         },
+        createPrAndMerge: {
+          label: "Создать PR и слить",
+          pending: "Создание PR и слияние...",
+          success: "PR слит",
+          autoMergeEnabled: "PR создан, автослияние включено",
+          notReady:
+            "PR создан, но ещё не готов к слиянию. Слейте его из меню, когда он будет готов.",
+          blockedConflicts: "PR создан, но в нём есть конфликты. Разрешите их, затем слейте.",
+          blockedQueue:
+            "PR создан, но этот репозиторий использует очередь слияния. Добавьте его в очередь на странице PR.",
+          blockedClosed: "PR был закрыт до слияния.",
+          label_mr: "Создать MR и слить",
+          pending_mr: "Создание MR и слияние...",
+          success_mr: "MR слит",
+          autoMergeEnabled_mr: "MR создан, автослияние включено",
+          notReady_mr:
+            "MR создан, но ещё не готов к слиянию. Слейте его из меню, когда он будет готов.",
+          blockedConflicts_mr: "MR создан, но в нём есть конфликты. Разрешите их, затем слейте.",
+          blockedQueue_mr:
+            "MR создан, но этот репозиторий использует очередь слияния. Добавьте его в очередь на странице MR.",
+          blockedClosed_mr: "MR был закрыт до слияния.",
+        },
         mergeBranch: {
           label: "Выполнить слияние локально",
           pending: "Слияние...",
@@ -922,6 +944,7 @@ export const ru: TranslationResources = {
           failedPush: "Не удалось отправить изменения",
           failedPullAndPush: "Не удалось получить и отправить изменения",
           failedCreatePr: "Не удалось создать PR.",
+          failedCreatePrAndMerge: "Не удалось создать и слить PR.",
           failedMergePr: "Не удалось выполнить слияние PR",
           failedEnableAutoMerge: "Не удалось включить автослияние",
           failedDisableAutoMerge: "Не удалось отключить автослияние",

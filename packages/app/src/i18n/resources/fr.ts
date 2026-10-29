@@ -834,6 +834,30 @@ export const fr: TranslationResources = {
           pending_mr: "Création de la MR…",
           success_mr: "MR créée",
         },
+        createPrAndMerge: {
+          label: "Créer la PR et fusionner",
+          pending: "Création de la PR et fusion…",
+          success: "PR fusionnée",
+          autoMergeEnabled: "PR créée, fusion automatique activée",
+          notReady:
+            "La PR a été créée mais n'est pas encore prête à être fusionnée. Fusionnez-la depuis le menu quand elle le sera.",
+          blockedConflicts:
+            "La PR a été créée mais présente des conflits. Résolvez-les, puis fusionnez.",
+          blockedQueue:
+            "La PR a été créée, mais ce dépôt utilise une file de fusion. Ajoutez-la à la file depuis la page de la PR.",
+          blockedClosed: "La PR a été fermée avant d'être fusionnée.",
+          label_mr: "Créer la MR et fusionner",
+          pending_mr: "Création de la MR et fusion…",
+          success_mr: "MR fusionnée",
+          autoMergeEnabled_mr: "MR créée, fusion automatique activée",
+          notReady_mr:
+            "La MR a été créée mais n'est pas encore prête à être fusionnée. Fusionnez-la depuis le menu quand elle le sera.",
+          blockedConflicts_mr:
+            "La MR a été créée mais présente des conflits. Résolvez-les, puis fusionnez.",
+          blockedQueue_mr:
+            "La MR a été créée, mais ce dépôt utilise une file de fusion. Ajoutez-la à la file depuis la page de la MR.",
+          blockedClosed_mr: "La MR a été fermée avant d'être fusionnée.",
+        },
         mergeBranch: {
           label: "Fusionner en local",
           pending: "Fusion…",
@@ -931,6 +955,7 @@ export const fr: TranslationResources = {
           failedPush: "Échec du push",
           failedPullAndPush: "Échec du pull et du push",
           failedCreatePr: "Impossible de créer la PR",
+          failedCreatePrAndMerge: "Impossible de créer et fusionner la PR",
           failedMergePr: "Impossible de fusionner la PR",
           failedEnableAutoMerge: "Impossible d’activer la fusion automatique",
           failedDisableAutoMerge: "Impossible de désactiver la fusion automatique",

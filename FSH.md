@@ -22,6 +22,7 @@ temporary by design: every patch is meant to go upstream and then drop out of `f
 - FSH-only (not upstream yet): new workspaces branch off the repo's default branch, not whatever branch the source checkout is on. The daemon picks the ref: the default branch's upstream (any remote), then origin's copy, then local
 - FSH-only (not upstream yet): remove a project from its settings page (Settings → Projects → project → Danger zone), not just from the sidebar menu
 - FSH-only: the desktop app's update callout installs new FSH builds through `scripts/install-fsh.sh` (see Install below)
+- FSH-only (upstreamable): **Create PR & Merge** in a feature branch's git menu commits local changes, creates the PR, then merges it, or turns on auto-merge if checks still block it. Shown until the branch has a PR
 
 Keep this list in sync with what's merged into `fsh`.
 

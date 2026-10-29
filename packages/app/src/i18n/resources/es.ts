@@ -833,6 +833,28 @@ export const es: TranslationResources = {
           pending_mr: "Creando MR...",
           success_mr: "MR creado",
         },
+        createPrAndMerge: {
+          label: "Crear PR y fusionar",
+          pending: "Creando PR y fusionando...",
+          success: "PR fusionado",
+          autoMergeEnabled: "PR creado, fusión automática activada",
+          notReady:
+            "El PR se creó pero aún no está listo para fusionarse. Fusiónalo desde el menú cuando lo esté.",
+          blockedConflicts: "El PR se creó pero tiene conflictos. Resuélvelos y luego fusiona.",
+          blockedQueue:
+            "El PR se creó, pero este repositorio usa una cola de fusión. Añádelo a la cola desde la página del PR.",
+          blockedClosed: "El PR se cerró antes de poder fusionarse.",
+          label_mr: "Crear MR y fusionar",
+          pending_mr: "Creando MR y fusionando...",
+          success_mr: "MR fusionado",
+          autoMergeEnabled_mr: "MR creado, fusión automática activada",
+          notReady_mr:
+            "El MR se creó pero aún no está listo para fusionarse. Fusiónalo desde el menú cuando lo esté.",
+          blockedConflicts_mr: "El MR se creó pero tiene conflictos. Resuélvelos y luego fusiona.",
+          blockedQueue_mr:
+            "El MR se creó, pero este repositorio usa una cola de fusión. Añádelo a la cola desde la página del MR.",
+          blockedClosed_mr: "El MR se cerró antes de poder fusionarse.",
+        },
         mergeBranch: {
           label: "Fusionar localmente",
           pending: "Fusionando...",
@@ -938,6 +960,7 @@ export const es: TranslationResources = {
           failedPush: "No se pudo empujar",
           failedPullAndPush: "No se pudo tirar y empujar",
           failedCreatePr: "No se pudo crearPR",
+          failedCreatePrAndMerge: "No se pudo crear y fusionar el PR",
           failedMergePr: "No se pudo fusionarPR",
           failedEnableAutoMerge: "No se pudo habilitar la combinación automática",
           failedDisableAutoMerge: "No se pudo deshabilitar la combinación automática",

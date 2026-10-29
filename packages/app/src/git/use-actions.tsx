@@ -411,6 +411,9 @@ export function useGitActions({ serverId, cwd, icons }: UseGitActionsInput): Use
   const prCreateStatus = useCheckoutGitActionsStore((s) =>
     s.getStatus({ serverId, cwd, actionId: "create-pr" }),
   );
+  const createPrAndMergeStatus = useCheckoutGitActionsStore((s) =>
+    s.getStatus({ serverId, cwd, actionId: "create-pr-and-merge" }),
+  );
   const mergePrStatuses: Record<CheckoutPrMergeMethod, CheckoutGitActionStatus> = {
     squash: useCheckoutGitActionsStore((s) =>
       s.getStatus({ serverId, cwd, actionId: "merge-pr-squash" }),
@@ -448,6 +451,7 @@ export function useGitActions({ serverId, cwd, icons }: UseGitActionsInput): Use
   const runPush = useCheckoutGitActionsStore((s) => s.push);
   const runPullAndPush = useCheckoutGitActionsStore((s) => s.pullAndPush);
   const runCreatePr = useCheckoutGitActionsStore((s) => s.createPr);
+  const runCreatePrAndMerge = useCheckoutGitActionsStore((s) => s.createPrAndMerge);
   const runMergePr = useCheckoutGitActionsStore((s) => s.mergePr);
   const runEnablePrAutoMerge = useCheckoutGitActionsStore((s) => s.enablePrAutoMerge);
   const runDisablePrAutoMerge = useCheckoutGitActionsStore((s) => s.disablePrAutoMerge);
@@ -534,6 +538,41 @@ export function useGitActions({ serverId, cwd, icons }: UseGitActionsInput): Use
     forge,
     persistShipDefault,
     runCreatePr,
+    serverId,
+    t,
+    toastActionError,
+    toastActionSuccess,
+  ]);
+
+  const handleCreatePrAndMerge = useCallback(() => {
+    void persistShipDefault("pr");
+    const vocabulary = forgeVocabulary(forge);
+    void runCreatePrAndMerge({
+      serverId,
+      cwd,
+      commitFirst: hasUncommittedChanges,
+      changeRequestContext: vocabulary.context,
+    })
+      .then((outcome) => {
+        if (outcome === "merged") {
+          setPostShipArchiveSuggested(true);
+          toastActionSuccess(t("workspace.git.actions.createPrAndMerge.success", vocabulary));
+        } else if (outcome === "auto-merge-enabled") {
+          toastActionSuccess(
+            t("workspace.git.actions.createPrAndMerge.autoMergeEnabled", vocabulary),
+          );
+        }
+        return;
+      })
+      .catch((err) => {
+        toastActionError(err, t("workspace.git.actions.toasts.failedCreatePrAndMerge"));
+      });
+  }, [
+    cwd,
+    forge,
+    hasUncommittedChanges,
+    persistShipDefault,
+    runCreatePrAndMerge,
     serverId,
     t,
     toastActionError,
@@ -735,6 +774,12 @@ export function useGitActions({ serverId, cwd, icons }: UseGitActionsInput): Use
           icon: prIcon,
           handler: handlePrAction,
         },
+        "create-pr-and-merge": {
+          disabled: isActionDisabled(actionsDisabled, createPrAndMergeStatus),
+          status: createPrAndMergeStatus,
+          icon: prIcon,
+          handler: handleCreatePrAndMerge,
+        },
         "merge-pr-squash": {
           disabled: isActionDisabled(actionsDisabled, mergePrStatuses.squash),
           status: mergePrStatuses.squash,
@@ -827,6 +872,7 @@ export function useGitActions({ serverId, cwd, icons }: UseGitActionsInput): Use
     pushStatus,
     pullAndPushStatus,
     prCreateStatus,
+    createPrAndMergeStatus,
     mergePrStatuses.squash,
     mergePrStatuses.merge,
     mergePrStatuses.rebase,
@@ -843,6 +889,7 @@ export function useGitActions({ serverId, cwd, icons }: UseGitActionsInput): Use
     handlePush,
     handlePullAndPush,
     handlePrAction,
+    handleCreatePrAndMerge,
     handleMergePr,
     handleEnablePrAutoMerge,
     handleDisablePrAutoMerge,
@@ -960,6 +1007,12 @@ function getTranslatedGitActionLabels(
             pendingLabel: t("workspace.git.actions.createPr.pending", forgeVocabulary(forge)),
             successLabel: t("workspace.git.actions.createPr.success", forgeVocabulary(forge)),
           };
+    case "create-pr-and-merge":
+      return {
+        label: t("workspace.git.actions.createPrAndMerge.label", forgeVocabulary(forge)),
+        pendingLabel: t("workspace.git.actions.createPrAndMerge.pending", forgeVocabulary(forge)),
+        successLabel: t("workspace.git.actions.createPrAndMerge.success", forgeVocabulary(forge)),
+      };
     case "merge-pr-squash":
       return {
         label: t("workspace.git.actions.mergePr.squash", forgeVocabulary(forge)),

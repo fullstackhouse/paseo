@@ -821,6 +821,28 @@ export const en = {
           pending_mr: "Creating MR...",
           success_mr: "MR Created",
         },
+        createPrAndMerge: {
+          label: "Create PR & Merge",
+          pending: "Creating PR & merging...",
+          success: "PR merged",
+          autoMergeEnabled: "PR created, auto-merge enabled",
+          notReady:
+            "The PR was created but isn't ready to merge yet. Merge it from the menu once it is.",
+          blockedConflicts: "The PR was created but has conflicts. Resolve them, then merge.",
+          blockedQueue:
+            "The PR was created, but this repository uses a merge queue. Add it to the queue from the PR page.",
+          blockedClosed: "The PR was closed before it could be merged.",
+          label_mr: "Create MR & Merge",
+          pending_mr: "Creating MR & merging...",
+          success_mr: "MR merged",
+          autoMergeEnabled_mr: "MR created, auto-merge enabled",
+          notReady_mr:
+            "The MR was created but isn't ready to merge yet. Merge it from the menu once it is.",
+          blockedConflicts_mr: "The MR was created but has conflicts. Resolve them, then merge.",
+          blockedQueue_mr:
+            "The MR was created, but this repository uses a merge queue. Add it to the queue from the MR page.",
+          blockedClosed_mr: "The MR was closed before it could be merged.",
+        },
         mergeBranch: {
           label: "Merge locally",
           pending: "Merging...",
@@ -913,6 +935,7 @@ export const en = {
           failedPush: "Failed to push",
           failedPullAndPush: "Failed to pull and push",
           failedCreatePr: "Failed to create PR",
+          failedCreatePrAndMerge: "Failed to create and merge PR",
           failedMergePr: "Failed to merge PR",
           failedEnableAutoMerge: "Failed to enable auto-merge",
           failedDisableAutoMerge: "Failed to disable auto-merge",
