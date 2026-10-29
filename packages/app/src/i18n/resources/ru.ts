@@ -1547,6 +1547,10 @@ export const ru: TranslationResources = {
         newVersionReady: "Новая версия готова к установке.",
         restartWarning:
           "При обновлении приложения работающие агенты будут остановлены, а сеансы терминала закрыты.",
+        waitingTitle: "Обновление ожидает",
+        waitingDescription: "Установится, когда локальные агенты не работают 2 минуты.",
+        installWhenIdle: "Установить в простое",
+        installNow: "Установить сейчас",
       },
     },
     settings: {
@@ -2427,6 +2431,9 @@ export const ru: TranslationResources = {
       updates: {
         label: "Обновления приложения",
         readyToInstall: "Версия {{version}} готова к установке",
+        autoInstallLabel: "Устанавливать обновления в простое",
+        autoInstallDescription:
+          "Устанавливать и перезапускать, когда локальные агенты не работают 2 минуты.",
         installTitle: "Установить обновление настольного приложения",
         installMessage: "Это обновит Paseo на этом компьютере.",
         installConfirm: "Установить обновление",

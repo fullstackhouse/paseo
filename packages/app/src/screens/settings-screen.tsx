@@ -82,6 +82,7 @@ import { EditorSection } from "@/screens/settings/editor-section";
 import { FilesSection } from "@/screens/settings/files-section";
 import { Button } from "@/components/ui/button";
 import { CommunityLinks } from "@/components/community-links";
+import { Switch } from "@/components/ui/switch";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { DesktopPermissionsSection } from "@/desktop/components/desktop-permissions-section";
@@ -625,6 +626,12 @@ function DesktopAppUpdateRow() {
     },
     [updateSettings],
   );
+  const handleAutoInstallChange = useCallback(
+    (autoInstallUpdatesWhenIdle: boolean) => {
+      void updateSettings({ autoInstallUpdatesWhenIdle });
+    },
+    [updateSettings],
+  );
   const releaseChannelOptions = useMemo(
     () => [
       { value: "stable" as const, label: t("settings.about.releaseChannel.stable") },
@@ -681,6 +688,22 @@ function DesktopAppUpdateRow() {
           value={settings.releaseChannel}
           onValueChange={handleReleaseChannelChange}
           options={releaseChannelOptions}
+        />
+      </View>
+      <View style={[settingsStyles.row, settingsStyles.rowBorder]}>
+        <View style={settingsStyles.rowContent}>
+          <Text style={settingsStyles.rowTitle}>
+            {t("settings.about.updates.autoInstallLabel")}
+          </Text>
+          <Text style={settingsStyles.rowHint}>
+            {t("settings.about.updates.autoInstallDescription")}
+          </Text>
+        </View>
+        <Switch
+          value={settings.autoInstallUpdatesWhenIdle}
+          onValueChange={handleAutoInstallChange}
+          accessibilityLabel={t("settings.about.updates.autoInstallLabel")}
+          testID="auto-install-updates-toggle"
         />
       </View>
       <View style={[settingsStyles.row, settingsStyles.rowBorder]}>

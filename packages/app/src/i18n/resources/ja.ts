@@ -1539,6 +1539,10 @@ export const ja: TranslationResources = {
         newVersionReady: "新しいバージョンのインストール準備ができました。",
         restartWarning:
           "アプリを更新すると、実行中のエージェントが停止しターミナルセッションが閉じられます。",
+        waitingTitle: "アップデート待機中",
+        waitingDescription: "ローカルのエージェントが2分間動作していないときにインストールします。",
+        installWhenIdle: "アイドル時にインストール",
+        installNow: "今すぐインストール",
       },
     },
     settings: {
@@ -2408,6 +2412,9 @@ export const ja: TranslationResources = {
       updates: {
         label: "アプリの更新",
         readyToInstall: "インストール準備完了: {{version}}",
+        autoInstallLabel: "アイドル時にアップデートをインストール",
+        autoInstallDescription:
+          "ローカルのエージェントが2分間動作していないときにインストールして再起動します。",
         installTitle: "デスクトップの更新をインストール",
         installMessage: "このコンピューターのPaseoを更新します",
         installConfirm: "更新をインストール",

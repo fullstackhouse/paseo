@@ -3,10 +3,11 @@ import { i18n } from "@/i18n/i18next";
 
 export type UpdateCalloutBody =
   | { kind: "available"; versionLabel: string | null }
+  | { kind: "waiting"; versionLabel: string | null }
   | { kind: "installing" }
   | { kind: "error"; message: string };
 
-export type UpdateCalloutActionRole = "changelog" | "install" | "retry";
+export type UpdateCalloutActionRole = "changelog" | "install" | "installWhenIdle" | "retry";
 
 export interface UpdateCalloutActionDescriptor {
   role: UpdateCalloutActionRole;
@@ -33,6 +34,8 @@ export interface ResolveUpdateCalloutInput {
   isInstalling: boolean;
   availableUpdate: { latestVersion?: string | null } | null;
   errorMessage: string | null;
+  /** FSH: the update installs on its own once the local host goes idle. */
+  waitingForIdle?: boolean;
 }
 
 function formatVersionLabel(latestVersion: string | null | undefined): string | null {
@@ -51,6 +54,7 @@ export function resolveUpdateCalloutDescriptor(
   const isError = input.status === "error";
   const isInstalling = input.isInstalling;
   const isAvailable = !isInstalling && !isError;
+  const isWaiting = isAvailable && input.waitingForIdle === true;
 
   const latestVersion = input.availableUpdate?.latestVersion ?? null;
   const dismissalKey = `desktop-update:${input.status}:${latestVersion ?? "unknown"}`;
@@ -66,16 +70,33 @@ export function resolveUpdateCalloutDescriptor(
       kind: "error",
       message: input.errorMessage ?? i18n.t("desktop.updates.callout.genericError"),
     };
+  } else if (isWaiting) {
+    title = i18n.t("desktop.updates.callout.waitingTitle");
+    body = { kind: "waiting", versionLabel: formatVersionLabel(latestVersion) };
   } else {
     title = i18n.t("desktop.updates.callout.availableTitle");
     body = { kind: "available", versionLabel: formatVersionLabel(latestVersion) };
   }
 
-  const actions: UpdateCalloutActionDescriptor[] = [
-    { role: "changelog", label: i18n.t("desktop.updates.callout.whatsNew") },
-  ];
+  // The callout shows two actions. An update that isn't waiting yet offers "Install when idle"
+  // in place of the changelog.
+  const actions: UpdateCalloutActionDescriptor[] = [];
+  if (isAvailable && !isWaiting) {
+    actions.push({
+      role: "installWhenIdle",
+      label: i18n.t("desktop.updates.callout.installWhenIdle"),
+    });
+  } else {
+    actions.push({ role: "changelog", label: i18n.t("desktop.updates.callout.whatsNew") });
+  }
   if (isError) {
     actions.push({ role: "retry", label: i18n.t("common.actions.retry"), variant: "primary" });
+  } else if (isWaiting) {
+    actions.push({
+      role: "install",
+      label: i18n.t("desktop.updates.callout.installNow"),
+      variant: "primary",
+    });
   } else {
     actions.push({
       role: "install",

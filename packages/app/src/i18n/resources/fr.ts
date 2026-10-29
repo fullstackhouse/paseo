@@ -1557,6 +1557,10 @@ export const fr: TranslationResources = {
         newVersionReady: "Une nouvelle version est prête à être installée.",
         restartWarning:
           "La mise à jour de l’application arrêtera les agents en cours et fermera les sessions de terminal.",
+        waitingTitle: "Mise à jour en attente",
+        waitingDescription: "S'installe quand aucun agent local n'a travaillé depuis 2 minutes.",
+        installWhenIdle: "Installer au repos",
+        installNow: "Installer maintenant",
       },
     },
     settings: {
@@ -2440,6 +2444,9 @@ export const fr: TranslationResources = {
       updates: {
         label: "Mises à jour de l’application",
         readyToInstall: "Prête à installer : {{version}}",
+        autoInstallLabel: "Installer les mises à jour au repos",
+        autoInstallDescription:
+          "Installe et redémarre quand aucun agent local n'a travaillé depuis 2 minutes.",
         installTitle: "Installer la mise à jour de l’app de bureau",
         installMessage: "Paseo sera mis à jour sur cet ordinateur",
         installConfirm: "Installer la mise à jour",
