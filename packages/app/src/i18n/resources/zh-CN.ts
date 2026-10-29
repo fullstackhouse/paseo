@@ -2,6 +2,14 @@ import { en, type TranslationResources } from "./en";
 import { pluginSettings } from "./plugin-settings";
 
 export const zhCN: TranslationResources = {
+  interruptedAgents: {
+    title_one: "{{count}} 个 agent 被中断",
+    title_other: "{{count}} 个 agents 被中断",
+    description: "Paseo 在它们运行时重启了：{{names}}",
+    untitled: "未命名 agent",
+    more: "另外 {{count}} 个",
+    resumeAll: "全部继续",
+  },
   paneFind: {
     connectionFailure: "无法搜索此聊天。请检查主机连接后重试。",
     historyChangedFailure: "搜索期间聊天已更改。请重新搜索。",

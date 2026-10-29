@@ -2,6 +2,14 @@ import { en, type TranslationResources } from "./en";
 import { pluginSettings } from "./plugin-settings";
 
 export const ja: TranslationResources = {
+  interruptedAgents: {
+    title_one: "{{count}} 件のエージェントが中断されました",
+    title_other: "{{count}} 件のエージェントが中断されました",
+    description: "実行中に Paseo が再起動しました: {{names}}",
+    untitled: "無題のエージェント",
+    more: "他 {{count}} 件",
+    resumeAll: "すべて再開",
+  },
   paneFind: {
     connectionFailure:
       "このチャットを検索できませんでした。ホストへの接続を確認して再試行してください。",

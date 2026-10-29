@@ -205,6 +205,21 @@ function buildStoredPersistenceHandle(
   return toAgentPersistenceHandle(validProviders, record.persistence);
 }
 
+function buildStoredAgentMarks(
+  record: StoredAgentRecord,
+): Pick<
+  AgentSnapshotPayload,
+  "requiresAttention" | "attentionReason" | "attentionTimestamp" | "archivedAt" | "interruptedAt"
+> {
+  return {
+    requiresAttention: record.requiresAttention ?? false,
+    attentionReason: record.attentionReason ?? null,
+    attentionTimestamp: record.attentionTimestamp ?? null,
+    archivedAt: record.archivedAt ?? null,
+    interruptedAt: record.interruptedAt ?? null,
+  };
+}
+
 export function buildStoredAgentPayload(
   record: StoredAgentRecord,
   validProviders: Iterable<AgentProvider>,
@@ -253,10 +268,7 @@ export function buildStoredAgentPayload(
     pendingPermissions: [],
     persistence,
     title: record.title ?? null,
-    requiresAttention: record.requiresAttention ?? false,
-    attentionReason: record.attentionReason ?? null,
-    attentionTimestamp: record.attentionTimestamp ?? null,
-    archivedAt: record.archivedAt ?? null,
+    ...buildStoredAgentMarks(record),
     ...(record.internal ? { internal: true } : {}),
     labels: normalizeLabels(record.labels),
     ...(typeof record.lastError === "string" ? { lastError: record.lastError } : {}),
