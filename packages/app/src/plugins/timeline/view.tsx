@@ -7,6 +7,7 @@ import { useIsCompactFormFactor } from "@/constants/layout";
 import { useHostRuntimeClient, useHosts } from "@/runtime/host-runtime";
 import type { Theme } from "@/styles/theme";
 import type { PluginTimelineStreamItem } from "@/types/stream";
+import { usePluginHostNavigation } from "../host-navigation";
 import { useInstalledPlugin } from "../registry";
 import { PluginInstallationProvider } from "../installation-provider";
 import { SurfaceErrorBoundary } from "../surface-error-boundary";
@@ -57,6 +58,7 @@ function PluginTimelineItemBody({
   const hostLabel = hosts.find((host) => host.serverId === serverId)?.label ?? serverId;
   const host = useMemo(() => ({ id: serverId, label: hostLabel }), [hostLabel, serverId]);
   const layout = useMemo(() => ({ compact, platform: resolvePluginPlatform() }), [compact]);
+  const navigation = usePluginHostNavigation(serverId);
 
   if (!plugin || !renderer || !parsed || !client) {
     return <TimelineItemUnavailable />;
@@ -68,6 +70,7 @@ function PluginTimelineItemBody({
     theme,
     host,
     layout,
+    navigation,
     timestamp: item.timestamp,
     item: {
       type: "plugin",

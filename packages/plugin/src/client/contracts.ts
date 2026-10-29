@@ -46,7 +46,7 @@ export interface PluginHostProps {
   };
 }
 
-interface PluginNavigableHostProps extends PluginHostProps {
+export interface PluginNavigableHostProps extends PluginHostProps {
   /** Client-owned navigation. Undefined on older hosts; hide dependent affordances when absent. */
   readonly navigation?: {
     /** This client supports the focusHost option on agent/workspace navigation. */
@@ -345,7 +345,7 @@ export type PluginTimelineTransformerContribution<
     }
   : never;
 
-export interface PluginTimelineItemProps<Data = unknown> extends PluginHostProps {
+export interface PluginTimelineItemProps<Data = unknown> extends PluginNavigableHostProps {
   agentId: string;
   item: {
     type: "plugin";
