@@ -39,6 +39,9 @@ is mid-turn. It asks first; `--yes` skips the question. Every FSH build reports 
 the app nor the daemon notices a swap underneath it — that's why the script stops both. It records the installed
 release tag in `~/.paseo/fsh-release` and does nothing when that matches the latest (`--force` reinstalls).
 
+To see which build you're running, open Paseo → About Paseo: it shows the commit (`Version 0.13.0-beta.1 (fsh.<sha>)`),
+the build time, and links to the release and the commit.
+
 It also removes the Homebrew `paseo-fsh` or upstream `paseo` cask if either is installed, since `brew upgrade` would put
 its own build back. Your `~/.paseo` data and hosts are kept. Plugins you installed from a local directory are left
 alone. `--no-plugins` skips the plugin step.
@@ -120,5 +123,8 @@ Agents that already existed when a plugin was installed don't get its MCP tools.
   and publishes a release for each (`fsh-*`, `fsh-android-*`).
   The build runs upstream's packaged-app smoke test first. You can also start it by hand:
   Actions → FSH desktop build → Run workflow.
+  To test a PR's desktop build, add the `deploy` label: every push then publishes a prerelease `fsh-pr<N>-<sha>`
+  with the DMG (a manual run on another branch publishes `fsh-test-<sha>`). `install-fsh.sh` and the in-app updater
+  only install the latest release, which never points at a prerelease. Closing the PR deletes its prereleases.
 - **Upstream workflows**: they trigger on pushes to `main` and on `v*` tags, and need upstream's
   secrets. Don't push `main` or `v*` tags here. Our release tags are `fsh-*`.
