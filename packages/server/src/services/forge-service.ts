@@ -254,6 +254,11 @@ export type GetPullRequestOptions = {
   number: number;
 } & ForgeReadOptions;
 
+export type GetPullRequestCheckoutTargetOptions = GetPullRequestOptions & {
+  /** The forge project the change request lives in (`owner/name` on GitHub). Defaults to the checkout's repo. */
+  projectPath?: string;
+};
+
 export type GetPullRequestTimelineOptions = {
   cwd: string;
   prNumber: number;
@@ -440,7 +445,9 @@ export interface ForgeService {
   listIssues(options: ListIssuesOptions): Promise<IssueSummary[]>;
   getPullRequest(options: GetPullRequestOptions): Promise<PullRequestSummary>;
   getPullRequestHeadRef(options: GetPullRequestOptions): Promise<string>;
-  getPullRequestCheckoutTarget(options: GetPullRequestOptions): Promise<PullRequestCheckoutTarget>;
+  getPullRequestCheckoutTarget(
+    options: GetPullRequestCheckoutTargetOptions,
+  ): Promise<PullRequestCheckoutTarget>;
   /**
    * Refs to fetch for a change-request checkout when the resolved checkout
    * target carries none. Adapters with a universal change-request head ref

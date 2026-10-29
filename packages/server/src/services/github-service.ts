@@ -2121,12 +2121,16 @@ export function createGitHubService(options: CreateGitHubServiceOptions = {}): G
       return cached({
         cwd: input.cwd,
         method: "getPullRequestCheckoutTarget",
-        args: { number: input.number },
+        args: { number: input.number, projectPath: input.projectPath },
         readOptions: input,
         load: async () => {
-          const repo = await getGitHubRepoView({ cwd: input.cwd, run });
-          const owner = repo?.owner?.login;
-          const name = repo?.name;
+          // `gh repo view` picks the `upstream` remote over `origin` when no gh default is set.
+          const [owner, name] = input.projectPath
+            ? input.projectPath.split("/")
+            : await getGitHubRepoView({ cwd: input.cwd, run }).then((repo) => [
+                repo?.owner?.login,
+                repo?.name,
+              ]);
           if (!owner || !name) {
             throw new Error("Unable to resolve GitHub repository for pull request checkout");
           }
