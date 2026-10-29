@@ -32,6 +32,8 @@ temporary by design: every patch is meant to go upstream and then drop out of `f
 
 - FSH-only (upstreamable): agents whose turn a daemon restart or crash cut short are marked interrupted; the sidebar then offers **Resume all**, which sends each a "continue where you left off" prompt
 
+- FSH-only (upstreamable): `paseo.json` service commands run through `bash -c '…'`, so workspace scripts start when the login shell is fish (the daemon types commands into `$SHELL`, and they use bash syntax)
+
 Keep this list in sync with what's merged into `fsh`.
 
 ## Install the desktop app and plugins (macOS, Apple Silicon)
