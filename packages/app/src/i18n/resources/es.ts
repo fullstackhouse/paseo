@@ -7,6 +7,14 @@ export const es: TranslationResources = {
     empty: "Sin resultados",
     failed: "La búsqueda falló: {{message}}",
   },
+  interruptedAgents: {
+    title_one: "Se interrumpió {{count}} agente",
+    title_other: "Se interrumpieron {{count}} agentes",
+    description: "Paseo se reinició durante su turno: {{names}}",
+    untitled: "Agente sin título",
+    more: "+{{count}} más",
+    resumeAll: "Reanudar todos",
+  },
   paneFind: {
     connectionFailure:
       "No se pudo buscar en este chat. Comprueba la conexión con el host y vuelve a intentarlo.",

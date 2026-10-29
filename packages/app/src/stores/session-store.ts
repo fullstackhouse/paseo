@@ -107,6 +107,8 @@ export interface Agent {
   archivedAt?: Date | null;
   /** Background agents stay out of tabs, the subagent track and agent lists. Open them by id. */
   background?: boolean;
+  /** A daemon stop or crash cut this agent's turn short; cleared when its next turn starts. */
+  interruptedAt?: Date | null;
   parentAgentId: string | null;
   labels: Record<string, string>;
   metadata?: Record<string, JsonValue>;

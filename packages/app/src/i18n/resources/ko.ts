@@ -7,6 +7,14 @@ export const ko: TranslationResources = {
     empty: "결과 없음",
     failed: "검색 실패: {{message}}",
   },
+  interruptedAgents: {
+    title_one: "에이전트 {{count}}개가 중단되었습니다",
+    title_other: "에이전트 {{count}}개가 중단되었습니다",
+    description: "작업 중에 Paseo가 다시 시작되었습니다: {{names}}",
+    untitled: "제목 없는 에이전트",
+    more: "외 {{count}}개",
+    resumeAll: "모두 재개",
+  },
   paneFind: {
     connectionFailure: "이 채팅을 검색할 수 없습니다. 호스트 연결을 확인하고 다시 시도하세요.",
     historyChangedFailure: "검색 중에 채팅이 변경되었습니다. 다시 검색하세요.",

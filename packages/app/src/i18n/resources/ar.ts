@@ -7,6 +7,14 @@ export const ar: TranslationResources = {
     empty: "لا توجد نتائج",
     failed: "فشل البحث: {{message}}",
   },
+  interruptedAgents: {
+    title_one: "تمت مقاطعة {{count}} وكيل",
+    title_other: "تمت مقاطعة {{count}} وكلاء",
+    description: "أُعيد تشغيل Paseo أثناء دورهم: {{names}}",
+    untitled: "وكيل بلا عنوان",
+    more: "+{{count}} آخرين",
+    resumeAll: "استئناف الكل",
+  },
   paneFind: {
     connectionFailure: "تعذر البحث في هذه المحادثة. تحقق من الاتصال بالمضيف وأعد المحاولة.",
     historyChangedFailure: "تغيّرت المحادثة أثناء البحث. أعد البحث.",

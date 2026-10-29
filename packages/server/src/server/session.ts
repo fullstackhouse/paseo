@@ -2388,6 +2388,7 @@ export class Session {
     if (!payload.internal && !storedRecord?.internal && !payload.archivedAt) {
       payload.backgroundWork = this.agentManager.getAgentBackgroundWorkSummary(payload.id);
     }
+    payload.interruptedAt = storedRecord?.interruptedAt ?? null;
     return payload;
   }
 

@@ -325,6 +325,7 @@ export function buildStoredAgentPayload(
     attentionTimestamp: record.attentionTimestamp ?? null,
     archivedAt: record.archivedAt ?? null,
     ...visibilityFlags(record),
+    interruptedAt: record.interruptedAt ?? null,
     labels: normalizeLabels(record.labels),
     metadata: record.metadata,
     ...(typeof record.lastError === "string" ? { lastError: record.lastError } : {}),

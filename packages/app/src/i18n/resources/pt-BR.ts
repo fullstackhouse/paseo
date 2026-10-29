@@ -7,6 +7,14 @@ export const ptBR: TranslationResources = {
     empty: "Nenhum resultado",
     failed: "Falha na pesquisa: {{message}}",
   },
+  interruptedAgents: {
+    title_one: "{{count}} agente foi interrompido",
+    title_other: "{{count}} agentes foram interrompidos",
+    description: "O Paseo reiniciou durante o turno deles: {{names}}",
+    untitled: "Agente sem título",
+    more: "+{{count}} outros",
+    resumeAll: "Retomar todos",
+  },
   paneFind: {
     connectionFailure:
       "Não foi possível pesquisar nesta conversa. Verifique a conexão com o host e tente novamente.",

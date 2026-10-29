@@ -28,6 +28,8 @@ temporary by design: every patch is meant to go upstream and then drop out of `f
 - FSH-only (not upstream yet): `app-main` worktree service runs the branch's web app against your main daemon, to review UI changes with real workspaces and no restart
 - FSH-only (upstreamable): a sidebar callout offers plugin updates per host and applies them in place, using the daemon's reviewed update preview/apply. Directory-installed plugins never show up there
 
+- FSH-only (upstreamable): agents whose turn a daemon restart or crash cut short are marked interrupted; the sidebar then offers **Resume all**, which sends each a "continue where you left off" prompt
+
 Keep this list in sync with what's merged into `fsh`.
 
 ## Install the desktop app and plugins (macOS, Apple Silicon)

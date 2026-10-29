@@ -7,6 +7,14 @@ export const ru: TranslationResources = {
     empty: "Нет результатов",
     failed: "Не удалось выполнить поиск: {{message}}",
   },
+  interruptedAgents: {
+    title_one: "Прерван {{count}} агент",
+    title_other: "Прервано агентов: {{count}}",
+    description: "Paseo перезапустился во время их работы: {{names}}",
+    untitled: "Агент без названия",
+    more: "ещё {{count}}",
+    resumeAll: "Возобновить все",
+  },
   paneFind: {
     connectionFailure:
       "Не удалось выполнить поиск в чате. Проверьте подключение к хосту и повторите попытку.",
