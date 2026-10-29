@@ -1455,6 +1455,16 @@ export const ptBR: TranslationResources = {
       commandPlaceholder: "Run a command, or leave empty for a blank terminal",
     },
   },
+  pluginUpdates: {
+    callout: {
+      title: "Atualizações de plugins disponíveis",
+      description: "{{plugins}} pode ser atualizado.",
+      descriptionOnHost: "{{plugins}} pode ser atualizado em {{host}}.",
+      update: "Atualizar",
+      updating: "Atualizando...",
+      failedTitle: "Falha ao atualizar o plugin",
+    },
+  },
   desktop: {
     windowControls: {
       minimize: "Minimizar janela",

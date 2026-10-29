@@ -1437,6 +1437,16 @@ export const en = {
       commandPlaceholder: "Run a command, or leave empty for a blank terminal",
     },
   },
+  pluginUpdates: {
+    callout: {
+      title: "Plugin updates available",
+      description: "{{plugins}} can be updated.",
+      descriptionOnHost: "{{plugins}} on {{host}} can be updated.",
+      update: "Update",
+      updating: "Updating...",
+      failedTitle: "Plugin update failed",
+    },
+  },
   desktop: {
     windowControls: {
       minimize: "Minimize window",

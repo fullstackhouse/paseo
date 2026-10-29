@@ -1436,6 +1436,16 @@ export const ko: TranslationResources = {
       commandPlaceholder: "Run a command, or leave empty for a blank terminal",
     },
   },
+  pluginUpdates: {
+    callout: {
+      title: "플러그인 업데이트 가능",
+      description: "{{plugins}}을(를) 업데이트할 수 있습니다.",
+      descriptionOnHost: "{{host}}의 {{plugins}}을(를) 업데이트할 수 있습니다.",
+      update: "업데이트",
+      updating: "업데이트 중...",
+      failedTitle: "플러그인 업데이트 실패",
+    },
+  },
   desktop: {
     windowControls: {
       minimize: "창 최소화",

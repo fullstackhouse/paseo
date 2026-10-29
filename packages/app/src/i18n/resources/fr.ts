@@ -1459,6 +1459,16 @@ export const fr: TranslationResources = {
       commandPlaceholder: "Saisissez une commande, ou laissez vide pour un terminal vierge",
     },
   },
+  pluginUpdates: {
+    callout: {
+      title: "Mises à jour de plugins disponibles",
+      description: "{{plugins}} peut être mis à jour.",
+      descriptionOnHost: "{{plugins}} peut être mis à jour sur {{host}}.",
+      update: "Mettre à jour",
+      updating: "Mise à jour…",
+      failedTitle: "Échec de la mise à jour du plugin",
+    },
+  },
   desktop: {
     windowControls: {
       minimize: "Réduire la fenêtre",

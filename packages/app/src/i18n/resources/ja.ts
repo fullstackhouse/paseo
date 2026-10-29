@@ -1443,6 +1443,16 @@ export const ja: TranslationResources = {
       commandPlaceholder: "Run a command, or leave empty for a blank terminal",
     },
   },
+  pluginUpdates: {
+    callout: {
+      title: "プラグインのアップデートがあります",
+      description: "{{plugins}} をアップデートできます。",
+      descriptionOnHost: "{{host}} の {{plugins}} をアップデートできます。",
+      update: "アップデート",
+      updating: "アップデート中...",
+      failedTitle: "プラグインのアップデートに失敗しました",
+    },
+  },
   desktop: {
     windowControls: {
       minimize: "ウィンドウを最小化",

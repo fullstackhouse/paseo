@@ -1429,6 +1429,16 @@ export const ar: TranslationResources = {
       commandPlaceholder: "Run a command, or leave empty for a blank terminal",
     },
   },
+  pluginUpdates: {
+    callout: {
+      title: "تحديثات الإضافات متاحة",
+      description: "يمكن تحديث {{plugins}}.",
+      descriptionOnHost: "يمكن تحديث {{plugins}} على {{host}}.",
+      update: "تحديث",
+      updating: "جارٍ التحديث...",
+      failedTitle: "فشل تحديث الإضافة",
+    },
+  },
   desktop: {
     windowControls: {
       minimize: "تصغير النافذة",
