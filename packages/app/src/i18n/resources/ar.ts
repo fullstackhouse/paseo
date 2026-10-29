@@ -825,6 +825,14 @@ export const ar: TranslationResources = {
           pending_mr: "إنشاء MR...",
           success_mr: "تم إنشاء MR",
         },
+        createPrAndMerge: {
+          label: "إنشاء PR ودمجه",
+          pending: "جارٍ الإرسال إلى الوكيل...",
+          success: "تم الإرسال إلى الوكيل",
+          sent: "طُلب من الوكيل إنشاء PR ودمجه",
+          label_mr: "إنشاء MR ودمجه",
+          sent_mr: "طُلب من الوكيل إنشاء MR ودمجه",
+        },
         mergeBranch: {
           label: "دمج محليا",
           pending: "جار الدمج...",
@@ -905,6 +913,7 @@ export const ar: TranslationResources = {
           failedPush: "فشل في الدفع",
           failedPullAndPush: "فشل في السحب والدفع",
           failedCreatePr: "فشل في إنشاء PR",
+          failedCreatePrAndMerge: "تعذّر إرسال الطلب إلى الوكيل",
           failedMergePr: "فشل دمج PR",
           failedEnableAutoMerge: "فشل في تمكين الدمج التلقائي",
           failedDisableAutoMerge: "فشل في تعطيل الدمج التلقائي",

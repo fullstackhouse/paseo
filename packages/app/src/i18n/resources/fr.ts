@@ -834,6 +834,14 @@ export const fr: TranslationResources = {
           pending_mr: "Création de la MR…",
           success_mr: "MR créée",
         },
+        createPrAndMerge: {
+          label: "Créer la PR et fusionner",
+          pending: "Envoi à l'agent…",
+          success: "Envoyé à l'agent",
+          sent: "L'agent doit créer et fusionner la PR",
+          label_mr: "Créer la MR et fusionner",
+          sent_mr: "L'agent doit créer et fusionner la MR",
+        },
         mergeBranch: {
           label: "Fusionner en local",
           pending: "Fusion…",
@@ -931,6 +939,7 @@ export const fr: TranslationResources = {
           failedPush: "Échec du push",
           failedPullAndPush: "Échec du pull et du push",
           failedCreatePr: "Impossible de créer la PR",
+          failedCreatePrAndMerge: "Impossible d'envoyer la demande à l'agent",
           failedMergePr: "Impossible de fusionner la PR",
           failedEnableAutoMerge: "Impossible d’activer la fusion automatique",
           failedDisableAutoMerge: "Impossible de désactiver la fusion automatique",
