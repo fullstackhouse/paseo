@@ -24,6 +24,7 @@ import type { TerminalCell, TerminalState } from "@getpaseo/protocol/messages";
 import { TerminalInputModeTracker } from "@getpaseo/protocol/terminal-input-mode";
 import { TerminalActivityTracker } from "./activity/terminal-activity-tracker.js";
 import type { TerminalActivity, TerminalActivityState } from "@getpaseo/protocol/terminal-activity";
+import { resolveDefaultTerminalShell } from "./default-shell.js";
 
 const { Terminal } = xterm;
 const require = createRequire(import.meta.url);
@@ -257,18 +258,7 @@ export function ensureNodePtySpawnHelperExecutableForCurrentPlatform(
   }
 }
 
-export function resolveDefaultTerminalShell(
-  options: { platform?: NodeJS.Platform; env?: NodeJS.ProcessEnv } = {},
-): string {
-  const platform = options.platform ?? process.platform;
-  const env = options.env ?? process.env;
-
-  if (platform === "win32") {
-    return env.ComSpec || env.COMSPEC || "C:\\Windows\\System32\\cmd.exe";
-  }
-
-  return env.SHELL || "/bin/sh";
-}
+export { resolveDefaultTerminalShell };
 
 export interface ResolvedTerminalCommand {
   command: string;
