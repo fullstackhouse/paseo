@@ -1533,6 +1533,10 @@ export const ar: TranslationResources = {
         versionReady: "{{version}}جاهز للتثبيت.",
         newVersionReady: "إصدار جديد جاهز للتثبيت.",
         restartWarning: "ستؤدي ترقية التطبيق إلى إيقاف تشغيل الوكلاء وإغلاق الجلسات الطرفية.",
+        waitingTitle: "التحديث في الانتظار",
+        waitingDescription: "سيُثبَّت فور توقف جميع الوكلاء المحليين عن العمل.",
+        installWhenIdle: "التثبيت عند الخمول",
+        installNow: "التثبيت الآن",
       },
     },
     settings: {
@@ -2434,6 +2438,8 @@ export const ar: TranslationResources = {
       updates: {
         label: "تحديثات التطبيق",
         readyToInstall: "جاهز للتثبيت:{{version}}",
+        autoInstallLabel: "تثبيت التحديثات عند الخمول",
+        autoInstallDescription: "التثبيت وإعادة التشغيل فور توقف جميع الوكلاء المحليين عن العمل.",
         installTitle: "تثبيت تحديث سطح المكتب",
         installMessage: "يؤدي هذا إلى تحديث Paseo على هذا الكمبيوتر",
         installConfirm: "تثبيت التحديث",

@@ -1558,6 +1558,10 @@ export const en = {
         versionReady: "{{version}} is ready to install.",
         newVersionReady: "A new version is ready to install.",
         restartWarning: "Upgrading the app will stop running agents and close terminal sessions.",
+        waitingTitle: "Update waiting",
+        waitingDescription: "Installs as soon as no local agent is working.",
+        installWhenIdle: "Install when idle",
+        installNow: "Install now",
       },
     },
     settings: {
@@ -2522,6 +2526,8 @@ export const en = {
       updates: {
         label: "App updates",
         readyToInstall: "Ready to install: {{version}}",
+        autoInstallLabel: "Install updates when idle",
+        autoInstallDescription: "Install and restart as soon as no local agent is working.",
         installTitle: "Install desktop update",
         installMessage: "This updates Paseo on this computer",
         installConfirm: "Install update",

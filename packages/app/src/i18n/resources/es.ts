@@ -1573,6 +1573,10 @@ export const es: TranslationResources = {
         newVersionReady: "Una nueva versión está lista para instalar.",
         restartWarning:
           "La actualización de la aplicación dejará de ejecutar agentes y cerrará sesiones de terminal.",
+        waitingTitle: "Actualización en espera",
+        waitingDescription: "Se instala en cuanto ningún agente local esté trabajando.",
+        installWhenIdle: "Instalar en reposo",
+        installNow: "Instalar ahora",
       },
     },
     settings: {
@@ -2450,6 +2454,8 @@ export const es: TranslationResources = {
       updates: {
         label: "Actualizaciones de aplicaciones",
         readyToInstall: "Listo para instalar:{{version}}",
+        autoInstallLabel: "Instalar actualizaciones en reposo",
+        autoInstallDescription: "Instala y reinicia en cuanto ningún agente local esté trabajando.",
         installTitle: "Instalar actualización de escritorio",
         installMessage: "Esto actualizaPaseoen esta computadora.",
         installConfirm: "Instalar actualización",

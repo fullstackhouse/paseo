@@ -1520,6 +1520,10 @@ export const zhCN: TranslationResources = {
         versionReady: "{{version}} 已准备好安装。",
         newVersionReady: "新版本已准备好安装。",
         restartWarning: "升级 app 会停止正在运行的 agents，并关闭 terminal 会话。",
+        waitingTitle: "更新等待中",
+        waitingDescription: "本地 agents 全部停止工作后立即安装。",
+        installWhenIdle: "空闲时安装",
+        installNow: "立即安装",
       },
     },
     settings: {
@@ -2373,6 +2377,8 @@ export const zhCN: TranslationResources = {
       updates: {
         label: "应用更新",
         readyToInstall: "可安装：{{version}}",
+        autoInstallLabel: "空闲时安装更新",
+        autoInstallDescription: "本地 agents 全部停止工作后立即安装并重启。",
         installTitle: "安装桌面版更新",
         installMessage: "这会更新此电脑上的 Paseo",
         installConfirm: "安装更新",

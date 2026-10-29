@@ -1542,6 +1542,10 @@ export const ko: TranslationResources = {
         versionReady: "{{version}} 설치가 준비되었습니다.",
         newVersionReady: "새 버전 설치가 준비되었습니다.",
         restartWarning: "앱을 업그레이드하면 실행 중인 에이전트가 중지되고 터미널 세션이 닫힙니다.",
+        waitingTitle: "업데이트 대기 중",
+        waitingDescription: "로컬 에이전트가 모두 작업을 멈추면 바로 설치됩니다.",
+        installWhenIdle: "유휴 시 설치",
+        installNow: "지금 설치",
       },
     },
     settings: {
@@ -2409,6 +2413,8 @@ export const ko: TranslationResources = {
       updates: {
         label: "앱 업데이트",
         readyToInstall: "설치 준비됨: {{version}}",
+        autoInstallLabel: "유휴 시 업데이트 설치",
+        autoInstallDescription: "로컬 에이전트가 모두 작업을 멈추면 바로 설치하고 다시 시작합니다.",
         installTitle: "데스크톱 업데이트 설치",
         installMessage: "이 컴퓨터의 Paseo를 업데이트합니다",
         installConfirm: "업데이트 설치",
