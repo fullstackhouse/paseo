@@ -1135,6 +1135,8 @@ test("startup closes stale active records before serving status without resuming
         record.lastStatus === "running" || record.lastStatus === "initializing"
           ? "closed"
           : record.lastStatus,
+      // Only a turn in flight counts as interrupted; an agent still starting up does not.
+      ...(record.lastStatus === "running" ? { interruptedAt: expect.any(String) } : {}),
     }));
     expect(
       (await handle.daemon.agentStorage.list()).sort((a, b) => a.id.localeCompare(b.id)),
@@ -1160,9 +1162,43 @@ test("startup closes stale active records before serving status without resuming
     expect(opened.lifecycle).toBe("idle");
     await handle.daemon.agentManager.runAgent(opened.id, "hello");
     expect(handle.daemon.agentManager.getAgent(opened.id)?.lifecycle).toBe("idle");
+    // The next turn clears the interruption.
+    await handle.daemon.agentStorage.flush();
+    expect((await handle.daemon.agentStorage.get(opened.id))?.interruptedAt).toBeUndefined();
   } finally {
     await client.close();
     await handle.close();
+  }
+}, 30_000);
+
+test("shutdown marks agents with a turn in flight as interrupted", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "paseo-interrupted-"));
+  const logger = pino({ level: "silent" });
+  const turnHeld = new Promise<void>(() => {});
+  const handle = await createTestPaseoDaemon({
+    paseoHomeRoot: root,
+    cleanup: false,
+    agentClients: createTestAgentClients({ beforeTurnComplete: () => turnHeld }),
+  });
+  const { agentManager } = handle.daemon;
+  const working = await agentManager.createAgent({ provider: "codex", cwd: root }, undefined, {
+    workspaceId: undefined,
+  });
+  const finished = await agentManager.createAgent({ provider: "codex", cwd: root }, undefined, {
+    workspaceId: undefined,
+  });
+  void agentManager.runAgent(working.id, "keep going").catch(() => undefined);
+  await vi.waitFor(() => expect(agentManager.getAgent(working.id)?.lifecycle).toBe("running"));
+
+  await handle.close();
+
+  const storage = new AgentStorage(path.join(root, ".paseo", "agents"), logger);
+  try {
+    expect((await storage.get(working.id))?.lastStatus).toBe("closed");
+    expect((await storage.get(working.id))?.interruptedAt).toEqual(expect.any(String));
+    expect((await storage.get(finished.id))?.interruptedAt).toBeUndefined();
+  } finally {
+    await rm(root, { recursive: true, force: true });
   }
 }, 30_000);
 

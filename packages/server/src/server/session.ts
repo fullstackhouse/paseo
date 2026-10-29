@@ -2147,6 +2147,7 @@ export class Session {
     const storedRecord = await this.agentStorage.get(payload.id);
     payload.title = storedRecord?.title ?? null;
     payload.archivedAt = storedRecord?.archivedAt ?? null;
+    payload.interruptedAt = storedRecord?.interruptedAt ?? null;
     return payload;
   }
 

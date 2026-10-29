@@ -1956,7 +1956,7 @@ export async function createPaseoDaemon(
     await finishSubscriptions.close();
     await wsServer?.agentMessages.close();
     agentManager.prepareForShutdown();
-    await closeAllAgents(logger, agentManager);
+    await closeAllAgents(logger, agentManager, agentStorage);
     await withTimeout({
       promise: pluginRuntime.drainEvents(),
       timeoutMs: AGENT_CLOSE_TIMEOUT_MS,
@@ -2012,7 +2012,11 @@ async function closeStaleAgentRecords(agentStorage: AgentStorage): Promise<void>
   // shutdowns before any status consumer sees the persisted active states.
   for (const record of await agentStorage.list()) {
     if (record.lastStatus === "running" || record.lastStatus === "initializing") {
-      await agentStorage.upsert({ ...record, lastStatus: "closed" });
+      await agentStorage.upsert({
+        ...record,
+        lastStatus: "closed",
+        ...(record.lastStatus === "running" ? { interruptedAt: new Date().toISOString() } : {}),
+      });
     }
   }
 }
@@ -2025,8 +2029,16 @@ async function closeStaleAgentRecords(agentStorage: AgentStorage): Promise<void>
  */
 const AGENT_CLOSE_TIMEOUT_MS = 5_000;
 
-async function closeAllAgents(logger: Logger, agentManager: AgentManager): Promise<void> {
+async function closeAllAgents(
+  logger: Logger,
+  agentManager: AgentManager,
+  agentStorage: AgentStorage,
+): Promise<void> {
   const agents = agentManager.listAgents({ includeInternal: true });
+  // Closing persists "closed", so note mid-turn agents first; clients offer to resume them.
+  const interruptedIds = agents
+    .filter((agent) => agent.lifecycle === "running" && !agent.internal)
+    .map((agent) => agent.id);
   await Promise.all(
     agents.map(async (agent) => {
       try {
@@ -2040,6 +2052,9 @@ async function closeAllAgents(logger: Logger, agentManager: AgentManager): Promi
       }
     }),
   );
+  await agentStorage
+    .markInterrupted(interruptedIds, new Date().toISOString())
+    .catch((err) => logger.warn({ err }, "Failed to mark interrupted agents"));
 }
 
 export function connectIdleRuntimeCleanupConfig(

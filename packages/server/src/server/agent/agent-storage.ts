@@ -74,6 +74,8 @@ const STORED_AGENT_SCHEMA = z.object({
   attentionTimestamp: z.string().nullable().optional(),
   internal: z.boolean().optional(),
   archivedAt: z.string().nullable().optional(),
+  /** Set when a daemon stop or crash cut a turn short; cleared when the next turn starts. */
+  interruptedAt: z.string().nullable().optional(),
   owner: AgentOwnerSchema.optional(),
 });
 
@@ -259,8 +261,24 @@ export class AgentStorage {
       if (existing && existing.archivedAt !== undefined) {
         record.archivedAt = existing.archivedAt;
       }
+      // An interruption stays until the agent's next turn starts.
+      if (existing?.interruptedAt && agent.lifecycle !== "running") {
+        record.interruptedAt = existing.interruptedAt;
+      }
       return record;
     });
+  }
+
+  /** Marks agents whose turn a daemon stop cut short, so clients can offer to resume them. */
+  async markInterrupted(agentIds: readonly string[], interruptedAt: string): Promise<void> {
+    await this.load();
+    await Promise.all(
+      agentIds.map(async (agentId) => {
+        await this.waitForPendingWrite(agentId);
+        const record = await this.get(agentId);
+        if (record) await this.upsert({ ...record, interruptedAt });
+      }),
+    );
   }
 
   async setTitle(agentId: string, title: string): Promise<void> {
