@@ -97,6 +97,8 @@ export interface Agent {
   attentionReason?: "finished" | "error" | "permission" | null;
   attentionTimestamp?: Date | null;
   archivedAt?: Date | null;
+  /** A daemon stop or crash cut this agent's turn short; cleared when its next turn starts. */
+  interruptedAt?: Date | null;
   parentAgentId: string | null;
   labels: Record<string, string>;
   projectPlacement?: ProjectPlacementPayload | null;

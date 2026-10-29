@@ -1058,6 +1058,7 @@ export async function createPaseoDaemon(
       sendPromptToAgent({ agentId, prompt, agentManager, agentStorage, logger, unarchive: false }),
     report: (agentId, err) => logger.error({ agentId, err }, "Agent restart recovery failed"),
   });
+  await markCrashInterruptedAgents(agentStorage);
   await restartRecovery.prepareStartup();
   logger.info({ elapsed: elapsed() }, "Agent storage initialized");
   await bootstrapWorkspaceRegistries({
@@ -1988,7 +1989,7 @@ export async function createPaseoDaemon(
     await wsServer?.agentMessages.close();
     agentManager.prepareForShutdown();
     await restartRecovery.captureRunningAgents();
-    await closeAllAgents(logger, agentManager);
+    await closeAllAgents(logger, agentManager, agentStorage);
     await withTimeout({
       promise: pluginRuntime.drainEvents(),
       timeoutMs: AGENT_CLOSE_TIMEOUT_MS,
@@ -2054,6 +2055,17 @@ export async function createPaseoDaemon(
   };
 }
 
+async function markCrashInterruptedAgents(agentStorage: AgentStorage): Promise<void> {
+  // A crash leaves mid-turn records as "running". Stamp them before restart recovery
+  // repairs that status, so clients can offer to resume them.
+  const interruptedAt = new Date().toISOString();
+  for (const record of await agentStorage.list()) {
+    if (record.lastStatus === "running" && !record.interruptedAt) {
+      await agentStorage.upsert({ ...record, interruptedAt });
+    }
+  }
+}
+
 /**
  * Closing an agent asks its provider to close the session and waits for the
  * answer. A provider that never answers must not hold the daemon open, so a
@@ -2062,8 +2074,16 @@ export async function createPaseoDaemon(
  */
 const AGENT_CLOSE_TIMEOUT_MS = 5_000;
 
-async function closeAllAgents(logger: Logger, agentManager: AgentManager): Promise<void> {
+async function closeAllAgents(
+  logger: Logger,
+  agentManager: AgentManager,
+  agentStorage: AgentStorage,
+): Promise<void> {
   const agents = agentManager.listAgents({ includeInternal: true });
+  // Closing persists "closed", so note mid-turn agents first; clients offer to resume them.
+  const interruptedIds = agents
+    .filter((agent) => agent.lifecycle === "running" && !agent.internal)
+    .map((agent) => agent.id);
   await Promise.all(
     agents.map(async (agent) => {
       try {
@@ -2077,6 +2097,9 @@ async function closeAllAgents(logger: Logger, agentManager: AgentManager): Promi
       }
     }),
   );
+  await agentStorage
+    .markInterrupted(interruptedIds, new Date().toISOString())
+    .catch((err) => logger.warn({ err }, "Failed to mark interrupted agents"));
 }
 
 export function connectIdleRuntimeCleanupConfig(

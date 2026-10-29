@@ -2,6 +2,14 @@ import { en, type TranslationResources } from "./en";
 import { pluginSettings } from "./plugin-settings";
 
 export const es: TranslationResources = {
+  interruptedAgents: {
+    title_one: "Se interrumpió {{count}} agente",
+    title_other: "Se interrumpieron {{count}} agentes",
+    description: "Paseo se reinició durante su turno: {{names}}",
+    untitled: "Agente sin título",
+    more: "+{{count}} más",
+    resumeAll: "Reanudar todos",
+  },
   paneFind: {
     connectionFailure:
       "No se pudo buscar en este chat. Comprueba la conexión con el host y vuelve a intentarlo.",

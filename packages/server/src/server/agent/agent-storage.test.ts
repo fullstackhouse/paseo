@@ -299,6 +299,22 @@ describe("AgentStorage", () => {
     expect(recordAfterSnapshot?.archivedAt).toBe(archivedAt);
   });
 
+  test("markInterrupted stamps known agents and survives snapshots until the next turn", async () => {
+    const agentId = "agent-interrupted";
+    await storage.applySnapshot(createManagedAgent({ id: agentId, lifecycle: "closed" }));
+
+    const interruptedAt = "2025-01-05T00:00:00.000Z";
+    await storage.markInterrupted([agentId, "agent-unknown"], interruptedAt);
+    expect((await storage.get(agentId))?.interruptedAt).toBe(interruptedAt);
+    expect(await storage.get("agent-unknown")).toBeNull();
+
+    await storage.applySnapshot(createManagedAgent({ id: agentId, lifecycle: "idle" }));
+    expect((await storage.get(agentId))?.interruptedAt).toBe(interruptedAt);
+
+    await storage.applySnapshot(createManagedAgent({ id: agentId, lifecycle: "running" }));
+    expect((await storage.get(agentId))?.interruptedAt).toBeUndefined();
+  });
+
   test("stores titles independently of snapshots", async () => {
     await storage.applySnapshot(
       createManagedAgent({

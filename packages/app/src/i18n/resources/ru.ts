@@ -2,6 +2,14 @@ import { en, type TranslationResources } from "./en";
 import { pluginSettings } from "./plugin-settings";
 
 export const ru: TranslationResources = {
+  interruptedAgents: {
+    title_one: "Прерван {{count}} агент",
+    title_other: "Прервано агентов: {{count}}",
+    description: "Paseo перезапустился во время их работы: {{names}}",
+    untitled: "Агент без названия",
+    more: "ещё {{count}}",
+    resumeAll: "Возобновить все",
+  },
   paneFind: {
     connectionFailure:
       "Не удалось выполнить поиск в чате. Проверьте подключение к хосту и повторите попытку.",
