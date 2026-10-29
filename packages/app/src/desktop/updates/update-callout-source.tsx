@@ -1,5 +1,5 @@
 import { Gift } from "lucide-react-native";
-import { type ReactNode, useEffect, useRef } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useUnistyles } from "react-native-unistyles";
 import {
@@ -13,6 +13,8 @@ import {
   type UpdateCalloutBody,
 } from "@/desktop/updates/resolve-update-callout";
 import { useDesktopAppUpdater } from "@/desktop/updates/use-desktop-app-updater";
+import { useInstallWhenIdle, useLocalHostActivity } from "@/desktop/updates/use-install-when-idle";
+import { useAppSettings } from "@/hooks/use-settings";
 import { useStableEvent } from "@/hooks/use-stable-event";
 import { openChangelog } from "@/changelog";
 
@@ -21,12 +23,18 @@ const CHECK_INTERVAL_MS = 30 * 60 * 1000;
 function renderBody(body: UpdateCalloutBody, t: ReturnType<typeof useTranslation>["t"]): ReactNode {
   if (body.kind === "installing") return t("desktop.updates.callout.installingDescription");
   if (body.kind === "error") return body.message;
-  return <UpdateAvailableDescription versionLabel={body.versionLabel ?? undefined} t={t} />;
+  return (
+    <UpdateAvailableDescription
+      versionLabel={body.versionLabel ?? undefined}
+      waiting={body.kind === "waiting"}
+      t={t}
+    />
+  );
 }
 
 function materializeActions(
   actions: readonly UpdateCalloutActionDescriptor[],
-  handlers: { changelog: () => void; install: () => void; retry: () => void },
+  handlers: Record<UpdateCalloutActionDescriptor["role"], () => void>,
 ): SidebarCalloutAction[] {
   return actions.map((action) => ({
     label: action.label,
@@ -50,6 +58,14 @@ export function UpdateCalloutSource() {
     isInstalling,
   } = useDesktopAppUpdater();
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const autoInstallWhenIdle = useAppSettings().settings.autoInstallUpdatesWhenIdle;
+  // Per-version choice from the callout; overrides the setting for that version only.
+  const [idleChoice, setIdleChoice] = useState<{ version: string; wait: boolean } | null>(null);
+  const latestVersion = availableUpdate?.latestVersion ?? "";
+  const waitingForIdle =
+    status === "available" &&
+    !isInstalling &&
+    (idleChoice?.version === latestVersion ? idleChoice.wait : autoInstallWhenIdle);
 
   const install = useStableEvent(() => {
     void installUpdate();
@@ -57,6 +73,14 @@ export function UpdateCalloutSource() {
   const retry = useStableEvent(() => {
     void checkForUpdates();
   });
+  const installWhenIdle = useStableEvent(() => {
+    setIdleChoice({ version: latestVersion, wait: true });
+  });
+  const cancelWaiting = useStableEvent(() => {
+    setIdleChoice({ version: latestVersion, wait: false });
+  });
+  const localHostActivity = useLocalHostActivity();
+  useInstallWhenIdle({ activity: localHostActivity, enabled: waitingForIdle, onIdle: install });
   useEffect(() => {
     if (!isDesktopApp) return;
 
@@ -80,6 +104,8 @@ export function UpdateCalloutSource() {
       isInstalling,
       availableUpdate,
       errorMessage,
+      waitingForIdle,
+      localHostBusy: localHostActivity === "busy",
     });
     if (!descriptor) return;
 
@@ -96,19 +122,26 @@ export function UpdateCalloutSource() {
       actions: materializeActions(descriptor.actions, {
         changelog: openChangelog,
         install,
+        installWhenIdle,
         retry,
       }),
+      // Dismissing a waiting update also stops the wait.
+      onDismiss: waitingForIdle ? cancelWaiting : undefined,
       testID: descriptor.testID,
     });
   }, [
     availableUpdate,
     callouts,
+    cancelWaiting,
     errorMessage,
     install,
+    installWhenIdle,
     isDesktopApp,
     isInstalling,
+    localHostActivity,
     retry,
     status,
+    waitingForIdle,
     theme.colors.foregroundMuted,
     theme.iconSize.sm,
     t,
@@ -119,9 +152,11 @@ export function UpdateCalloutSource() {
 
 function UpdateAvailableDescription({
   versionLabel,
+  waiting,
   t,
 }: {
   versionLabel?: string;
+  waiting: boolean;
   t: ReturnType<typeof useTranslation>["t"];
 }) {
   return (
@@ -131,6 +166,11 @@ function UpdateAvailableDescription({
           ? t("desktop.updates.callout.versionReady", { version: versionLabel })
           : t("desktop.updates.callout.newVersionReady")}
       </SidebarCalloutDescriptionText>
+      {waiting ? (
+        <SidebarCalloutDescriptionText>
+          {t("desktop.updates.callout.waitingDescription")}
+        </SidebarCalloutDescriptionText>
+      ) : null}
       <SidebarCalloutDescriptionText>
         {t("desktop.updates.callout.restartWarning")}
       </SidebarCalloutDescriptionText>
