@@ -31,6 +31,7 @@ temporary by design: every patch is meant to go upstream and then drop out of `f
 - FSH-only (upstreamable): plugin timeline items and button popovers get `navigation` (`openAgent`, `openWorkspace`, `openBrowser`), like screens and panels, so a plugin card in the chat can open the agent it just created
 
 - FSH-only (upstreamable): agents whose turn a daemon restart or crash cut short are marked interrupted; the sidebar then offers **Resume all**, which sends each a "continue where you left off" prompt
+- FSH-only (upstreamable): workspace scripts work when the daemon's shell is fish, nu or PowerShell. paseo.json commands are POSIX `sh`; for those shells Paseo runs them through `/bin/sh` instead of typing them into the shell
 
 - FSH-only (upstreamable): `paseo.json` service commands run through `bash -c '…'`, so workspace scripts start when the login shell is fish (the daemon types commands into `$SHELL`, and they use bash syntax)
 
