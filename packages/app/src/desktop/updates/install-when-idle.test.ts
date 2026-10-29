@@ -20,6 +20,15 @@ describe("summarizeLocalHostActivity", () => {
     expect(summarizeLocalHostActivity(session(["attention", "needs_input"]))).toBe("busy");
   });
 
+  it("is busy while a workspace runs its setup script", () => {
+    expect(
+      summarizeLocalHostActivity({
+        hasHydratedWorkspaces: true,
+        workspaces: new Map([["ws", { status: "done" as const, setupStatus: "running" }]]),
+      }),
+    ).toBe("busy");
+  });
+
   it("is idle when every workspace is done, failed or waiting for review", () => {
     expect(summarizeLocalHostActivity(session([]))).toBe("idle");
     expect(summarizeLocalHostActivity(session(["done", "failed", "attention"]))).toBe("idle");

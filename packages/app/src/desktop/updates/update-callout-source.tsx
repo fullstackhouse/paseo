@@ -13,7 +13,7 @@ import {
   type UpdateCalloutBody,
 } from "@/desktop/updates/resolve-update-callout";
 import { useDesktopAppUpdater } from "@/desktop/updates/use-desktop-app-updater";
-import { useInstallWhenIdle } from "@/desktop/updates/use-install-when-idle";
+import { useInstallWhenIdle, useLocalHostActivity } from "@/desktop/updates/use-install-when-idle";
 import { useAppSettings } from "@/hooks/use-settings";
 import { useStableEvent } from "@/hooks/use-stable-event";
 import { openChangelog } from "@/changelog";
@@ -79,7 +79,8 @@ export function UpdateCalloutSource() {
   const cancelWaiting = useStableEvent(() => {
     setIdleChoice({ version: latestVersion, wait: false });
   });
-  useInstallWhenIdle({ enabled: waitingForIdle, onIdle: install });
+  const localHostActivity = useLocalHostActivity();
+  useInstallWhenIdle({ activity: localHostActivity, enabled: waitingForIdle, onIdle: install });
   useEffect(() => {
     if (!isDesktopApp) return;
 
@@ -104,6 +105,7 @@ export function UpdateCalloutSource() {
       availableUpdate,
       errorMessage,
       waitingForIdle,
+      localHostBusy: localHostActivity === "busy",
     });
     if (!descriptor) return;
 
@@ -136,6 +138,7 @@ export function UpdateCalloutSource() {
     installWhenIdle,
     isDesktopApp,
     isInstalling,
+    localHostActivity,
     retry,
     status,
     waitingForIdle,

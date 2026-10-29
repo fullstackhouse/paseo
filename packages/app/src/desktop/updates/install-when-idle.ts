@@ -8,21 +8,25 @@ export const IDLE_INSTALL_QUIET_MS = 2 * 60 * 1000;
 export type LocalHostActivity = "busy" | "idle" | "unknown";
 
 // `running` covers background shells and Monitor watches too. `needs_input` is a turn waiting
-// on a permission prompt; restarting would drop it.
+// on a permission prompt; restarting would drop it. A workspace still running its setup
+// script is busy as well.
 const BUSY_BUCKETS: ReadonlySet<WorkspaceStateBucket> = new Set(["running", "needs_input"]);
 
 export function summarizeLocalHostActivity(
   session:
     | {
         hasHydratedWorkspaces: boolean;
-        workspaces: ReadonlyMap<string, { status: WorkspaceStateBucket }>;
+        workspaces: ReadonlyMap<
+          string,
+          { status: WorkspaceStateBucket; setupStatus?: string | null }
+        >;
       }
     | null
     | undefined,
 ): LocalHostActivity {
   if (!session?.hasHydratedWorkspaces) return "unknown";
   for (const workspace of session.workspaces.values()) {
-    if (BUSY_BUCKETS.has(workspace.status)) return "busy";
+    if (BUSY_BUCKETS.has(workspace.status) || workspace.setupStatus === "running") return "busy";
   }
   return "idle";
 }

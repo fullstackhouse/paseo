@@ -27,7 +27,7 @@ describe("resolveUpdateCalloutDescriptor", () => {
     }
   });
 
-  it("builds an update-available descriptor with install-when-idle + install actions", () => {
+  it("builds an update-available descriptor with changelog + install actions", () => {
     const descriptor = resolveUpdateCalloutDescriptor(input());
 
     expect(descriptor).not.toBeNull();
@@ -39,10 +39,19 @@ describe("resolveUpdateCalloutDescriptor", () => {
     expect(descriptor?.showGiftIcon).toBe(true);
     expect(descriptor?.body).toEqual({ kind: "available", versionLabel: "v1.2.3" });
     expect(descriptor?.actions).toEqual([
-      { role: "installWhenIdle", label: "Install when idle" },
+      { role: "changelog", label: "What's new" },
       { role: "install", label: "Install & restart", variant: "primary", disabled: false },
     ]);
     expect(descriptor?.dismissalKey).toBe("desktop-update:available:1.2.3");
+  });
+
+  it("offers install-when-idle in place of the changelog while local agents work", () => {
+    const descriptor = resolveUpdateCalloutDescriptor(input({ localHostBusy: true }));
+
+    expect(descriptor?.actions).toEqual([
+      { role: "installWhenIdle", label: "Install when idle" },
+      { role: "install", label: "Install & restart", variant: "primary", disabled: false },
+    ]);
   });
 
   it("builds a waiting descriptor with changelog + install-now actions", () => {
@@ -134,7 +143,7 @@ describe("resolveUpdateCalloutDescriptor", () => {
 
       expect(descriptor?.title).toBe("有可用更新");
       expect(descriptor?.actions).toEqual([
-        { role: "installWhenIdle", label: "空闲时安装" },
+        { role: "changelog", label: "更新内容" },
         { role: "install", label: "安装并重启", variant: "primary", disabled: false },
       ]);
     } finally {
