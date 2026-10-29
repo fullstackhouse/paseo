@@ -33,7 +33,7 @@ export interface PluginHostProps {
   };
 }
 
-interface PluginNavigableHostProps extends PluginHostProps {
+export interface PluginNavigableHostProps extends PluginHostProps {
   /** Client-owned navigation. Undefined on older hosts; hide dependent affordances when absent. */
   readonly navigation?: {
     /** Present only on Electron. The browser runs locally; serverId selects workspace ownership. */
@@ -290,7 +290,7 @@ export type PluginTimelineTransformerContribution<
     }
   : never;
 
-export interface PluginTimelineItemProps<Data = unknown> extends PluginHostProps {
+export interface PluginTimelineItemProps<Data = unknown> extends PluginNavigableHostProps {
   agentId: string;
   item: {
     type: "plugin";

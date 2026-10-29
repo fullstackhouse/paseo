@@ -17,6 +17,13 @@ vi.mock("@/constants/layout", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/constants/layout")>()),
   useIsCompactFormFactor: () => false,
 }));
+const openAgent = vi.hoisted(() => vi.fn());
+vi.mock("../host-navigation", () => ({
+  usePluginHostNavigation: (serverId: string) => ({
+    openAgent: (input: { agentId: string }) => openAgent({ serverId, ...input }),
+    openWorkspace: () => undefined,
+  }),
+}));
 vi.mock("../navigation", () => ({
   createPluginNavigation: () => ({}),
 }));
@@ -88,6 +95,24 @@ const recoveringBundle = `(function(require) {
   } };
 })`;
 
+const navigatingBundle = `(function(require) {
+  const React = require("react");
+  return { default: function(plugin) {
+    function Card(props) {
+      return React.createElement("button", {
+        onClick: function() { props.navigation.openAgent({ agentId: "side-chat" }); },
+      }, "Open");
+    }
+    plugin.addTimelineRenderer({
+      kind: "test-report",
+      version: 1,
+      schema: { safeParse(value) { return { success: true, data: value }; } },
+      Component: Card,
+    });
+    return function() {};
+  } };
+})`;
+
 const timelineItem = {
   kind: "plugin" as const,
   id: "item-1",
@@ -139,6 +164,32 @@ describe("PluginTimelineItemView", () => {
       ),
     );
     expect(container.textContent).toContain("Four tests passed");
+  });
+
+  it("lets the renderer open an agent on its host", async () => {
+    pluginRegistry.installCatalog(
+      "host-1",
+      [
+        {
+          id: "reports",
+          requirements: { paseo: `>=${appPackage.version}` },
+          clientBundle: navigatingBundle,
+        },
+      ],
+      { client: daemonClient, audio },
+    );
+    const container = document.createElement("div");
+    containers.push(container);
+    const root = createRoot(container);
+    roots.push(root);
+    await act(async () =>
+      root.render(
+        <PluginTimelineItemView serverId="host-1" agentId="agent-1" item={timelineItem} />,
+      ),
+    );
+
+    act(() => container.querySelector("button")!.click());
+    expect(openAgent).toHaveBeenCalledWith({ serverId: "host-1", agentId: "side-chat" });
   });
 
   it("contains renderer crashes to one timeline item", async () => {

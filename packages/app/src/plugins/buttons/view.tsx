@@ -37,6 +37,7 @@ import { useToast } from "@/contexts/toast-context";
 import { useHostRuntimeClient, useHosts } from "@/runtime/host-runtime";
 import type { Theme } from "@/styles/theme";
 import { createPluginClientStateSource } from "../client-state/source";
+import { usePluginHostNavigation } from "../host-navigation";
 import { pluginIconComponent } from "../icons";
 import {
   PluginEnvironmentProvider,
@@ -165,11 +166,12 @@ function ButtonBody({
 }) {
   const menu = useMenuContext("PluginButton");
   const close = useCallback(() => menu.setOpen(false), [menu]);
+  const navigation = usePluginHostNavigation(view.entry.installation.serverId);
   if (behavior.kind === "popover") {
     const Content = behavior.Content;
     return (
       <PluginPopoverContent>
-        <Content {...view.props} close={close} />
+        <Content {...view.props} navigation={navigation} close={close} />
       </PluginPopoverContent>
     );
   }
