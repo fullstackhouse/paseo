@@ -3,6 +3,7 @@ import {
   ChunkedTransportProtocolError,
 } from "@getpaseo/protocol/chunked-transport";
 import { type WorkspaceRuntimeStore } from "./workspace-runtime-store/index.js";
+import { createDaemonUpgradeListener } from "./upgrade-routing.js";
 import {
   createAgentMessageDelivery,
   type AgentMessageDelivery,
@@ -879,8 +880,7 @@ export class VoiceAssistantWebSocketServer {
   ): WebSocketServer {
     const password = auth?.password;
     const wss = new WebSocketServer({
-      server,
-      path: "/ws",
+      noServer: true,
       maxPayload: MAX_WEBSOCKET_MESSAGE_BYTES,
       handleProtocols: (protocols) => selectWebSocketProtocol(protocols, password),
       verifyClient: ({ req }, callback) => {
@@ -895,6 +895,9 @@ export class VoiceAssistantWebSocketServer {
     wss.on("connection", (ws, request) => {
       void this.attachAuthenticatedSocket(ws, request, password);
     });
+    const upgradeListener = createDaemonUpgradeListener({ wss, path: "/ws" });
+    server.on("upgrade", upgradeListener);
+    wss.on("close", () => server.off("upgrade", upgradeListener));
     return wss;
   }
 

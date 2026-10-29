@@ -5,6 +5,7 @@ import net from "node:net";
 import express from "express";
 import { describe, expect, it } from "vitest";
 import pino from "pino";
+import { WebSocketServer } from "ws";
 import {
   buildLocalServiceHostname,
   buildPublicServiceHostname,
@@ -14,6 +15,7 @@ import {
   ServiceProxyRouteCollisionError,
   ServiceProxyRouteRegistry,
 } from "./service-proxy.js";
+import { createDaemonUpgradeListener } from "./upgrade-routing.js";
 
 const logger = pino({ level: "silent" });
 
@@ -412,11 +414,12 @@ function upgradeThroughProxy(
   port: number,
   host: string,
   extraHeaders: Record<string, string> = {},
+  requestPath = "/ws",
 ): Promise<Record<string, string | undefined>> {
   return new Promise((resolve, reject) => {
     const socket = net.connect({ host: "127.0.0.1", port }, () => {
       const lines = [
-        "GET /ws HTTP/1.1",
+        `GET ${requestPath} HTTP/1.1`,
         `Host: ${host}`,
         "Upgrade: websocket",
         "Connection: Upgrade",
@@ -650,4 +653,69 @@ describe("service proxy forwarded headers", () => {
       await fixture.close();
     }
   });
+
+  it("forwards service upgrades on any path while the daemon serves its own /ws", async () => {
+    const fixture = await startForwardedHeadersFixture();
+    const wss = new WebSocketServer({ noServer: true });
+    const daemonPort = await findFreePort();
+    const daemon = http.createServer();
+    const daemonSockets = new Set<net.Socket>();
+    daemon.on("connection", (socket) => daemonSockets.add(socket));
+    const serviceProxy = createServiceProxySubsystem({ logger });
+    const route = serviceProxy.registerWorkspaceService({
+      workspaceId: "workspace-b",
+      projectSlug: "repo",
+      branchName: "feature",
+      scriptName: "app",
+      port: fixture.upstreamPort,
+    });
+    daemon.on("upgrade", serviceProxy.upgradeHandler({ passthroughUnknown: true }));
+    daemon.on("upgrade", createDaemonUpgradeListener({ wss, path: "/ws" }));
+    await new Promise<void>((resolve) => daemon.listen(daemonPort, "127.0.0.1", resolve));
+    try {
+      // Metro's dev-server socket: a service path that isn't /ws.
+      const proxied = await upgradeThroughProxy(
+        daemonPort,
+        `${route.hostname}:${daemonPort}`,
+        {},
+        "/message",
+      );
+      expect(proxied["x-forwarded-host"]).toBe(`${route.hostname}:${daemonPort}`);
+
+      expect(await rawUpgradeStatus(daemonPort, `localhost:${daemonPort}`, "/other")).toBe(400);
+      expect(await rawUpgradeStatus(daemonPort, `localhost:${daemonPort}`, "/ws")).toBe(101);
+    } finally {
+      // Upgraded sockets outlive closeAllConnections(); end them or close() hangs.
+      for (const socket of daemonSockets) socket.destroy();
+      wss.close();
+      await new Promise<void>((resolve) => daemon.close(() => resolve()));
+      await fixture.close();
+    }
+  });
 });
+
+function rawUpgradeStatus(port: number, host: string, requestPath: string): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const socket = net.connect({ host: "127.0.0.1", port }, () => {
+      socket.write(
+        [
+          `GET ${requestPath} HTTP/1.1`,
+          `Host: ${host}`,
+          "Upgrade: websocket",
+          "Connection: Upgrade",
+          "Sec-WebSocket-Version: 13",
+          "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==",
+          "",
+          "",
+        ].join("\r\n"),
+      );
+    });
+    socket.once("data", (chunk: Buffer) => {
+      socket.destroy();
+      const status = /^HTTP\/1\.1 (\d{3})/.exec(chunk.toString());
+      if (status) resolve(Number(status[1]));
+      else reject(new Error(`No HTTP status in ${JSON.stringify(chunk.toString())}`));
+    });
+    socket.on("error", reject);
+  });
+}

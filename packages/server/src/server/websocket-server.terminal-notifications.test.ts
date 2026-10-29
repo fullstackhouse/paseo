@@ -138,7 +138,7 @@ function createServer(terminalManager: TerminalManager, workspaceRegistry?: Work
   };
 
   const server = new VoiceAssistantWebSocketServer(
-    createStub<HTTPServer>({}),
+    createStub<HTTPServer>({ on: () => undefined }),
     createStub<pino.Logger>(createLogger()),
     "srv-test",
     createStub<AgentManager>(agentManager),

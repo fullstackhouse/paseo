@@ -107,7 +107,7 @@ function createServer(agentManagerOverrides?: Record<string, unknown>) {
   };
 
   const server = new VoiceAssistantWebSocketServer(
-    createStub<HTTPServer>({}),
+    createStub<HTTPServer>({ on: () => undefined }),
     createStub<pino.Logger>(createLogger()),
     "srv-test",
     createStub<AgentManager>(agentManager),
