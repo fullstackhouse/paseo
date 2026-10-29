@@ -1448,6 +1448,16 @@ export const ru: TranslationResources = {
         "Введите команду или оставьте поле пустым, чтобы открыть терминал без запуска команды",
     },
   },
+  pluginUpdates: {
+    callout: {
+      title: "Доступны обновления плагинов",
+      description: "Можно обновить: {{plugins}}.",
+      descriptionOnHost: "Можно обновить на {{host}}: {{plugins}}.",
+      update: "Обновить",
+      updating: "Обновление...",
+      failedTitle: "Не удалось обновить плагин",
+    },
+  },
   desktop: {
     windowControls: {
       minimize: "Свернуть окно",

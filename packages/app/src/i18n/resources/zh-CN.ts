@@ -1418,6 +1418,16 @@ export const zhCN: TranslationResources = {
       commandPlaceholder: "Run a command, or leave empty for a blank terminal",
     },
   },
+  pluginUpdates: {
+    callout: {
+      title: "插件有可用更新",
+      description: "{{plugins}} 可以更新。",
+      descriptionOnHost: "{{host}} 上的 {{plugins}} 可以更新。",
+      update: "更新",
+      updating: "正在更新...",
+      failedTitle: "插件更新失败",
+    },
+  },
   desktop: {
     windowControls: {
       minimize: "最小化窗口",

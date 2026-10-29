@@ -26,6 +26,7 @@ temporary by design: every patch is meant to go upstream and then drop out of `f
 - FSH-only (upstreamable): workspace diffs show unpushed and behind counts (`↑1 ↓327`) in the composer pill and the Changes header, opening a sync card (upstream, uncommitted files, unpushed commits, commits to pull, next step); a branch both ahead and behind its remote offers Pull and push as the primary action
 - FSH-only (upstreamable): WebSocket upgrades through the service proxy reach the workspace service instead of getting a 400 from the daemon's own `/ws` server, so worktree web apps opened by proxy URL stop reload-looping
 - FSH-only (not upstream yet): `app-main` worktree service runs the branch's web app against your main daemon, to review UI changes with real workspaces and no restart
+- FSH-only (upstreamable): a sidebar callout offers plugin updates per host and applies them in place, using the daemon's reviewed update preview/apply. Directory-installed plugins never show up there
 
 Keep this list in sync with what's merged into `fsh`.
 
