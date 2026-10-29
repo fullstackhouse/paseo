@@ -927,6 +927,20 @@ export const zhCN: TranslationResources = {
           unpushedCommits: "{{count}} 个未 push 的 commit",
         },
       },
+      sync: {
+        uncommitted: "未提交的更改",
+        filesUncommitted_one: "{{count}} 个未提交的文件",
+        filesUncommitted_other: "{{count}} 个未提交的文件",
+        toPush: "{{number}} 个待推送",
+        toPull: "{{number}} 个待拉取",
+        moreCommits: "另外 {{number}} 个",
+        next: {
+          commit: "下一步：提交",
+          pullThenPush: "下一步：先拉取，再推送",
+          pull: "下一步：拉取",
+          push: "下一步：推送",
+        },
+      },
       diff: {
         openChangesTab: "打开“更改”标签页",
         openDiffTab: "打开 Diff 标签页",

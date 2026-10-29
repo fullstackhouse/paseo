@@ -935,6 +935,20 @@ export const ar: TranslationResources = {
           unpushedCommits: "التزامات{{count}}غير المدفوعة",
         },
       },
+      sync: {
+        uncommitted: "تغييرات غير مُودَعة",
+        filesUncommitted_one: "{{count}} ملف غير مُودَع",
+        filesUncommitted_other: "{{count}} ملفات غير مُودَعة",
+        toPush: "{{number}} للدفع",
+        toPull: "{{number}} للسحب",
+        moreCommits: "+{{number}} أخرى",
+        next: {
+          commit: "التالي: إيداع",
+          pullThenPush: "التالي: سحب ثم دفع",
+          pull: "التالي: سحب",
+          push: "التالي: دفع",
+        },
+      },
       diff: {
         openChangesTab: "فتح علامة تبويب التغييرات",
         openDiffTab: "فتح علامة تبويب الفرق",

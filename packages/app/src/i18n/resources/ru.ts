@@ -952,6 +952,20 @@ export const ru: TranslationResources = {
           unpushedCommits: "Неотправленных коммитов: {{count}}",
         },
       },
+      sync: {
+        uncommitted: "Незакоммиченные изменения",
+        filesUncommitted_one: "{{count}} незакоммиченный файл",
+        filesUncommitted_other: "Незакоммиченных файлов: {{count}}",
+        toPush: "К отправке: {{number}}",
+        toPull: "К получению: {{number}}",
+        moreCommits: "Ещё {{number}}",
+        next: {
+          commit: "Далее: коммит",
+          pullThenPush: "Далее: получить, затем отправить",
+          pull: "Далее: получить",
+          push: "Далее: отправить",
+        },
+      },
       diff: {
         openChangesTab: "Открыть вкладку «Изменения»",
         openDiffTab: "Открыть вкладку «Дифф»",

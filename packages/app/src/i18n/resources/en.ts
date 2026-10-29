@@ -943,6 +943,20 @@ export const en = {
           unpushedCommits: "{{count}} unpushed commits",
         },
       },
+      sync: {
+        uncommitted: "Uncommitted changes",
+        filesUncommitted_one: "{{count}} file uncommitted",
+        filesUncommitted_other: "{{count}} files uncommitted",
+        toPush: "{{number}} to push",
+        toPull: "{{number}} to pull",
+        moreCommits: "+{{number}} more",
+        next: {
+          commit: "Next: commit",
+          pullThenPush: "Next: pull, then push",
+          pull: "Next: pull",
+          push: "Next: push",
+        },
+      },
       diff: {
         openChangesTab: "Open Changes tab",
         openDiffTab: "Open Diff tab",
