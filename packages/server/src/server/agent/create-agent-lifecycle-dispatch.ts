@@ -79,7 +79,11 @@ export class CreateAgentLifecycleDispatch {
         placement.refName = target.branch;
         break;
       case "checkout-pr":
-        placement.githubPrNumber = target.prNumber;
+        placement.checkoutSource = {
+          kind: "change_request",
+          number: target.prNumber,
+          ...(target.projectPath ? { projectPath: target.projectPath } : {}),
+        };
         break;
     }
     const base = target.mode === "branch-off" ? target.base : undefined;
