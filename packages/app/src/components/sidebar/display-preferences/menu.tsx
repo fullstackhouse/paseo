@@ -10,6 +10,7 @@ import { useTranslation } from "react-i18next";
 import { View, type PressableStateCallbackType } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import {
+  Archive,
   Captions,
   Circle,
   CircleCheck,
@@ -67,6 +68,7 @@ const ThemedSettings2 = withUnistyles(Settings2);
 /** CI's mark: the subject of the checks row, and the shape the icon-only option leaves behind. */
 const ThemedCircleCheck = withUnistyles(CircleCheck);
 const ThemedCircle = withUnistyles(Circle);
+const ThemedArchive = withUnistyles(Archive);
 const ThemedPluginIconView = withUnistyles(PluginIconView);
 
 /** Fits the item's 16pt leading slot with a hair of room, matching the trailing check. */
@@ -593,9 +595,10 @@ function OptionList<Value extends string>({
 }
 
 /**
- * Two groups, split by the separator. Above it, what a row may say about a workspace — each one
- * independent. Below it, the one thing the slot to the right of the title holds, so picking the
- * one already showing empties the slot and gives the width back to the title.
+ * Three groups, split by separators. First, what a row may say about a workspace — each one
+ * independent. Second, the one thing the slot to the right of the title holds, so picking the
+ * one already showing empties the slot and gives the width back to the title. Last, the actions a
+ * hovered row offers beside its menu.
  *
  * CI is the one item above the separator with three answers rather than two, so it opens a page
  * instead of ticking, and it goes last: a row that navigates does not belong in the middle of a
@@ -634,7 +637,28 @@ function ShowPage({ preferences }: { preferences: Preferences }): ReactElement {
           testID={`sidebar-workspace-trailing-${choice}`}
         />
       ))}
+      <MenuSeparator />
+      <ArchiveButtonOption preferences={preferences} />
     </>
+  );
+}
+
+function ArchiveButtonOption({ preferences }: { preferences: Preferences }): ReactElement {
+  const { t } = useTranslation();
+  const leading = useMemo(
+    () => <ThemedArchive size={OPTION_ICON_SIZE} uniProps={mutedIconMapping} />,
+    [],
+  );
+  return (
+    <MenuItem
+      selected={preferences.archiveButton}
+      leading={leading}
+      closeOnSelect={false}
+      onSelect={preferences.toggleArchiveButton}
+      testID="sidebar-row-archive-button"
+    >
+      {t("sidebar.display.show.archiveButton")}
+    </MenuItem>
   );
 }
 

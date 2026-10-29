@@ -1643,6 +1643,29 @@ export async function resolveRepositoryDefaultBranch(
   return null;
 }
 
+// FSH: the exact ref a new workspace branches off when none was picked. The default branch's
+// own upstream wins, so a fork whose main tracks upstream/main branches from upstream/main
+// whatever remote it is called; then origin's copy, so unpushed local commits stay out; then
+// the local branch.
+export async function resolveDefaultBranchBaseRef(
+  repoRoot: string,
+  defaultBranch: string,
+  context?: CheckoutContext,
+): Promise<string> {
+  const localRef = `refs/heads/${defaultBranch}`;
+  if (await doesGitRefExist(repoRoot, localRef, context)) {
+    const upstream = await getUpstreamStatus(repoRoot, defaultBranch, context);
+    if (upstream && (await doesGitRefExist(repoRoot, upstream.ref, context))) {
+      return upstream.ref;
+    }
+  }
+  const originRef = `refs/remotes/origin/${branchNameFromRef(defaultBranch)}`;
+  if (await doesGitRefExist(repoRoot, originRef, context)) {
+    return originRef;
+  }
+  return defaultBranch;
+}
+
 async function resolveBaseRef(repoRoot: string, context?: CheckoutContext): Promise<string | null> {
   return resolveRepositoryDefaultBranch(repoRoot, context);
 }

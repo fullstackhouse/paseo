@@ -834,6 +834,14 @@ export const fr: TranslationResources = {
           pending_mr: "Création de la MR…",
           success_mr: "MR créée",
         },
+        createPrAndMerge: {
+          label: "Créer la PR et fusionner",
+          pending: "Envoi à l'agent…",
+          success: "Envoyé à l'agent",
+          sent: "L'agent doit créer et fusionner la PR",
+          label_mr: "Créer la MR et fusionner",
+          sent_mr: "L'agent doit créer et fusionner la MR",
+        },
         mergeBranch: {
           label: "Fusionner en local",
           pending: "Fusion…",
@@ -931,6 +939,7 @@ export const fr: TranslationResources = {
           failedPush: "Échec du push",
           failedPullAndPush: "Échec du pull et du push",
           failedCreatePr: "Impossible de créer la PR",
+          failedCreatePrAndMerge: "Impossible d'envoyer la demande à l'agent",
           failedMergePr: "Impossible de fusionner la PR",
           failedEnableAutoMerge: "Impossible d’activer la fusion automatique",
           failedDisableAutoMerge: "Impossible de désactiver la fusion automatique",
@@ -950,6 +959,20 @@ export const fr: TranslationResources = {
           deletedLines: "{{count}} lignes supprimées",
           unpushedCommit: "{{count}} commit non poussé",
           unpushedCommits: "{{count}} commits non poussés",
+        },
+      },
+      sync: {
+        uncommitted: "Modifications non validées",
+        filesUncommitted_one: "{{count}} fichier non validé",
+        filesUncommitted_other: "{{count}} fichiers non validés",
+        toPush: "{{number}} à pousser",
+        toPull: "{{number}} à tirer",
+        moreCommits: "+{{number}} de plus",
+        next: {
+          commit: "Étape suivante : valider",
+          pullThenPush: "Étape suivante : tirer, puis pousser",
+          pull: "Étape suivante : tirer",
+          push: "Étape suivante : pousser",
         },
       },
       diff: {
@@ -1231,6 +1254,7 @@ export const fr: TranslationResources = {
         labels: "Libellés",
         diff: "Statistiques du diff",
         timestamp: "Dernière activité",
+        archiveButton: "Bouton Archiver",
       },
       checks: {
         iconAndText: "Icône et texte",
@@ -2945,6 +2969,8 @@ export const fr: TranslationResources = {
     project: {
       noEditableTarget: "Ce projet n’est pas modifiable sur cet hôte.",
       backToProjects: "Retour aux projets",
+      removeHint:
+        "Retire ce projet de Paseo sur cet hôte. Les fichiers sur le disque ne sont pas modifiés.",
       edit: {
         title: "Modifier le projet",
         name: "Nom",

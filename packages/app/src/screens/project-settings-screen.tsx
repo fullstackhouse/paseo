@@ -3,9 +3,9 @@ import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import { Pressable, Text, View } from "react-native";
 import { useFocusEffect } from "expo-router/react-navigation";
-import { StyleSheet } from "react-native-unistyles";
+import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, MoreVertical, Pencil, Plus } from "lucide-react-native";
+import { ArrowLeft, MoreVertical, Pencil, Plus, Trash2 } from "lucide-react-native";
 import { ProjectIconView } from "@/components/project-icon-view";
 import type {
   PaseoConfigRaw,
@@ -31,9 +31,11 @@ import { SettingsTextAreaCard } from "@/components/settings-textarea";
 import { SettingsGroup } from "@/components/settings/headings/settings-group";
 import { SettingsSection } from "@/components/settings/headings/settings-section";
 import { settingsStyles } from "@/styles/settings";
+import type { Theme } from "@/styles/theme";
 import { useProjects } from "@/hooks/use-projects";
 import type { ProjectEditFormSnapshot } from "@/projects/edit-form";
 import { useProjectIcons } from "@/projects/icons";
+import { removeProjectFromHosts } from "@/projects/project-remove";
 import { createProjectIconTarget } from "@/projects/icon-target";
 import { useHostRuntimeClient, useHostRuntimeSnapshot } from "@/runtime/host-runtime";
 import { useHostFeature } from "@/runtime/host-features";
@@ -318,7 +320,97 @@ function ProjectSettingsBody({
         onBackToProjects,
         showBackToProjects,
       })}
+
+      <ProjectDangerZone selectedHost={selectedHost} client={client} onRemoved={onBackToProjects} />
     </View>
+  );
+}
+
+const ThemedTrash2 = withUnistyles(Trash2);
+const destructiveColorMapping = (theme: Theme) => ({ color: theme.colors.destructive });
+const removeProjectIcon = <ThemedTrash2 size={ICON_SIZE} uniProps={destructiveColorMapping} />;
+
+function ProjectDangerZone({
+  selectedHost,
+  client,
+  onRemoved,
+}: {
+  selectedHost: ProjectHostEntry;
+  client: DaemonClient;
+  onRemoved: () => void;
+}) {
+  const { t } = useTranslation();
+  const toast = useToast();
+  const supportsProjectRemove = useHostFeature(selectedHost.serverId, "projectRemove");
+  const [isRemoving, setIsRemoving] = useState(false);
+  const { serverId, projectId, projectName } = selectedHost;
+
+  const handleRemove = useCallback(() => {
+    if (isRemoving) return;
+    void (async () => {
+      const confirmed = await confirmDialog({
+        title: t("sidebar.project.confirmations.removeTitle"),
+        message: t("sidebar.project.confirmations.removeMessage", { projectName }),
+        confirmLabel: t("sidebar.project.confirmations.removeConfirm"),
+        cancelLabel: t("sidebar.project.confirmations.cancel"),
+        destructive: true,
+      });
+      if (!confirmed) return;
+      if (!supportsProjectRemove) {
+        toast.error(t("sidebar.project.toasts.updateHostToRemove"));
+        return;
+      }
+      setIsRemoving(true);
+      try {
+        const outcome = await removeProjectFromHosts({
+          targets: [{ serverId, projectId }],
+          getClient: () => client,
+        });
+        if (outcome.kind === "removed") {
+          onRemoved();
+          return;
+        }
+        toast.error(t("sidebar.project.toasts.removeFailed"));
+      } finally {
+        setIsRemoving(false);
+      }
+    })();
+  }, [
+    client,
+    isRemoving,
+    onRemoved,
+    projectId,
+    projectName,
+    serverId,
+    supportsProjectRemove,
+    t,
+    toast,
+  ]);
+
+  return (
+    <SettingsSection title={t("settings.host.daemon.dangerZone")} testID="project-danger-zone">
+      <View style={settingsStyles.card}>
+        <View style={settingsStyles.row}>
+          <View style={settingsStyles.rowContent}>
+            <Text style={settingsStyles.rowTitle}>{t("sidebar.project.actions.remove")}</Text>
+            <Text style={settingsStyles.rowHint}>{t("settings.project.removeHint")}</Text>
+          </View>
+          <Button
+            variant="outline"
+            size="sm"
+            leftIcon={removeProjectIcon}
+            textStyle={styles.destructiveText}
+            onPress={handleRemove}
+            disabled={isRemoving}
+            testID="project-remove-button"
+          >
+            {isRemoving
+              ? t("sidebar.project.actions.removing")
+              : t("settings.host.connections.removeAction")}
+          </Button>
+        </View>
+      </View>
+    </SettingsSection>
   );
 }
 
@@ -1160,6 +1252,9 @@ const styles = StyleSheet.create((theme) => ({
   },
   iconColor: {
     color: theme.colors.foregroundMuted,
+  },
+  destructiveText: {
+    color: theme.colors.destructive,
   },
   centered: {
     flex: 1,

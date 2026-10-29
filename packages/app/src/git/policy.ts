@@ -12,6 +12,7 @@ export type GitActionId =
   | "push"
   | "pull-and-push"
   | "pr"
+  | "create-pr-and-merge"
   | "merge-pr-squash"
   | "merge-pr-merge"
   | "merge-pr-rebase"
@@ -252,6 +253,21 @@ export function buildGitActions(input: BuildGitActionsInput): GitActions {
     allActions.set(model.id, model.build(input));
   }
 
+  allActions.set("create-pr-and-merge", {
+    id: "create-pr-and-merge",
+    label: i18n.t("workspace.git.actions.createPrAndMerge.label"),
+    pendingLabel: i18n.t("workspace.git.actions.createPrAndMerge.pending"),
+    successLabel: i18n.t("workspace.git.actions.createPrAndMerge.success"),
+    disabled: input.runtime["create-pr-and-merge"].disabled,
+    status: input.runtime["create-pr-and-merge"].status,
+    unavailableMessage: input.runtime["create-pr-and-merge"].disabled
+      ? undefined
+      : getCreatePrAndMergeUnavailableMessage(input),
+    icon: input.runtime["create-pr-and-merge"].icon,
+    startsGroup: false,
+    handler: input.runtime["create-pr-and-merge"].handler,
+  });
+
   allActions.set("merge-branch", {
     id: "merge-branch",
     label: i18n.t("workspace.git.actions.mergeBranch.label"),
@@ -332,7 +348,8 @@ function getPrimaryActionId(input: BuildGitActionsInput): GitActionId | null {
     return "commit";
   }
   if (canPull(input)) {
-    return "pull";
+    // A diverged branch would otherwise hide its unpushed commits behind a plain Pull.
+    return (input.aheadOfOrigin ?? 0) > 0 ? "pull-and-push" : "pull";
   }
   if (canPush(input)) {
     return "push";
@@ -382,6 +399,8 @@ function getFeatureActionIds(input: BuildGitActionsInput): GitActionId[] {
     "merge-from-base",
     "merge-branch",
     ...getPullRequestActionIds({ roles: ["status", "direct", "auto"], input }),
+    // Once a PR exists, its own merge and auto-merge actions take over.
+    ...(input.hasPullRequest ? [] : (["create-pr-and-merge"] as const)),
   ];
 }
 
@@ -676,6 +695,20 @@ function getCreatePrUnavailableMessage(input: BuildGitActionsInput): string | un
     });
   }
   if (input.aheadCount === 0) {
+    return i18n.t("workspace.git.actions.unavailable.createPrNoCommits");
+  }
+  return undefined;
+}
+
+function getCreatePrAndMergeUnavailableMessage(input: BuildGitActionsInput): string | undefined {
+  if (!input.githubFeaturesEnabled) {
+    return i18n.t("workspace.git.actions.unavailable.createPrNoForge", {
+      brand: input.forgeBrandLabel,
+      noun: input.forgeChangeRequestNoun,
+    });
+  }
+  // The agent commits local changes first, so they count as something to ship.
+  if (input.aheadCount === 0 && !input.hasUncommittedChanges) {
     return i18n.t("workspace.git.actions.unavailable.createPrNoCommits");
   }
   return undefined;

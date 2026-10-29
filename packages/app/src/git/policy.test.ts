@@ -142,6 +142,11 @@ function createInput(
         status: "idle",
         handler: () => undefined,
       },
+      "create-pr-and-merge": {
+        disabled: false,
+        status: "idle",
+        handler: () => undefined,
+      },
       "merge-branch": {
         disabled: false,
         status: "idle",
@@ -188,6 +193,36 @@ describe("git-actions-policy", () => {
     );
 
     expect(actions.primary).toMatchObject({ id: "pull", label: "Pull" });
+  });
+
+  it("prioritizes pull and push when the branch is ahead of and behind origin", () => {
+    const actions = buildGitActions(
+      createInput({
+        hasRemote: true,
+        aheadOfOrigin: 1,
+        behindOfOrigin: 327,
+      }),
+    );
+
+    expect(actions.primary).toMatchObject({ id: "pull-and-push", label: "Pull and push" });
+    expect(actionsWithoutPrimary(actions).map((action) => action.id)).toEqual([
+      "pull",
+      "push",
+      "archive-workspace",
+    ]);
+  });
+
+  it("keeps commit ahead of pull and push when a diverged branch has uncommitted changes", () => {
+    const actions = buildGitActions(
+      createInput({
+        hasRemote: true,
+        hasUncommittedChanges: true,
+        aheadOfOrigin: 1,
+        behindOfOrigin: 327,
+      }),
+    );
+
+    expect(actions.primary?.id).toBe("commit");
   });
 
   it("drops a promoted remote action from the remaining menu actions", () => {
@@ -1137,5 +1172,64 @@ describe("git-actions-policy", () => {
       "merge-pr-merge",
       "merge-pr-rebase",
     ]);
+  });
+
+  it("offers Create PR & Merge right after Create PR on a feature branch without a PR", () => {
+    const actions = buildGitActions(
+      createInput({ hasRemote: true, isOnBaseBranch: false, aheadCount: 2, aheadOfOrigin: 0 }),
+    );
+
+    const ids = actions.secondary.map((action) => action.id);
+    expect(ids.slice(ids.indexOf("pr"), ids.indexOf("pr") + 2)).toEqual([
+      "pr",
+      "create-pr-and-merge",
+    ]);
+    expect(actions.secondary.find((action) => action.id === "create-pr-and-merge")).toMatchObject({
+      label: "Create PR & Merge",
+      disabled: false,
+      unavailableMessage: undefined,
+    });
+  });
+
+  it("keeps Create PR & Merge available with only uncommitted changes, since the agent commits them", () => {
+    const actions = buildGitActions(
+      createInput({ hasRemote: true, isOnBaseBranch: false, hasUncommittedChanges: true }),
+    );
+
+    expect(
+      actions.secondary.find((action) => action.id === "create-pr-and-merge")?.unavailableMessage,
+    ).toBeUndefined();
+  });
+
+  it("explains why Create PR & Merge is unavailable", () => {
+    const find = (input: Parameters<typeof createInput>[0]) =>
+      buildGitActions(
+        createInput({ hasRemote: true, isOnBaseBranch: false, ...input }),
+      ).secondary.find((action) => action.id === "create-pr-and-merge")?.unavailableMessage;
+
+    expect(find({})).toBe(
+      "Create PR isn't available because this branch doesn't have any new commits yet",
+    );
+    expect(find({ aheadCount: 1, githubFeaturesEnabled: false })).toBe(
+      "Create PR isn't available right now because GitHub isn't connected",
+    );
+  });
+
+  it("hides Create PR & Merge once the branch has a PR or sits on the base branch", () => {
+    const withPr = buildGitActions(
+      createInput({
+        hasRemote: true,
+        isOnBaseBranch: false,
+        aheadCount: 2,
+        hasPullRequest: true,
+        pullRequestUrl: "https://example.com/pr/456",
+        pullRequestState: "open",
+      }),
+    );
+    const onBase = buildGitActions(createInput({ hasRemote: true, aheadCount: 2 }));
+
+    for (const actions of [withPr, onBase]) {
+      expect(actions.secondary.some((action) => action.id === "create-pr-and-merge")).toBe(false);
+    }
   });
 });

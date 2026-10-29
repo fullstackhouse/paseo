@@ -821,6 +821,14 @@ export const en = {
           pending_mr: "Creating MR...",
           success_mr: "MR Created",
         },
+        createPrAndMerge: {
+          label: "Create PR & Merge",
+          pending: "Sending to agent...",
+          success: "Sent to agent",
+          sent: "Asked the agent to create and merge the PR",
+          label_mr: "Create MR & Merge",
+          sent_mr: "Asked the agent to create and merge the MR",
+        },
         mergeBranch: {
           label: "Merge locally",
           pending: "Merging...",
@@ -913,6 +921,7 @@ export const en = {
           failedPush: "Failed to push",
           failedPullAndPush: "Failed to pull and push",
           failedCreatePr: "Failed to create PR",
+          failedCreatePrAndMerge: "Couldn't send the request to the agent",
           failedMergePr: "Failed to merge PR",
           failedEnableAutoMerge: "Failed to enable auto-merge",
           failedDisableAutoMerge: "Failed to disable auto-merge",
@@ -932,6 +941,20 @@ export const en = {
           deletedLines: "{{count}} deleted lines",
           unpushedCommit: "{{count}} unpushed commit",
           unpushedCommits: "{{count}} unpushed commits",
+        },
+      },
+      sync: {
+        uncommitted: "Uncommitted changes",
+        filesUncommitted_one: "{{count}} file uncommitted",
+        filesUncommitted_other: "{{count}} files uncommitted",
+        toPush: "{{number}} to push",
+        toPull: "{{number}} to pull",
+        moreCommits: "+{{number}} more",
+        next: {
+          commit: "Next: commit",
+          pullThenPush: "Next: pull, then push",
+          pull: "Next: pull",
+          push: "Next: push",
         },
       },
       diff: {
@@ -1210,6 +1233,7 @@ export const en = {
         labels: "Labels",
         diff: "Diff stats",
         timestamp: "Last activity",
+        archiveButton: "Archive button",
       },
       checks: {
         iconAndText: "Icon and text",
@@ -3006,6 +3030,7 @@ export const en = {
     project: {
       noEditableTarget: "This project isn't editable on this host.",
       backToProjects: "Back to projects",
+      removeHint: "Removes this project from Paseo on this host. Files on disk are not changed.",
       edit: {
         title: "Edit project",
         name: "Name",

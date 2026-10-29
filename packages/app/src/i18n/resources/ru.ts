@@ -833,6 +833,14 @@ export const ru: TranslationResources = {
           pending_mr: "Создание MR...",
           success_mr: "MR создан",
         },
+        createPrAndMerge: {
+          label: "Создать PR и слить",
+          pending: "Отправка агенту...",
+          success: "Отправлено агенту",
+          sent: "Агенту поручено создать и слить PR",
+          label_mr: "Создать MR и слить",
+          sent_mr: "Агенту поручено создать и слить MR",
+        },
         mergeBranch: {
           label: "Выполнить слияние локально",
           pending: "Слияние...",
@@ -922,6 +930,7 @@ export const ru: TranslationResources = {
           failedPush: "Не удалось отправить изменения",
           failedPullAndPush: "Не удалось получить и отправить изменения",
           failedCreatePr: "Не удалось создать PR.",
+          failedCreatePrAndMerge: "Не удалось отправить запрос агенту.",
           failedMergePr: "Не удалось выполнить слияние PR",
           failedEnableAutoMerge: "Не удалось включить автослияние",
           failedDisableAutoMerge: "Не удалось отключить автослияние",
@@ -941,6 +950,20 @@ export const ru: TranslationResources = {
           deletedLines: "Удалено строк: {{count}}",
           unpushedCommit: "Неотправленных коммитов: {{count}}",
           unpushedCommits: "Неотправленных коммитов: {{count}}",
+        },
+      },
+      sync: {
+        uncommitted: "Незакоммиченные изменения",
+        filesUncommitted_one: "{{count}} незакоммиченный файл",
+        filesUncommitted_other: "Незакоммиченных файлов: {{count}}",
+        toPush: "К отправке: {{number}}",
+        toPull: "К получению: {{number}}",
+        moreCommits: "Ещё {{number}}",
+        next: {
+          commit: "Далее: коммит",
+          pullThenPush: "Далее: получить, затем отправить",
+          pull: "Далее: получить",
+          push: "Далее: отправить",
         },
       },
       diff: {
@@ -1219,6 +1242,7 @@ export const ru: TranslationResources = {
         labels: "Метки",
         diff: "Статистика изменений",
         timestamp: "Последняя активность",
+        archiveButton: "Кнопка архивации",
       },
       checks: {
         iconAndText: "Значок и текст",
@@ -2930,6 +2954,7 @@ export const ru: TranslationResources = {
     project: {
       noEditableTarget: "Этот проект нельзя редактировать на этом хосте.",
       backToProjects: "Вернуться к проектам",
+      removeHint: "Удаляет этот проект из Paseo на этом хосте. Файлы на диске не изменяются.",
       edit: {
         title: "Изменить проект",
         name: "Название",
