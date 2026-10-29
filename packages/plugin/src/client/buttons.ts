@@ -1,7 +1,7 @@
 import type { PluginText } from "../text.js";
 import type { ComponentType } from "react";
 import type { PluginIconProps } from "../icons.js";
-import type { PluginHostProps, PluginIcon } from "./contracts.js";
+import type { PluginHostProps, PluginIcon, PluginNavigableHostProps } from "./contracts.js";
 
 export type PluginButtonContext =
   | { context: "workspace"; workspaceId: string }
@@ -9,7 +9,8 @@ export type PluginButtonContext =
 
 export type PluginButtonIconProps = PluginHostProps & PluginButtonContext & PluginIconProps;
 
-export type PluginButtonContentProps = PluginHostProps & PluginButtonContext & { close(): void };
+export type PluginButtonContentProps = PluginNavigableHostProps &
+  PluginButtonContext & { close(): void };
 
 export type PluginButtonIcon = PluginIcon<PluginButtonIconProps>;
 

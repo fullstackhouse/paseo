@@ -28,6 +28,7 @@ temporary by design: every patch is meant to go upstream and then drop out of `f
 - FSH-only (upstreamable): WebSocket upgrades through the service proxy reach the workspace service instead of getting a 400 from the daemon's own `/ws` server, so worktree web apps opened by proxy URL stop reload-looping
 - FSH-only (not upstream yet): `app-main` worktree service runs the branch's web app against your main daemon, to review UI changes with real workspaces and no restart
 - FSH-only (upstreamable): a sidebar callout offers plugin updates per host and applies them in place, using the daemon's reviewed update preview/apply. Directory-installed plugins never show up there
+- FSH-only (upstreamable): plugin timeline items and button popovers get `navigation` (`openAgent`, `openWorkspace`, `openBrowser`), like screens and panels, so a plugin card in the chat can open the agent it just created
 
 - FSH-only (upstreamable): agents whose turn a daemon restart or crash cut short are marked interrupted; the sidebar then offers **Resume all**, which sends each a "continue where you left off" prompt
 
