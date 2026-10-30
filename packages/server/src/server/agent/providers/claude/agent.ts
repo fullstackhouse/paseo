@@ -1157,7 +1157,10 @@ function getClaudeModeLabel(modeId: PermissionMode): string {
 
 function buildClaudePlanPermissionActions(
   resumeMode: PermissionMode | null,
+  autoModeAvailable: boolean,
 ): AgentPermissionAction[] {
+  const offersAuto =
+    resumeMode === "auto" || (resumeMode === "bypassPermissions" && autoModeAvailable);
   const actions: AgentPermissionAction[] = [
     {
       id: "reject",
@@ -1170,17 +1173,28 @@ function buildClaudePlanPermissionActions(
       id: "implement",
       label: "Implement",
       behavior: "allow",
-      variant: "primary",
+      variant: offersAuto ? "secondary" : "primary",
       intent: "implement",
     },
   ];
+
+  if (resumeMode === "bypassPermissions" && autoModeAvailable) {
+    actions.push({
+      id: "implement_auto",
+      label: `Implement with ${getClaudeModeLabel("auto")}`,
+      behavior: "allow",
+      variant: "primary",
+      // Old clients reject unknown intents, so this stays on an existing value.
+      intent: "implement",
+    });
+  }
 
   if (resumeMode === "bypassPermissions" || resumeMode === "auto") {
     actions.push({
       id: "implement_resume",
       label: `Implement with ${getClaudeModeLabel(resumeMode)}`,
       behavior: "allow",
-      variant: "secondary",
+      variant: resumeMode === "auto" ? "primary" : "secondary",
       intent: "implement_resume",
     });
   }
@@ -2902,7 +2916,12 @@ class ClaudeAgentSession implements AgentSession {
             "Ignoring unknown plan approval mode, falling back to acceptEdits",
           );
         }
-        const targetMode: PermissionMode = shouldResumePriorMode ? resumeMode : requestedMode;
+        let targetMode: PermissionMode = requestedMode;
+        if (selectedActionId === "implement_auto") {
+          targetMode = "auto";
+        } else if (shouldResumePriorMode) {
+          targetMode = resumeMode;
+        }
         await this.setMode(targetMode);
         this.pushToolCall(
           mapClaudeCompletedToolCall({
@@ -5157,7 +5176,13 @@ class ClaudeAgentSession implements AgentSession {
       suggestions: options.suggestions?.map((suggestion) => ({
         ...suggestion,
       })),
-      actions: kind === "plan" ? buildClaudePlanPermissionActions(this.planResumeMode) : undefined,
+      actions:
+        kind === "plan"
+          ? buildClaudePlanPermissionActions(
+              this.planResumeMode,
+              claudeAutoModeUnavailableOn(this.harnessEnvironment) === null,
+            )
+          : undefined,
       metadata: Object.keys(metadata).length ? metadata : undefined,
     };
 
