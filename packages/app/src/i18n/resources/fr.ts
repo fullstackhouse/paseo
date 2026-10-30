@@ -844,6 +844,7 @@ export const fr: TranslationResources = {
           success_mr: "MR créée",
           sent: "Demande envoyée à l'agent pour créer la PR",
           sent_mr: "Demande envoyée à l'agent pour créer la MR",
+          alreadySent: "Déjà envoyé à l'agent. Consultez son onglet",
         },
         createPrAndMerge: {
           label: "Créer la PR et fusionner",

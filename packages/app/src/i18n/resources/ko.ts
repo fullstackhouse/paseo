@@ -836,6 +836,7 @@ export const ko: TranslationResources = {
           success_mr: "MR 생성됨",
           sent: "에이전트에게 PR 생성을 요청했습니다",
           sent_mr: "에이전트에게 MR 생성을 요청했습니다",
+          alreadySent: "이미 에이전트에게 보냈습니다. 해당 탭을 확인하세요",
         },
         createPrAndMerge: {
           label: "PR 생성 후 병합",

@@ -843,6 +843,7 @@ export const ru: TranslationResources = {
           success_mr: "MR создан",
           sent: "Агенту отправлен запрос на создание PR",
           sent_mr: "Агенту отправлен запрос на создание MR",
+          alreadySent: "Уже отправлено агенту. Проверьте его вкладку",
         },
         createPrAndMerge: {
           label: "Создать PR и слить",

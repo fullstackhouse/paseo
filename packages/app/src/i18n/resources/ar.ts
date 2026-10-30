@@ -835,6 +835,7 @@ export const ar: TranslationResources = {
           success_mr: "تم إنشاء MR",
           sent: "طُلب من الوكيل إنشاء PR",
           sent_mr: "طُلب من الوكيل إنشاء MR",
+          alreadySent: "أُرسل بالفعل إلى الوكيل. تحقّق من علامة تبويبه",
         },
         createPrAndMerge: {
           label: "إنشاء PR ودمجه",

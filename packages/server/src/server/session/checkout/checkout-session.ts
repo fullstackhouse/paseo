@@ -54,6 +54,7 @@ import {
   listCheckoutCommits,
   getCommitFileDiff,
   getCheckoutDiffImage,
+  resolveCheckoutComparisonBaseRef,
 } from "../../../utils/checkout-git.js";
 import { runGitCommand } from "../../../utils/run-git-command.js";
 import { expandTilde } from "../../../utils/path.js";
@@ -79,6 +80,11 @@ export interface CheckoutSessionHost {
     cwd: string,
     branch: string,
   ): Promise<{ previousBranch: string | null; currentBranch: string | null }>;
+}
+
+// "refs/remotes/origin/main" -> "origin/main", the form an agent types into git.
+function shortRefName(ref: string): string {
+  return ref.replace(/^refs\/(heads|remotes)\//, "");
 }
 
 type CurrentWorkspacePullRequest = NonNullable<
@@ -1055,12 +1061,20 @@ export class CheckoutSession {
       if (!snapshot.git.baseRef) {
         throw new Error("Base branch is required to create a PR");
       }
-      const [template, overrides] = await Promise.all([
+      const baseBranch = branchNameFromRef(snapshot.git.baseRef);
+      const currentBranch = snapshot.git.currentBranch;
+      const [template, overrides, forge, comparisonBaseRef] = await Promise.all([
         findPullRequestTemplate(snapshot.git.repoRoot),
         readProjectMetadataOverrides({ cwd, workspaceGitService: this.workspaceGitService }),
+        this.resolveForgeService(cwd).catch(() => null),
+        currentBranch
+          ? resolveCheckoutComparisonBaseRef({ cwd, currentBranch }).catch(() => null)
+          : null,
       ]);
       const prompt = buildPrAgentPrompt({
-        baseBranch: branchNameFromRef(snapshot.git.baseRef),
+        forge: forge?.forge ?? null,
+        baseBranch,
+        diffBase: comparisonBaseRef ? shortRefName(comparisonBaseRef) : baseBranch,
         template,
         preferences: overrides?.pullRequest?.instructions ?? null,
         merge: msg.merge === true,

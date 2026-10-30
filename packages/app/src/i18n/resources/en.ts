@@ -831,6 +831,7 @@ export const en = {
           success_mr: "MR Created",
           sent: "Asked the agent to create the PR",
           sent_mr: "Asked the agent to create the MR",
+          alreadySent: "Already sent to the agent. Check its tab",
         },
         createPrAndMerge: {
           label: "Create PR & Merge",

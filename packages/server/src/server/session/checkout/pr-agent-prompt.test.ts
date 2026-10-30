@@ -7,7 +7,9 @@ import { buildPrAgentPrompt, findPullRequestTemplate } from "./pr-agent-prompt.j
 describe("buildPrAgentPrompt", () => {
   it("targets the base branch and leaves out optional sections", () => {
     const prompt = buildPrAgentPrompt({
+      forge: "github",
       baseBranch: "main",
+      diffBase: "main",
       template: null,
       preferences: null,
       merge: false,
@@ -15,7 +17,9 @@ describe("buildPrAgentPrompt", () => {
 
     expect(prompt).toContain("The user requested a PR.");
     expect(prompt).toContain("`git diff main...HEAD`");
-    expect(prompt).toContain("`gh pr create --base main`");
+    expect(prompt).toContain(
+      "`gh pr create --base main` to create a PR onto the target branch `main`.",
+    );
     expect(prompt).not.toContain("## PR Description Template");
     expect(prompt).not.toContain("<user-preferences>");
     expect(prompt).not.toContain("## Merge");
@@ -23,7 +27,9 @@ describe("buildPrAgentPrompt", () => {
 
   it("includes the repo template and the user's preferences", () => {
     const prompt = buildPrAgentPrompt({
+      forge: "github",
       baseBranch: "fsh",
+      diffBase: "origin/fsh",
       template: "## Summary\n\n## Test plan\n",
       preferences: "  Use conventional commit titles.  ",
       merge: false,
@@ -40,9 +46,72 @@ describe("buildPrAgentPrompt", () => {
     );
   });
 
+  it("diffs against the comparison ref but targets the branch name", () => {
+    const prompt = buildPrAgentPrompt({
+      forge: "github",
+      baseBranch: "main",
+      diffBase: "upstream/main",
+      template: null,
+      preferences: null,
+      merge: false,
+    });
+
+    expect(prompt).toContain("`git diff upstream/main...HEAD`");
+    expect(prompt).toContain("`git log upstream/main..HEAD`");
+    expect(prompt).toContain("`gh pr create --base main`");
+  });
+
+  it("uses the GitLab CLI and MR wording on GitLab", () => {
+    const prompt = buildPrAgentPrompt({
+      forge: "gitlab",
+      baseBranch: "main",
+      diffBase: "origin/main",
+      template: "## Summary",
+      preferences: null,
+      merge: true,
+    });
+
+    expect(prompt).toContain("The user requested an MR.");
+    expect(prompt).toContain("`glab mr create --target-branch main`");
+    expect(prompt).toContain("## MR Description Template");
+    expect(prompt).toContain("Merge the MR once it's green and mergeable.");
+    expect(prompt).not.toContain("gh pr create");
+  });
+
+  it("uses tea on Gitea-family forges", () => {
+    const prompt = buildPrAgentPrompt({
+      forge: "codeberg",
+      baseBranch: "main",
+      diffBase: "origin/main",
+      template: null,
+      preferences: null,
+      merge: false,
+    });
+
+    expect(prompt).toContain("`tea pulls create --base main`");
+  });
+
+  it("names no CLI without a known forge", () => {
+    const prompt = buildPrAgentPrompt({
+      forge: null,
+      baseBranch: "main",
+      diffBase: "main",
+      template: null,
+      preferences: null,
+      merge: false,
+    });
+
+    expect(prompt).toContain(
+      "Create a PR with the forge's CLI or web UI onto the target branch `main`.",
+    );
+    expect(prompt).not.toContain("gh pr create");
+  });
+
   it("treats blank preferences as none", () => {
     const prompt = buildPrAgentPrompt({
+      forge: "github",
       baseBranch: "main",
+      diffBase: "main",
       template: "   ",
       preferences: "\n  ",
       merge: false,
@@ -54,7 +123,9 @@ describe("buildPrAgentPrompt", () => {
 
   it("asks the agent to merge when requested", () => {
     const prompt = buildPrAgentPrompt({
+      forge: "github",
       baseBranch: "main",
+      diffBase: "main",
       template: null,
       preferences: null,
       merge: true,

@@ -11,6 +11,11 @@ import { useSessionStore, type WorkspaceDescriptor } from "@/stores/session-stor
 import { useWorkspaceLayoutStore } from "@/stores/workspace-layout-store";
 import { buildWorkspaceTabPersistenceKey } from "@/workspace-tabs/model";
 
+// The agent takes minutes to open the PR and the button stays enabled meanwhile, so a repeat
+// click within this window would queue the same request twice.
+const REPEAT_SEND_WINDOW_MS = 60_000;
+const lastSendAtByWorkspace: Record<string, number> = {};
+
 function findFocusedAgentId(serverId: string, workspaceId: string): string | null {
   const layoutKey = buildWorkspaceTabPersistenceKey({ serverId, workspaceId });
   const layout = layoutKey
@@ -63,6 +68,13 @@ export function useAgentPr(input: {
       toast.error(t("workspace.git.actions.toasts.updateHostForAgentPr"));
       return;
     }
+    const sendKey = `${serverId}:${workspaceId}`;
+    const lastSendAt = lastSendAtByWorkspace[sendKey];
+    if (lastSendAt !== undefined && Date.now() - lastSendAt < REPEAT_SEND_WINDOW_MS) {
+      toast.show(t("workspace.git.actions.createPr.alreadySent"));
+      return;
+    }
+    lastSendAtByWorkspace[sendKey] = Date.now();
     const client = session.client;
     const context = getForgePresentation(forge).changeRequestContext;
     const sentMessage = merge
@@ -80,6 +92,7 @@ export function useAgentPr(input: {
         focusedAgentId: findFocusedAgentId(serverId, workspaceId),
       });
       if (!agentId) {
+        delete lastSendAtByWorkspace[sendKey];
         openPromptDraft(serverId, workspaceId, payload.prompt);
         return;
       }
@@ -87,6 +100,7 @@ export function useAgentPr(input: {
       navigateToWorkspace({ serverId, workspaceId, target: { kind: "agent", agentId } });
       toast.show(sentMessage, { variant: "success" });
     })().catch((error: unknown) => {
+      delete lastSendAtByWorkspace[sendKey];
       toast.error(error instanceof Error ? error.message : failedMessage);
     });
   }, [cwd, forge, merge, serverId, t, toast, workspaceId]);

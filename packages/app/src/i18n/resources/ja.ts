@@ -839,6 +839,7 @@ export const ja: TranslationResources = {
           success_mr: "MRが作成されました",
           sent: "エージェントにPRの作成を依頼しました",
           sent_mr: "エージェントにMRの作成を依頼しました",
+          alreadySent: "すでにエージェントに送信済みです。そのタブを確認してください",
         },
         createPrAndMerge: {
           label: "PRを作成してマージ",

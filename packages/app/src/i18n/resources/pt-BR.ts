@@ -839,6 +839,7 @@ export const ptBR: TranslationResources = {
           success_mr: "MR criada",
           sent: "Pedimos ao agente para criar a PR",
           sent_mr: "Pedimos ao agente para criar a MR",
+          alreadySent: "Já enviado ao agente. Confira a aba dele",
         },
         createPrAndMerge: {
           label: "Criar PR e mesclar",

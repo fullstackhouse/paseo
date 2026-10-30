@@ -831,6 +831,7 @@ export const zhCN: TranslationResources = {
           success_mr: "MR 已创建",
           sent: "已请代理创建 PR",
           sent_mr: "已请代理创建 MR",
+          alreadySent: "已发送给代理，请查看其标签页",
         },
         createPrAndMerge: {
           label: "创建 PR 并合并",

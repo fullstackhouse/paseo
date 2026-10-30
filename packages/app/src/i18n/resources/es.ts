@@ -843,6 +843,7 @@ export const es: TranslationResources = {
           success_mr: "MR creado",
           sent: "Se pidió al agente que cree el PR",
           sent_mr: "Se pidió al agente que cree el MR",
+          alreadySent: "Ya se envió al agente. Revisa su pestaña",
         },
         createPrAndMerge: {
           label: "Crear PR y fusionar",
