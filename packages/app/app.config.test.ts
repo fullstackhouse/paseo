@@ -112,3 +112,20 @@ describe("hardware keyboard scene integration", () => {
     expect(configureHardwareKeyboardAppDelegate(configured)).toBe(configured);
   });
 });
+
+describe("iOS app config", () => {
+  it("explains photo capture and QR scanning while preserving voice permissions", async () => {
+    const { exp } = await getPrebuildConfigAsync(__dirname, { platforms: ["ios"] });
+    await compileModsAsync(exp, {
+      projectRoot: __dirname,
+      introspect: true,
+      platforms: ["ios"],
+      assertMissingModProviders: false,
+    });
+    const infoPlist = exp._internal.modResults.ios.infoPlist;
+
+    expect(infoPlist.NSCameraUsageDescription).toContain("photo attachments");
+    expect(infoPlist.NSCameraUsageDescription).toContain("pairing QR codes");
+    expect(infoPlist.NSMicrophoneUsageDescription).toContain("voice commands");
+  }, 30_000);
+});
