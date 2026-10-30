@@ -4,7 +4,6 @@ import os from "node:os";
 import path, { join } from "node:path";
 import type pino from "pino";
 import type { ForgeService } from "../services/forge-service.js";
-import { GitHubAuthenticationError } from "../services/github-service.js";
 import type {
   CheckoutSnapshotFacts,
   CheckoutStatusGit,
@@ -304,7 +303,7 @@ function buildDefaultTestServiceDeps() {
   };
 }
 
-function createService(options?: CreateServiceTestOptions) {
+function createService(options?: CreateServiceTestOptions, logger = createLogger()) {
   const deps = { ...buildDefaultTestServiceDeps(), ...options };
   deps.getCheckoutWorktreeState =
     options?.getCheckoutWorktreeState ??
@@ -319,7 +318,7 @@ function createService(options?: CreateServiceTestOptions) {
       };
     });
   return new WorkspaceGitServiceImpl({
-    logger: createLogger() as unknown as pino.Logger,
+    logger: logger as unknown as pino.Logger,
     paseoHome: "/tmp/paseo-test",
     deps,
   });
@@ -528,52 +527,60 @@ describe("WorkspaceGitServiceImpl", () => {
     service.dispose();
   });
 
-  test("getSnapshot keeps forge features enabled when the auth probe fails for non-auth reasons", async () => {
-    const forgeStub: ForgeService = {
-      ...createGitHubServiceStub(),
-      isAuthenticated: vi.fn(async () => {
-        throw new Error("gh timed out");
-      }),
-    };
-    const service = createService({
-      getCheckoutStatus: vi.fn(async (cwd: string) =>
-        createCheckoutStatus(cwd, { remoteUrl: "https://github.com/acme/repo.git" }),
-      ),
-      forgeOverrides: { github: forgeStub },
-    });
+  test("getSnapshot logs why the forge auth probe failed", async () => {
+    const probeError = new Error("gh timed out");
+    const logger = createLogger();
+    const service = createService(
+      {
+        getCheckoutStatus: vi.fn(async (cwd: string) =>
+          createCheckoutStatus(cwd, { remoteUrl: "https://github.com/acme/repo.git" }),
+        ),
+        forgeOverrides: {
+          github: {
+            ...createGitHubServiceStub(),
+            isAuthenticated: vi.fn(async () => {
+              throw probeError;
+            }),
+          },
+        },
+      },
+      logger,
+    );
 
     const snapshot = await service.getSnapshot(REPO_CWD);
 
-    expect(snapshot.forge).toMatchObject({
-      featuresEnabled: true,
-      authState: "error",
-      error: { message: "gh timed out" },
-    });
+    expect(snapshot.forge.authState).toBe("unauthenticated");
+    expect(logger.warn).toHaveBeenCalledWith(
+      { err: probeError, cwd: REPO_CWD, authState: "unauthenticated" },
+      "Forge auth probe failed",
+    );
 
     service.dispose();
   });
 
-  test("getSnapshot reports unauthenticated when the auth probe fails with an auth error", async () => {
-    const forgeStub: ForgeService = {
-      ...createGitHubServiceStub(),
-      isAuthenticated: vi.fn(async () => {
-        throw new GitHubAuthenticationError({ stderr: "no oauth token found for github.com" });
-      }),
-    };
-    const service = createService({
-      getCheckoutStatus: vi.fn(async (cwd: string) =>
-        createCheckoutStatus(cwd, { remoteUrl: "https://github.com/acme/repo.git" }),
-      ),
-      forgeOverrides: { github: forgeStub },
-    });
+  test("getSnapshot logs an auth failure from the PR status lookup", async () => {
+    const logger = createLogger();
+    const service = createService(
+      {
+        getCheckoutStatus: vi.fn(async (cwd: string) =>
+          createCheckoutStatus(cwd, { remoteUrl: "https://github.com/acme/repo.git" }),
+        ),
+        getPullRequestStatus: vi.fn(async () => ({
+          ...createPullRequestStatusResult(),
+          status: null,
+          authState: "unauthenticated" as const,
+          githubFeaturesEnabled: false,
+        })),
+      },
+      logger,
+    );
 
-    const snapshot = await service.getSnapshot(REPO_CWD);
+    await service.getSnapshot(REPO_CWD);
 
-    expect(snapshot.forge).toMatchObject({
-      featuresEnabled: false,
-      authState: "unauthenticated",
-      error: null,
-    });
+    expect(logger.warn).toHaveBeenCalledWith(
+      { cwd: REPO_CWD, authState: "unauthenticated" },
+      "Forge PR status lookup reported an auth failure",
+    );
 
     service.dispose();
   });

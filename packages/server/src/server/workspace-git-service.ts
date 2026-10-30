@@ -3807,13 +3807,8 @@ async function loadForgeSnapshot(options: {
       await forgeService.isAuthenticated({ cwd: options.cwd });
     } catch (error) {
       const authState = forgeAuthStateFromError(error);
-      if (authState !== "error") {
-        return buildForgeSnapshot(authState, null, null);
-      }
-      options.logger.warn({ err: error, cwd: options.cwd }, "Forge auth probe failed");
-      return buildForgeSnapshot(authState, null, {
-        message: error instanceof Error ? error.message : String(error),
-      });
+      options.logger.warn({ err: error, cwd: options.cwd, authState }, "Forge auth probe failed");
+      return buildForgeSnapshot(authState, null, null);
     }
   }
 
@@ -3827,6 +3822,12 @@ async function loadForgeSnapshot(options: {
       },
       { facts: options.facts, runGitCommand: options.runGitCommand },
     );
+    if (result.authState === "unauthenticated" || result.authState === "cli_missing") {
+      options.logger.warn(
+        { cwd: options.cwd, authState: result.authState },
+        "Forge PR status lookup reported an auth failure",
+      );
+    }
     return buildForgeSnapshot(result.authState, result.status, null);
   } catch (error) {
     // The auth probe succeeded, so a failure here is a command error, not an
@@ -3843,8 +3844,7 @@ function buildForgeSnapshot(
   error: WorkspaceGitRuntimeSnapshot["forge"]["error"],
 ): WorkspaceGitRuntimeSnapshot["forge"] {
   return {
-    // "error" is a failed check, not a missing login, so features stay available.
-    featuresEnabled: authState === "authenticated" || authState === "error",
+    featuresEnabled: authState === "authenticated",
     authState,
     pullRequest,
     error,

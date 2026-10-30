@@ -74,7 +74,7 @@ const origin = spawnSync("git", ["config", "--get", "remote.origin.url"], {
 
 if (origin === fixtureRemote) {
   const command = args.slice(0, 2).join(" ");
-  if (command === "auth status" || command === "auth token") process.exit(0);
+  if (command === "auth status") process.exit(0);
   if (command === "repo view") {
     process.stdout.write(JSON.stringify({ owner: { login: "paseo-e2e" }, name: "local-fixture", parent: null }));
     process.exit(0);

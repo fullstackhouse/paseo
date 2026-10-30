@@ -1251,15 +1251,11 @@ export class CheckoutSession {
     // authState is omitted rather than guessed.
     let featuresEnabled: boolean;
     let probeAuthState: ForgeAuthState | undefined;
-    let probeFailureMessage: string | undefined;
     try {
       featuresEnabled = await service.isAuthenticated({ cwd });
     } catch (error) {
       featuresEnabled = false;
       probeAuthState = forgeAuthStateFromError(error);
-      if (probeAuthState === "error") {
-        probeFailureMessage = error instanceof Error ? error.message : String(error);
-      }
     }
     if (!featuresEnabled) {
       this.host.emit({
@@ -1271,12 +1267,10 @@ export class CheckoutSession {
           truncated: false,
           error: {
             kind: "unknown",
-            message:
-              probeFailureMessage ??
-              `${getForgeDefinitionOrNeutral(forge).displayName} CLI is unavailable or not authenticated`,
+            message: `${getForgeDefinitionOrNeutral(forge).displayName} CLI is unavailable or not authenticated`,
           },
           requestId,
-          githubFeaturesEnabled: probeAuthState === "error",
+          githubFeaturesEnabled: false,
           ...(probeAuthState ? { authState: probeAuthState } : {}),
         },
       });

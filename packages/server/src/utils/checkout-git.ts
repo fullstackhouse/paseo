@@ -4430,17 +4430,14 @@ export function isForgeAuthError(error: unknown): boolean {
 
 /**
  * Map a forge CLI failure to an auth state. A missing-CLI error means the user
- * must install the tool and an authentication error means they must sign in.
- * Anything else (timeout, network) says nothing about their credentials.
+ * must install the tool; anything else surfaced as an auth probe failure means
+ * they must sign in.
  */
 export function forgeAuthStateFromError(error: unknown): ForgeAuthState {
   if (error instanceof ForgeCliMissingError) {
     return "cli_missing";
   }
-  if (error instanceof ForgeAuthenticationError) {
-    return "unauthenticated";
-  }
-  return "error";
+  return "unauthenticated";
 }
 
 export type PullRequestCheck = ForgePullRequestCheck;
