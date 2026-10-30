@@ -3058,6 +3058,9 @@ export const en = {
       noEditableTarget: "This project isn't editable on this host.",
       backToProjects: "Back to projects",
       removeHint: "Removes this project from Paseo on this host. Files on disk are not changed.",
+      sidebarTitle: "Sidebar",
+      categoryHint:
+        "Filter the sidebar by category to show only its projects. Saved on this device.",
       edit: {
         title: "Edit project",
         name: "Name",

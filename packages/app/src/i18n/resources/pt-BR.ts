@@ -2975,6 +2975,9 @@ export const ptBR: TranslationResources = {
       backToProjects: "Voltar para projetos",
       removeHint:
         "Remove este projeto do Paseo neste host. Os arquivos no disco não são alterados.",
+      sidebarTitle: "Barra lateral",
+      categoryHint:
+        "Filtre a barra lateral por categoria para ver só os projetos dela. Salvo neste dispositivo.",
       edit: {
         title: "Editar projeto",
         name: "Nome",

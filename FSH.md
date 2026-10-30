@@ -17,7 +17,7 @@ temporary by design: every patch is meant to go upstream and then drop out of `f
 - FSH-only (upstreamable): F-Droid builds link the app's own native modules (`packages/app/modules`); before, `paseo-scroll` was never linked and the build failed to compile
 - FSH-only (not upstream yet): the connected-hosts batching test holds the parent's batch with an injected scheduler instead of racing the 2-second quiet window against a cold CLI spawn
 - FSH-only (upstreamable): hovering a sidebar workspace row shows an Archive button beside its menu, so archiving takes one click. Off by default; turn it on under Show > Archive button in the sidebar's display menu. Desktop and web only; touch keeps the menu
-- FSH-only (not upstream yet): project categories. Put each project in a category from its menu, then pick a category in the Workspaces header so the sidebar shows only that category's projects. Categories are stored per device
+- FSH-only (not upstream yet): project categories. Put each project in a category from its menu or its settings page (Settings → Projects → project), then pick a category in the Workspaces header so the sidebar shows only that category's projects. Categories are stored per device
 - FSH-only (not upstream yet): docs and a `paseo-run` skill for running a branch, or testing a plugin, next to the Paseo you work in
 - FSH-only (not upstream yet): new workspaces branch off the repo's default branch, not whatever branch the source checkout is on. The daemon picks the ref: the default branch's upstream (any remote), then origin's copy, then local
 - FSH-only (not upstream yet): remove a project from its settings page (Settings → Projects → project → Danger zone), not just from the sidebar menu
