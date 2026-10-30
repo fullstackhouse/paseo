@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, View, type ViewStyle } from "react-native";
 import { Code, Maximize2, Workflow } from "lucide-react-native";
 import { useTranslation } from "react-i18next";
@@ -29,6 +29,8 @@ function MermaidFenceHostImpl({
     phase,
     colorScheme,
   });
+  const sourceRef = useRef<View>(null);
+  const nearViewport = useNearViewport(sourceRef);
   const [hasRuntimeContent, setHasRuntimeContent] = useState(false);
   const [showSource, setShowSource] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -86,7 +88,7 @@ function MermaidFenceHostImpl({
   return (
     <>
       {sourceVisible ? (
-        <View style={sourceContainerStyle}>
+        <View ref={sourceRef} style={sourceContainerStyle}>
           <HighlightedCodeBlock
             code={code}
             language="mermaid"
@@ -111,20 +113,22 @@ function MermaidFenceHostImpl({
           ) : null}
         </View>
       ) : null}
-      <ZoomableViewport
-        accessibilityLabel={t("message.diagram.diagram")}
-        actions={actions}
-        contentSize={diagramSize}
-        style={viewportStyle}
-        testID="mermaid-viewport"
-        wheelActivation="modifier"
-      >
-        <MermaidIframeRuntime
-          request={request}
-          onRendered={handleRendered}
-          onRenderFailed={renderFailed}
-        />
-      </ZoomableViewport>
+      {nearViewport ? (
+        <ZoomableViewport
+          accessibilityLabel={t("message.diagram.diagram")}
+          actions={actions}
+          contentSize={diagramSize}
+          style={viewportStyle}
+          testID="mermaid-viewport"
+          wheelActivation="modifier"
+        >
+          <MermaidIframeRuntime
+            request={request}
+            onRendered={handleRendered}
+            onRenderFailed={renderFailed}
+          />
+        </ZoomableViewport>
+      ) : null}
       {isFullscreen && visible ? (
         <MermaidFullscreenViewer
           source={visible.source}
@@ -134,6 +138,28 @@ function MermaidFenceHostImpl({
       ) : null}
     </>
   );
+}
+
+/**
+ * Each diagram loads its own Mermaid runtime, so a document with many diagrams loads
+ * only the ones the reader reaches. Stays true once seen, so scrolling back keeps the diagram.
+ */
+function useNearViewport(ref: React.RefObject<View | null>): boolean {
+  const [near, setNear] = useState(false);
+  useEffect(() => {
+    if (near) return;
+    const element = ref.current as unknown as Element | null;
+    if (!element) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) setNear(true);
+      },
+      { rootMargin: "100% 0px" },
+    );
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [near, ref]);
+  return near;
 }
 
 const MEASURING_SIZE = { width: 240, height: 240 };
