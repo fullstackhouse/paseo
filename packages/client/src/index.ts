@@ -203,6 +203,12 @@ export interface PaseoWorkspaceHandle {
     baseRef: string;
     requestId?: string;
   }): Promise<{ baseRef: string | null }>;
+  /**
+   * The prompt that asks an agent to open a pull request for this workspace's
+   * branch: base branch, the repo's PR template and the project's PR preferences.
+   * `merge` adds steps to get CI green and merge.
+   */
+  pullRequestPrompt(options?: { merge?: boolean }): Promise<string>;
   archive(requestId?: string): Promise<PaseoWorkspaceArchiveResult>;
   /**
    * Subscribes to already-emitted daemon workspace_update events for this id.
@@ -978,6 +984,23 @@ function createWorkspaceHandleFactory(
         }),
       setBaseBranch: (options) =>
         daemonClient.setWorkspaceBaseBranch({ ...options, workspaceId: id }),
+      pullRequestPrompt: async (options) => {
+        // COMPAT(checkoutPrAgentPrompt): added in FSH v0.13.0-beta.1, remove gate after 2027-04-30.
+        if (!daemonClient.getLastServerInfoMessage()?.features?.checkoutPrAgentPrompt) {
+          throw new Error("Update the host to create pull requests through an agent");
+        }
+        const snapshot = current ?? (await refresh());
+        if (!snapshot?.workspaceDirectory) {
+          throw new Error(`Workspace ${id} has no available directory`);
+        }
+        const payload = await daemonClient.checkoutPrAgentPrompt(snapshot.workspaceDirectory, {
+          merge: options?.merge,
+        });
+        if (payload.error || payload.prompt === null) {
+          throw new Error(payload.error?.message ?? "Pull request prompt unavailable");
+        }
+        return payload.prompt;
+      },
       archive: async (requestId) => {
         const result = await daemonClient.archiveWorkspace(id, requestId);
         if (current) {
