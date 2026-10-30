@@ -68,6 +68,10 @@ export async function archiveIfSafe(input: {
   if (typeof snapshot.git.aheadOfOrigin === "number" && snapshot.git.aheadOfOrigin > 0) {
     return;
   }
+  if (hasRunningAgent(options.agentManager, workspaceId)) {
+    log.info({ workspaceId, cwd }, "Skipping auto-archive after merge: an agent is running");
+    return;
+  }
 
   const ownership = await deps.isPaseoOwnedWorktreeCwd(cwd, {
     paseoHome: options.paseoHome,
@@ -122,4 +126,13 @@ export async function archiveIfSafe(input: {
   } catch (error) {
     log.warn({ err: error, cwd }, "Auto-archive after merge failed");
   }
+}
+
+function hasRunningAgent(
+  agentManager: Pick<AgentManager, "listAgents" | "hasInFlightRun">,
+  workspaceId: string,
+): boolean {
+  return agentManager
+    .listAgents({ includeInternal: true })
+    .some((agent) => agent.workspaceId === workspaceId && agentManager.hasInFlightRun(agent.id));
 }
