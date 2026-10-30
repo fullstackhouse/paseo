@@ -1,15 +1,5 @@
 import { normalizeWorkspaceOpaqueId } from "@/utils/workspace-identity";
 
-/**
- * What "Create PR & Merge" asks the workspace's agent to do. Plain language on
- * purpose: it has to work for any provider, with or without delivery skills.
- * The agent, not the app, decides when the PR is ready to merge.
- */
-export const DELIVERY_PROMPT =
-  "Deliver this branch: commit any uncommitted changes, push, and open a pull request against " +
-  "the base branch. Wait for CI. If checks fail or there are conflicts, fix them and push again. " +
-  "Merge the PR once it's green and mergeable. If you can't get it there, stop and tell me why.";
-
 export interface DeliveryAgentCandidate {
   id: string;
   workspaceId?: string;
