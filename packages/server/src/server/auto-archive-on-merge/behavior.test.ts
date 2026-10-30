@@ -202,6 +202,7 @@ async function createUnobservedWorkspace(archiveBarrier?: Promise<void>) {
     logger,
     paseoHome,
     daemonConfigStore: { get: () => ({ autoArchiveAfterMerge: true }) },
+    agentManager: { listAgents: () => [], hasInFlightRun: () => false },
     workspaceGitService: service,
     getAutoArchivedChangeRequestUrl: async () => null,
     listActiveWorkspaces: async () =>
