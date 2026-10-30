@@ -83,7 +83,9 @@ function createHarness(overrides?: {
   snapshot?: WorkspaceGitRuntimeSnapshot;
   isPaseoOwnedWorktreeCwd?: ArchiveIfSafeDependencies["isPaseoOwnedWorktreeCwd"];
   archiveByScope?: ArchiveIfSafeDependencies["archiveByScope"];
+  agents?: Array<{ id: string; workspaceId: string; running: boolean }>;
 }) {
+  const agents = overrides?.agents ?? [];
   const getSnapshot = vi.fn(async () =>
     createSnapshot(),
   ) as unknown as AutoArchiveArchiveOptions["workspaceGitService"]["getSnapshot"];
@@ -97,7 +99,11 @@ function createHarness(overrides?: {
     } as unknown as AutoArchiveArchiveOptions["daemonConfigStore"],
     workspaceGitService,
     github: {} as AutoArchiveArchiveOptions["github"],
-    agentManager: {} as AutoArchiveArchiveOptions["agentManager"],
+    agentManager: {
+      listAgents: () => agents,
+      hasInFlightRun: (agentId: string) =>
+        agents.some((agent) => agent.id === agentId && agent.running),
+    } as unknown as AutoArchiveArchiveOptions["agentManager"],
     agentStorage: {} as AutoArchiveArchiveOptions["agentStorage"],
     terminalManager: {} as AutoArchiveArchiveOptions["terminalManager"],
     findWorkspaceIdForCwd: vi.fn(async () => "ws-auto-archive"),
@@ -384,6 +390,29 @@ describe("archiveIfSafe", () => {
   test("archives when the PR is merged and the upstream branch was deleted", async () => {
     const harness = createHarness({
       snapshot: createSnapshot({ git: { aheadOfOrigin: null, behindOfOrigin: null } }),
+    });
+
+    await runArchiveIfSafe(harness);
+
+    expect(harness.deps.archiveByScope).toHaveBeenCalledTimes(1);
+  });
+
+  test("skips archiving while an agent in the workspace is running", async () => {
+    const harness = createHarness({
+      agents: [{ id: "agent-running", workspaceId: "ws-auto-archive", running: true }],
+    });
+
+    await runArchiveIfSafe(harness);
+
+    expect(harness.deps.archiveByScope).not.toHaveBeenCalled();
+  });
+
+  test("archives when only idle agents or agents in other workspaces exist", async () => {
+    const harness = createHarness({
+      agents: [
+        { id: "agent-idle", workspaceId: "ws-auto-archive", running: false },
+        { id: "agent-elsewhere", workspaceId: "ws-other", running: true },
+      ],
     });
 
     await runArchiveIfSafe(harness);
