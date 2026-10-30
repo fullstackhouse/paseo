@@ -317,7 +317,7 @@ function buildDefaultTestServiceDeps() {
 
 // Registering a workspace reads the checkout twice: once at start and once
 // when observation setup establishes watcher coverage.
-function createService(options?: CreateServiceTestOptions) {
+function createService(options?: CreateServiceTestOptions, logger = createLogger()) {
   const deps = { ...buildDefaultTestServiceDeps(), ...options };
   deps.getCheckoutWorktreeState =
     options?.getCheckoutWorktreeState ??
@@ -332,7 +332,7 @@ function createService(options?: CreateServiceTestOptions) {
       };
     });
   return new WorkspaceGitServiceImpl({
-    logger: createLogger() as unknown as pino.Logger,
+    logger: logger as unknown as pino.Logger,
     paseoHome: "/tmp/paseo-test",
     deps,
   });
@@ -750,6 +750,64 @@ describe("WorkspaceGitServiceImpl", () => {
 
     expect(gitlabIsAuthenticated).not.toHaveBeenCalled();
     expect(getPullRequestStatus).toHaveBeenCalledTimes(1);
+
+    service.dispose();
+  });
+
+  test("getSnapshot logs why the forge auth probe failed", async () => {
+    const probeError = new Error("gh timed out");
+    const logger = createLogger();
+    const service = createService(
+      {
+        getCheckoutStatus: vi.fn(async (cwd: string) =>
+          createCheckoutStatus(cwd, { remoteUrl: "https://github.com/acme/repo.git" }),
+        ),
+        forgeOverrides: {
+          github: {
+            ...createGitHubServiceStub(),
+            isAuthenticated: vi.fn(async () => {
+              throw probeError;
+            }),
+          },
+        },
+      },
+      logger,
+    );
+
+    const snapshot = await service.getSnapshot(REPO_CWD);
+
+    expect(snapshot.forge.authState).toBe("unauthenticated");
+    expect(logger.warn).toHaveBeenCalledWith(
+      { err: probeError, cwd: REPO_CWD, authState: "unauthenticated" },
+      "Forge auth probe failed",
+    );
+
+    service.dispose();
+  });
+
+  test("getSnapshot logs an auth failure from the PR status lookup", async () => {
+    const logger = createLogger();
+    const service = createService(
+      {
+        getCheckoutStatus: vi.fn(async (cwd: string) =>
+          createCheckoutStatus(cwd, { remoteUrl: "https://github.com/acme/repo.git" }),
+        ),
+        getPullRequestStatus: vi.fn(async () => ({
+          ...createPullRequestStatusResult(),
+          status: null,
+          authState: "unauthenticated" as const,
+          githubFeaturesEnabled: false,
+        })),
+      },
+      logger,
+    );
+
+    await service.getSnapshot(REPO_CWD);
+
+    expect(logger.warn).toHaveBeenCalledWith(
+      { cwd: REPO_CWD, authState: "unauthenticated" },
+      "Forge PR status lookup reported an auth failure",
+    );
 
     service.dispose();
   });
