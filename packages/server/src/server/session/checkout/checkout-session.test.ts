@@ -1,6 +1,6 @@
 import { SessionDelivery } from "../owned-subscriptions/index.js";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -956,6 +956,113 @@ describe("CheckoutSession", () => {
             success: false,
             error: { code: "UNKNOWN", message: "Working directory has uncommitted changes." },
             requestId: "m2",
+          },
+        },
+      ]);
+    });
+  });
+
+  describe("pr agent prompt", () => {
+    it("builds the prompt from the forge, base branch, template and project preferences", async () => {
+      const cwd = realpathSync(mkdtempSync(join(tmpdir(), "checkout-session-pr-prompt-")));
+      try {
+        execFileSync("git", ["init", "-q", "-b", "main"], { cwd });
+        execFileSync("git", ["config", "user.email", "test@example.com"], { cwd });
+        execFileSync("git", ["config", "user.name", "Test User"], { cwd });
+        mkdirSync(join(cwd, ".github"));
+        writeFileSync(join(cwd, ".github", "pull_request_template.md"), "## Summary\n");
+        writeFileSync(
+          join(cwd, "paseo.json"),
+          JSON.stringify({
+            metadataGeneration: { pullRequest: { instructions: "Title in Polish." } },
+          }),
+        );
+        execFileSync("git", ["add", "."], { cwd });
+        execFileSync("git", ["commit", "-qm", "initial"], { cwd });
+        execFileSync("git", ["checkout", "-qb", "feature"], { cwd });
+
+        const { checkout, emitted } = makeCheckoutSession({
+          git: {
+            getSnapshot: async (snapshotCwd) => {
+              const snapshot = createGitSnapshot(snapshotCwd, "feature");
+              return { ...snapshot, git: { ...snapshot.git, baseRef: "main" } };
+            },
+            resolveForge: async () => ({
+              forge: "gitlab",
+              host: "gitlab.com",
+              service: createGitHubService(),
+            }),
+          },
+        });
+
+        await checkout.handleCheckoutPrAgentPromptRequest({
+          type: "checkout.pr.agent_prompt.request",
+          cwd,
+          merge: true,
+          requestId: "prompt-1",
+        });
+
+        expect(emitted).toHaveLength(1);
+        const response = emitted[0];
+        if (response?.type !== "checkout.pr.agent_prompt.response") {
+          throw new Error(`Unexpected response: ${response?.type}`);
+        }
+        expect(response.payload.error).toBeNull();
+        expect(response.payload.requestId).toBe("prompt-1");
+        const prompt = response.payload.prompt ?? "";
+        expect(prompt).toContain("`git diff main...HEAD`");
+        expect(prompt).toContain("`glab mr create --target-branch main`");
+        expect(prompt).toContain("## Merge");
+        expect(prompt).toContain("```markdown\n## Summary\n```");
+        expect(prompt).toContain("<user-preferences>\nTitle in Polish.\n</user-preferences>");
+      } finally {
+        rmSync(cwd, { recursive: true, force: true });
+      }
+    });
+
+    it("fails without a base branch", async () => {
+      const { checkout, emitted } = makeCheckoutSession({
+        git: { getSnapshot: async (cwd) => createGitSnapshot(cwd, "feature") },
+      });
+
+      await checkout.handleCheckoutPrAgentPromptRequest({
+        type: "checkout.pr.agent_prompt.request",
+        cwd: "/repo",
+        requestId: "prompt-2",
+      });
+
+      expect(emitted).toEqual([
+        {
+          type: "checkout.pr.agent_prompt.response",
+          payload: {
+            cwd: "/repo",
+            prompt: null,
+            error: { code: "UNKNOWN", message: "Base branch is required to create a PR" },
+            requestId: "prompt-2",
+          },
+        },
+      ]);
+    });
+
+    it("fails outside a git repository", async () => {
+      const { checkout, emitted } = makeCheckoutSession({
+        git: { getSnapshot: async (cwd) => createNoGitWorkspaceRuntimeSnapshot(cwd) },
+      });
+
+      await checkout.handleCheckoutPrAgentPromptRequest({
+        type: "checkout.pr.agent_prompt.request",
+        cwd: "/repo",
+        requestId: "prompt-3",
+      });
+
+      expect(emitted).toEqual([
+        {
+          type: "checkout.pr.agent_prompt.response",
+          payload: {
+            cwd: "/repo",
+            prompt: null,
+            error: { code: "UNKNOWN", message: "Not a git repository: /repo" },
+            requestId: "prompt-3",
           },
         },
       ]);

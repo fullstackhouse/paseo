@@ -834,6 +834,9 @@ export const ko: TranslationResources = {
           label_mr: "MR 생성",
           pending_mr: "MR 생성 중...",
           success_mr: "MR 생성됨",
+          sent: "에이전트에게 PR 생성을 요청했습니다",
+          sent_mr: "에이전트에게 MR 생성을 요청했습니다",
+          alreadySent: "이미 에이전트에게 보냈습니다. 해당 탭을 확인하세요",
         },
         createPrAndMerge: {
           label: "PR 생성 후 병합",
@@ -928,7 +931,7 @@ export const ko: TranslationResources = {
           failedPull: "가져오지 못했습니다",
           failedPush: "푸시하지 못했습니다",
           failedPullAndPush: "풀 후 푸시하지 못했습니다",
-          failedCreatePr: "PR을 생성하지 못했습니다",
+          updateHostForAgentPr: "에이전트로 PR을 만들려면 호스트를 업데이트하세요",
           failedCreatePrAndMerge: "에이전트에 요청을 보내지 못했습니다",
           failedMergePr: "PR을 병합하지 못했습니다",
           failedEnableAutoMerge: "자동 병합을 사용 설정하지 못했습니다",

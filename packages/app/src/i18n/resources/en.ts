@@ -829,6 +829,9 @@ export const en = {
           label_mr: "Create MR",
           pending_mr: "Creating MR...",
           success_mr: "MR Created",
+          sent: "Asked the agent to create the PR",
+          sent_mr: "Asked the agent to create the MR",
+          alreadySent: "Already sent to the agent. Check its tab",
         },
         createPrAndMerge: {
           label: "Create PR & Merge",
@@ -929,7 +932,7 @@ export const en = {
           failedPull: "Failed to pull",
           failedPush: "Failed to push",
           failedPullAndPush: "Failed to pull and push",
-          failedCreatePr: "Failed to create PR",
+          updateHostForAgentPr: "Update the host to create PRs through an agent",
           failedCreatePrAndMerge: "Couldn't send the request to the agent",
           failedMergePr: "Failed to merge PR",
           failedEnableAutoMerge: "Failed to enable auto-merge",

@@ -837,6 +837,9 @@ export const ptBR: TranslationResources = {
           label_mr: "Criar MR",
           pending_mr: "Criando MR...",
           success_mr: "MR criada",
+          sent: "Pedimos ao agente para criar a PR",
+          sent_mr: "Pedimos ao agente para criar a MR",
+          alreadySent: "Já enviado ao agente. Confira a aba dele",
         },
         createPrAndMerge: {
           label: "Criar PR e mesclar",
@@ -944,7 +947,7 @@ export const ptBR: TranslationResources = {
           failedPull: "Falha ao fazer pull",
           failedPush: "Falha ao fazer push",
           failedPullAndPush: "Falha ao fazer pull e push",
-          failedCreatePr: "Falha ao criar PR",
+          updateHostForAgentPr: "Atualize o host para criar PRs por meio de um agente",
           failedCreatePrAndMerge: "Não foi possível enviar a solicitação ao agente",
           failedMergePr: "Falha ao fazer merge da PR",
           failedEnableAutoMerge: "Falha ao ativar merge automático",

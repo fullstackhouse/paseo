@@ -2619,6 +2619,33 @@ async function tryResolveCheckoutCommitsBaseRef(
   }
 }
 
+/**
+ * The ref a branch's own commits are counted from: the base branch, or its origin copy when
+ * that is further ahead. Null on the base branch itself or when no base branch exists.
+ */
+export async function resolveCheckoutComparisonBaseRef({
+  cwd,
+  currentBranch,
+  context,
+}: {
+  cwd: string;
+  currentBranch: string;
+  context?: CheckoutContext;
+}): Promise<string | null> {
+  const { resolvedBaseRef } = await resolveBaseRefForCwd(cwd, context);
+  const normalizedBaseRef = resolvedBaseRef ? branchNameFromRef(resolvedBaseRef) : null;
+  const comparisonBaseRef = await tryResolveCheckoutCommitsBaseRef(
+    cwd,
+    resolvedBaseRef,
+    currentBranch,
+  );
+  if (comparisonBaseRef || !normalizedBaseRef || normalizedBaseRef === currentBranch) {
+    return comparisonBaseRef;
+  }
+  // Saved worktree metadata can outlive a renamed or deleted base branch.
+  return tryResolveCheckoutCommitsBaseRef(cwd, await resolveBaseRef(cwd), currentBranch);
+}
+
 export async function listCheckoutCommits({
   cwd,
   context,
@@ -2631,21 +2658,11 @@ export async function listCheckoutCommits({
     return { baseRef: null, commits: [] };
   }
 
-  const { resolvedBaseRef } = await resolveBaseRefForCwd(cwd, context);
-  const normalizedBaseRef = resolvedBaseRef ? branchNameFromRef(resolvedBaseRef) : null;
-  let comparisonBaseRef = await tryResolveCheckoutCommitsBaseRef(
+  const comparisonBaseRef = await resolveCheckoutComparisonBaseRef({
     cwd,
-    resolvedBaseRef,
     currentBranch,
-  );
-  if (!comparisonBaseRef && normalizedBaseRef && normalizedBaseRef !== currentBranch) {
-    // Saved worktree metadata can outlive a renamed or deleted base branch.
-    comparisonBaseRef = await tryResolveCheckoutCommitsBaseRef(
-      cwd,
-      await resolveBaseRef(cwd),
-      currentBranch,
-    );
-  }
+    context,
+  });
 
   let workspaceRecords: ParsedCheckoutCommit[] = [];
   let baseRevision = "HEAD";

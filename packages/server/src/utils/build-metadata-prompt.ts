@@ -44,7 +44,7 @@ function renderStyleSection(section: MetadataStyleSection, override: string | un
   return section.label ? `${section.label}:\n${body}` : body;
 }
 
-async function readProjectMetadataOverrides(
+export async function readProjectMetadataOverrides(
   options: Pick<BuildMetadataPromptOptions, "cwd" | "workspaceGitService">,
 ): Promise<PaseoMetadataGeneration | undefined> {
   if (!options.workspaceGitService) {

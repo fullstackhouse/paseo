@@ -3010,6 +3010,8 @@ export class Session {
         return this.checkoutSession.handleCheckoutDiscardChangesRequest(msg);
       case "checkout_pr_create_request":
         return this.checkoutSession.handleCheckoutPrCreateRequest(msg);
+      case "checkout.pr.agent_prompt.request":
+        return this.checkoutSession.handleCheckoutPrAgentPromptRequest(msg);
       case "checkout_pr_merge_request":
         return this.checkoutSession.handleCheckoutPrMergeRequest(msg);
       case "checkout.forge.set_auto_merge.request":
