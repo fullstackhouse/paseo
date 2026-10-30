@@ -165,6 +165,7 @@ export const ru: TranslationResources = {
     },
     attachments: {
       addImage: "Добавить изображение",
+      takePhoto: "Сделать фото",
       pasteImage: "Вставить изображение",
       addFile: "Загрузить файл",
       addIssueOrPr: "Добавить проблему или PR",
@@ -1716,6 +1717,9 @@ export const ru: TranslationResources = {
     failed: "Не удалось загрузить старую историю.",
   },
   imageAttachmentPicker: {
+    cameraPermissionMessage:
+      "Разрешите доступ к камере в настройках, чтобы делать и прикреплять фотографии.",
+    failedToCapture: "Не удалось прикрепить фото",
     permissionTitle: "Требуется разрешение",
     permissionMessage: "Разрешите доступ к медиатеке, чтобы прикреплять изображения.",
     errorTitle: "Ошибка",

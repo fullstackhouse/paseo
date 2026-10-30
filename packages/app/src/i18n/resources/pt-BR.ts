@@ -165,6 +165,7 @@ export const ptBR: TranslationResources = {
     },
     attachments: {
       addImage: "Adicionar imagem",
+      takePhoto: "Tirar foto",
       pasteImage: "Colar imagem",
       addFile: "Enviar arquivo",
       addIssueOrPr: "Adicionar issue ou PR",
@@ -1718,6 +1719,9 @@ export const ptBR: TranslationResources = {
     failed: "Não foi possível carregar o histórico mais antigo",
   },
   imageAttachmentPicker: {
+    cameraPermissionMessage:
+      "Permita o acesso à câmera nas configurações para tirar fotos e anexá-las.",
+    failedToCapture: "Não foi possível anexar a foto",
     permissionTitle: "Permissão obrigatória",
     permissionMessage: "Permita acesso à sua biblioteca de fotos para anexar imagens.",
     errorTitle: "Erro",
