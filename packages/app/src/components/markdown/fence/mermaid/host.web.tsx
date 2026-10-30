@@ -154,7 +154,8 @@ function useNearViewport(ref: React.RefObject<View | null>): boolean {
       (entries) => {
         if (entries.some((entry) => entry.isIntersecting)) setNear(true);
       },
-      { rootMargin: "100% 0px" },
+      // rootMargin only grows the browser viewport; scrollMargin also applies to nested scrollers.
+      { rootMargin: "100% 0px", scrollMargin: "100% 0px" },
     );
     observer.observe(element);
     return () => observer.disconnect();
