@@ -45,7 +45,18 @@ export function editorBaseExtensions(onSave: () => void) {
   ];
 }
 
-export function editorTheme(theme: EditorVisualTheme) {
+type EditorThemeExtension = ReturnType<typeof buildEditorTheme>;
+
+// Each build injects new CSS rules into the document, so equal themes share one extension.
+const editorThemeCache: Record<string, EditorThemeExtension> = {};
+
+export function editorTheme(theme: EditorVisualTheme): EditorThemeExtension {
+  const key = JSON.stringify(theme);
+  editorThemeCache[key] ??= buildEditorTheme(theme);
+  return editorThemeCache[key];
+}
+
+function buildEditorTheme(theme: EditorVisualTheme) {
   return [
     EditorView.theme(
       {

@@ -35,6 +35,7 @@ export function FileSourceView({
   const viewRef = useRef<EditorView | null>(null);
   const [ready, setReady] = useState(false);
   const initial = useRef({ content, filename, presentation, theme });
+  const themeExtension = editorTheme(theme);
 
   useEffect(() => {
     if (!hostRef.current) return;
@@ -74,12 +75,13 @@ export function FileSourceView({
 
   useEffect(() => {
     viewRef.current?.dispatch({
-      effects: [
-        languageCompartment.reconfigure(languageFor({ filename, presentation })),
-        themeCompartment.reconfigure(editorTheme(theme)),
-      ],
+      effects: languageCompartment.reconfigure(languageFor({ filename, presentation })),
     });
-  }, [filename, presentation, theme]);
+  }, [filename, presentation]);
+
+  useEffect(() => {
+    viewRef.current?.dispatch({ effects: themeCompartment.reconfigure(themeExtension) });
+  }, [themeExtension]);
 
   useEffect(() => {
     const view = viewRef.current;

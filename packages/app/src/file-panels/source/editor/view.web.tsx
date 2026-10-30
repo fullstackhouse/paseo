@@ -57,6 +57,7 @@ export function FileEditorView({
     content: snapshot.content,
     onReady,
   });
+  const themeExtension = editorTheme(theme);
   const onCursorChangeRef = useRef(onCursorChange);
   onCursorChangeRef.current = onCursorChange;
 
@@ -136,8 +137,8 @@ export function FileEditorView({
   }, [filename]);
 
   useEffect(() => {
-    viewRef.current?.dispatch({ effects: themeCompartment.reconfigure(editorTheme(theme)) });
-  }, [theme]);
+    viewRef.current?.dispatch({ effects: themeCompartment.reconfigure(themeExtension) });
+  }, [themeExtension]);
 
   useEffect(() => {
     const view = viewRef.current;
