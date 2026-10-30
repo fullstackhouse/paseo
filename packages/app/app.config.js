@@ -13,6 +13,8 @@ const appVariant = process.env.APP_VARIANT ?? "production";
 const isFdroidBuild = process.env.PASEO_FDROID_BUILD === "1";
 const isWatchdogBuild = process.env.PASEO_WATCHDOG_BUILD === "1";
 const isProfileBuild = process.env.PASEO_PROFILE_BUILD === "1";
+const cameraPermission =
+  "Allow $(PRODUCT_NAME) to access your camera to take photo attachments and scan pairing QR codes.";
 
 const buildProfile = isFdroidBuild
   ? {
@@ -20,6 +22,8 @@ const buildProfile = isFdroidBuild
         "RECORD_AUDIO",
         "android.permission.RECORD_AUDIO",
         "android.permission.MODIFY_AUDIO_SETTINGS",
+        "CAMERA",
+        "android.permission.CAMERA",
       ],
       cameraPlugins: [],
       fdroidPlugins: [withFdroidAutolinking],
@@ -37,8 +41,7 @@ const buildProfile = isFdroidBuild
         [
           "expo-camera",
           {
-            cameraPermission:
-              "Allow $(PRODUCT_NAME) to access your camera to scan pairing QR codes.",
+            cameraPermission,
           },
         ],
       ],
@@ -155,6 +158,7 @@ export default {
       withAndroidScroll,
       [withAndroidAsyncStorageSize, 64],
       ...buildProfile.cameraPlugins,
+      ["expo-image-picker", { cameraPermission }],
       withAndroidOptionalCamera,
       [
         "expo-splash-screen",

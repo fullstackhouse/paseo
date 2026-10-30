@@ -11,6 +11,7 @@ import {
 import { isWeb } from "@/constants/platform";
 
 interface UseImageAttachmentPickerResult {
+  takePhoto: () => Promise<PickedImageAttachmentInput[] | null>;
   pickImages: () => Promise<PickedImageAttachmentInput[] | null>;
 }
 
@@ -88,5 +89,43 @@ export function useImageAttachmentPicker(): UseImageAttachmentPickerResult {
     }
   }, [ensurePermission, t]);
 
-  return { pickImages };
+  const takePhoto = useCallback(async () => {
+    if (isPickingRef.current) {
+      return null;
+    }
+    isPickingRef.current = true;
+    try {
+      const permission = await ImagePicker.requestCameraPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert(
+          t("imageAttachmentPicker.permissionTitle"),
+          t("imageAttachmentPicker.cameraPermissionMessage"),
+        );
+        return null;
+      }
+      const pendingResult = await ImagePicker.getPendingResultAsync();
+      if (pendingResult && "canceled" in pendingResult && !pendingResult.canceled) {
+        return await normalizePickedImageAssets(pendingResult.assets);
+      }
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ["images"],
+        quality: 0.8,
+      });
+      if (result.canceled) {
+        return null;
+      }
+      return await normalizePickedImageAssets(result.assets);
+    } catch (error) {
+      console.error("[ImageAttachmentPicker] Failed to take photo:", error);
+      Alert.alert(
+        t("imageAttachmentPicker.errorTitle"),
+        t("imageAttachmentPicker.failedToCapture"),
+      );
+      return null;
+    } finally {
+      isPickingRef.current = false;
+    }
+  }, [t]);
+
+  return { pickImages, takePhoto };
 }
