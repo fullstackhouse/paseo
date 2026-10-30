@@ -290,6 +290,10 @@ hides the row by the latest local intent, so a late remove or upsert from a supe
 does not flip it back. Tabs and layout are purged only once the undo window closes with the
 archive committed.
 
+Auto-archive after a PR merge (`autoArchiveAfterMerge`) skips a workspace while any of its agents
+has a run in flight, because workspace archive closes every agent in it. The skip is not retried:
+the workspace stays until you archive it or its git snapshot changes again.
+
 History navigation opens the selected agent without changing either archive state. Workspace
 **Unarchive**, **Restore**, Undo, and reopening the directory recover the agents closed by that
 workspace archive, including

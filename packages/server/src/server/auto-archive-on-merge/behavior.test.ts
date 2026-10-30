@@ -210,6 +210,7 @@ async function createUnobservedWorkspace(journeyOptions?: {
     logger,
     paseoHome,
     daemonConfigStore: { get: () => ({ autoArchiveAfterMerge: true }) },
+    agentManager: { listAgents: () => [], hasInFlightRun: () => false },
     workspaceGitService: {
       onSnapshotUpdated: service.onSnapshotUpdated.bind(service),
       getSnapshot: async (
