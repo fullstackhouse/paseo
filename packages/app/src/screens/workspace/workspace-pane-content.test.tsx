@@ -12,6 +12,7 @@ import {
 import type { WorkspaceTabDescriptor } from "@/screens/workspace/workspace-tabs-types";
 import { usePaneContext, usePaneFocus, type PaneContextValue } from "@/panels/pane-context";
 import { definePanel, registerPanel } from "@/panels/panel-registry";
+import { useWorkspaceLayoutStore } from "@/stores/workspace-layout-store";
 
 interface ProbeSnapshot {
   paneContextValue: PaneContextValue;
@@ -181,5 +182,36 @@ describe("WorkspacePaneContent", () => {
       kind: "agent",
       agentId: "agent-a",
     });
+  });
+
+  it("re-renders a pane only when its own panel revision changes", () => {
+    container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+    const otherTab: WorkspaceTabDescriptor = {
+      key: "agent_agent-b",
+      tabId: "agent_agent-b",
+      kind: "agent",
+      target: { kind: "agent", agentId: "agent-b" },
+    };
+    const content = buildContent();
+    const setRevisions = (revisions: Record<string, number>) =>
+      act(() => {
+        useWorkspaceLayoutStore.setState({
+          panelRevisionByWorkspace: { "server-a:workspace-a": revisions },
+        });
+      });
+
+    act(() => {
+      root?.render(
+        <WorkspacePaneContent content={content} isPaneFocused isWorkspaceFocused={true} />,
+      );
+    });
+    setRevisions({ [otherTab.tabId]: 1 });
+    expect(snapshots).toHaveLength(1);
+
+    setRevisions({ [otherTab.tabId]: 1, [agentTab.tabId]: 1 });
+    expect(snapshots).toHaveLength(2);
+    expect(snapshots[1]?.paneContextValue.panelRevision).toBe(1);
   });
 });
