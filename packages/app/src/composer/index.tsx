@@ -44,6 +44,7 @@ import {
   GitPullRequest,
   Image as ImageIcon,
   ClipboardPaste,
+  Camera,
   Paperclip,
 } from "lucide-react-native";
 import * as Clipboard from "expo-clipboard";
@@ -1475,7 +1476,7 @@ function ComposerContentImpl({
     [blurOnSubmit, clearDraft, replaceUserInput, resetSuppression, setSelectedAttachments],
   );
 
-  const { pickImages } = useImageAttachmentPicker();
+  const { pickImages, takePhoto } = useImageAttachmentPicker();
   const { pickFiles } = useFilePicker();
   const agentIdRef = useRef(agentId);
   const sendAgentMessageRef = useRef<
@@ -1753,6 +1754,19 @@ function ComposerContentImpl({
     if (newImages.length === 0) return;
     addImages(newImages);
   }, [addImages, pickImages]);
+
+  const handleTakePhoto = useCallback(async () => {
+    try {
+      const newImages = await pickAndPersistImages({
+        pickImages: takePhoto,
+        persister: composerImageAttachmentPersister,
+      });
+      if (newImages.length > 0) addImages(newImages);
+    } catch (error) {
+      console.error("[Composer] Failed to attach photo:", error);
+      toastErrorRef.current(t("imageAttachmentPicker.failedToCapture"));
+    }
+  }, [addImages, takePhoto, t]);
 
   const handlePasteImage = useCallback(async () => {
     try {
@@ -2169,6 +2183,14 @@ function ComposerContentImpl({
     ];
     if (isNative) {
       items.push({
+        id: "camera",
+        label: t("composer.attachments.takePhoto"),
+        icon: <ThemedCamera size={ICON_SIZE.md} uniProps={iconForegroundMutedMapping} />,
+        onSelect: () => {
+          void handleTakePhoto();
+        },
+      });
+      items.push({
         id: "paste-image",
         label: t("composer.attachments.pasteImage"),
         icon: <ThemedClipboardPaste size={ICON_SIZE.md} uniProps={iconForegroundMutedMapping} />,
@@ -2201,6 +2223,7 @@ function ComposerContentImpl({
     return items;
   }, [
     forgePresentation,
+    handleTakePhoto,
     handlePasteImage,
     handlePickFile,
     handlePickImage,
@@ -2702,6 +2725,7 @@ const ThemedGitPullRequest = withUnistyles(GitPullRequest);
 const ThemedCircleDot = withUnistyles(CircleDot);
 const ThemedAudioLines = withUnistyles(AudioLines);
 const ThemedPaperclip = withUnistyles(Paperclip);
+const ThemedCamera = withUnistyles(Camera);
 const ThemedImageIcon = withUnistyles(ImageIcon);
 const ThemedClipboardPaste = withUnistyles(ClipboardPaste);
 const ThemedFileText = withUnistyles(FileText);
