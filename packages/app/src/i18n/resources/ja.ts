@@ -837,6 +837,8 @@ export const ja: TranslationResources = {
           label_mr: "MRを作成",
           pending_mr: "MRを作成中...",
           success_mr: "MRが作成されました",
+          sent: "エージェントにPRの作成を依頼しました",
+          sent_mr: "エージェントにMRの作成を依頼しました",
         },
         createPrAndMerge: {
           label: "PRを作成してマージ",
@@ -934,7 +936,7 @@ export const ja: TranslationResources = {
           failedPull: "プルに失敗しました",
           failedPush: "プッシュに失敗しました",
           failedPullAndPush: "プル＆プッシュに失敗しました",
-          failedCreatePr: "PRの作成に失敗しました",
+          updateHostForAgentPr: "エージェント経由でPRを作成するにはホストを更新してください",
           failedCreatePrAndMerge: "エージェントにリクエストを送信できませんでした",
           failedMergePr: "PRのマージに失敗しました",
           failedEnableAutoMerge: "自動マージの有効化に失敗しました",

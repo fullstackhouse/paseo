@@ -31,7 +31,7 @@ import { type WorktreeArchiveWarningLabels } from "@/git/worktree-archive-warnin
 import { useWorkspaceArchive } from "@/workspace/use-workspace-archive";
 import { resolveWorkspaceMapKeyByIdentity } from "@/utils/workspace-identity";
 import { readValidatedString } from "@/storage/validated-storage";
-import { useCreatePrAndMerge } from "@/git/use-create-pr-and-merge";
+import { useAgentPr } from "@/git/use-agent-pr";
 
 export type { GitActionId, GitAction, GitActions } from "@/git/policy";
 
@@ -410,9 +410,6 @@ export function useGitActions({ serverId, cwd, icons }: UseGitActionsInput): Use
   const pullAndPushStatus = useCheckoutGitActionsStore((s) =>
     s.getStatus({ serverId, cwd, actionId: "pull-and-push" }),
   );
-  const prCreateStatus = useCheckoutGitActionsStore((s) =>
-    s.getStatus({ serverId, cwd, actionId: "create-pr" }),
-  );
   const mergePrStatuses: Record<CheckoutPrMergeMethod, CheckoutGitActionStatus> = {
     squash: useCheckoutGitActionsStore((s) =>
       s.getStatus({ serverId, cwd, actionId: "merge-pr-squash" }),
@@ -449,7 +446,6 @@ export function useGitActions({ serverId, cwd, icons }: UseGitActionsInput): Use
   const runPull = useCheckoutGitActionsStore((s) => s.pull);
   const runPush = useCheckoutGitActionsStore((s) => s.push);
   const runPullAndPush = useCheckoutGitActionsStore((s) => s.pullAndPush);
-  const runCreatePr = useCheckoutGitActionsStore((s) => s.createPr);
   const runMergePr = useCheckoutGitActionsStore((s) => s.mergePr);
   const runEnablePrAutoMerge = useCheckoutGitActionsStore((s) => s.enablePrAutoMerge);
   const runDisablePrAutoMerge = useCheckoutGitActionsStore((s) => s.disablePrAutoMerge);
@@ -520,27 +516,6 @@ export function useGitActions({ serverId, cwd, icons }: UseGitActionsInput): Use
         toastActionError(err, t("workspace.git.actions.toasts.failedPullAndPush"));
       });
   }, [cwd, runPullAndPush, serverId, t, toastActionError, toastActionSuccess]);
-
-  const handleCreatePr = useCallback(() => {
-    void persistShipDefault("pr");
-    void runCreatePr({ serverId, cwd })
-      .then(() => {
-        toastActionSuccess(t("workspace.git.actions.createPr.success", forgeVocabulary(forge)));
-        return;
-      })
-      .catch((err) => {
-        toastActionError(err, t("workspace.git.actions.toasts.failedCreatePr"));
-      });
-  }, [
-    cwd,
-    forge,
-    persistShipDefault,
-    runCreatePr,
-    serverId,
-    t,
-    toastActionError,
-    toastActionSuccess,
-  ]);
 
   const handleMergePr = useCallback(
     (method: CheckoutPrMergeMethod) => {
@@ -643,10 +618,24 @@ export function useGitActions({ serverId, cwd, icons }: UseGitActionsInput): Use
     t,
   });
 
-  const handleCreatePrAndMerge = useCreatePrAndMerge({
+  const sendCreatePr = useAgentPr({
     serverId,
+    cwd,
     workspace: archiveController.workspaceDescriptor,
     forge,
+    merge: false,
+  });
+  const handleCreatePr = useCallback(() => {
+    void persistShipDefault("pr");
+    sendCreatePr();
+  }, [persistShipDefault, sendCreatePr]);
+
+  const handleCreatePrAndMerge = useAgentPr({
+    serverId,
+    cwd,
+    workspace: archiveController.workspaceDescriptor,
+    forge,
+    merge: true,
   });
 
   const handleArchiveWorkspace = useCallback(() => {
@@ -738,8 +727,8 @@ export function useGitActions({ serverId, cwd, icons }: UseGitActionsInput): Use
           handler: handlePullAndPush,
         },
         pr: {
-          disabled: isActionDisabled(actionsDisabled, prCreateStatus),
-          status: hasPullRequest ? "idle" : prCreateStatus,
+          disabled: actionsDisabled,
+          status: "idle",
           icon: prIcon,
           handler: handlePrAction,
         },
@@ -840,7 +829,6 @@ export function useGitActions({ serverId, cwd, icons }: UseGitActionsInput): Use
     pullStatus,
     pushStatus,
     pullAndPushStatus,
-    prCreateStatus,
     mergePrStatuses.squash,
     mergePrStatuses.merge,
     mergePrStatuses.rebase,

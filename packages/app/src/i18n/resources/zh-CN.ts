@@ -829,6 +829,8 @@ export const zhCN: TranslationResources = {
           label_mr: "创建 MR",
           pending_mr: "正在创建 MR...",
           success_mr: "MR 已创建",
+          sent: "已请代理创建 PR",
+          sent_mr: "已请代理创建 MR",
         },
         createPrAndMerge: {
           label: "创建 PR 并合并",
@@ -913,7 +915,7 @@ export const zhCN: TranslationResources = {
           failedPull: "Pull 失败",
           failedPush: "Push 失败",
           failedPullAndPush: "Pull 并 push 失败",
-          failedCreatePr: "创建 PR 失败",
+          updateHostForAgentPr: "请更新主机以通过代理创建 PR",
           failedCreatePrAndMerge: "无法将请求发送给代理",
           failedMergePr: "Merge PR 失败",
           failedEnableAutoMerge: "启用 auto-merge 失败",

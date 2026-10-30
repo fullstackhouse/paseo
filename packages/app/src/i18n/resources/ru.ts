@@ -841,6 +841,8 @@ export const ru: TranslationResources = {
           label_mr: "Создать MR",
           pending_mr: "Создание MR...",
           success_mr: "MR создан",
+          sent: "Агенту отправлен запрос на создание PR",
+          sent_mr: "Агенту отправлен запрос на создание MR",
         },
         createPrAndMerge: {
           label: "Создать PR и слить",
@@ -938,7 +940,7 @@ export const ru: TranslationResources = {
           failedPull: "Не удалось получить изменения",
           failedPush: "Не удалось отправить изменения",
           failedPullAndPush: "Не удалось получить и отправить изменения",
-          failedCreatePr: "Не удалось создать PR.",
+          updateHostForAgentPr: "Обновите хост, чтобы создавать PR через агента",
           failedCreatePrAndMerge: "Не удалось отправить запрос агенту.",
           failedMergePr: "Не удалось выполнить слияние PR",
           failedEnableAutoMerge: "Не удалось включить автослияние",
