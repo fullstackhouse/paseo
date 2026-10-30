@@ -2327,6 +2327,13 @@ export const CheckoutPrCreateRequestSchema = z.object({
   requestId: z.string(),
 });
 
+export const CheckoutPrAgentPromptRequestSchema = z.object({
+  type: z.literal("checkout.pr.agent_prompt.request"),
+  cwd: z.string(),
+  merge: z.boolean().optional(),
+  requestId: z.string(),
+});
+
 export const CheckoutPrMergeRequestSchema = z.object({
   type: z.literal("checkout_pr_merge_request"),
   cwd: z.string(),
@@ -3409,6 +3416,7 @@ export const SessionInboundMessageSchema = z.discriminatedUnion("type", [
   CheckoutRefreshRequestSchema,
   CheckoutDiscardChangesRequestSchema,
   CheckoutPrCreateRequestSchema,
+  CheckoutPrAgentPromptRequestSchema,
   CheckoutPrMergeRequestSchema,
   CheckoutForgeSetAutoMergeRequestSchema,
   CheckoutGithubSetAutoMergeRequestSchema,
@@ -3702,6 +3710,8 @@ export const ServerInfoStatusPayloadSchema = z
         workspaceSetupRun: z.boolean().optional(),
         // COMPAT(workspaceTerminals): added in v0.8.0, remove gate after 2027-09-05.
         workspaceTerminals: z.boolean().optional(),
+        // COMPAT(checkoutPrAgentPrompt): added in FSH v0.13.0-beta.1, remove gate after 2027-04-30.
+        checkoutPrAgentPrompt: z.boolean().optional(),
         // COMPAT(checkoutForgeSetAutoMerge): added in v0.2.0-beta.1. Remove the
         // feature gate and checkoutGithubSetAutoMerge fallback after 2027-01-17
         // once the supported daemon floor is >= v0.2.0.
@@ -5685,6 +5695,16 @@ export const CheckoutPrCreateResponseSchema = z.object({
   }),
 });
 
+export const CheckoutPrAgentPromptResponseSchema = z.object({
+  type: z.literal("checkout.pr.agent_prompt.response"),
+  payload: z.object({
+    cwd: z.string(),
+    prompt: z.string().nullable(),
+    error: CheckoutErrorSchema.nullable(),
+    requestId: z.string(),
+  }),
+});
+
 export const CheckoutPrMergeResponseSchema = z.object({
   type: z.literal("checkout_pr_merge_response"),
   payload: z.object({
@@ -7204,6 +7224,7 @@ export const SessionOutboundMessageSchema = z.discriminatedUnion("type", [
   CheckoutRefreshResponseSchema,
   CheckoutDiscardChangesResponseSchema,
   CheckoutPrCreateResponseSchema,
+  CheckoutPrAgentPromptResponseSchema,
   CheckoutPrMergeResponseSchema,
   CheckoutForgeSetAutoMergeResponseSchema,
   CheckoutGithubSetAutoMergeResponseSchema,
@@ -7585,6 +7606,8 @@ export type CheckoutDiffImageSide = z.infer<typeof CheckoutDiffImageSideSchema>;
 export type ParsedDiffFile = z.infer<typeof ParsedDiffFileSchema>;
 export type CheckoutPrCreateRequest = z.infer<typeof CheckoutPrCreateRequestSchema>;
 export type CheckoutPrCreateResponse = z.infer<typeof CheckoutPrCreateResponseSchema>;
+export type CheckoutPrAgentPromptRequest = z.infer<typeof CheckoutPrAgentPromptRequestSchema>;
+export type CheckoutPrAgentPromptResponse = z.infer<typeof CheckoutPrAgentPromptResponseSchema>;
 export type CheckoutPrMergeRequest = z.infer<typeof CheckoutPrMergeRequestSchema>;
 export type CheckoutPrMergeResponse = z.infer<typeof CheckoutPrMergeResponseSchema>;
 export type CheckoutPrMergeMethod = z.infer<typeof CheckoutPrMergeRequestSchema>["mergeMethod"];
