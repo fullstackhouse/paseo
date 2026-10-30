@@ -7,8 +7,6 @@ import {
   type AutoArchiveOnMergeDependencies,
   type AutoArchiveOnMergeOptions,
 } from "./index.js";
-import type { ArchiveIfSafeResult } from "./archive-if-safe.js";
-import type { AgentManagerEvent } from "../agent/agent-manager.js";
 import type { WorkspaceGitRuntimeSnapshot } from "../workspace-git-service.js";
 
 function createSnapshot(
@@ -56,7 +54,6 @@ test("fans one fresh observation out to every workspace attached to its exact cw
   const options = {
     logger: { child: () => ({ warn: vi.fn() }) } as unknown as Logger,
     daemonConfigStore: { get: () => ({ autoArchiveAfterMerge: true }) },
-    agentManager: { subscribe: () => () => {}, listAgents: () => [], hasInFlightRun: () => false },
     workspaceGitService: {
       onSnapshotUpdated: (listener: (next: WorkspaceGitRuntimeSnapshot) => void) => {
         onSnapshotUpdated = listener;
@@ -82,7 +79,6 @@ test("fans one fresh observation out to every workspace attached to its exact cw
         pullRequest: input.snapshot.forge.pullRequest,
       });
       if (calls.length === 2) resolveFinished?.();
-      return "archived";
     },
     resolvePath: resolve,
   };
@@ -106,7 +102,6 @@ test("serializes the complete fan-out for duplicate merge events on one cwd", as
   const options = {
     logger: { child: () => ({ warn: vi.fn() }) } as unknown as Logger,
     daemonConfigStore: { get: () => ({ autoArchiveAfterMerge: true }) },
-    agentManager: { subscribe: () => () => {}, listAgents: () => [], hasInFlightRun: () => false },
     workspaceGitService: {
       onSnapshotUpdated: (listener: (next: WorkspaceGitRuntimeSnapshot) => void) => {
         onSnapshotUpdated = listener;
@@ -135,7 +130,6 @@ test("serializes the complete fan-out for duplicate merge events on one cwd", as
         await firstArchivePaused;
       }
       if (archivedWorkspaceIds.length === 2) resolveFinished?.();
-      return "archived";
     },
     resolvePath: resolve,
   };
@@ -165,7 +159,6 @@ test("does not fan out a stale merged event when the fresh observation has no PR
   const options = {
     logger: { child: () => ({ warn: vi.fn() }) } as unknown as Logger,
     daemonConfigStore: { get: () => ({ autoArchiveAfterMerge: true }) },
-    agentManager: { subscribe: () => () => {}, listAgents: () => [], hasInFlightRun: () => false },
     workspaceGitService: {
       onSnapshotUpdated: (listener: (next: WorkspaceGitRuntimeSnapshot) => void) => {
         onSnapshotUpdated = listener;
@@ -195,7 +188,6 @@ test("logs and skips when the fresh observation cannot be read", async () => {
   const options = {
     logger: { child: () => ({ warn }) } as unknown as Logger,
     daemonConfigStore: { get: () => ({ autoArchiveAfterMerge: true }) },
-    agentManager: { subscribe: () => () => {}, listAgents: () => [], hasInFlightRun: () => false },
     workspaceGitService: {
       onSnapshotUpdated: (listener: (next: WorkspaceGitRuntimeSnapshot) => void) => {
         onSnapshotUpdated = listener;
@@ -229,7 +221,6 @@ test("does not read an observation when auto-archive is disabled", async () => {
   const options = {
     logger: { child: () => ({ warn: vi.fn() }) } as unknown as Logger,
     daemonConfigStore: { get: () => ({ autoArchiveAfterMerge: false }) },
-    agentManager: { subscribe: () => () => {}, listAgents: () => [], hasInFlightRun: () => false },
     workspaceGitService: {
       onSnapshotUpdated: (listener: (next: WorkspaceGitRuntimeSnapshot) => void) => {
         onSnapshotUpdated = listener;
@@ -245,65 +236,4 @@ test("does not read an observation when auto-archive is disabled", async () => {
   onSnapshotUpdated(createSnapshot("/repo/worktree"));
   expect(getSnapshot).not.toHaveBeenCalled();
   expect(archiveIfSafe).not.toHaveBeenCalled();
-});
-
-test("retries a merge deferred by a running agent once that agent stops", async () => {
-  let onSnapshotUpdated: ((snapshot: WorkspaceGitRuntimeSnapshot) => void) | null = null;
-  let onAgentEvent: ((event: AgentManagerEvent) => void) | null = null;
-  let agentRunning = true;
-  const snapshot = createSnapshot("/repo/worktree");
-  const options = {
-    logger: { child: () => ({ warn: vi.fn() }) } as unknown as Logger,
-    daemonConfigStore: { get: () => ({ autoArchiveAfterMerge: true }) },
-    agentManager: {
-      subscribe: (callback: (event: AgentManagerEvent) => void) => {
-        onAgentEvent = callback;
-        return () => {};
-      },
-      hasInFlightRun: () => agentRunning,
-    },
-    workspaceGitService: {
-      onSnapshotUpdated: (listener: (next: WorkspaceGitRuntimeSnapshot) => void) => {
-        onSnapshotUpdated = listener;
-        return { unsubscribe: vi.fn() };
-      },
-      getSnapshot: async () => snapshot,
-    },
-    listActiveWorkspaces: async () => [{ workspaceId: "workspace-a", cwd: "/repo/worktree" }],
-  } as unknown as AutoArchiveOnMergeOptions;
-  const results: ArchiveIfSafeResult[] = [];
-  const archiveIfSafe = vi.fn(async () => {
-    const result: ArchiveIfSafeResult = agentRunning ? "blocked-by-running-agent" : "archived";
-    results.push(result);
-    return result;
-  });
-
-  setupAutoArchiveOnMerge(options, { archiveIfSafe, resolvePath: resolve });
-  if (!onSnapshotUpdated) throw new Error("Snapshot listener was not registered");
-  if (!onAgentEvent) throw new Error("Agent listener was not registered");
-  const emitAgentState = onAgentEvent as (event: AgentManagerEvent) => void;
-  onSnapshotUpdated(createSnapshot("/repo/worktree", "open"));
-  onSnapshotUpdated(snapshot);
-  await vi.waitFor(() => expect(results).toEqual(["blocked-by-running-agent"]));
-
-  emitAgentState({
-    type: "agent_state",
-    agent: { id: "agent-a", workspaceId: "workspace-a" },
-  } as unknown as AgentManagerEvent);
-  await Promise.resolve();
-  expect(archiveIfSafe).toHaveBeenCalledTimes(1);
-
-  agentRunning = false;
-  emitAgentState({
-    type: "agent_state",
-    agent: { id: "agent-a", workspaceId: "workspace-a" },
-  } as unknown as AgentManagerEvent);
-  await vi.waitFor(() => expect(results).toEqual(["blocked-by-running-agent", "archived"]));
-
-  emitAgentState({
-    type: "agent_state",
-    agent: { id: "agent-a", workspaceId: "workspace-a" },
-  } as unknown as AgentManagerEvent);
-  await Promise.resolve();
-  expect(archiveIfSafe).toHaveBeenCalledTimes(2);
 });

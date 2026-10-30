@@ -41,9 +41,6 @@ export interface ArchiveIfSafeDependencies {
   killTerminalsForWorkspace: typeof killTerminalsForWorkspace;
 }
 
-export const ARCHIVE_IF_SAFE_RESULTS = ["archived", "skipped", "blocked-by-running-agent"] as const;
-export type ArchiveIfSafeResult = (typeof ARCHIVE_IF_SAFE_RESULTS)[number];
-
 const defaultDependencies: ArchiveIfSafeDependencies = {
   archiveByScope,
   isPaseoOwnedWorktreeCwd,
@@ -56,24 +53,24 @@ export async function archiveIfSafe(input: {
   options: AutoArchiveArchiveOptions;
   log: Logger;
   deps?: ArchiveIfSafeDependencies;
-}): Promise<ArchiveIfSafeResult> {
+}): Promise<void> {
   const { workspaceId, snapshot, options, log } = input;
   const deps = input.deps ?? defaultDependencies;
   const cwd = snapshot.cwd;
   const pullRequest = snapshot.forge.pullRequest;
 
   if (!pullRequest?.isMerged) {
-    return "skipped";
+    return;
   }
   if (snapshot.git.isDirty === true) {
-    return "skipped";
+    return;
   }
   if (typeof snapshot.git.aheadOfOrigin === "number" && snapshot.git.aheadOfOrigin > 0) {
-    return "skipped";
+    return;
   }
   if (hasRunningAgent(options.agentManager, workspaceId)) {
-    log.info({ workspaceId, cwd }, "Deferring auto-archive after merge: an agent is running");
-    return "blocked-by-running-agent";
+    log.info({ workspaceId, cwd }, "Skipping auto-archive after merge: an agent is running");
+    return;
   }
 
   const ownership = await deps.isPaseoOwnedWorktreeCwd(cwd, {
@@ -81,13 +78,13 @@ export async function archiveIfSafe(input: {
     worktreesRoot: options.paseoWorktreesBaseRoot,
   });
   if (!ownership.allowed) {
-    return "skipped";
+    return;
   }
 
   try {
     const autoArchivedChangeRequestUrl = await options.getAutoArchivedChangeRequestUrl(workspaceId);
     if (autoArchivedChangeRequestUrl === pullRequest.url) {
-      return "skipped";
+      return;
     }
 
     await deps.archiveByScope(
@@ -126,14 +123,12 @@ export async function archiveIfSafe(input: {
       { workspaceId, cwd, branch: pullRequest.headRefName, pullRequestUrl: pullRequest.url },
       "Auto-archived worktree after PR merge",
     );
-    return "archived";
   } catch (error) {
     log.warn({ err: error, cwd }, "Auto-archive after merge failed");
-    return "skipped";
   }
 }
 
-export function hasRunningAgent(
+function hasRunningAgent(
   agentManager: Pick<AgentManager, "listAgents" | "hasInFlightRun">,
   workspaceId: string,
 ): boolean {

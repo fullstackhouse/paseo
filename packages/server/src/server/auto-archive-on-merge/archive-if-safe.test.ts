@@ -9,7 +9,6 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import {
   archiveIfSafe,
   type ArchiveIfSafeDependencies,
-  type ArchiveIfSafeResult,
   type AutoArchiveArchiveOptions,
 } from "./archive-if-safe.js";
 import type { ArchiveResult, ActiveWorkspaceRef } from "../workspace-archive-service.js";
@@ -157,8 +156,8 @@ async function runArchiveIfSafe(
     snapshot?: WorkspaceGitRuntimeSnapshot;
     pullRequest?: WorkspaceGitRuntimeSnapshot["forge"]["pullRequest"];
   },
-): Promise<ArchiveIfSafeResult> {
-  return archiveIfSafe({
+): Promise<void> {
+  await archiveIfSafe({
     workspaceId: overrides?.workspaceId ?? "ws-auto-archive",
     snapshot:
       overrides?.snapshot ??
@@ -403,9 +402,8 @@ describe("archiveIfSafe", () => {
       agents: [{ id: "agent-running", workspaceId: "ws-auto-archive", running: true }],
     });
 
-    const result = await runArchiveIfSafe(harness);
+    await runArchiveIfSafe(harness);
 
-    expect(result).toBe("blocked-by-running-agent");
     expect(harness.deps.archiveByScope).not.toHaveBeenCalled();
   });
 
@@ -417,9 +415,8 @@ describe("archiveIfSafe", () => {
       ],
     });
 
-    const result = await runArchiveIfSafe(harness);
+    await runArchiveIfSafe(harness);
 
-    expect(result).toBe("archived");
     expect(harness.deps.archiveByScope).toHaveBeenCalledTimes(1);
   });
 

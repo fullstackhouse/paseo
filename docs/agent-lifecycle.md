@@ -166,8 +166,8 @@ or mutate either lifecycle. The workspace route asks the daemon for authoritativ
 only the route's explicit Unarchive or Restore action changes the archived workspace.
 
 Auto-archive after a PR merge (`autoArchiveAfterMerge`) skips a workspace while any of its agents
-has a run in flight, and retries when that agent stops. Workspace archive closes every agent in
-the workspace, so archiving mid-turn would kill the run.
+has a run in flight, because workspace archive closes every agent in it. The skip is not retried:
+the workspace stays until you archive it or its git snapshot changes again.
 
 History navigation opens the selected agent without changing either archive state. Workspace
 **Restore** recovers only the workspace; the selected archived agent stays open with its callout.
