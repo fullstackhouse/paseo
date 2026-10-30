@@ -3425,6 +3425,7 @@ export class WorkspaceGitServiceImpl implements WorkspaceGitService {
       reason: request.reason,
       facts,
       runGitCommand: runRefreshGitCommand,
+      logger: this.logger,
     });
     // Carry the resolved forge (probe-aware) so the wire projection labels
     // self-managed GitLab hosts correctly instead of falling back to "github".
@@ -3790,6 +3791,7 @@ async function loadForgeSnapshot(options: {
   reason?: string;
   facts?: CheckoutSnapshotFacts;
   runGitCommand: RunGitCommand;
+  logger: pino.Logger;
 }): Promise<WorkspaceGitRuntimeSnapshot["forge"]> {
   const forgeService = options.forgeService;
   if (!forgeService) {
@@ -3804,7 +3806,9 @@ async function loadForgeSnapshot(options: {
     try {
       await forgeService.isAuthenticated({ cwd: options.cwd });
     } catch (error) {
-      return buildForgeSnapshot(forgeAuthStateFromError(error), null, null);
+      const authState = forgeAuthStateFromError(error);
+      options.logger.warn({ err: error, cwd: options.cwd, authState }, "Forge auth probe failed");
+      return buildForgeSnapshot(authState, null, null);
     }
   }
 
@@ -3818,6 +3822,12 @@ async function loadForgeSnapshot(options: {
       },
       { facts: options.facts, runGitCommand: options.runGitCommand },
     );
+    if (result.authState === "unauthenticated" || result.authState === "cli_missing") {
+      options.logger.warn(
+        { cwd: options.cwd, authState: result.authState },
+        "Forge PR status lookup reported an auth failure",
+      );
+    }
     return buildForgeSnapshot(result.authState, result.status, null);
   } catch (error) {
     // The auth probe succeeded, so a failure here is a command error, not an
