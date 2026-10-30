@@ -202,3 +202,32 @@ describe("local transport session lifecycle", () => {
     expect(events).toEqual([]);
   });
 });
+
+describe("local transport messages", () => {
+  it("relays text frames as text and only binary frames as base64", async () => {
+    let handleOpen: (() => void) | null = null;
+    let handleMessage: ((data: Buffer, isBinary: boolean) => void) | null = null;
+    const socket = {
+      ...createConnectingSocket(),
+      once: vi.fn((_event: "open", listener: () => void) => {
+        handleOpen = listener;
+      }),
+      on: vi.fn((event: string, listener: (data: Buffer, isBinary: boolean) => void) => {
+        if (event === "message") handleMessage = listener;
+      }),
+    } as unknown as TransportWebSocket;
+    const { events, manager } = createManagerHarness(async () => createEndpoint(), [socket]);
+
+    manager.open(SESSION_INPUT);
+    await Promise.resolve();
+    handleOpen?.();
+    handleMessage?.(Buffer.from('{"type":"ping"}'), false);
+    handleMessage?.(Buffer.from([1, 2, 3]), true);
+
+    expect(events).toEqual([
+      { sessionId: SESSION_INPUT.sessionId, kind: "open" },
+      { sessionId: SESSION_INPUT.sessionId, kind: "message", text: '{"type":"ping"}' },
+      { sessionId: SESSION_INPUT.sessionId, kind: "message", binaryBase64: "AQID" },
+    ]);
+  });
+});

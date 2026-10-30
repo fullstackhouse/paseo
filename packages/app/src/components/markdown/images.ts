@@ -41,28 +41,36 @@ export function useMarkdownSource(text: string, context: MarkdownImageContext) {
     () => prepareMarkdownSource(text, context.workspaceRoot, { supportsSvg: isWeb }),
     [text, context.workspaceRoot],
   );
-  const sources = [...new Set(prepared.images.map((image) => image.source))];
-  const acquisitions = sources.map((source) => {
-    const resolved = resolveMarkdownPreviewImageSource({
-      source,
-      markdownPath: context.filePath ?? "",
-      workspaceRoot: context.workspaceRoot,
-    });
-    return createAssistantImageFileAcquisition({
-      port: context.client
-        ? {
-            readFile: (cwd, path) => context.client!.readFile(cwd, path),
-            persist: persistAttachmentFromBytes,
-          }
-        : null,
-      resolution: resolved
-        ? resolveAssistantImageSource({ source: resolved, workspaceRoot: context.workspaceRoot })
-        : null,
-      serverId: context.serverId,
-      occurrenceKey,
-      unavailableMessage: "Image unavailable",
-    });
-  });
+  const sources = useMemo(
+    () => [...new Set(prepared.images.map((image) => image.source))],
+    [prepared],
+  );
+  const { client, filePath, workspaceRoot, serverId } = context;
+  const acquisitions = useMemo(
+    () =>
+      sources.map((source) => {
+        const resolved = resolveMarkdownPreviewImageSource({
+          source,
+          markdownPath: filePath ?? "",
+          workspaceRoot,
+        });
+        return createAssistantImageFileAcquisition({
+          port: client
+            ? {
+                readFile: (cwd, path) => client.readFile(cwd, path),
+                persist: persistAttachmentFromBytes,
+              }
+            : null,
+          resolution: resolved
+            ? resolveAssistantImageSource({ source: resolved, workspaceRoot })
+            : null,
+          serverId,
+          occurrenceKey,
+          unavailableMessage: "Image unavailable",
+        });
+      }),
+    [client, filePath, occurrenceKey, serverId, sources, workspaceRoot],
+  );
   const results = useFetchQueries(
     acquisitions.map((acquisition, index) => ({
       queryKey: ["markdownImage", acquisition?.key ?? sources[index]],

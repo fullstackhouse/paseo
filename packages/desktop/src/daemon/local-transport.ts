@@ -411,8 +411,9 @@ export function createLocalTransportManager(
       if (!isCurrent(session) || session.state !== "open") {
         return;
       }
-      if (isBinary || data instanceof Buffer) {
-        const buf = Buffer.isBuffer(data) ? data : Buffer.from(data as ArrayBuffer);
+      // ws delivers text frames as Buffers too; only real binary frames pay for base64.
+      const buf = Buffer.isBuffer(data) ? data : Buffer.from(data as ArrayBuffer);
+      if (isBinary) {
         emitEvent({
           sessionId: session.id,
           kind: "message",
@@ -424,7 +425,7 @@ export function createLocalTransportManager(
       emitEvent({
         sessionId: session.id,
         kind: "message",
-        text: data.toString(),
+        text: buf.toString("utf8"),
       });
     });
 

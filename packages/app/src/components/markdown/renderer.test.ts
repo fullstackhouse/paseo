@@ -421,6 +421,11 @@ it.each([darkTheme, lightTheme])("supplies the theme selection colour to the ren
 });
 
 describe("GitHub comment HTML normalization", () => {
+  it("returns text whose angle brackets are not tags unchanged", () => {
+    const source = "a < b and c <= d\n\n```ts\nif (x < 1) return;\n```";
+    expect(normalizeMarkdownHtml(source)).toBe(source);
+  });
+
   it.each([
     [
       '<img alt="P1" src="https://example.com/p1.svg" align="top">',
