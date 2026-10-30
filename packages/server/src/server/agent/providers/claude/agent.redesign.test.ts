@@ -1147,6 +1147,13 @@ test("plan approval exposes a resume-bypass action and can return to bypassPermi
         id: "implement",
         label: "Implement",
         behavior: "allow",
+        variant: "secondary",
+        intent: "implement",
+      },
+      {
+        id: "implement_auto",
+        label: "Implement with Auto mode",
+        behavior: "allow",
         variant: "primary",
         intent: "implement",
       },
