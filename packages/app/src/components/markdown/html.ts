@@ -32,7 +32,7 @@ const EMPHASIS: Readonly<Record<string, string>> = { b: "**", strong: "**", i: "
 
 /** Convert comment HTML to Markdown while preserving the original spelling of code. */
 export function normalizeMarkdownHtml(source: string): string {
-  if (!source.includes("<")) return source;
+  if (!hasHtmlTag(source)) return source;
   const htmlRanges: { start: number; end: number }[] = [];
   function findHtml(node: Nodes) {
     if (node.type === "html" && node.position) {
@@ -108,6 +108,15 @@ export function normalizeMarkdownHtml(source: string): string {
     cursor = end;
   }
   return result + source.slice(cursor);
+}
+
+// Skips both Markdown parses when no `<` starts a tag, like `a < b` or `x <= y`.
+function hasHtmlTag(source: string): boolean {
+  if (!source.includes("<")) return false;
+  HTML.lastIndex = 0;
+  const found = HTML.test(source);
+  HTML.lastIndex = 0;
+  return found;
 }
 
 function attributes(tag: string): Record<string, string> {
