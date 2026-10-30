@@ -14,6 +14,8 @@ import { RenderProfile } from "@/utils/render-profiler";
 import type { WorkspaceFileOpenRequest } from "@/workspace/file-open";
 import type { OpenInSidePaneSource } from "@/workspace-tabs/open-beside";
 import type { PaneHost } from "@/panels/panel-manifest";
+import { useWorkspaceLayoutStore } from "@/stores/workspace-layout-store";
+import { buildWorkspaceTabPersistenceKey } from "@/workspace-tabs/model";
 
 export interface WorkspacePaneContentModel {
   key: string;
@@ -26,7 +28,6 @@ export interface BuildWorkspacePaneContentModelInput {
   normalizedServerId: string;
   normalizedWorkspaceId: string;
   host: PaneHost;
-  panelRevision?: number;
   onOpenTab: (target: WorkspaceTabDescriptor["target"]) => void;
   onOpenPreferredTarget: (
     target: WorkspaceTabDescriptor["target"],
@@ -45,7 +46,6 @@ export function buildWorkspacePaneContentModel({
   normalizedServerId,
   normalizedWorkspaceId,
   host,
-  panelRevision,
   onOpenTab,
   onOpenPreferredTarget,
   onOpenTargetToSide,
@@ -67,7 +67,6 @@ export function buildWorkspacePaneContentModel({
       tabId: tab.tabId,
       target: tab.target,
       state: tab.state,
-      panelRevision,
       openTab: onOpenTab,
       openPreferredTarget: onOpenPreferredTarget,
       openTargetToSide: onOpenTargetToSide,
@@ -94,6 +93,12 @@ export function WorkspacePaneContent({
   onFocusPane,
 }: WorkspacePaneContentProps) {
   const { Component, key, paneContextValue } = content;
+  // Each tab reads only its own revision, so opening one file doesn't re-render every tab.
+  const panelRevision = useWorkspaceLayoutStore((state) => {
+    const workspaceKey = buildWorkspaceTabPersistenceKey(paneContextValue);
+    if (!workspaceKey) return 0;
+    return state.panelRevisionByWorkspace[workspaceKey]?.[paneContextValue.tabId] ?? 0;
+  });
   const openTab = useStableEvent(paneContextValue.openTab);
   const openPreferredTarget = useStableEvent(paneContextValue.openPreferredTarget);
   const openTargetToSide = useStableEvent(paneContextValue.openTargetToSide ?? (() => undefined));
@@ -110,7 +115,7 @@ export function WorkspacePaneContent({
       tabId: paneContextValue.tabId,
       target: paneContextValue.target,
       state: paneContextValue.state,
-      panelRevision: paneContextValue.panelRevision,
+      panelRevision,
       openTab,
       openPreferredTarget,
       openTargetToSide: paneContextValue.openTargetToSide ? openTargetToSide : undefined,
@@ -128,7 +133,7 @@ export function WorkspacePaneContent({
       openPreferredTarget,
       openTargetToSide,
       paneContextValue.serverId,
-      paneContextValue.panelRevision,
+      panelRevision,
       paneContextValue.tabId,
       paneContextValue.target,
       paneContextValue.state,

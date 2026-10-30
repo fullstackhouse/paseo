@@ -346,6 +346,14 @@ if (electronFlags) {
   log.info("[electron-flags]", electronFlags);
 }
 
+// HTML previews and Mermaid diagrams run untrusted scripts in sandboxed iframes. Give
+// them their own process so a heavy or looping page cannot freeze the app's UI thread.
+const enabledFeatures = app.commandLine.getSwitchValue("enable-features");
+app.commandLine.appendSwitch(
+  "enable-features",
+  [enabledFeatures, "IsolateSandboxedIframes"].filter(Boolean).join(","),
+);
+
 if (process.platform === "linux") {
   // Keep the desktop/dock identity independent of the wrapped Electron filename.
   app.setDesktopName("Paseo.desktop");
