@@ -397,7 +397,7 @@ describe("archiveIfSafe", () => {
     expect(harness.deps.archiveByScope).toHaveBeenCalledTimes(1);
   });
 
-  test("defers archiving while an agent in the workspace is running", async () => {
+  test("skips archiving while an agent in the workspace is running", async () => {
     const harness = createHarness({
       agents: [{ id: "agent-running", workspaceId: "ws-auto-archive", running: true }],
     });
