@@ -89,11 +89,15 @@ const MarkdownPart = memo(function MarkdownPart({
 }: MarkdownRendererProps & { commandHints?: CommandHints | null }) {
   const environment = useAssistantFileLinkEnvironment();
   const actions = useAssistantFileLinkActions();
-  const client =
-    imageContext.client ??
-    (environment.client?.readFile
-      ? { readFile: environment.client.readFile.bind(environment.client) }
-      : undefined);
+  const environmentClient = environment.client;
+  const fallbackClient = useMemo(
+    () =>
+      environmentClient?.readFile
+        ? { readFile: environmentClient.readFile.bind(environmentClient) }
+        : undefined,
+    [environmentClient],
+  );
+  const client = imageContext.client ?? fallbackClient;
   const { markdown, imageSources, linkRecognition, linkSource } = useMarkdownSource(
     text,
     {
