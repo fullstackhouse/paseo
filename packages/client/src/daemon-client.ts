@@ -65,6 +65,7 @@ import type {
   CheckoutPushResponse,
   CheckoutRefreshResponse,
   CheckoutPrCreateResponse,
+  CheckoutPrAgentPromptResponse,
   CheckoutPrMergeResponse,
   CheckoutPrMergeMethod,
   CheckoutForgeSetAutoMergeResponse,
@@ -532,6 +533,7 @@ type CheckoutPullPayload = CheckoutPullResponse["payload"];
 type CheckoutPushPayload = CheckoutPushResponse["payload"];
 type CheckoutRefreshPayload = CheckoutRefreshResponse["payload"];
 type CheckoutPrCreatePayload = CheckoutPrCreateResponse["payload"];
+type CheckoutPrAgentPromptPayload = CheckoutPrAgentPromptResponse["payload"];
 type CheckoutPrMergePayload = CheckoutPrMergeResponse["payload"];
 type CheckoutForgeSetAutoMergePayload = CheckoutForgeSetAutoMergeResponse["payload"];
 type CheckoutGithubSetAutoMergePayload = CheckoutGithubSetAutoMergeResponse["payload"];
@@ -4679,6 +4681,21 @@ export class DaemonClient {
         baseRef: input.baseRef,
       },
       responseType: "checkout_pr_create_response",
+    });
+  }
+
+  async checkoutPrAgentPrompt(
+    cwd: string,
+    input: { merge?: boolean } = {},
+    requestId?: string,
+  ): Promise<CheckoutPrAgentPromptPayload> {
+    return this.sendNamespacedCorrelatedSessionRequest<"checkout.pr.agent_prompt.response">({
+      requestId,
+      message: {
+        type: "checkout.pr.agent_prompt.request",
+        cwd,
+        ...(input.merge ? { merge: true } : {}),
+      },
     });
   }
 

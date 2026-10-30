@@ -58,6 +58,9 @@ import {
 import { runGitCommand } from "../../../utils/run-git-command.js";
 import { expandTilde } from "../../../utils/path.js";
 import type { GitMetadataGenerator } from "./git-metadata-generator.js";
+import { buildPrAgentPrompt, findPullRequestTemplate } from "./pr-agent-prompt.js";
+import { readProjectMetadataOverrides } from "../../../utils/build-metadata-prompt.js";
+import { branchNameFromRef } from "../../../utils/worktree-metadata.js";
 
 /**
  * The collaborators a checkout command reaches that are NOT part of the checkout
@@ -1035,6 +1038,42 @@ export class CheckoutSession {
           error: toCheckoutError(error),
           requestId,
         },
+      });
+    }
+  }
+
+  async handleCheckoutPrAgentPromptRequest(
+    msg: Extract<SessionInboundMessage, { type: "checkout.pr.agent_prompt.request" }>,
+  ): Promise<void> {
+    const { cwd, requestId } = msg;
+
+    try {
+      const snapshot = await this.workspaceGitService.getSnapshot(cwd);
+      if (!snapshot.git.isGit || !snapshot.git.repoRoot) {
+        throw new Error(`Not a git repository: ${cwd}`);
+      }
+      if (!snapshot.git.baseRef) {
+        throw new Error("Base branch is required to create a PR");
+      }
+      const [template, overrides] = await Promise.all([
+        findPullRequestTemplate(snapshot.git.repoRoot),
+        readProjectMetadataOverrides({ cwd, workspaceGitService: this.workspaceGitService }),
+      ]);
+      const prompt = buildPrAgentPrompt({
+        baseBranch: branchNameFromRef(snapshot.git.baseRef),
+        template,
+        preferences: overrides?.pullRequest?.instructions ?? null,
+        merge: msg.merge === true,
+      });
+
+      this.host.emit({
+        type: "checkout.pr.agent_prompt.response",
+        payload: { cwd, prompt, error: null, requestId },
+      });
+    } catch (error) {
+      this.host.emit({
+        type: "checkout.pr.agent_prompt.response",
+        payload: { cwd, prompt: null, error: toCheckoutError(error), requestId },
       });
     }
   }
