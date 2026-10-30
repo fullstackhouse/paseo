@@ -67,8 +67,27 @@ test.each([
 });
 
 test.each([
+  ["auto", ["implement_resume"]],
+  ["bypassPermissions", ["implement_auto"]],
+  ["default", ["implement"]],
+] as const)("plan approval from %s highlights %s", async (mode, primary) => {
+  const plan = await createPlanApproval(mode);
+  try {
+    const ids = plan.request.actions
+      ?.filter((entry) => entry.variant === "primary")
+      .map((entry) => entry.id);
+    expect(ids).toEqual(primary);
+  } finally {
+    await plan.session.respondToPermission(plan.request.id, { behavior: "deny" });
+    await plan.resolution;
+    await plan.session.close();
+  }
+});
+
+test.each([
   ["auto", "implement_resume", "auto"],
   ["bypassPermissions", "implement_resume", "bypassPermissions"],
+  ["bypassPermissions", "implement_auto", "auto"],
   ["auto", "implement", "acceptEdits"],
   ["bypassPermissions", "implement", "acceptEdits"],
   ["default", "implement_resume", "acceptEdits"],
@@ -95,6 +114,7 @@ test.each([
   ["default", "implement", "bypassPermissions", "bypassPermissions"],
   ["acceptEdits", "implement", "default", "default"],
   ["auto", "implement_resume", "default", "auto"],
+  ["bypassPermissions", "implement_auto", "default", "auto"],
   ["default", "implement", "plan", "acceptEdits"],
   ["default", "implement", "unknown", "acceptEdits"],
 ] as const)(
