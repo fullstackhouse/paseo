@@ -2551,7 +2551,10 @@ export function createGitHubService(options: CreateGitHubServiceOptions = {}): G
         readOptions: input,
         load: async () => {
           try {
-            await run(["auth", "status"], { cwd: input.cwd });
+            // Not `auth status`: it validates the token over the network and
+            // reports any network failure as an invalid token. A revoked token
+            // surfaces as a 401 from the PR status lookup instead.
+            await run(["auth", "token"], { cwd: input.cwd });
             return true;
           } catch (error) {
             if (isGitHubAuthenticationError(error)) {
@@ -2925,6 +2928,7 @@ function isAuthFailureText(text: string): boolean {
   return (
     normalized.includes("gh auth login") ||
     normalized.includes("not logged into any github hosts") ||
+    normalized.includes("no oauth token found") ||
     normalized.includes("authentication failed") ||
     normalized.includes("authentication required") ||
     normalized.includes("bad credentials") ||

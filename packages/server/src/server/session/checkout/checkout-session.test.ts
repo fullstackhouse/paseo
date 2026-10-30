@@ -1402,6 +1402,40 @@ describe("CheckoutSession", () => {
       });
     });
 
+    it("keeps features enabled when the auth probe fails for non-auth reasons", async () => {
+      const gitlabService: Partial<ForgeService> = {
+        async isAuthenticated() {
+          throw new Error("glab timed out");
+        },
+      };
+      const { checkout, emitted } = makeCheckoutSession({
+        git: {
+          resolveForge: async () => ({
+            forge: "gitlab",
+            host: "gitlab.example.com",
+            service: gitlabService as ForgeService,
+          }),
+        },
+      });
+
+      await checkout.handlePullRequestTimelineRequest({
+        type: "pull_request_timeline_request",
+        cwd: "/repo",
+        prNumber: 14,
+        repoOwner: "g",
+        repoName: "r",
+        requestId: "tl-probe-error",
+      });
+
+      expect(emitted.find(isTimelineResponse)).toMatchObject({
+        payload: {
+          githubFeaturesEnabled: true,
+          error: { kind: "unknown", message: "glab timed out" },
+          authState: "error",
+        },
+      });
+    });
+
     it("keeps features enabled when the timeline fetch fails for non-auth reasons", async () => {
       const gitlabService: Partial<ForgeService> = {
         async isAuthenticated() {

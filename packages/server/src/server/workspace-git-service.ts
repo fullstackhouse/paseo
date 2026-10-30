@@ -3425,6 +3425,7 @@ export class WorkspaceGitServiceImpl implements WorkspaceGitService {
       reason: request.reason,
       facts,
       runGitCommand: runRefreshGitCommand,
+      logger: this.logger,
     });
     // Carry the resolved forge (probe-aware) so the wire projection labels
     // self-managed GitLab hosts correctly instead of falling back to "github".
@@ -3790,6 +3791,7 @@ async function loadForgeSnapshot(options: {
   reason?: string;
   facts?: CheckoutSnapshotFacts;
   runGitCommand: RunGitCommand;
+  logger: pino.Logger;
 }): Promise<WorkspaceGitRuntimeSnapshot["forge"]> {
   const forgeService = options.forgeService;
   if (!forgeService) {
@@ -3804,7 +3806,14 @@ async function loadForgeSnapshot(options: {
     try {
       await forgeService.isAuthenticated({ cwd: options.cwd });
     } catch (error) {
-      return buildForgeSnapshot(forgeAuthStateFromError(error), null, null);
+      const authState = forgeAuthStateFromError(error);
+      if (authState !== "error") {
+        return buildForgeSnapshot(authState, null, null);
+      }
+      options.logger.warn({ err: error, cwd: options.cwd }, "Forge auth probe failed");
+      return buildForgeSnapshot(authState, null, {
+        message: error instanceof Error ? error.message : String(error),
+      });
     }
   }
 
@@ -3834,7 +3843,8 @@ function buildForgeSnapshot(
   error: WorkspaceGitRuntimeSnapshot["forge"]["error"],
 ): WorkspaceGitRuntimeSnapshot["forge"] {
   return {
-    featuresEnabled: authState === "authenticated",
+    // "error" is a failed check, not a missing login, so features stay available.
+    featuresEnabled: authState === "authenticated" || authState === "error",
     authState,
     pullRequest,
     error,

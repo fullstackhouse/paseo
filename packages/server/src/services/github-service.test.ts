@@ -4132,6 +4132,38 @@ describe("ForgeService", () => {
     );
   });
 
+  it("probes auth locally so a network failure can't read as an invalid token", async () => {
+    const runner = createRunner([""]);
+    const service = createGitHubService({
+      runner: runner.runner,
+      resolveGhPath: async () => "/usr/bin/gh",
+      now: () => 100,
+    });
+
+    await service.isAuthenticated({ cwd: "/repo" });
+
+    expect(runner.calls.map((call) => call.args)).toEqual([["auth", "token"]]);
+  });
+
+  it("treats a missing token as an auth failure", async () => {
+    const service = createGitHubService({
+      runner: async () => {
+        throw new GitHubCommandError({
+          args: ["auth", "token"],
+          cwd: "/repo",
+          exitCode: 1,
+          stderr: "no oauth token found for github.com",
+        });
+      },
+      resolveGhPath: async () => "/usr/bin/gh",
+      now: () => 100,
+    });
+
+    await expect(service.isAuthenticated({ cwd: "/repo" })).rejects.toBeInstanceOf(
+      GitHubAuthenticationError,
+    );
+  });
+
   it("throws a typed command error for non-zero exits", async () => {
     const service = createGitHubService({
       runner: async () => {

@@ -4,6 +4,7 @@ import os from "node:os";
 import path, { join } from "node:path";
 import type pino from "pino";
 import type { ForgeService } from "../services/forge-service.js";
+import { GitHubAuthenticationError } from "../services/github-service.js";
 import type {
   CheckoutSnapshotFacts,
   CheckoutStatusGit,
@@ -523,6 +524,56 @@ describe("WorkspaceGitServiceImpl", () => {
 
     expect(gitlabIsAuthenticated).not.toHaveBeenCalled();
     expect(getPullRequestStatus).toHaveBeenCalledTimes(1);
+
+    service.dispose();
+  });
+
+  test("getSnapshot keeps forge features enabled when the auth probe fails for non-auth reasons", async () => {
+    const forgeStub: ForgeService = {
+      ...createGitHubServiceStub(),
+      isAuthenticated: vi.fn(async () => {
+        throw new Error("gh timed out");
+      }),
+    };
+    const service = createService({
+      getCheckoutStatus: vi.fn(async (cwd: string) =>
+        createCheckoutStatus(cwd, { remoteUrl: "https://github.com/acme/repo.git" }),
+      ),
+      forgeOverrides: { github: forgeStub },
+    });
+
+    const snapshot = await service.getSnapshot(REPO_CWD);
+
+    expect(snapshot.forge).toMatchObject({
+      featuresEnabled: true,
+      authState: "error",
+      error: { message: "gh timed out" },
+    });
+
+    service.dispose();
+  });
+
+  test("getSnapshot reports unauthenticated when the auth probe fails with an auth error", async () => {
+    const forgeStub: ForgeService = {
+      ...createGitHubServiceStub(),
+      isAuthenticated: vi.fn(async () => {
+        throw new GitHubAuthenticationError({ stderr: "no oauth token found for github.com" });
+      }),
+    };
+    const service = createService({
+      getCheckoutStatus: vi.fn(async (cwd: string) =>
+        createCheckoutStatus(cwd, { remoteUrl: "https://github.com/acme/repo.git" }),
+      ),
+      forgeOverrides: { github: forgeStub },
+    });
+
+    const snapshot = await service.getSnapshot(REPO_CWD);
+
+    expect(snapshot.forge).toMatchObject({
+      featuresEnabled: false,
+      authState: "unauthenticated",
+      error: null,
+    });
 
     service.dispose();
   });
