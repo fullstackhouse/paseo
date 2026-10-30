@@ -1175,9 +1175,6 @@ function WorkspaceScreenContent({
     ) => openTab({ workspaceKey, target, intent: "reveal", parentTabId, placement }),
     [openTab],
   );
-  const panelRevisions = useWorkspaceLayoutStore((state) =>
-    persistenceKey ? state.panelRevisionByWorkspace[persistenceKey] : undefined,
-  );
   const focusWorkspacePane = useWorkspaceLayoutStore((state) => state.focusPane);
   const hasHydratedWorkspaces = useSessionStore(
     (state) => state.sessions[normalizedServerId]?.hasHydratedWorkspaces ?? false,
@@ -2968,7 +2965,6 @@ function WorkspaceScreenContent({
         host:
           input.host ??
           (input.paneId !== null && input.paneId === explorerSidebarPaneId ? "explorer" : "main"),
-        panelRevision: panelRevisions?.[input.tab.tabId] ?? 0,
         onOpenTab: (target) => {
           if (!persistenceKey) {
             return;
@@ -3037,7 +3033,6 @@ function WorkspaceScreenContent({
       }),
     [
       handleCloseTabById,
-      panelRevisions,
       handleOpenWorkspaceFileFromPane,
       navigateToTabId,
       normalizedServerId,
