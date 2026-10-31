@@ -1575,6 +1575,11 @@ export const ptBR: TranslationResources = {
         newVersionReady: "Uma nova versão está pronta para instalar.",
         restartWarning:
           "Atualizar o app vai interromper agentes em execução e fechar sessões de terminal.",
+        idleTitle: "Instalação em breve",
+        idleDescription:
+          "Nenhum agente local está trabalhando. Instalação após {{seconds}} segundos de inatividade.",
+        checkingActivityDescription:
+          "Verificando a atividade dos espaços de trabalho locais antes de instalar.",
         waitingTitle: "Atualização aguardando",
         waitingDescription: "Instala assim que nenhum agente local estiver trabalhando.",
         installWhenIdle: "Instalar quando ocioso",

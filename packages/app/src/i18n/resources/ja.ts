@@ -1561,6 +1561,11 @@ export const ja: TranslationResources = {
         newVersionReady: "新しいバージョンのインストール準備ができました。",
         restartWarning:
           "アプリを更新すると、実行中のエージェントが停止しターミナルセッションが閉じられます。",
+        idleTitle: "まもなくインストール",
+        idleDescription:
+          "ローカルのエージェントは作業していません。{{seconds}}秒間操作がなければインストールします。",
+        checkingActivityDescription:
+          "インストール前にローカルのワークスペースの動作状況を確認しています。",
         waitingTitle: "アップデート待機中",
         waitingDescription: "ローカルのエージェントがすべて停止したらすぐにインストールします。",
         installWhenIdle: "アイドル時にインストール",

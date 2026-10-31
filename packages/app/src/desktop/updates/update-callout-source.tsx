@@ -26,7 +26,7 @@ function renderBody(body: UpdateCalloutBody, t: ReturnType<typeof useTranslation
   return (
     <UpdateAvailableDescription
       versionLabel={body.versionLabel ?? undefined}
-      waiting={body.kind === "waiting"}
+      waitingMessage={body.kind === "waiting" ? body.message : undefined}
       t={t}
     />
   );
@@ -105,7 +105,7 @@ export function UpdateCalloutSource() {
       availableUpdate,
       errorMessage,
       waitingForIdle,
-      localHostBusy: localHostActivity === "busy",
+      localHostActivity,
     });
     if (!descriptor) return;
 
@@ -152,11 +152,11 @@ export function UpdateCalloutSource() {
 
 function UpdateAvailableDescription({
   versionLabel,
-  waiting,
+  waitingMessage,
   t,
 }: {
   versionLabel?: string;
-  waiting: boolean;
+  waitingMessage?: string;
   t: ReturnType<typeof useTranslation>["t"];
 }) {
   return (
@@ -166,10 +166,8 @@ function UpdateAvailableDescription({
           ? t("desktop.updates.callout.versionReady", { version: versionLabel })
           : t("desktop.updates.callout.newVersionReady")}
       </SidebarCalloutDescriptionText>
-      {waiting ? (
-        <SidebarCalloutDescriptionText>
-          {t("desktop.updates.callout.waitingDescription")}
-        </SidebarCalloutDescriptionText>
+      {waitingMessage ? (
+        <SidebarCalloutDescriptionText>{waitingMessage}</SidebarCalloutDescriptionText>
       ) : null}
       <SidebarCalloutDescriptionText>
         {t("desktop.updates.callout.restartWarning")}
