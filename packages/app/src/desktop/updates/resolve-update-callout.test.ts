@@ -46,7 +46,7 @@ describe("resolveUpdateCalloutDescriptor", () => {
   });
 
   it("offers install-when-idle in place of the changelog while local agents work", () => {
-    const descriptor = resolveUpdateCalloutDescriptor(input({ localHostBusy: true }));
+    const descriptor = resolveUpdateCalloutDescriptor(input({ localHostActivity: "busy" }));
 
     expect(descriptor?.actions).toEqual([
       { role: "installWhenIdle", label: "Install when idle" },
@@ -55,10 +55,16 @@ describe("resolveUpdateCalloutDescriptor", () => {
   });
 
   it("builds a waiting descriptor with changelog + install-now actions", () => {
-    const descriptor = resolveUpdateCalloutDescriptor(input({ waitingForIdle: true }));
+    const descriptor = resolveUpdateCalloutDescriptor(
+      input({ waitingForIdle: true, localHostActivity: "busy" }),
+    );
 
     expect(descriptor?.title).toBe("Update waiting");
-    expect(descriptor?.body).toEqual({ kind: "waiting", versionLabel: "v1.2.3" });
+    expect(descriptor?.body).toEqual({
+      kind: "waiting",
+      versionLabel: "v1.2.3",
+      message: "Installs as soon as no local agent is working.",
+    });
     expect(descriptor?.showGiftIcon).toBe(true);
     expect(descriptor?.actions).toEqual([
       { role: "changelog", label: "What's new" },
@@ -66,6 +72,26 @@ describe("resolveUpdateCalloutDescriptor", () => {
     ]);
     // Same key as the available callout: dismissing one hides both for this version.
     expect(descriptor?.dismissalKey).toBe("desktop-update:available:1.2.3");
+  });
+
+  it("updates a queued alert as local work finishes and resumes", () => {
+    const describeActivity = (localHostActivity: "busy" | "idle" | "unknown") =>
+      resolveUpdateCalloutDescriptor(input({ waitingForIdle: true, localHostActivity }));
+    expect(describeActivity("busy")?.title).toBe("Update waiting");
+    const idle = describeActivity("idle");
+    expect(idle?.title).toBe("Installing soon");
+    expect(idle?.body).toEqual({
+      kind: "waiting",
+      versionLabel: "v1.2.3",
+      message: "No local agents are working. Installing after 15 seconds of inactivity.",
+    });
+    expect(describeActivity("busy")?.title).toBe("Update waiting");
+    expect(describeActivity("unknown")?.body).toEqual({
+      kind: "waiting",
+      versionLabel: "v1.2.3",
+      message: "Checking local workspace activity before installing.",
+    });
+    expect(idle?.dismissalKey).toBe(describeActivity("busy")?.dismissalKey);
   });
 
   it("ignores waitingForIdle once the install has started", () => {

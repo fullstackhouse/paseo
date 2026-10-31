@@ -1,9 +1,10 @@
 import type { DesktopAppUpdateStatus } from "@/desktop/updates/use-desktop-app-updater";
+import { IDLE_INSTALL_QUIET_MS, type LocalHostActivity } from "./install-when-idle";
 import { i18n } from "@/i18n/i18next";
 
 export type UpdateCalloutBody =
   | { kind: "available"; versionLabel: string | null }
-  | { kind: "waiting"; versionLabel: string | null }
+  | { kind: "waiting"; versionLabel: string | null; message: string }
   | { kind: "installing" }
   | { kind: "error"; message: string };
 
@@ -36,8 +37,7 @@ export interface ResolveUpdateCalloutInput {
   errorMessage: string | null;
   /** FSH: the update installs on its own once the local host goes idle. */
   waitingForIdle?: boolean;
-  /** FSH: local agents are working, so offering "Install when idle" makes sense. */
-  localHostBusy?: boolean;
+  localHostActivity?: LocalHostActivity;
 }
 
 function formatVersionLabel(latestVersion: string | null | undefined): string | null {
@@ -112,8 +112,23 @@ export function resolveUpdateCalloutDescriptor(
       message: input.errorMessage ?? i18n.t("desktop.updates.callout.genericError"),
     };
   } else if (isWaiting) {
-    title = i18n.t("desktop.updates.callout.waitingTitle");
-    body = { kind: "waiting", versionLabel: formatVersionLabel(latestVersion) };
+    title = i18n.t(
+      input.localHostActivity === "idle"
+        ? "desktop.updates.callout.idleTitle"
+        : "desktop.updates.callout.waitingTitle",
+    );
+    body = {
+      kind: "waiting",
+      versionLabel: formatVersionLabel(latestVersion),
+      message: i18n.t(
+        {
+          idle: "desktop.updates.callout.idleDescription",
+          busy: "desktop.updates.callout.waitingDescription",
+          unknown: "desktop.updates.callout.checkingActivityDescription",
+        }[input.localHostActivity ?? "unknown"],
+        { seconds: IDLE_INSTALL_QUIET_MS / 1000 },
+      ),
+    };
   } else {
     title = i18n.t("desktop.updates.callout.availableTitle");
     body = { kind: "available", versionLabel: formatVersionLabel(latestVersion) };
@@ -123,7 +138,7 @@ export function resolveUpdateCalloutDescriptor(
     isError,
     isInstalling,
     isWaiting,
-    offerInstallWhenIdle: isAvailable && !isWaiting && input.localHostBusy === true,
+    offerInstallWhenIdle: isAvailable && !isWaiting && input.localHostActivity === "busy",
   });
 
   return {

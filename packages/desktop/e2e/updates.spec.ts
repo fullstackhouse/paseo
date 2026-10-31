@@ -1,6 +1,8 @@
 import { expect, test } from "../../app/e2e/support/fixtures";
 import { gotoAppShell, openSettings } from "../../app/e2e/support/helpers/app";
 import { getServerId } from "../../app/e2e/support/helpers/server-id";
+import { getE2EDaemonPort } from "../../app/e2e/support/helpers/daemon-port";
+import { seedRunningMockAgentWorkspace } from "../../app/e2e/support/helpers/mock-agent";
 import {
   openHostSection,
   openSettingsHost,
@@ -31,6 +33,57 @@ import {
 // These renderer cases use the Desktop bridge fixture. Actual Electron ownership
 // and native confirmation journeys live in daemon-lifecycle.e2e.mjs.
 test.describe("Desktop updates", () => {
+  test("queued update callout follows busy idle busy workspace activity", async ({
+    page,
+  }, testInfo) => {
+    const errors: string[] = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+    page.on("console", (message) => {
+      if (message.type() === "error") errors.push(message.text());
+    });
+    const agent = await seedRunningMockAgentWorkspace({
+      repoPrefix: "desktop-idle-update-",
+      title: "Update activity regression",
+      model: "five-minute-stream",
+      initialPrompt: "Keep working until cancelled",
+    });
+    try {
+      await installDesktopRuntime(page, {
+        serverId: getServerId(),
+        daemonListen: `127.0.0.1:${getE2EDaemonPort()}`,
+        updateAvailable: true,
+        latestVersion: "1.2.3",
+        slowInstall: true,
+      });
+      await gotoAppShell(page);
+      const callout = page.getByTestId("update-callout");
+      await callout.getByRole("button", { name: "Install when idle", exact: true }).click();
+      await expect(callout).toContainText("Update waiting");
+      await expect(callout).toContainText("Installs as soon as no local agent is working.");
+
+      await agent.client.cancelAgent(agent.agentId);
+      await expect(callout).toContainText("Installing soon");
+      await expect(callout).toContainText(
+        "No local agents are working. Installing after 15 seconds of inactivity.",
+      );
+      await testInfo.attach("idle-update-callout", {
+        body: await callout.screenshot({ path: testInfo.outputPath("idle-update-callout.png") }),
+        contentType: "image/png",
+      });
+
+      await agent.client.sendAgentMessage(agent.agentId, "Resume working until cancelled");
+      await expect(callout).toContainText("Update waiting");
+      await expect(callout).toContainText("Installs as soon as no local agent is working.");
+      await expect(callout).not.toContainText("Installing soon");
+    } finally {
+      await agent.cleanup();
+      await testInfo.attach("browser-errors", {
+        body: errors.length ? errors.join("\n") : "No browser errors",
+        contentType: "text/plain",
+      });
+    }
+  });
+
   test("a desktop-managed daemon explains why its update action is disabled", async ({
     page,
     desktopManagedOutdatedDaemon,
