@@ -15,6 +15,7 @@ import {
   useMenuContext,
   type MenuPageDefinition,
 } from "@/components/ui/menu";
+import { DropdownTrigger } from "@/components/ui/dropdown-trigger";
 import { isWeb } from "@/constants/platform";
 import type { Theme } from "@/styles/theme";
 import { confirmDialog } from "@/utils/confirm-dialog";
@@ -37,7 +38,7 @@ const SWITCHER_CREATE_PAGE_ID = "projectCategorySwitcherCreate";
 const SWITCHER_RENAME_PAGE_ID = "projectCategorySwitcherRename";
 
 const MENU_ICON_SIZE = 14;
-const SWITCHER_MENU_WIDTH = 220;
+const MENU_WIDTH = 220;
 
 const mutedMapping = (theme: Theme) => ({ color: theme.colors.foregroundMuted });
 const ThemedPlus = withUnistyles(Plus);
@@ -65,15 +66,22 @@ export function useProjectCategoryMenuPages(
         title: t("sidebar.categories.label"),
         content: <ProjectCategoryAssignPage projectViewKey={projectViewKey} />,
       },
-      {
-        id: PROJECT_CATEGORY_CREATE_PAGE_ID,
-        title: t("sidebar.categories.create"),
-        // A page you type into is not one the pointer opens or dismisses on its own.
-        hoverIntent: false,
-        content: <ProjectCategoryCreateAndAssignPage projectViewKey={projectViewKey} />,
-      },
+      createAndAssignPage(projectViewKey, t),
     ];
   }, [projectViewKey, t]);
+}
+
+function createAndAssignPage(
+  projectViewKey: string,
+  t: (key: string) => string,
+): MenuPageDefinition {
+  return {
+    id: PROJECT_CATEGORY_CREATE_PAGE_ID,
+    title: t("sidebar.categories.create"),
+    // A page you type into is not one the pointer opens or dismisses on its own.
+    hoverIntent: false,
+    content: <ProjectCategoryCreateAndAssignPage projectViewKey={projectViewKey} />,
+  };
 }
 
 /** The project menu's root row, carrying the project's current category as its value. */
@@ -95,6 +103,44 @@ export function ProjectCategorySubTrigger({
     >
       {t("sidebar.categories.label")}
     </MenuSubTrigger>
+  );
+}
+
+/**
+ * A project's category as a select-style control, for its settings page: the same choices as the
+ * `Category` row on its sidebar menu, creating a category included.
+ */
+export function ProjectCategorySelect({
+  projectViewKey,
+}: {
+  projectViewKey: string;
+}): ReactElement {
+  const { t } = useTranslation();
+  const categoryName = useProjectCategoriesStore(
+    (state) => projectCategoryOf(state, projectViewKey)?.name,
+  );
+  const pages = useMemo(() => [createAndAssignPage(projectViewKey, t)], [projectViewKey, t]);
+  const label = categoryName ?? t("sidebar.categories.none");
+  return (
+    <MenuRoot compactMode="sheet">
+      <DropdownTrigger
+        accessibilityRole="button"
+        accessibilityLabel={`${t("sidebar.categories.label")}: ${label}`}
+        testID="project-category-select"
+      >
+        {label}
+      </DropdownTrigger>
+      <MenuSurface
+        side="bottom"
+        align="end"
+        width={MENU_WIDTH}
+        pages={pages}
+        sheetTitle={t("sidebar.categories.label")}
+        testID="project-category-select-content"
+      >
+        <ProjectCategoryAssignPage projectViewKey={projectViewKey} />
+      </MenuSurface>
+    </MenuRoot>
   );
 }
 
@@ -243,7 +289,7 @@ export function ProjectCategorySwitcher(): ReactElement | null {
       </MenuTrigger>
       <MenuSurface
         align="end"
-        width={SWITCHER_MENU_WIDTH}
+        width={MENU_WIDTH}
         pages={pages}
         sheetTitle={t("sidebar.categories.label")}
         testID="sidebar-project-category-switcher-content"

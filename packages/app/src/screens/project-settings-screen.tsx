@@ -30,10 +30,12 @@ import { EditingTextInput as TextInput } from "@/components/ui/text-input";
 import { SettingsTextAreaCard } from "@/components/settings-textarea";
 import { SettingsGroup } from "@/components/settings/headings/settings-group";
 import { SettingsSection } from "@/components/settings/headings/settings-section";
+import { SettingsCard, SettingsRow } from "@/components/settings";
 import { settingsStyles } from "@/styles/settings";
 import type { Theme } from "@/styles/theme";
 import { useProjects } from "@/hooks/use-projects";
 import type { ProjectEditFormSnapshot } from "@/projects/edit-form";
+import { ProjectCategorySelect } from "@/projects/categories/menu";
 import { useProjectIcons } from "@/projects/icons";
 import { removeProjectFromHosts } from "@/projects/project-remove";
 import { createProjectIconTarget } from "@/projects/icon-target";
@@ -305,6 +307,17 @@ function ProjectSettingsBody({
         supportsCustomIcon={supportsCustomIcon}
         snapshot={editSnapshot}
       />
+
+      <SettingsSection title={t("settings.project.sidebarTitle")} testID="project-sidebar-section">
+        <SettingsCard>
+          <SettingsRow
+            label={t("sidebar.categories.label")}
+            hint={t("settings.project.categoryHint")}
+          >
+            <ProjectCategorySelect projectViewKey={project.viewKey} />
+          </SettingsRow>
+        </SettingsCard>
+      </SettingsSection>
 
       {renderContent({
         readQuery,
