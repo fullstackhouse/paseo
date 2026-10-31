@@ -1554,6 +1554,10 @@ export const ko: TranslationResources = {
         versionReady: "{{version}} 설치가 준비되었습니다.",
         newVersionReady: "새 버전 설치가 준비되었습니다.",
         restartWarning: "앱을 업그레이드하면 실행 중인 에이전트가 중지되고 터미널 세션이 닫힙니다.",
+        idleTitle: "곧 설치됩니다",
+        idleDescription:
+          "작업 중인 로컬 에이전트가 없습니다. {{seconds}}초 동안 활동이 없으면 설치합니다.",
+        checkingActivityDescription: "설치 전 로컬 작업 공간의 활동을 확인하고 있습니다.",
         waitingTitle: "업데이트 대기 중",
         waitingDescription: "로컬 에이전트가 모두 작업을 멈추면 바로 설치됩니다.",
         installWhenIdle: "유휴 시 설치",

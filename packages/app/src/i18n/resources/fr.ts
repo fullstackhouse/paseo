@@ -1579,6 +1579,11 @@ export const fr: TranslationResources = {
         newVersionReady: "Une nouvelle version est prête à être installée.",
         restartWarning:
           "La mise à jour de l’application arrêtera les agents en cours et fermera les sessions de terminal.",
+        idleTitle: "Installation imminente",
+        idleDescription:
+          "Aucun agent local ne travaille. Installation après {{seconds}} secondes d’inactivité.",
+        checkingActivityDescription:
+          "Vérification de l’activité des espaces de travail locaux avant l’installation.",
         waitingTitle: "Mise à jour en attente",
         waitingDescription: "S'installe dès qu'aucun agent local ne travaille.",
         installWhenIdle: "Installer au repos",

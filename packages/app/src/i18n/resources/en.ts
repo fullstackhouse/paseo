@@ -1570,6 +1570,10 @@ export const en = {
         versionReady: "{{version}} is ready to install.",
         newVersionReady: "A new version is ready to install.",
         restartWarning: "Upgrading the app will stop running agents and close terminal sessions.",
+        idleTitle: "Installing soon",
+        idleDescription:
+          "No local agents are working. Installing after {{seconds}} seconds of inactivity.",
+        checkingActivityDescription: "Checking local workspace activity before installing.",
         waitingTitle: "Update waiting",
         waitingDescription: "Installs as soon as no local agent is working.",
         installWhenIdle: "Install when idle",
