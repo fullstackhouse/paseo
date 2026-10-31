@@ -2965,6 +2965,9 @@ export const ja: TranslationResources = {
       backToProjects: "プロジェクトに戻る",
       removeHint:
         "このホストの Paseo からこのプロジェクトを削除します。ディスク上のファイルは変更されません。",
+      sidebarTitle: "サイドバー",
+      categoryHint:
+        "サイドバーをカテゴリで絞り込むと、そのカテゴリのプロジェクトだけが表示されます。この端末に保存されます。",
       edit: {
         title: "プロジェクトを編集",
         name: "名前",

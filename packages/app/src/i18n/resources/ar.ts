@@ -2969,6 +2969,8 @@ export const ar: TranslationResources = {
       noEditableTarget: "هذا المشروع غير متاح للتحرير على هذا المضيف.",
       backToProjects: "العودة إلى المشاريع",
       removeHint: "يزيل هذا المشروع من Paseo على هذا المضيف. لن تتغير الملفات على القرص.",
+      sidebarTitle: "الشريط الجانبي",
+      categoryHint: "صفِّ الشريط الجانبي حسب الفئة لعرض مشاريعها فقط. يُحفظ على هذا الجهاز.",
       edit: {
         title: "تعديل المشروع",
         name: "الاسم",

@@ -2949,6 +2949,9 @@ export const ko: TranslationResources = {
       backToProjects: "프로젝트로 돌아가기",
       removeHint:
         "이 호스트의 Paseo에서 이 프로젝트를 제거합니다. 디스크의 파일은 변경되지 않습니다.",
+      sidebarTitle: "사이드바",
+      categoryHint:
+        "사이드바를 카테고리로 필터링하면 해당 카테고리의 프로젝트만 표시됩니다. 이 기기에 저장됩니다.",
       edit: {
         title: "프로젝트 편집",
         name: "이름",
