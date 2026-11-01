@@ -128,7 +128,7 @@ Agents that already existed when a plugin was installed don't get its MCP tools.
 - **Upstreamable change**: open the PR against `getpaseo/paseo` from your personal fork, then merge
   its branch into `fsh` and add it to the list above.
 - **FSH-only change**: open a PR against `fsh` on this repo. CI runs on it.
-- **Refresh**: rebase `fsh` onto the latest stable upstream release tag (`v*`, no prerelease), dropping patches upstream merged. A Paseo schedule tries this every Sunday and opens a draft PR that you land by hand. Keep the
+- **Refresh**: rebase `fsh` onto the latest stable upstream release tag (`v*`, no prerelease), dropping patches upstream merged. A Paseo schedule tries this every Sunday: a low-risk result lands on `fsh` by itself; anything else stays a draft PR for you to land. Keep the
   `fsh`-only commits (this file, the pointers at the top of
   `README.md` / `CLAUDE.md`, `.github/workflows/fsh-desktop.yml`, `.github/workflows/fsh-android.yml`, `.github/workflows/fsh-cli.yml`, `scripts/install-fsh.sh`,
   the `fsh` variant in `packages/app/app.config.js` and `plugins/with-fsh-release-signing.js`).
