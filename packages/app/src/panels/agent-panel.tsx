@@ -1108,6 +1108,7 @@ const ChatAgentReadyContent = memo(function ChatAgentReadyContent({
     rows: subagentRows,
   });
   const hasPluginComposerPills = useHasPluginComposerPills(serverId, workspaceId, agentId);
+  const [composerTrackExtraHeight, setComposerTrackExtraHeight] = useState(0);
   const hasActiveComposer = !agentState.archivedAt && !isArchivingCurrentAgent;
   const hasVisibleAgentTracks = hasAgentTracks({
     subagentRows,
@@ -1194,6 +1195,7 @@ const ChatAgentReadyContent = memo(function ChatAgentReadyContent({
           hasAppliedAuthoritativeHistory={hasAppliedAuthoritativeHistory}
           hasActiveComposer={hasActiveComposer}
           hasVisibleAgentTracks={hasVisibleAgentTracks}
+          composerTrackExtraHeight={composerTrackExtraHeight}
           toast={toastApi}
           onOpenWorkspaceFile={onOpenWorkspaceFile}
         />
@@ -1208,6 +1210,7 @@ const ChatAgentReadyContent = memo(function ChatAgentReadyContent({
           archiveFinishedStatus={archiveFinishedSubagents.status}
           onArchiveFinished={archiveFinishedSubagents.archiveFinished}
           hasPluginComposerPills={hasPluginComposerPills}
+          onExtraHeightChange={setComposerTrackExtraHeight}
         />
       ) : null}
     </View>
@@ -1329,6 +1332,7 @@ const AgentStreamSection = memo(function AgentStreamSection({
   hasAppliedAuthoritativeHistory,
   hasActiveComposer,
   hasVisibleAgentTracks,
+  composerTrackExtraHeight,
   toast,
   onOpenWorkspaceFile,
 }: {
@@ -1341,6 +1345,7 @@ const AgentStreamSection = memo(function AgentStreamSection({
   hasAppliedAuthoritativeHistory: boolean;
   hasActiveComposer: boolean;
   hasVisibleAgentTracks: boolean;
+  composerTrackExtraHeight: number;
   toast: ReturnType<typeof useToastHost>["api"];
   onOpenWorkspaceFile?: (request: WorkspaceFileOpenRequest) => void;
 }) {
@@ -1349,10 +1354,10 @@ const AgentStreamSection = memo(function AgentStreamSection({
   const hasVisibleComposerTracks =
     hasActiveComposer && (hasVisibleAgentTracks || hasWorkspaceDiffStat);
   const bottomOverlayTailClearance = hasVisibleComposerTracks
-    ? resolveComposerTrackTailClearance(isCompactFormFactor)
+    ? resolveComposerTrackTailClearance(isCompactFormFactor) + composerTrackExtraHeight
     : 0;
   const bottomOverlayControlClearance = hasVisibleComposerTracks
-    ? resolveComposerTrackControlClearance(isCompactFormFactor)
+    ? resolveComposerTrackControlClearance(isCompactFormFactor) + composerTrackExtraHeight
     : 0;
   const streamItemsRaw = useSessionStore((state) =>
     agentId ? state.sessions[serverId]?.agentStreamTail?.get(agentId) : undefined,
