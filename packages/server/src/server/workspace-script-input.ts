@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdir, writeFile } from "node:fs/promises";
 import { tmpdir, userInfo } from "node:os";
 import { basename, join } from "node:path";
 
@@ -38,7 +38,9 @@ export interface BuildWorkspaceScriptInputOptions {
  * doesn't speak it (fish, nu, pwsh) gets `/bin/sh <file>` instead: plain words parse the same in every
  * shell, and the script inherits the terminal's environment and working directory.
  */
-export function buildWorkspaceScriptInput(options: BuildWorkspaceScriptInputOptions): string {
+export async function buildWorkspaceScriptInput(
+  options: BuildWorkspaceScriptInputOptions,
+): Promise<string> {
   const platform = options.platform ?? process.platform;
   if (platform === "win32" || shellParsesPosixCommands(options.shell)) {
     return `${options.command}\r`;
@@ -51,7 +53,7 @@ export function buildWorkspaceScriptInput(options: BuildWorkspaceScriptInputOpti
       `Can't run workspace scripts from ${options.shell}: the script path ${scriptPath} needs quoting. Set SHELL to a POSIX shell for the daemon.`,
     );
   }
-  mkdirSync(scriptDir, { recursive: true, mode: 0o700 });
-  writeFileSync(scriptPath, `${options.command}\n`, { mode: 0o600 });
+  await mkdir(scriptDir, { recursive: true, mode: 0o700 });
+  await writeFile(scriptPath, `${options.command}\n`, { mode: 0o600 });
   return `/bin/sh ${scriptPath}\r`;
 }

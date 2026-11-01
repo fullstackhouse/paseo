@@ -420,10 +420,10 @@ describe("Claude runtime exit", () => {
 
       // The retired query still had this queued when the restart emptied the list.
       deliverLateEvent?.(BACKGROUND_SHELL_TURN_EVENTS[1]);
-      // One next() per scripted event, one for the late event, and one that ends
-      // the stream once the late event has been routed.
+      // One next() per scripted event and one for the late event; the pump stops
+      // there because the query no longer owns the session.
       await vi.waitFor(() =>
-        expect(retiredQuery?.next).toHaveBeenCalledTimes(BACKGROUND_SHELL_TURN_EVENTS.length + 2),
+        expect(retiredQuery?.next).toHaveBeenCalledTimes(BACKGROUND_SHELL_TURN_EVENTS.length + 1),
       );
 
       const backgroundWork = events.filter((event) => event.type === "background_work");

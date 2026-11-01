@@ -32,15 +32,20 @@ describe("buildWorkspaceScriptInput", () => {
     rmSync(join(scriptDir, ".."), { recursive: true, force: true });
   });
 
-  it("types the command into a POSIX shell unchanged", () => {
+  it("types the command into a POSIX shell unchanged", async () => {
     expect(
-      buildWorkspaceScriptInput({ command: COMMAND, shell: "/bin/zsh", scriptKey: "k", scriptDir }),
+      await buildWorkspaceScriptInput({
+        command: COMMAND,
+        shell: "/bin/zsh",
+        scriptKey: "k",
+        scriptDir,
+      }),
     ).toBe(`${COMMAND}\r`);
   });
 
-  it("types the command unchanged on Windows", () => {
+  it("types the command unchanged on Windows", async () => {
     expect(
-      buildWorkspaceScriptInput({
+      await buildWorkspaceScriptInput({
         command: COMMAND,
         shell: "C:\\Windows\\System32\\cmd.exe",
         platform: "win32",
@@ -53,8 +58,8 @@ describe("buildWorkspaceScriptInput", () => {
   // The /bin/sh path only exists off Windows, where scripts are typed into the shell unchanged.
   it.skipIf(isPlatform("win32"))(
     "runs the command through /bin/sh from a script file for other shells",
-    () => {
-      const input = buildWorkspaceScriptInput({
+    async () => {
+      const input = await buildWorkspaceScriptInput({
         command: COMMAND,
         shell: "/opt/homebrew/bin/fish",
         scriptKey: "abc123",
@@ -66,14 +71,17 @@ describe("buildWorkspaceScriptInput", () => {
     },
   );
 
-  it.skipIf(isPlatform("win32"))("refuses a script path the shell would have to unquote", () => {
-    expect(() =>
-      buildWorkspaceScriptInput({
-        command: COMMAND,
-        shell: "/opt/homebrew/bin/fish",
-        scriptKey: "k",
-        scriptDir: join(scriptDir, "with space"),
-      }),
-    ).toThrow(/needs quoting/);
-  });
+  it.skipIf(isPlatform("win32"))(
+    "refuses a script path the shell would have to unquote",
+    async () => {
+      await expect(
+        buildWorkspaceScriptInput({
+          command: COMMAND,
+          shell: "/opt/homebrew/bin/fish",
+          scriptKey: "k",
+          scriptDir: join(scriptDir, "with space"),
+        }),
+      ).rejects.toThrow(/needs quoting/);
+    },
+  );
 });
