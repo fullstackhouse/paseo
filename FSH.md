@@ -133,10 +133,11 @@ Agents that already existed when a plugin was installed don't get its MCP tools.
 - **FSH-only change**: open a PR against `fsh` on this repo. CI runs on it.
 - **Refresh**: recreate `fsh` from `upstream/main`, re-merge the still-open patches, drop the ones
   upstream merged, and keep the `fsh`-only commits (this file, the pointers at the top of
-  `README.md` / `CLAUDE.md`, `.github/workflows/fsh-desktop.yml`, `.github/workflows/fsh-android.yml`, `scripts/install-fsh.sh`,
+  `README.md` / `CLAUDE.md`, `.github/workflows/fsh-desktop.yml`, `.github/workflows/fsh-android.yml`, `.github/workflows/fsh-cli.yml`, `scripts/install-fsh.sh`,
   the `fsh` variant in `packages/app/app.config.js` and `plugins/with-fsh-release-signing.js`).
 - **Build**: every push to `fsh` (except edits to this file, `README.md` or `docs/fsh/`) builds the DMG and the Android APK
   and publishes a release for each (`fsh-*`, `fsh-android-*`).
+- **Servers**: the same pushes build the Linux CLI and daemon bundle (`fsh-cli-*`, `.github/workflows/fsh-cli.yml`). The FSH agent box pins one by tag and sha256.
   The build runs upstream's packaged-app smoke test first. You can also start it by hand:
   Actions → FSH desktop build → Run workflow.
   To test a PR's desktop build, add the `deploy` label: every push then publishes a prerelease `fsh-pr<N>-<sha>`
