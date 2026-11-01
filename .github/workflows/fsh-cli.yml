@@ -1,0 +1,111 @@
+# FSH fork: the Paseo CLI and daemon for Linux servers, so the agent box can run the fork.
+#
+# - Pull requests into `fsh`: build, install and smoke-test the bundle (a gate).
+# - Pushes to `fsh`: also publish it on a GitHub Release (`fsh-cli-*`).
+#
+# The bundle holds the same `npm pack` tarballs as docker/base/Dockerfile. To install, unpack it
+# and run `npm install -g *.tgz`. hetzner/agent-box in fsh-monorepo pins a release by tag and
+# sha256. Native dependencies resolve at install time; the arm64 runner matches that box.
+name: FSH CLI build
+
+on:
+  push:
+    branches: [fsh]
+    paths-ignore: [FSH.md, README.md, "docs/fsh/**"]
+  pull_request:
+    branches: [fsh]
+    paths:
+      - packages/cli/**
+      - packages/client/**
+      - packages/highlight/**
+      - packages/plugin/**
+      - packages/protocol/**
+      - packages/relay/**
+      - packages/server/**
+      - package-lock.json
+      - .github/workflows/fsh-cli.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: fsh-cli-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  ONNXRUNTIME_NODE_INSTALL: skip
+
+jobs:
+  bundle:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: package-lock.json
+
+      - name: Install JS dependencies
+        run: node scripts/npm-retry.mjs ci
+
+      - name: Pack
+        run: |
+          set -euo pipefail
+          version="$(node -p 'require("./packages/cli/package.json").version')"
+          bundle="paseo-fsh-cli-${version}-${GITHUB_SHA::7}.tgz"
+          packs="$RUNNER_TEMP/packs"
+          mkdir -p "$packs"
+          for package in highlight relay protocol client plugin server cli; do
+            npm pack --workspace="@getpaseo/$package" --pack-destination "$packs"
+          done
+          tar -czf "$RUNNER_TEMP/$bundle" -C "$packs" .
+          (cd "$RUNNER_TEMP" && sha256sum "$bundle" > "$bundle.sha256")
+          echo "CLI_VERSION=$version" >> "$GITHUB_ENV"
+          echo "CLI_BUNDLE=$RUNNER_TEMP/$bundle" >> "$GITHUB_ENV"
+
+      - name: Smoke test the installed daemon
+        run: |
+          set -euo pipefail
+          unpacked="$RUNNER_TEMP/unpacked"
+          mkdir -p "$unpacked"
+          tar -xzf "$CLI_BUNDLE" -C "$unpacked"
+          npm install -g "$unpacked"/*.tgz
+          test "$(paseo --version)" = "$CLI_VERSION"
+          export PASEO_HOME="$RUNNER_TEMP/home"
+          paseo daemon config set daemon.listen 127.0.0.1:6767
+          paseo daemon config set daemon.relay.enabled false
+          paseo daemon config set features.webUi.enabled true
+          paseo daemon run > "$RUNNER_TEMP/daemon.log" 2>&1 &
+          trap 'kill %1 || true; tail -40 "$RUNNER_TEMP/daemon.log"' EXIT
+          curl --fail --silent --show-error --retry 20 --retry-delay 3 --retry-connrefused \
+            --output "$RUNNER_TEMP/web-ui.html" http://127.0.0.1:6767/
+          test -s "$RUNNER_TEMP/web-ui.html"
+          paseo schedule ls --json
+          paseo hub status --json
+
+      - name: Upload artifact
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: paseo-fsh-cli
+          path: |
+            ${{ env.CLI_BUNDLE }}
+            ${{ env.CLI_BUNDLE }}.sha256
+          retention-days: 7
+
+      - name: Publish release
+        if: github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          gh release create "fsh-cli-${CLI_VERSION}-${GITHUB_SHA::7}" \
+            "$CLI_BUNDLE" "$CLI_BUNDLE.sha256" \
+            --target "$GITHUB_SHA" \
+            --latest=false \
+            --title "Paseo CLI ${CLI_VERSION} (FSH ${GITHUB_SHA::7})" \
+            --notes "CLI and daemon bundle of \`fsh\` for Linux servers. sha256: \`$(cut -d' ' -f1 "$CLI_BUNDLE.sha256")\`"
