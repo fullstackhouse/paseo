@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState, type ReactElement, type ReactNode } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Pressable, Text, View, type LayoutChangeEvent } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import {
   MENU_ITEM_HEIGHT,
@@ -18,24 +18,45 @@ import { isWeb } from "@/constants/platform";
 import { getStatusDotColor } from "@/utils/status-dot-color";
 import { STATUS_INDICATOR_FILLED_DOT_SIZE } from "@/utils/status-indicator-geometry";
 import type { SidebarStateBucket } from "@/utils/sidebar-agent-state";
-import { COMPOSER_PILL_CLEARANCE, composerPillStyles } from "./pill-styles";
+import {
+  COMPOSER_PILL_CLEARANCE,
+  COMPOSER_PILL_MIN_HEIGHT,
+  composerPillStyles,
+} from "./pill-styles";
 
 /**
  * The strip of pills where a pane's ambient trackers and plugin actions live.
  *
  * Trackers expose a count and a detail panel; plugin actions expose their own icon and text.
  * Trackers used to be stacked cards, so every one of them pushed the composer further down the
- * pane. Built-in and contributed pills share this one-line rail and its deterministic geometry
- * on every platform.
+ * pane. Built-in and contributed pills share this rail on every platform.
  *
  * The bar floats over the transcript with no background, so content remains visible underneath.
  * Its host gives the scroll viewport a small bottom inset only when the bar exists; that keeps
  * the final footer clear without turning the overlay into a layout band.
+ *
+ * Pills that don't fit wrap upward onto more rows instead of shrinking: squeezed plugin pills lost
+ * their whole label, count included. The clearances assume one row, so a bar that can wrap reports
+ * the height of the rows above the first through `onExtraHeightChange`.
  */
-export function ComposerTrackBar({ children }: { children: ReactNode }): ReactElement {
+export function ComposerTrackBar({
+  children,
+  onExtraHeightChange,
+}: {
+  children: ReactNode;
+  onExtraHeightChange?: (height: number) => void;
+}): ReactElement {
+  const handleLayout = useCallback(
+    (event: LayoutChangeEvent) => {
+      onExtraHeightChange?.(
+        Math.max(0, event.nativeEvent.layout.height - COMPOSER_PILL_MIN_HEIGHT),
+      );
+    },
+    [onExtraHeightChange],
+  );
   return (
     <View style={styles.bar} pointerEvents="box-none">
-      <View style={styles.track} pointerEvents="box-none">
+      <View style={styles.track} pointerEvents="box-none" onLayout={handleLayout}>
         {children}
       </View>
     </View>
@@ -372,6 +393,7 @@ const styles = StyleSheet.create((theme) => {
       width: "100%",
       maxWidth: theme.contentMaxWidth,
       flexDirection: "row",
+      flexWrap: "wrap",
       alignItems: "center",
       gap: theme.spacing[1],
     },
