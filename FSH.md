@@ -6,7 +6,6 @@ temporary by design: every patch is meant to go upstream and then drop out of `f
 
 ## Patches on `fsh`
 
-- getpaseo/paseo#7514: chat links to folders outside the workspace open in the file manager
 - getpaseo/paseo#7692: Cmd+Shift+[ / ] for previous/next tab on macOS desktop
 - getpaseo/paseo#7645: plugins can add items to sidebar workspace rows
 - getpaseo/paseo#6220: clients and plugins can see an agent's background work
@@ -14,9 +13,7 @@ temporary by design: every patch is meant to go upstream and then drop out of `f
 - FSH-only (not upstream yet): host setting for the mode an agent switches to after plan approval, per provider (Claude, Codex), under host Settings → Agents. Applies to approvals from the app, MCP and CLI
 - FSH-only (upstreamable): approving a Claude plan from Bypass offers **Implement with Auto mode** as the highlighted action, next to **Implement with Bypass**, when the host can run Auto
 - FSH-only (not upstream yet): changed images in the Changes diff and commit diffs show a before/after preview instead of "Binary file" (PNG, JPEG, GIF, WebP, BMP up to 8 MB per side). getpaseo/paseo#1813 tried this upstream and was closed; discussion getpaseo/paseo#5689 tracks it
-- getpaseo/paseo#7955 (cherry-picked, merged upstream): retry brief Windows file locks during atomic writes. Drop at the next refresh
 - FSH-only (upstreamable): F-Droid builds link the app's own native modules (`packages/app/modules`); before, `paseo-scroll` was never linked and the build failed to compile
-- FSH-only (not upstream yet): the connected-hosts batching test holds the parent's batch with an injected scheduler instead of racing the 2-second quiet window against a cold CLI spawn
 - FSH-only (upstreamable): hovering a sidebar workspace row shows an Archive button beside its menu, so archiving takes one click. Off by default; turn it on under Show > Archive button in the sidebar's display menu. Desktop and web only; touch keeps the menu
 - FSH-only (not upstream yet): project categories. Put each project in a category from its menu or its settings page (Settings → Projects → project), then pick a category in the Workspaces header so the sidebar shows only that category's projects. Categories are stored per device
 - FSH-only (not upstream yet): docs and a `paseo-run` skill for running a branch, or testing a plugin, next to the Paseo you work in
@@ -130,8 +127,8 @@ Agents that already existed when a plugin was installed don't get its MCP tools.
 - **Upstreamable change**: open the PR against `getpaseo/paseo` from your personal fork, then merge
   its branch into `fsh` and add it to the list above.
 - **FSH-only change**: open a PR against `fsh` on this repo. CI runs on it.
-- **Refresh**: recreate `fsh` from `upstream/main`, re-merge the still-open patches, drop the ones
-  upstream merged, and keep the `fsh`-only commits (this file, the pointers at the top of
+- **Refresh**: rebase `fsh` onto the latest stable upstream release tag (`v*`, no prerelease), dropping patches upstream merged. A Paseo schedule tries this every Sunday and opens a draft PR when the result is risky. Keep the
+  `fsh`-only commits (this file, the pointers at the top of
   `README.md` / `CLAUDE.md`, `.github/workflows/fsh-desktop.yml`, `.github/workflows/fsh-android.yml`, `scripts/install-fsh.sh`,
   the `fsh` variant in `packages/app/app.config.js` and `plugins/with-fsh-release-signing.js`).
 - **Build**: every push to `fsh` (except edits to this file, `README.md` or `docs/fsh/`) builds the DMG and the Android APK

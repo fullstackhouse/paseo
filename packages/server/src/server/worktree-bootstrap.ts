@@ -668,17 +668,15 @@ export async function spawnWorkspaceScript(
     if (!reusableTerminal) {
       await waitForTerminalBootstrapReadiness(terminal);
     }
-    terminal.send({
-      type: "input",
-      data: buildWorkspaceScriptInput({
-        command: config.command,
-        shell: resolveDefaultTerminalShell(),
-        scriptKey: createHash("sha256")
-          .update(`${workspaceId}\0${scriptName}`)
-          .digest("hex")
-          .slice(0, 16),
-      }),
+    const scriptInput = await buildWorkspaceScriptInput({
+      command: config.command,
+      shell: resolveDefaultTerminalShell(),
+      scriptKey: createHash("sha256")
+        .update(`${workspaceId}\0${scriptName}`)
+        .digest("hex")
+        .slice(0, 16),
     });
+    terminal.send({ type: "input", data: scriptInput });
 
     logger?.info(
       {
