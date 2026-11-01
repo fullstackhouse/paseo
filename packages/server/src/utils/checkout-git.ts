@@ -1,7 +1,7 @@
 import { MAX_RELAY_WEBSOCKET_MESSAGE_BYTES } from "@getpaseo/protocol/websocket-message-limit";
 import { getDiffImageMimeType } from "@getpaseo/protocol/diff-image";
 import { resolve, dirname, basename, relative, isAbsolute, sep } from "path";
-import { constants as fsConstants, existsSync, realpathSync } from "fs";
+import { constants as fsConstants } from "fs";
 import {
   open as openFile,
   readFile,
