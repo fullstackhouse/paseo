@@ -3,7 +3,12 @@ import { createRoot, type Root } from "react-dom/client";
 import { Pressable, Text } from "react-native";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { RetainedPanelActivity } from "@/components/retained-panel";
-import { ComposerTrackPill, ComposerTrackRow, type ComposerTrackPillSegment } from "./tracks";
+import {
+  ComposerTrackBar,
+  ComposerTrackPill,
+  ComposerTrackRow,
+  type ComposerTrackPillSegment,
+} from "./tracks";
 
 const SUBAGENT_SEGMENTS: ComposerTrackPillSegment[] = [{ bucket: null, text: "3 subagents" }];
 
@@ -275,5 +280,34 @@ describe("composer track pill status mark", () => {
     // The ring is the only mark that animates, so its presence proves the second state survived.
     const animated = segments[1]?.querySelectorAll("*") ?? [];
     expect([...animated].filter((element) => element.getAnimations().length > 0)).toHaveLength(1);
+  });
+});
+
+const NARROW_PANE_STYLE = { position: "relative", width: 240, height: 80 } as const;
+const SHRINKABLE_PILL_STYLE = { flexShrink: 1, minWidth: 0, maxWidth: 160 };
+
+describe("ComposerTrackBar", () => {
+  it("wraps pills that do not fit and reports the extra rows' height", async () => {
+    const onExtraHeightChange = vi.fn();
+    const container = mount(
+      <div style={NARROW_PANE_STYLE}>
+        <ComposerTrackBar onExtraHeightChange={onExtraHeightChange}>
+          {["Asks · 3", "Waiting on you · 3m", "PR #25 draft", "+367 -0"].map((label) => (
+            <Pressable key={label} testID={label} style={SHRINKABLE_PILL_STYLE}>
+              <Text numberOfLines={1}>{label}</Text>
+            </Pressable>
+          ))}
+        </ComposerTrackBar>
+      </div>,
+    );
+
+    const asks = container.querySelector('[data-testid="Asks · 3"]') as HTMLElement;
+    const label = asks.firstElementChild as HTMLElement;
+    expect(label.clientWidth).toBeGreaterThan(0);
+    expect(label.scrollWidth).toBeLessThanOrEqual(label.clientWidth);
+
+    const diff = container.querySelector('[data-testid="+367 -0"]') as HTMLElement;
+    expect(diff.getBoundingClientRect().top).toBeGreaterThan(asks.getBoundingClientRect().top);
+    await vi.waitFor(() => expect(onExtraHeightChange.mock.lastCall?.[0]).toBeGreaterThan(0));
   });
 });
