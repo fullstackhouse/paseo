@@ -6747,13 +6747,13 @@ describe("Codex app-server provider", () => {
       const events: AgentStreamEvent[] = [];
       session.subscribe((event) => events.push(event));
 
-      asInternals(session).handleNotification("turn/started", {
+      await asInternals(session).handleNotification("turn/started", {
         turn: { id: "turn-plan-mode" },
       });
-      asInternals(session).handleNotification("turn/plan/updated", {
+      await asInternals(session).handleNotification("turn/plan/updated", {
         plan: [{ step: "Implement the flow", status: "pending" }],
       });
-      asInternals(session).handleNotification("turn/completed", {
+      await asInternals(session).handleNotification("turn/completed", {
         turn: { status: "completed", error: null },
       });
 
