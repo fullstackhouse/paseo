@@ -26,13 +26,24 @@ function setup(overrides: Partial<FshUpdaterDeps> = {}) {
 }
 
 describe("parseLatestReleaseVersion", () => {
+  const assets = [{ name: "Paseo-0.13.0-arm64.dmg" }, { name: "Paseo-0.13.0-x86_64.rpm" }];
+
   it("strips the fsh- prefix from the release tag", () => {
-    expect(parseLatestReleaseVersion({ tag_name: `fsh-${NEWER}` })).toBe(NEWER);
+    expect(parseLatestReleaseVersion({ tag_name: `fsh-${NEWER}`, assets }, "rpm")).toBe(NEWER);
   });
 
   it("rejects a release that isn't an FSH desktop build", () => {
-    expect(() => parseLatestReleaseVersion({ tag_name: "v0.13.0" })).toThrow(/FSH desktop/);
-    expect(() => parseLatestReleaseVersion({})).toThrow(/FSH desktop/);
+    expect(() => parseLatestReleaseVersion({ tag_name: "v0.13.0", assets }, "dmg")).toThrow(
+      /FSH desktop/,
+    );
+    expect(() => parseLatestReleaseVersion({}, "dmg")).toThrow(/FSH desktop/);
+    expect(() => parseLatestReleaseVersion(null, "dmg")).toThrow(/FSH desktop/);
+  });
+
+  it("rejects a release without this platform's package", () => {
+    const macOnly = { tag_name: `fsh-${NEWER}`, assets: [{ name: "Paseo-0.13.0-arm64.dmg" }] };
+    expect(parseLatestReleaseVersion(macOnly, "dmg")).toBe(NEWER);
+    expect(() => parseLatestReleaseVersion(macOnly, "rpm")).toThrow(/no \.rpm/);
   });
 });
 
