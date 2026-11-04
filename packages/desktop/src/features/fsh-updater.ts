@@ -36,8 +36,8 @@ const errorMessage = (error: unknown): string =>
 
 /**
  * The FSH build in GitHub's latest release. `assetExtension` is the package install-fsh.sh
- * installs on this platform (`dmg`, `rpm`): the macOS and Linux builds are separate CI jobs,
- * so a release can ship without one of them, and offering it would run a script that fails.
+ * installs on this platform (`dmg`, `rpm`). CI publishes a release only when both build, but
+ * releases from before the Linux build have no RPM, and offering one would run a script that fails.
  */
 export function parseLatestReleaseVersion(release: unknown, assetExtension: string): string {
   if (typeof release !== "object" || release === null) {

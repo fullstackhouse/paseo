@@ -42,13 +42,14 @@ case "$(uname -s)/$(uname -m)" in
   *) die "macOS on Apple Silicon or x86_64 Linux with dnf only." ;;
 esac
 
-# Every process running the app's executable, minus the daemon and CLI: on Linux those run the same
-# binary as Node (ELECTRON_RUN_AS_NODE) through node-entrypoint-runner. An upgraded RPM leaves the
-# running copy's exe link as "/opt/Paseo/Paseo (deleted)", hence the prefix match.
+# Every process running the Electron binary, minus the daemon and CLI: those run the same binary as
+# Node (ELECTRON_RUN_AS_NODE) through node-entrypoint-runner. /opt/Paseo/Paseo is a shell launcher
+# (packages/desktop/scripts/linux-sandbox/launcher.sh) that execs /opt/Paseo/Paseo.bin, so exe links
+# point at Paseo.bin. An upgraded RPM leaves them as "Paseo.bin (deleted)", hence the prefix match.
 linux_app_pids() {
   local exe pid
   for exe in /proc/[0-9]*/exe; do
-    [[ "$(readlink "$exe" 2>/dev/null)" == "$APP/Paseo"* ]] || continue
+    [[ "$(readlink "$exe" 2>/dev/null)" == "$APP/Paseo.bin"* ]] || continue
     pid="${exe#/proc/}" pid="${pid%/exe}"
     tr '\0' ' ' <"/proc/$pid/cmdline" 2>/dev/null | grep -q node-entrypoint-runner && continue
     echo "$pid"
@@ -80,15 +81,16 @@ open_app() {
   fi
 }
 
-# sudo when someone can type the password, pkexec (a desktop password dialog) when the in-app
-# updater runs this script detached from any terminal.
-as_root() {
+# How dnf gets root: sudo when someone can type the password, pkexec (a desktop password dialog)
+# when the in-app updater runs this script detached from any terminal. Picked before Paseo quits,
+# so a machine with neither stops here with the app still running.
+pick_root() {
   if [[ $EUID -eq 0 ]]; then
-    "$@"
+    ROOT=()
   elif sudo -n true 2>/dev/null || { : </dev/tty; } 2>/dev/null; then
-    sudo "$@"
+    ROOT=(sudo)
   elif command -v pkexec >/dev/null; then
-    pkexec "$@"
+    ROOT=(pkexec)
   else
     die "Installing the RPM needs root: rerun this script in a terminal."
   fi
@@ -119,6 +121,7 @@ else
     trap 'rm -rf "$tmp"' EXIT
   fi
   curl -fL --progress-bar -o "$tmp/paseo.$ASSET" "$asset_url"
+  [[ $OS == mac ]] || pick_root
 
   # Every FSH build reports the same version, so neither the app nor the daemon notices a swap
   # underneath it. Quit both, or the old build keeps running.
@@ -162,7 +165,7 @@ else
     fi
     # dnf runs as root and can't read a private mktemp dir; hand it a world-readable copy.
     chmod 755 "$tmp" && chmod 644 "$tmp/paseo.rpm"
-    if ! as_root dnf "$action" -y "$tmp/paseo.rpm"; then
+    if ! "${ROOT[@]}" dnf "$action" -y "$tmp/paseo.rpm"; then
       installed && open_app
       die "dnf $action failed; the previous build is still installed."
     fi
