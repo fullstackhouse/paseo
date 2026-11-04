@@ -66,8 +66,8 @@ Once installed, Paseo checks every 30 minutes whether GitHub's latest release is
 the release tag stamped into the app). If it is, an **Update available** callout appears at the bottom of the sidebar.
 **Install & restart** runs this script with `--yes` in the background and writes its output to `fsh-update.log` in
 the app's log folder (`~/Library/Logs/Paseo`, `~/.config/Paseo/logs` on Linux). With no terminal to type a `sudo`
-password into, the Linux install asks through `pkexec`'s desktop dialog. A release whose Linux build failed has no RPM,
-so Linux installs aren't offered it. Settings → App updates runs the same check. If the app was replaced on
+password into, the Linux install asks through `pkexec`'s desktop dialog. Releases from before the Linux build have no
+RPM, so Linux installs aren't offered them. Settings → App updates runs the same check. If the app was replaced on
 disk some other way, the callout offers a plain restart. Builds from before this updater have no stamp, so run the
 script by hand once.
 
@@ -138,8 +138,9 @@ Agents that already existed when a plugin was installed don't get its MCP tools.
   `README.md` / `CLAUDE.md`, `.github/workflows/fsh-desktop.yml`, `.github/workflows/fsh-android.yml`, `.github/workflows/fsh-cli.yml`, `scripts/install-fsh.sh`,
   the `fsh` variant in `packages/app/app.config.js` and `plugins/with-fsh-release-signing.js`).
 - **Build**: every push to `fsh` (except edits to this file, `README.md` or `docs/fsh/`) builds the DMG, the Linux RPM and the Android APK
-  and publishes a release for the desktop pair and one for Android (`fsh-*`, `fsh-android-*`). A failed RPM build
-  doesn't hold back the DMG: that release ships without an RPM.
+  and publishes a release for the desktop pair and one for Android (`fsh-*`, `fsh-android-*`). The desktop release
+  waits for both: if one build fails, nothing ships, so macOS and Linux stay on the same commit. For a flaky build, use
+  **Re-run failed jobs**.
 - **Servers**: the same pushes build the Linux CLI and daemon bundle (`fsh-cli-*`, `.github/workflows/fsh-cli.yml`). The FSH agent box pins one by tag and sha256.
   The build runs upstream's packaged-app smoke test first. You can also start it by hand:
   Actions → FSH desktop build → Run workflow.
