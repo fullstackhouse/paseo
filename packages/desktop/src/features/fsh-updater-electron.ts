@@ -61,7 +61,10 @@ export function createElectronFshUpdater(deps: { stopDaemon(): Promise<void> }):
         signal: AbortSignal.timeout(15_000),
       });
       if (!response.ok) throw new Error(`GitHub answered ${response.status}.`);
-      return parseLatestReleaseVersion(await response.json());
+      return parseLatestReleaseVersion(
+        await response.json(),
+        process.platform === "linux" ? "rpm" : "dmg",
+      );
     },
     async readExecutableIdentity() {
       return String((await stat(process.execPath)).ino);

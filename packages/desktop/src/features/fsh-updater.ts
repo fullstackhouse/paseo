@@ -34,13 +34,30 @@ export interface FshUpdater {
 const errorMessage = (error: unknown): string =>
   error instanceof Error ? error.message : String(error);
 
-export function parseLatestReleaseVersion(release: unknown): string {
-  const tag =
-    typeof release === "object" && release !== null && "tag_name" in release
-      ? release.tag_name
-      : null;
+/**
+ * The FSH build in GitHub's latest release. `assetExtension` is the package install-fsh.sh
+ * installs on this platform (`dmg`, `rpm`): the macOS and Linux builds are separate CI jobs,
+ * so a release can ship without one of them, and offering it would run a script that fails.
+ */
+export function parseLatestReleaseVersion(release: unknown, assetExtension: string): string {
+  if (typeof release !== "object" || release === null) {
+    throw new Error("The latest release isn't an FSH desktop build.");
+  }
+  const tag = "tag_name" in release ? release.tag_name : null;
   if (typeof tag !== "string" || !tag.startsWith("fsh-")) {
     throw new Error("The latest release isn't an FSH desktop build.");
+  }
+  const assets = "assets" in release && Array.isArray(release.assets) ? release.assets : [];
+  const hasPackage = assets.some(
+    (asset: unknown) =>
+      typeof asset === "object" &&
+      asset !== null &&
+      "name" in asset &&
+      typeof asset.name === "string" &&
+      asset.name.endsWith(`.${assetExtension}`),
+  );
+  if (!hasPackage) {
+    throw new Error(`The latest FSH release (${tag}) has no .${assetExtension} for this platform.`);
   }
   return tag.slice("fsh-".length);
 }
