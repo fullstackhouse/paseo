@@ -224,12 +224,12 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-  # One release per commit with both packages. A failed Linux build doesn't hold back the DMG:
-  # the release ships without the RPM. The in-app updater on Linux doesn't offer that release, and
-  # install-fsh.sh stops with "No .rpm found" until a later build has one.
+  # One release per commit with both packages, and none unless both built. Shipping the DMG alone
+  # would leave Linux installs on an older commit with the same version number, and fresh Linux
+  # installs with nothing to install (install-fsh.sh only looks at the latest release). A flaky
+  # Linux job costs a "Re-run failed jobs"; publish then runs on the DMG already built.
   publish:
     needs: [macos-arm64, linux-x64]
-    if: always() && needs.macos-arm64.result == 'success'
     runs-on: ubuntu-latest
     env:
       FSH_PRERELEASE: ${{ github.ref != 'refs/heads/fsh' }}
@@ -255,14 +255,9 @@ jobs:
           set -euo pipefail
           version="$FSH_VERSION"
           tag="$FSH_TAG"
-          shopt -s nullglob
           files=(release-assets/*.dmg release-assets/*.rpm)
           unsigned="Unsigned: after copying to Applications, run \`xattr -cr /Applications/Paseo.app\` once."
-          if compgen -G 'release-assets/*.rpm' >/dev/null; then
-            linux="Fedora: \`sudo dnf install ./Paseo-*.rpm\`, or the install script."
-          else
-            linux="No Linux RPM in this build: the Linux job failed."
-          fi
+          rpm="\`sudo dnf install ./Paseo-*.rpm\`"
           if [[ "$FSH_PRERELEASE" == "true" ]]; then
             # Rebuilding the same commit (relabel, re-run) replaces its prerelease.
             gh release delete "$tag" --cleanup-tag --yes 2>/dev/null || true
@@ -271,12 +266,12 @@ jobs:
               --target "$(git rev-parse HEAD)" \
               --prerelease --latest=false \
               --title "Paseo ${version} test build (${source//\`/} ${FSH_SHA})" \
-              --notes "Test build of ${source} ($(git log -1 --format=%h)). Not offered to installs or the in-app updater. ${unsigned} ${linux}"
+              --notes "Test build of ${source} ($(git log -1 --format=%h)). Not offered to installs or the in-app updater. ${unsigned} Fedora: ${rpm}."
           else
             gh release create "$tag" "${files[@]}" \
               --target "$GITHUB_SHA" \
               --title "Paseo ${version} (FSH ${GITHUB_SHA::7})" \
-              --notes "Upstream Paseo ${version} plus the FSH patches on \`fsh\` ($(git log -1 --format=%h)). ${unsigned} ${linux}"
+              --notes "Upstream Paseo ${version} plus the FSH patches on \`fsh\` ($(git log -1 --format=%h)). ${unsigned} Fedora: ${rpm}, or the install script."
           fi
 
   delete-pr-prereleases:
