@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Install or update Paseo FSH (desktop app + CLI) and the FSH plugins on macOS (Apple Silicon).
+# Install or update Paseo FSH (desktop app + CLI) and the FSH plugins on macOS (Apple Silicon)
+# or an RPM-based Linux (Fedora, x86_64).
 #
 #   curl -fsSL https://raw.githubusercontent.com/fullstackhouse/paseo/fsh/scripts/install-fsh.sh | bash
 #
@@ -8,8 +9,6 @@ set -euo pipefail
 
 REPO="fullstackhouse/paseo"
 PLUGINS=(paseo-asks paseo-status paseo-limits paseo-prs)
-APP="/Applications/Paseo.app"
-PASEO="$APP/Contents/Resources/bin/paseo"
 MARKER="$HOME/.paseo/fsh-release"
 
 yes=0 plugins=1 force=0
@@ -25,52 +24,149 @@ done
 say() { printf '\033[1m==>\033[0m %s\n' "$*"; }
 die() { printf 'error: %s\n' "$*" >&2; exit 1; }
 
-[[ "$(uname -s)" == Darwin && "$(uname -m)" == arm64 ]] || die "macOS on Apple Silicon only."
+case "$(uname -s)/$(uname -m)" in
+  Darwin/arm64)
+    OS=mac
+    ASSET=dmg
+    APP="/Applications/Paseo.app"
+    PASEO="$APP/Contents/Resources/bin/paseo"
+    ;;
+  Linux/x86_64)
+    command -v rpm >/dev/null && command -v dnf >/dev/null ||
+      die "Linux builds are RPMs; this needs dnf (Fedora, RHEL and derivatives)."
+    OS=linux
+    ASSET=rpm
+    APP="/opt/Paseo"
+    PASEO="$APP/resources/bin/paseo"
+    ;;
+  *) die "macOS on Apple Silicon or x86_64 Linux with dnf only." ;;
+esac
+
+# Every process running the app's executable, minus the daemon and CLI: on Linux those run the same
+# binary as Node (ELECTRON_RUN_AS_NODE) through node-entrypoint-runner. An upgraded RPM leaves the
+# running copy's exe link as "/opt/Paseo/Paseo (deleted)", hence the prefix match.
+linux_app_pids() {
+  local exe pid
+  for exe in /proc/[0-9]*/exe; do
+    [[ "$(readlink "$exe" 2>/dev/null)" == "$APP/Paseo"* ]] || continue
+    pid="${exe#/proc/}" pid="${pid%/exe}"
+    tr '\0' ' ' <"/proc/$pid/cmdline" 2>/dev/null | grep -q node-entrypoint-runner && continue
+    echo "$pid"
+  done
+}
+
+app_running() {
+  if [[ $OS == mac ]]; then
+    pgrep -f "$APP/Contents/MacOS/Paseo" >/dev/null
+  else
+    [[ -n "$(linux_app_pids)" ]]
+  fi
+}
+
+quit_app() {
+  if [[ $OS == mac ]]; then
+    osascript -e 'quit app "Paseo"' 2>/dev/null || true
+  else
+    linux_app_pids | xargs -r kill -TERM 2>/dev/null || true
+  fi
+  for _ in {1..30}; do app_running || break; sleep 1; done
+}
+
+open_app() {
+  if [[ $OS == mac ]]; then
+    open "$APP"
+  else
+    setsid -f "$APP/Paseo" >/dev/null 2>&1 </dev/null
+  fi
+}
+
+# sudo when someone can type the password, pkexec (a desktop password dialog) when the in-app
+# updater runs this script detached from any terminal.
+as_root() {
+  if [[ $EUID -eq 0 ]]; then
+    "$@"
+  elif sudo -n true 2>/dev/null || { : </dev/tty; } 2>/dev/null; then
+    sudo "$@"
+  elif command -v pkexec >/dev/null; then
+    pkexec "$@"
+  else
+    die "Installing the RPM needs root: rerun this script in a terminal."
+  fi
+}
+
+installed() {
+  if [[ $OS == mac ]]; then
+    [[ -d "$APP" ]]
+  else
+    rpm -q Paseo >/dev/null 2>&1
+  fi
+}
 
 # GitHub's "latest" release is always the newest desktop build; Android releases opt out of it.
-dmg_url="$(curl -fsSL "https://api.github.com/repos/$REPO/releases/latest" |
-  grep -o '"browser_download_url": *"[^"]*\.dmg"' | head -1 | sed 's/.*"\(https[^"]*\)"/\1/')"
-[[ -n "$dmg_url" ]] || die "No DMG found in $REPO releases."
-tag="$(basename "$(dirname "$dmg_url")")"
+asset_url="$(curl -fsSL "https://api.github.com/repos/$REPO/releases/latest" |
+  grep -o "\"browser_download_url\": *\"[^\"]*\\.$ASSET\"" | head -1 | sed 's/.*"\(https[^"]*\)"/\1/')"
+[[ -n "$asset_url" ]] || die "No .$ASSET found in the latest $REPO release."
+tag="$(basename "$(dirname "$asset_url")")"
 
-if [[ $force -eq 0 && -d "$APP" && -f "$MARKER" && "$(cat "$MARKER")" == "$tag" ]]; then
+if [[ $force -eq 0 ]] && installed && [[ -f "$MARKER" && "$(cat "$MARKER")" == "$tag" ]]; then
   say "Paseo $tag is already installed."
 else
   say "Installing Paseo $tag"
   tmp="$(mktemp -d)"
-  trap 'hdiutil detach -quiet "$tmp/mnt" 2>/dev/null || true; rm -rf "$tmp"' EXIT
-  curl -fL --progress-bar -o "$tmp/paseo.dmg" "$dmg_url"
+  if [[ $OS == mac ]]; then
+    trap 'hdiutil detach -quiet "$tmp/mnt" 2>/dev/null || true; rm -rf "$tmp"' EXIT
+  else
+    trap 'rm -rf "$tmp"' EXIT
+  fi
+  curl -fL --progress-bar -o "$tmp/paseo.$ASSET" "$asset_url"
 
   # Every FSH build reports the same version, so neither the app nor the daemon notices a swap
   # underneath it. Quit both, or the old build keeps running.
-  if pgrep -qf "$APP/Contents/MacOS/Paseo" || { [[ -x "$PASEO" ]] && "$PASEO" daemon status 2>/dev/null | grep -q 'localDaemon: running'; }; then
+  if app_running || { [[ -x "$PASEO" ]] && "$PASEO" daemon status 2>/dev/null | grep -q 'localDaemon: running'; }; then
     if [[ $yes -eq 0 ]]; then
       printf 'Paseo is running. Quitting it stops the daemon and every running agent. Continue? [y/N] '
       read -r answer </dev/tty
       [[ "$answer" =~ ^[Yy] ]] || die "Aborted."
     fi
     say "Quitting Paseo"
-    osascript -e 'quit app "Paseo"' 2>/dev/null || true
-    for _ in {1..30}; do pgrep -qf "$APP/Contents/MacOS/Paseo" || break; sleep 1; done
+    quit_app
     [[ -x "$PASEO" ]] && "$PASEO" daemon stop >/dev/null 2>&1 || true
   fi
 
-  # The Homebrew casks would put their own build back on `brew upgrade`.
-  if command -v brew >/dev/null; then
-    for cask in paseo-fsh paseo; do
-      if brew list --cask "$cask" >/dev/null 2>&1; then
-        say "Removing Homebrew cask $cask"
-        brew uninstall --cask "$cask"
-      fi
-    done
-  fi
+  if [[ $OS == mac ]]; then
+    # The Homebrew casks would put their own build back on `brew upgrade`.
+    if command -v brew >/dev/null; then
+      for cask in paseo-fsh paseo; do
+        if brew list --cask "$cask" >/dev/null 2>&1; then
+          say "Removing Homebrew cask $cask"
+          brew uninstall --cask "$cask"
+        fi
+      done
+    fi
 
-  hdiutil attach -quiet -nobrowse -readonly -mountpoint "$tmp/mnt" "$tmp/paseo.dmg"
-  rm -rf "$APP"
-  ditto "$tmp/mnt/Paseo.app" "$APP"
-  hdiutil detach -quiet "$tmp/mnt"
-  # The build is unsigned; Gatekeeper refuses it while the quarantine flag is set.
-  xattr -cr "$APP"
+    hdiutil attach -quiet -nobrowse -readonly -mountpoint "$tmp/mnt" "$tmp/paseo.dmg"
+    rm -rf "$APP"
+    ditto "$tmp/mnt/Paseo.app" "$APP"
+    hdiutil detach -quiet "$tmp/mnt"
+    # The build is unsigned; Gatekeeper refuses it while the quarantine flag is set.
+    xattr -cr "$APP"
+  else
+    # The RPM's release field carries the CI run number, so a newer build is an upgrade. --force on
+    # the same build needs reinstall: install would call it already installed and do nothing.
+    say "Installing the RPM (asks for your password)"
+    nevr="$(rpm -qp --qf '%{NAME}-%{VERSION}-%{RELEASE}' "$tmp/paseo.rpm")"
+    if [[ "$(rpm -q Paseo 2>/dev/null)" == "$nevr"* ]]; then
+      action=reinstall
+    else
+      action=install
+    fi
+    # dnf runs as root and can't read a private mktemp dir; hand it a world-readable copy.
+    chmod 755 "$tmp" && chmod 644 "$tmp/paseo.rpm"
+    if ! as_root dnf "$action" -y "$tmp/paseo.rpm"; then
+      installed && open_app
+      die "dnf $action failed; the previous build is still installed."
+    fi
+  fi
   mkdir -p "$(dirname "$MARKER")"
   echo "$tag" >"$MARKER"
 fi
@@ -86,7 +182,7 @@ for dir in /opt/homebrew/bin /usr/local/bin "$HOME/.local/bin"; do
   fi
 done
 
-pgrep -qf "$APP/Contents/MacOS/Paseo" || open "$APP"
+app_running || open_app
 
 [[ $plugins -eq 1 ]] || exit 0
 

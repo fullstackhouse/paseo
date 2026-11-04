@@ -19,7 +19,7 @@ temporary by design: every patch is meant to go upstream and then drop out of `f
 - FSH-only (not upstream yet): docs and a `paseo-run` skill for running a branch, or testing a plugin, next to the Paseo you work in
 - FSH-only (not upstream yet): new workspaces branch off the repo's default branch, not whatever branch the source checkout is on. The daemon picks the ref: the default branch's upstream (any remote), then origin's copy, then local
 - FSH-only (not upstream yet): remove a project from its settings page (Settings → Projects → project → Danger zone), not just from the sidebar menu
-- FSH-only: the desktop app's update callout installs new FSH builds through `scripts/install-fsh.sh` (see Install below)
+- FSH-only: the desktop app's update callout installs new FSH builds through `scripts/install-fsh.sh`, on macOS (DMG) and Fedora (RPM) (see Install below)
 - FSH-only (upstreamable): the desktop update callout offers **Install when idle**: the update installs once no workspace on the local host has been running or waiting on a permission prompt for 15 seconds. Settings → About → **Install updates when idle** does this for every update
 - FSH-only (upstreamable): **Create PR** in a feature branch's git menu sends the workspace's agent a prompt to commit, push and open the PR, instead of the daemon writing the PR on its own. The daemon builds the prompt (`checkout.pr.agent_prompt.*`, also `workspaces.ref(id).pullRequestPrompt()` for plugins) with the base branch, the repo's `pull_request_template.md` and the project's Pull request prompt from `paseo.json`. **Create PR & Merge** sends the same prompt plus steps to get CI green and merge. With no agent in the workspace, either opens a new agent tab with the prompt filled in. Shown until the branch has a PR
 - FSH-only (upstreamable): workspace diffs show unpushed and behind counts (`↑1 ↓327`) in the composer pill and the Changes header, opening a sync card (upstream, uncommitted files, unpushed commits, commits to pull, next step); a branch both ahead and behind its remote offers Pull and push as the primary action
@@ -38,10 +38,11 @@ temporary by design: every patch is meant to go upstream and then drop out of `f
 
 Keep this list in sync with what's merged into `fsh`.
 
-## Install the desktop app and plugins (macOS, Apple Silicon)
+## Install the desktop app and plugins (macOS, Fedora)
 
-Requires macOS 13 (Ventura) or newer on Apple Silicon. One script installs the latest FSH release, links the `paseo`
-CLI, and installs or updates the [FSH plugins](#fsh-plugins). Run it again to update:
+Requires macOS 13 (Ventura) or newer on Apple Silicon, or x86_64 Linux with `dnf` (Fedora, RHEL and derivatives).
+One script installs the latest FSH release, links the `paseo` CLI, and installs or updates the
+[FSH plugins](#fsh-plugins). Run it again to update:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/fullstackhouse/paseo/fsh/scripts/install-fsh.sh | bash
@@ -55,14 +56,18 @@ release tag in `~/.paseo/fsh-release` and does nothing when that matches the lat
 To see which build you're running, open Paseo → About Paseo: it shows the commit (`Version 0.13.0-beta.1 (fsh.<sha>)`),
 the build time, and links to the release and the commit.
 
-It also removes the Homebrew `paseo-fsh` or upstream `paseo` cask if either is installed, since `brew upgrade` would put
-its own build back. Your `~/.paseo` data and hosts are kept. Plugins you installed from a local directory are left
+On macOS it also removes the Homebrew `paseo-fsh` or upstream `paseo` cask if either is installed, since `brew upgrade`
+would put its own build back. On Linux it installs the RPM with `dnf` (into `/opt/Paseo`, CLI at
+`~/.local/bin/paseo`) and asks for your password through `sudo`. The RPM's release field carries the CI run number, so
+each build is a `dnf` upgrade of the last. Your `~/.paseo` data and hosts are kept. Plugins you installed from a local directory are left
 alone. `--no-plugins` skips the plugin step.
 
 Once installed, Paseo checks every 30 minutes whether GitHub's latest release is newer than its own build (`fshBuild`,
 the release tag stamped into the app). If it is, an **Update available** callout appears at the bottom of the sidebar.
 **Install & restart** runs this script with `--yes` in the background and writes its output to `fsh-update.log` in
-the app's log folder (`~/Library/Logs/Paseo`). Settings → App updates runs the same check. If the app was replaced on
+the app's log folder (`~/Library/Logs/Paseo`, `~/.config/Paseo/logs` on Linux). With no terminal to type a `sudo`
+password into, the Linux install asks through `pkexec`'s desktop dialog. A release whose Linux build failed has no RPM,
+so Linux installs aren't offered it. Settings → App updates runs the same check. If the app was replaced on
 disk some other way, the callout offers a plain restart. Builds from before this updater have no stamp, so run the
 script by hand once.
 
@@ -108,7 +113,7 @@ never rotate it casually.
 
 ## FSH plugins
 
-These work on upstream Paseo too (0.12+). The [install script](#install-the-desktop-app-and-plugins-macos-apple-silicon) enables plugins and installs all of them on the local daemon. On another daemon:
+These work on upstream Paseo too (0.12+). The [install script](#install-the-desktop-app-and-plugins-macos-fedora) enables plugins and installs all of them on the local daemon. On another daemon:
 
 ```bash
 paseo daemon config set pluginsEnabled true && paseo daemon reload
@@ -132,13 +137,14 @@ Agents that already existed when a plugin was installed don't get its MCP tools.
   `fsh`-only commits (this file, the pointers at the top of
   `README.md` / `CLAUDE.md`, `.github/workflows/fsh-desktop.yml`, `.github/workflows/fsh-android.yml`, `.github/workflows/fsh-cli.yml`, `scripts/install-fsh.sh`,
   the `fsh` variant in `packages/app/app.config.js` and `plugins/with-fsh-release-signing.js`).
-- **Build**: every push to `fsh` (except edits to this file, `README.md` or `docs/fsh/`) builds the DMG and the Android APK
-  and publishes a release for each (`fsh-*`, `fsh-android-*`).
+- **Build**: every push to `fsh` (except edits to this file, `README.md` or `docs/fsh/`) builds the DMG, the Linux RPM and the Android APK
+  and publishes a release for the desktop pair and one for Android (`fsh-*`, `fsh-android-*`). A failed RPM build
+  doesn't hold back the DMG: that release ships without an RPM.
 - **Servers**: the same pushes build the Linux CLI and daemon bundle (`fsh-cli-*`, `.github/workflows/fsh-cli.yml`). The FSH agent box pins one by tag and sha256.
   The build runs upstream's packaged-app smoke test first. You can also start it by hand:
   Actions → FSH desktop build → Run workflow.
   To test a PR's desktop build, add the `deploy` label: every push then publishes a prerelease `fsh-pr<N>-<sha>`
-  with the DMG (a manual run on another branch publishes `fsh-test-<sha>`). `install-fsh.sh` and the in-app updater
+  with the DMG and RPM (a manual run on another branch publishes `fsh-test-<sha>`). `install-fsh.sh` and the in-app updater
   only install the latest release, which never points at a prerelease. Closing the PR deletes its prereleases.
 - **Upstream workflows**: they trigger on pushes to `main` and on `v*` tags, and need upstream's
   secrets. Don't push `main` or `v*` tags here. Our release tags are `fsh-*`.
