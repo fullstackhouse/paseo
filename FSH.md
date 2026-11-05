@@ -126,6 +126,7 @@ paseo plugin ls   # should show "running"
 - [paseo-status](https://github.com/fullstackhouse/paseo-status): a plain-language status card per agent, written by the agent
 - [paseo-limits](https://github.com/fullstackhouse/paseo-limits): Retry and Log in buttons on usage-limit, login and connection errors
 - [paseo-prs](https://github.com/fullstackhouse/paseo-prs): composer pills for an agent's PRs, with Create PR when there is none
+- [paseo-inbox](https://github.com/fullstackhouse/paseo-inbox): drafts reviews of the PRs you're asked to review, read and posted from a review screen; idle until you add sources and rules in Settings → Plugins → paseo-inbox
 
 Agents that already existed when a plugin was installed don't get its MCP tools. Start a new agent.
 
