@@ -56,12 +56,7 @@ import { TerminalSection } from "@/screens/settings/terminal/terminal-section";
 import { ChatSection } from "@/screens/settings/chat/chat-section";
 import { SidebarNavSection } from "@/screens/settings/sidebar/sidebar-nav-section";
 import { SendingSection } from "@/screens/settings/general/sending-section";
-import {
-  useAppSettings,
-  useSettings,
-  type AppSettings,
-  type Settings as EffectiveSettings,
-} from "@/hooks/use-settings";
+import { useAppSettings, useSettings, type AppSettings } from "@/hooks/use-settings";
 import { useHostRuntimeIsConnected, useHosts } from "@/runtime/host-runtime";
 import { useSessionStore } from "@/stores/session-store";
 import {
@@ -84,7 +79,6 @@ import { FilesSection } from "@/screens/settings/files-section";
 import { Button } from "@/components/ui/button";
 import { CommunityLinks } from "@/components/community-links";
 import { Switch } from "@/components/ui/switch";
-import { SegmentedControl } from "@/components/ui/segmented-control";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { DesktopPermissionsSection } from "@/desktop/components/desktop-permissions-section";
 import { DesktopNotificationsSection } from "@/desktop/components/desktop-notifications-section";
@@ -650,24 +644,11 @@ function DesktopAppUpdateRow() {
     void checkForUpdates();
   }, [checkForUpdates, isDesktopApp]);
 
-  const handleReleaseChannelChange = useCallback(
-    (releaseChannel: EffectiveSettings["releaseChannel"]) => {
-      void updateSettings({ releaseChannel });
-    },
-    [updateSettings],
-  );
   const handleAutoInstallChange = useCallback(
     (autoInstallUpdatesWhenIdle: boolean) => {
       void updateSettings({ autoInstallUpdatesWhenIdle });
     },
     [updateSettings],
-  );
-  const releaseChannelOptions = useMemo(
-    () => [
-      { value: "stable" as const, label: t("settings.about.releaseChannel.stable") },
-      { value: "beta" as const, label: t("settings.about.releaseChannel.beta") },
-    ],
-    [t],
   );
 
   const handleInstallUpdate = useCallback(() => {
@@ -706,19 +687,8 @@ function DesktopAppUpdateRow() {
 
   return (
     <>
-      <View style={[settingsStyles.row, settingsStyles.rowBorder]}>
-        <View style={settingsStyles.rowContent}>
-          <Text style={settingsStyles.rowTitle}>{t("settings.about.releaseChannel.label")}</Text>
-          <Text style={settingsStyles.rowHint}>
-            {t("settings.about.releaseChannel.description")}
-          </Text>
-        </View>
-        <SegmentedControl
-          value={settings.releaseChannel}
-          onValueChange={handleReleaseChannelChange}
-          options={releaseChannelOptions}
-        />
-      </View>
+      {/* FSH fork: no release channel picker. FSH builds update from GitHub's latest
+          release (fsh-updater), which has no beta channel. */}
       <View style={[settingsStyles.row, settingsStyles.rowBorder]}>
         <View style={settingsStyles.rowContent}>
           <Text style={settingsStyles.rowTitle}>
