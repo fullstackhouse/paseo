@@ -187,9 +187,12 @@ The provider still owns the underlying runtime. Paseo keeps an agent record so t
 
 `workspace.background` controls discovery only. Background workspaces contain ordinary durable
 agents and terminals: provider history, plugin hooks, parentage, archive, and restart recovery
-keep their normal behavior. Visibility is creation-only; selecting an existing workspace cannot
-change it. New workspaces default to false, inherit the caller workspace's value when an agent
-creates one without an override, and accept explicit true or false.
+keep their normal behavior. New workspaces default to false, inherit the caller workspace's value
+when an agent creates one without an override, and accept explicit true or false. Selecting an
+existing workspace on agent creation cannot change its visibility; only
+`workspace.background.set` does (FSH-only, `workspaces.ref(id).setBackground()`, gated on
+`features.workspaceBackgroundSet`). That RPC re-announces the workspace's agents, because agent
+lists filter on the owning workspace and would otherwise miss the flip.
 
 The daemon derives agent discovery from workspace ownership. Default workspace and agent lists,
 including History requests, exclude background work; `filter.includeBackground` includes it.
