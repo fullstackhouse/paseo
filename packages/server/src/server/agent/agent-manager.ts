@@ -2304,6 +2304,23 @@ export class AgentManager {
     this.emitState(agent, { persist: false });
   }
 
+  /**
+   * Re-announces a workspace's agents, live and stored, so sessions re-check their discovery
+   * filters after the workspace moved into or out of the background.
+   */
+  async republishWorkspaceAgents(workspaceId: string): Promise<void> {
+    const liveIds = new Set<string>();
+    for (const agent of this.agents.values()) {
+      if (agent.workspaceId !== workspaceId || agent.internal) continue;
+      liveIds.add(agent.id);
+      this.emitState(agent, { persist: false });
+    }
+    for (const record of (await this.registry?.list()) ?? []) {
+      if (record.workspaceId !== workspaceId || record.internal || liveIds.has(record.id)) continue;
+      this.dispatchStoredAgentState(record);
+    }
+  }
+
   async setLabels(agentId: string, labels: Record<string, string>): Promise<void> {
     await this.runLifecycleMutation(agentId, async () => {
       const agent = this.requireAgent(agentId);
