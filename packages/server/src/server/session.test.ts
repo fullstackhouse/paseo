@@ -338,6 +338,7 @@ interface SessionForTestOptions {
   pluginRuntime?: SessionOptions["pluginRuntime"];
   orchestrationSkills?: SessionOptions["orchestrationSkills"];
   workspaceLabelService?: WorkspaceLabelService;
+  sendPluginNotification?: SessionOptions["sendPluginNotification"];
 }
 
 function createSessionForTest(options: SessionForTestOptions = {}): Session {
@@ -450,6 +451,7 @@ function createSessionForTest(options: SessionForTestOptions = {}): Session {
     daemonVersion: options.daemonVersion,
     daemonRuntimeConfig: options.daemonRuntimeConfig,
     permissions: options.permissions ?? OWNER_PERMISSIONS,
+    sendPluginNotification: options.sendPluginNotification,
   };
   if (options.sendToSource) sessionOptions.onMessageToSource = options.sendToSource;
   return new Session(sessionOptions);
@@ -1511,6 +1513,71 @@ describe("plugin timeline append RPC", () => {
           requestId: "append-large",
           code: "handler_error",
           error: expect.stringContaining("65536 bytes"),
+        }),
+      }),
+    );
+  });
+});
+
+describe("plugin notification send RPC", () => {
+  test("stamps the plugin identity and acknowledges the outcome", async () => {
+    const messages: SessionOutboundMessage[] = [];
+    const sendPluginNotification = vi
+      .fn()
+      .mockReturnValueOnce({ delivered: true })
+      .mockReturnValueOnce({ delivered: false, dropped: "duplicate" });
+    const session = createSessionForTest({
+      clientId: "plugin:paseo-inbox",
+      messages,
+      sendPluginNotification,
+    });
+    const request = {
+      type: "plugin.notification.send.request" as const,
+      title: "Review ready",
+      body: "PR #12",
+      open: { screen: "review", params: { runId: "run-1" } },
+      key: "run-1",
+    };
+
+    await session.handleMessage({ ...request, requestId: "notify-1" });
+    await session.handleMessage({ ...request, requestId: "notify-2" });
+
+    expect(sendPluginNotification).toHaveBeenCalledWith("paseo-inbox", {
+      title: "Review ready",
+      body: "PR #12",
+      open: { screen: "review", params: { runId: "run-1" } },
+      key: "run-1",
+    });
+    expect(messages).toContainEqual({
+      type: "plugin.notification.send.response",
+      payload: { requestId: "notify-1", delivered: true },
+    });
+    expect(messages).toContainEqual({
+      type: "plugin.notification.send.response",
+      payload: { requestId: "notify-2", delivered: false, dropped: "duplicate" },
+    });
+  });
+
+  test("rejects notifications from non-plugin sessions", async () => {
+    const messages: SessionOutboundMessage[] = [];
+    const sendPluginNotification = vi.fn();
+    const session = createSessionForTest({ messages, sendPluginNotification });
+
+    await session.handleMessage({
+      type: "plugin.notification.send.request",
+      requestId: "notify-1",
+      title: "Spoofed",
+      body: "",
+    });
+
+    expect(sendPluginNotification).not.toHaveBeenCalled();
+    expect(messages).toContainEqual(
+      expect.objectContaining({
+        type: "rpc_error",
+        payload: expect.objectContaining({
+          requestId: "notify-1",
+          code: "handler_error",
+          error: expect.stringContaining("Only plugin sessions"),
         }),
       }),
     );

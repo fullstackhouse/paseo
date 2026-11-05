@@ -268,6 +268,7 @@ test("createPaseoApi borrows daemon capabilities without exposing connection own
     "config",
     "dispose",
     "hosts",
+    "notifications",
     "observeEvents",
     "projects",
     "providers",
@@ -277,6 +278,18 @@ test("createPaseoApi borrows daemon capabilities without exposing connection own
   expect("connect" in paseo).toBe(false);
   expect("close" in paseo).toBe(false);
   expect("skills" in paseo.agents).toBe(false);
+});
+
+test("plugin notifications ask for a host update before sending to an older daemon", async () => {
+  const daemonClient = new DaemonClient({
+    url: "ws://daemon.test",
+    clientId: "plugin:notify",
+    reconnect: { enabled: false },
+  });
+
+  await expect(
+    createPaseoApi(daemonClient).notifications.send({ title: "Ready", body: "" }),
+  ).rejects.toThrow("Update the host to send plugin notifications.");
 });
 
 test("agent handles send permission responses for their agent", async () => {

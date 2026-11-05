@@ -3611,6 +3611,29 @@ export class DaemonClient {
     return { seq: payload.seq, epoch: payload.epoch };
   }
 
+  async sendPluginNotification(
+    input: Omit<
+      Extract<SessionInboundMessage, { type: "plugin.notification.send.request" }>,
+      "type" | "requestId"
+    >,
+    options?: { requestId?: string },
+  ): Promise<{ delivered: boolean; dropped?: string }> {
+    // COMPAT(pluginNotifications): FSH-only, added after v0.13.0, remove gate after 2027-05-05.
+    if (this.lastServerInfoMessage?.features?.pluginNotifications !== true) {
+      throw new Error("Update the host to send plugin notifications.");
+    }
+    const requestId = this.createRequestId(options?.requestId);
+    const payload = await this.sendCorrelatedSessionRequest({
+      requestId,
+      message: { type: "plugin.notification.send.request", requestId, ...input },
+      responseType: "plugin.notification.send.response",
+    });
+    return {
+      delivered: payload.delivered,
+      ...(payload.dropped !== undefined ? { dropped: payload.dropped } : {}),
+    };
+  }
+
   async searchAgentTimeline({
     agentId,
     query,

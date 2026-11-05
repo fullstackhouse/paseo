@@ -17,6 +17,7 @@ const runtime = vi.hoisted(() => ({
   connected: true,
   supported: true,
   logsSupported: true,
+  notificationsSupported: true,
   client: null as DaemonClient | null,
 }));
 
@@ -28,6 +29,7 @@ vi.mock("@/runtime/host-runtime", () => ({
 vi.mock("@/runtime/host-features", () => ({
   useHostFeature: (_serverId: string, feature: string) => {
     if (feature === "pluginLogs") return runtime.logsSupported;
+    if (feature === "pluginNotifications") return runtime.notificationsSupported;
     return runtime.supported;
   },
 }));
@@ -150,6 +152,7 @@ describe("HostPluginsPage", () => {
     runtime.connected = true;
     runtime.supported = true;
     runtime.logsSupported = true;
+    runtime.notificationsSupported = true;
     runtime.client = null;
     vi.stubGlobal(
       "confirm",
@@ -194,6 +197,41 @@ describe("HostPluginsPage", () => {
     await selectPluginAction(action);
 
     await waitFor(() => expect(client[method]).toHaveBeenCalledTimes(1));
+  });
+
+  it("turns a plugin's notifications off and back on through the daemon config", async () => {
+    const client = createClient();
+    client.listPlugins.mockResolvedValue([plugin()]);
+    client.patchDaemonConfig.mockResolvedValueOnce({
+      config: { pluginsEnabled: true, pluginNotifications: { example: false } },
+    } as never);
+    renderPage(client);
+
+    await selectPluginAction("Turn off notifications");
+    await waitFor(() =>
+      expect(client.patchDaemonConfig).toHaveBeenCalledWith({
+        pluginNotifications: { example: false },
+      }),
+    );
+    expect(await screen.findByText("Notifications off for example")).toBeDefined();
+
+    await selectPluginAction("Turn on notifications");
+    await waitFor(() =>
+      expect(client.patchDaemonConfig).toHaveBeenLastCalledWith({
+        pluginNotifications: { example: true },
+      }),
+    );
+  });
+
+  it("hides the notifications action when the host cannot send plugin notifications", async () => {
+    runtime.notificationsSupported = false;
+    const client = createClient();
+    client.listPlugins.mockResolvedValue([plugin()]);
+    renderPage(client);
+
+    await screen.findByText("example");
+    fireEvent.click(screen.getByRole("button", { name: "Actions for example" }));
+    expect(screen.queryByRole("menuitem", { name: "Turn off notifications" })).toBeNull();
   });
 
   it("hides the logs action when the host does not advertise support", async () => {

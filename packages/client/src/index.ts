@@ -528,6 +528,39 @@ export interface PaseoConfigActions {
   ): Promise<{ requestId: string; config: MutableDaemonConfig }>;
 }
 
+export interface PaseoNotificationSendInput {
+  /** Up to 120 characters. */
+  title: string;
+  /** Up to 500 characters. */
+  body: string;
+  /**
+   * What a tap opens: one of the plugin's own screens (by `screens` id, with string params),
+   * or an agent. Without it, a tap opens the host.
+   */
+  open?: { screen: string; params?: Record<string, string> } | { agentId: string };
+  /** A repeat of the same key within a minute is dropped. */
+  key?: string;
+}
+
+export interface PaseoNotificationSendResult {
+  delivered: boolean;
+  /** Set when the daemon dropped it: "muted", "duplicate" or "rate_limited". */
+  dropped?: string;
+}
+
+export interface PaseoNotificationActions {
+  /**
+   * Shows the user a notification from this plugin: a phone push when no app is open,
+   * otherwise a desktop or browser notification in the app they used last. Plugin code only;
+   * other clients are rejected. The daemon drops it when the user turned the plugin's
+   * notifications off, on a duplicate `key`, and past 20 per minute per plugin.
+   */
+  send(
+    input: PaseoNotificationSendInput,
+    options?: { requestId?: string },
+  ): Promise<PaseoNotificationSendResult>;
+}
+
 export interface PaseoApi {
   readonly hosts: PaseoHostActions;
   dispose(): Promise<void>;
@@ -538,6 +571,7 @@ export interface PaseoApi {
   readonly agents: PaseoAgentActions;
   readonly providers: PaseoProviderActions;
   readonly config: PaseoConfigActions;
+  readonly notifications: PaseoNotificationActions;
 }
 
 export interface PaseoClient extends PaseoApi {
@@ -830,6 +864,9 @@ export function createPaseoApi(
     config: {
       get: (requestId) => daemonClient.getDaemonConfig(requestId),
       patch: (patch, requestId) => daemonClient.patchDaemonConfig(patch, requestId),
+    },
+    notifications: {
+      send: (input, options) => daemonClient.sendPluginNotification(input, options),
     },
   };
 }
