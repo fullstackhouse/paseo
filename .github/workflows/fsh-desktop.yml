@@ -1,5 +1,5 @@
-# FSH fork: on every push to `fsh`, build an unsigned (ad-hoc signed) macOS arm64 DMG of the `fsh`
-# branch and attach it to a GitHub Release on fullstackhouse/paseo.
+# FSH fork: on every push to `fsh`, build an unsigned (ad-hoc signed) macOS arm64 DMG and a Linux
+# x86_64 RPM of the `fsh` branch and attach both to one GitHub Release on fullstackhouse/paseo.
 #
 # No latest-mac.yml is published: an ad-hoc signed app can't run electron-updater. The build
 # stamps `fshBuild` (the release tag minus `fsh-`) into the app's package.json, and the app
@@ -46,6 +46,10 @@ jobs:
     env:
       FSH_PRERELEASE: ${{ github.ref != 'refs/heads/fsh' }}
       FSH_PR: ${{ github.event.pull_request.number }}
+    outputs:
+      version: ${{ steps.stamp.outputs.version }}
+      sha: ${{ steps.stamp.outputs.sha }}
+      tag: ${{ steps.stamp.outputs.tag }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -66,6 +70,7 @@ jobs:
       # copyright. Upstream's defaults make every FSH build look the same, so stamp the commit,
       # the build time and links to the release and commit.
       - name: Stamp FSH build info
+        id: stamp
         run: |
           set -euo pipefail
           version="$(node -p 'require("./packages/desktop/package.json").version')"
@@ -80,6 +85,7 @@ jobs:
           echo "FSH_SHA=${sha}" >> "$GITHUB_ENV"
           echo "FSH_VERSION=${version}" >> "$GITHUB_ENV"
           echo "FSH_TAG=${tag}" >> "$GITHUB_ENV"
+          printf 'version=%s\nsha=%s\ntag=%s\n' "$version" "$sha" "$tag" >> "$GITHUB_OUTPUT"
           cat > packages/desktop/Credits.html <<EOF
           <div style="font: 11px -apple-system, sans-serif; text-align: center">
           Built $(date -u '+%Y-%m-%d %H:%M UTC')<br>
@@ -124,28 +130,154 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
-      - name: Publish release
+      - name: Keep the DMG for the release
+        uses: actions/upload-artifact@v4
+        with:
+          name: fsh-desktop-dmg
+          path: packages/desktop/release/*.dmg
+          if-no-files-found: error
+          retention-days: 7
+
+  # Fedora/RHEL x86_64 RPM, installed and updated by scripts/install-fsh.sh like the DMG.
+  linux-x64:
+    if: >-
+      github.event_name != 'pull_request' ||
+      (github.event.action != 'closed' &&
+       contains(github.event.pull_request.labels.*.name, 'deploy') &&
+       (github.event.action != 'labeled' || github.event.label.name == 'deploy'))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    concurrency:
+      group: fsh-desktop-linux-${{ github.event.pull_request.number || github.ref }}
+      cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+    env:
+      ONNXRUNTIME_NODE_INSTALL: skip
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: package-lock.json
+
+      - name: Install JS dependencies
+        run: node scripts/npm-retry.mjs ci
+
+      - name: Install packaging and smoke dependencies
+        run: sudo apt-get update && sudo apt-get install -y xvfb xauth rpm
+
+      # Every FSH build carries the same app version, so the RPM's release field gets the run
+      # number: a newer build is then an upgrade to dnf instead of "already installed".
+      - name: Build RPM
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          EP_GH_IGNORE_TIME: true
+          NODE_OPTIONS: --max-old-space-size=4096
+        # One config file for every override: `--config <file>` and `-c.<key>=` are the same
+        # electron-builder option, so they don't combine.
+        run: |
+          set -euo pipefail
+          node -e '
+            const { execSync } = require("child_process");
+            const version = require("./packages/desktop/package.json").version;
+            const sha = execSync("git rev-parse --short HEAD").toString().trim();
+            const config = {
+              extends: `${process.env.GITHUB_WORKSPACE}/packages/desktop/electron-builder.yml`,
+              extraMetadata: { fshBuild: `${version}-${sha}` },
+              buildVersion: `fsh.${sha}`,
+              copyright: `Copyright © ${new Date().getFullYear()} Mohamed Boudra · FSH build by Full Stack House`,
+              publish: { provider: "github", owner: "fullstackhouse", repo: "paseo" },
+              rpm: { fpm: [`--iteration=${process.env.GITHUB_RUN_NUMBER}.fsh.${sha}`] },
+            };
+            require("fs").writeFileSync(`${process.env.RUNNER_TEMP}/fsh-linux-builder.json`, JSON.stringify(config));
+          '
+          npm run build:desktop -- --publish never --linux rpm --x64 \
+            --config "$RUNNER_TEMP/fsh-linux-builder.json"
+
+      # Upstream's installed-RPM smoke (.github/workflows/desktop-packages.yml): Ubuntu names the
+      # runtime libraries differently, so --nodeps; the payload and postinstall still run for real.
+      - name: Smoke the installed RPM
+        env:
+          PASEO_DESKTOP_SMOKE_ARTIFACT_DIR: ${{ runner.temp }}/desktop-smoke
+        run: |
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=1
+          sudo rpm --install --nodeps packages/desktop/release/*.rpm
+          node packages/desktop/e2e/linux-artifact-smoke.js packages/desktop/release disabled --installed-only
+
+      - name: Upload smoke diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-smoke-linux
+          path: ${{ runner.temp }}/desktop-smoke
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Keep the RPM for the release
+        uses: actions/upload-artifact@v4
+        with:
+          name: fsh-desktop-rpm
+          path: packages/desktop/release/*.rpm
+          if-no-files-found: error
+          retention-days: 7
+
+  # One release per commit with both packages, and none unless both built. Shipping the DMG alone
+  # would leave Linux installs on an older commit with the same version number, and fresh Linux
+  # installs with nothing to install (install-fsh.sh only looks at the latest release). A flaky
+  # Linux job costs a "Re-run failed jobs"; publish then runs on the DMG already built.
+  publish:
+    needs: [macos-arm64, linux-x64]
+    runs-on: ubuntu-latest
+    # The build jobs serialize per platform, but publish jobs from back-to-back pushes could still
+    # run out of order and make the older commit "latest". Never cancelled: a waiting publish that a
+    # newer one replaces is fine, a half-created release isn't.
+    concurrency:
+      group: fsh-desktop-publish-${{ github.event.pull_request.number || github.ref }}
+      cancel-in-progress: false
+    env:
+      FSH_PRERELEASE: ${{ github.ref != 'refs/heads/fsh' }}
+      FSH_PR: ${{ github.event.pull_request.number }}
+      FSH_VERSION: ${{ needs.macos-arm64.outputs.version }}
+      FSH_SHA: ${{ needs.macos-arm64.outputs.sha }}
+      FSH_TAG: ${{ needs.macos-arm64.outputs.tag }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Fetch the packages
+        uses: actions/download-artifact@v4
+        with:
+          pattern: fsh-desktop-*
+          path: release-assets
+          merge-multiple: true
+
+      - name: Publish release
         run: |
           set -euo pipefail
           version="$FSH_VERSION"
           tag="$FSH_TAG"
+          files=(release-assets/*.dmg release-assets/*.rpm)
           unsigned="Unsigned: after copying to Applications, run \`xattr -cr /Applications/Paseo.app\` once."
+          rpm="\`sudo dnf install ./Paseo-*.rpm\`"
           if [[ "$FSH_PRERELEASE" == "true" ]]; then
             # Rebuilding the same commit (relabel, re-run) replaces its prerelease.
             gh release delete "$tag" --cleanup-tag --yes 2>/dev/null || true
             source="${FSH_PR:+PR #${FSH_PR}, }branch \`${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}\`"
-            gh release create "$tag" packages/desktop/release/*.dmg \
+            gh release create "$tag" "${files[@]}" \
               --target "$(git rev-parse HEAD)" \
               --prerelease --latest=false \
               --title "Paseo ${version} test build (${source//\`/} ${FSH_SHA})" \
-              --notes "Test build of ${source} ($(git log -1 --format=%h)). Not offered to installs or the in-app updater. ${unsigned}"
+              --notes "Test build of ${source} ($(git log -1 --format=%h)). Not offered to installs or the in-app updater. ${unsigned} Fedora: ${rpm}."
           else
-            gh release create "$tag" packages/desktop/release/*.dmg \
+            gh release create "$tag" "${files[@]}" \
               --target "$GITHUB_SHA" \
               --title "Paseo ${version} (FSH ${GITHUB_SHA::7})" \
-              --notes "Upstream Paseo ${version} plus the FSH patches on \`fsh\` ($(git log -1 --format=%h)). ${unsigned}"
+              --notes "Upstream Paseo ${version} plus the FSH patches on \`fsh\` ($(git log -1 --format=%h)). ${unsigned} Fedora: ${rpm}, or the install script."
           fi
 
   delete-pr-prereleases:
