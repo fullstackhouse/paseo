@@ -616,3 +616,68 @@ test("default and inclusive observers retain independent snapshots, live updates
     await otherClient.close();
   }
 }, 30_000);
+
+test("moving a workspace out of the background reaches default observers, and back", async () => {
+  const otherClient = new DaemonClient({ url: `ws://127.0.0.1:${ctx.daemon.port}/ws` });
+  await otherClient.connect();
+  try {
+    const cwd = createGitRepo();
+    const config = { ...getFullAccessConfig("codex"), cwd };
+    const hidden = await ctx.client.createAgent({ config, background: true });
+    const agents = otherClient.observeAgents({ scope: "active", sync: {} });
+    const workspaces = otherClient.observeWorkspaces({ sync: {} });
+    expect((await agents.ready).entries.map((entry) => entry.agent.id)).not.toContain(hidden.id);
+    expect((await workspaces.ready).entries.map((entry) => entry.id)).not.toContain(
+      hidden.workspaceId,
+    );
+    const agentEvents: string[] = [];
+    const workspaceEvents: string[] = [];
+    agents.subscribe({
+      snapshot: () => {},
+      update: (message) => {
+        if (message.type !== "agent_update") return;
+        const { payload } = message;
+        const id = payload.kind === "upsert" ? payload.agent.id : payload.agentId;
+        if (id === hidden.id) agentEvents.push(payload.kind);
+      },
+    });
+    workspaces.subscribe({
+      snapshot: () => {},
+      update: (message) => {
+        if (message.type !== "workspace_update") return;
+        const { payload } = message;
+        const id = payload.kind === "upsert" ? payload.workspace.id : payload.id;
+        if (id === hidden.workspaceId) workspaceEvents.push(payload.kind);
+      },
+    });
+
+    expect(await ctx.client.setWorkspaceBackground(hidden.workspaceId!, false)).toEqual({
+      background: false,
+    });
+    await expect.poll(() => agentEvents).toContain("upsert");
+    await expect.poll(() => workspaceEvents).toContain("upsert");
+    expect((await otherClient.fetchWorkspaces()).entries).toContainEqual(
+      expect.objectContaining({ id: hidden.workspaceId, background: false }),
+    );
+    expect((await otherClient.fetchAgents()).entries.map((entry) => entry.agent.id)).toContain(
+      hidden.id,
+    );
+
+    agentEvents.length = 0;
+    workspaceEvents.length = 0;
+    await ctx.client.setWorkspaceBackground(hidden.workspaceId!, true);
+    await expect.poll(() => agentEvents).toContain("remove");
+    await expect.poll(() => workspaceEvents).toContain("remove");
+    expect((await otherClient.fetchAgents()).entries.map((entry) => entry.agent.id)).not.toContain(
+      hidden.id,
+    );
+
+    await expect(ctx.client.setWorkspaceBackground("missing-workspace", false)).rejects.toThrow(
+      "Workspace not found",
+    );
+    await agents.release();
+    await workspaces.release();
+  } finally {
+    await otherClient.close();
+  }
+}, 30_000);
