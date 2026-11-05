@@ -37,6 +37,7 @@ Pick the contribution that matches the request. Each row names the registration,
 | Composer pill             | `addComposerPill`                                           | A per-agent button in the composer track bar next to Tasks and Subagents                                                                                         | reference.md → Composer pills                                                                      |
 | Timeline transformer      | `addTimelineTransformer` + `addTimelineRenderer`            | Replace, explode, or hide a built-in timeline item, including while it streams                                                                                   | reference.md → Timeline items; `plugin-examples/timeline-items`, `plugin-examples/inline-thinking` |
 | Timeline row              | `paseo.agents.ref(id).timeline.append(...)`                 | Push a plugin-owned row into an agent timeline from a server handler and update it later                                                                         | reference.md → Append a timeline row from the daemon                                               |
+| Notification              | `paseo.notifications.send(...)`                             | Push or desktop notification from a server handler or hook; a tap opens a plugin screen or an agent                                                              | reference.md → Notifications                                                                       |
 | Attachment source         | `client.addAttachmentSource` + `server.handle`              | Let the user attach a searchable external resource, such as an issue, to a prompt                                                                                | reference.md → Add a composer attachment source; `plugin-examples/linear`                          |
 | Theme                     | `addTheme`                                                  | A light or dark palette under Settings → Appearance                                                                                                              | reference.md → Contribute a theme; `plugin-examples/catppuccin`                                    |
 | Plugin RPC                | `defineRpc` + `server.handle` + `useRpc`                    | Daemon-side work that is not a normal Paseo operation: vendor APIs, credentials, local files                                                                     | reference.md → Add plugin-specific backend behavior                                                |
@@ -635,6 +636,21 @@ server.handle(publishReview, async ({ agentId, verdict }, { paseo }) => {
 ```
 
 The daemon stamps `pluginId` from the plugin session, so only plugin code can call this. Re-appending with the same `id` replaces the earlier row live and on refetch, which is how a plugin updates a row. `data` is capped at 64 KiB serialized and rejected above that. Rows live in the daemon's in-memory timeline and survive scroll, refetch, and reconnect, but not a daemon restart. A row whose plugin is missing renders an unavailable placeholder. Hosts advertise support through `server_info.features.pluginTimelineItems`.
+
+## Send a notification
+
+From a server handler or a lifecycle hook, `paseo.notifications.send` tells the user something is ready. A tap opens a plugin screen (by `screens` id, string params) or an agent.
+
+```ts
+await paseo.notifications.send({
+  title: "Review draft ready", // up to 120 chars
+  body: "Open it to check the comments", // up to 500 chars
+  open: { screen: "review", params: { runId } }, // or { agentId }
+  key: runId, // same key within a minute is dropped
+});
+```
+
+It resolves to `{ delivered, dropped? }`. The daemon drops a muted plugin's notifications (Settings → Plugins → actions menu, or `pluginNotifications.<id>: false` in daemon config), duplicates, and anything past 20 a minute. Plugin code only. Hosts advertise `server_info.features.pluginNotifications`; older ones throw.
 
 ## Contribute a theme
 

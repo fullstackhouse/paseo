@@ -1510,6 +1510,51 @@ async function publishReview(agentId: string, { paseo }: PluginHandlerContext) {
 
 daemon 会根据发起调用的插件会话写入 `pluginId`，并拒绝来自非插件会话的此 RPC。该行会实时出现，在时间线重新获取后依然保留，并且对于同一插件和 `id` 只保留最新的值。如果它的渲染器缺失，Paseo 会显示现有的“不可用”行。daemon 会拒绝超过限制的 `data`，而不是截断它。支持此操作的 daemon 会声明 `server_info.features.pluginTimelineItems`。
 
+## 通知 {#notifications}
+
+服务端代码可以通过通知告诉用户发生了什么，点按通知会打开插件自己的某个界面或某个 agent。可以在 RPC 处理函数或生命周期钩子中，通过其上下文中的 `paseo` 调用：
+
+```ts
+import { defineRpc } from "@getpaseo/plugin";
+import type { PluginServerContext } from "@getpaseo/plugin/server";
+import { z } from "zod";
+
+const draftReady = defineRpc({
+  name: "draftReady",
+  input: z.object({ runId: z.string() }),
+  output: z.object({ delivered: z.boolean(), dropped: z.string().optional() }),
+});
+
+export default function contribute(server: PluginServerContext) {
+  server.handle(draftReady, ({ runId }, { paseo }) =>
+    paseo.notifications.send({
+      title: "Review draft ready",
+      body: "Open it to check the comments",
+      open: { screen: "review", params: { runId } },
+      key: runId,
+    }),
+  );
+  server.on("agent.turn_ended", async ({ agent, outcome }, { paseo }) => {
+    if (outcome.kind !== "failed") return;
+    await paseo.notifications.send({
+      title: "Turn failed",
+      body: outcome.error.message.slice(0, 500),
+      open: { agentId: agent.id },
+    });
+  });
+  return () => undefined;
+}
+```
+
+| 字段    | 类型                                   | 是否必填 | 行为                                                              |
+| ------- | -------------------------------------- | -------- | ----------------------------------------------------------------- |
+| `title` | `string`                               | 是       | 最多 120 个字符，不能为空。                                       |
+| `body`  | `string`                               | 是       | 最多 500 个字符。                                                 |
+| `open`  | `{ screen, params? }` 或 `{ agentId }` | 否       | 点按后打开该 `screens` 条目（带参数）或该 agent；不填则打开宿主。 |
+| `key`   | `string`                               | 否       | 一分钟内重复的 key 会被丢弃。                                     |
+
+Paseo 的展示方式与 agent 提醒相同：没有打开的应用时发送手机推送，否则在你最近使用的应用中显示桌面或浏览器通知；如果该应用正显示你指定的 agent，则不显示。调用结果为 `{ delivered }`，被 daemon 丢弃时 `dropped` 为 `"muted"`、`"duplicate"` 或 `"rate_limited"`。一个插件每分钟超过 20 条通知后，其余的会被丢弃。可以在 设置 → 插件 中该插件的操作菜单里关闭它的通知，或运行 `paseo daemon config set pluginNotifications.<plugin-id> false`。daemon 会写入你的插件 id，并拒绝来自非插件客户端的调用。支持此功能的 daemon 会声明 `server_info.features.pluginNotifications`；在旧版 daemon 上调用会抛出错误。
+
 ## 主题与布局 {#theme-and-layout}
 
 插件 UI 运行在桌面、浏览器、iOS 和 Android 上，适用于每一个 Paseo 主题。`theme` 是由当前宿主主题映射而来的带类型 `PluginTheme`。颜色和间距必须来自这些属性。写死的颜色和没有样式的 `Text` 会在宿主主题变化时出问题。

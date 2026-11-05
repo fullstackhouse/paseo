@@ -52,6 +52,34 @@ describe("notification open", () => {
       { serverId: "h", workspaceId: "w", terminalId: "t", agentId: "a" },
       { kind: "terminal", serverId: "h", workspaceId: "w", terminalId: "t" },
     ],
+    [
+      {
+        serverId: "h",
+        pluginId: "inbox",
+        screenId: "review",
+        params: { runId: "r1", bad: 1 },
+        key: "r1",
+      },
+      {
+        kind: "plugin-screen",
+        serverId: "h",
+        pluginId: "inbox",
+        screenId: "review",
+        params: { runId: "r1" },
+      },
+    ],
+    [
+      { serverId: "h", pluginId: "inbox", screenId: "review", params: ["x"] },
+      { kind: "plugin-screen", serverId: "h", pluginId: "inbox", screenId: "review", params: {} },
+    ],
+    [
+      { serverId: "h", pluginId: "inbox", agentId: "a" },
+      { kind: "agent", serverId: "h", agentId: "a" },
+    ],
+    [
+      { serverId: "h", pluginId: "inbox" },
+      { kind: "host", serverId: "h" },
+    ],
   ])("parses %j", (data, expected) => {
     expect(parseNotificationOpenTarget(data)).toEqual(expected);
   });
@@ -141,7 +169,20 @@ describe("notification open", () => {
     });
     source.tap({ id: "host", data: { serverId: "host" } });
     await flush();
-    expect(routes).toEqual(["/h/host"]);
+    source.tap({
+      id: "plugin",
+      data: {
+        serverId: "host",
+        pluginId: "paseo-inbox",
+        screenId: "review",
+        params: { runId: "run 1" },
+      },
+    });
+    await flush();
+    expect(routes).toEqual([
+      "/h/host",
+      "/h/host/plugin/paseo-inbox/surface/review?param.runId=run%201",
+    ]);
     expect(terminals).toEqual([
       { kind: "terminal", serverId: "host", workspaceId: "ws", terminalId: "term" },
     ]);

@@ -244,6 +244,8 @@ export const MutableDaemonConfigSchema = z
     skills: z.object({ selection: AgentSkillSelectionSchema.optional() }).strict().optional(),
     pluginsEnabled: z.boolean().optional(),
     plugins: z.record(PluginIdSchema, PluginSourceSchema).optional(),
+    // Per plugin; false mutes it. Plugins missing here send notifications.
+    pluginNotifications: z.record(PluginIdSchema, z.boolean()).optional(),
     // COMPAT(speechSettings): added in v0.12.0, optional because older daemons omit it.
     features: SpeechSettingsSchema.optional(),
     envOverrides: z.record(z.string(), z.string()).optional(),
@@ -268,6 +270,8 @@ export const MutableDaemonConfigPatchSchema = z
     agentProfiles: z.array(AgentProfileSchema).optional(),
     pluginsEnabled: z.boolean().optional(),
     plugins: z.record(PluginIdSchema, PluginSourceSchema).optional(),
+    // Per plugin; false mutes it. Plugins missing here send notifications.
+    pluginNotifications: z.record(PluginIdSchema, z.boolean()).optional(),
     features: SpeechSettingsPatchSchema.optional(),
   })
   .partial()
@@ -1609,6 +1613,25 @@ export const AgentTimelineAppendRequestSchema = z.object({
     data: JsonWireValueSchema,
   }),
 });
+
+// COMPAT(pluginNotifications): FSH-only, added after v0.13.0, remove gate after 2027-05-05.
+// Plain union: the open targets share no literal tag. The daemon checks lengths and that a
+// target names exactly one of a screen or an agent.
+export const PluginNotificationOpenSchema = z.union([
+  z.object({ screen: z.string(), params: z.record(z.string(), z.string()).optional() }),
+  z.object({ agentId: z.string() }),
+]);
+export type PluginNotificationOpen = z.infer<typeof PluginNotificationOpenSchema>;
+
+export const PluginNotificationSendRequestSchema = z.object({
+  type: z.literal("plugin.notification.send.request"),
+  requestId: z.string(),
+  title: z.string(),
+  body: z.string(),
+  open: PluginNotificationOpenSchema.optional(),
+  key: z.string().optional(),
+});
+export type PluginNotificationSendRequest = z.infer<typeof PluginNotificationSendRequestSchema>;
 
 export const AgentSkillOperationSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("add"), name: z.string() }).strict(),
@@ -3248,6 +3271,8 @@ export const SessionEventSubscriptionSchema = z.enum([
   "agent.provider_subagents.update",
   "agent.background_work.update",
   "terminal_attention_required",
+  // COMPAT(pluginNotifications): subscribe only when server_info.features.pluginNotifications.
+  "plugin.notification",
   "status.server_info",
   "status.daemon_config_changed",
   "status.plugin_catalog_changed",
@@ -3358,6 +3383,7 @@ export const SessionInboundMessageSchema = z.discriminatedUnion("type", [
   PluginRemoveRequestSchema,
   PluginRpcInvokeRequestSchema,
   AgentTimelineAppendRequestSchema,
+  PluginNotificationSendRequestSchema,
   AgentSkillsGetStatusRequestSchema,
   AgentSkillsReconcileRequestSchema,
   AgentSkillsUninstallRequestSchema,
@@ -3760,6 +3786,8 @@ export const ServerInfoStatusPayloadSchema = z
         pluginThemes: z.boolean().optional(),
         pluginSettings: z.boolean().optional(),
         pluginTimelineItems: z.boolean().optional(),
+        // COMPAT(pluginNotifications): FSH-only, added after v0.13.0, remove gate after 2027-05-05.
+        pluginNotifications: z.boolean().optional(),
         // COMPAT(skillManagement): added in v0.4.0, remove gate after 2027-08-16.
         skillManagement: z.boolean().optional(),
         // COMPAT(idleRuntimeCleanupSetting): added in v0.13.0, remove gate after 2027-04-26.
@@ -6737,6 +6765,34 @@ export const TerminalAttentionRequiredSchema = z.object({
   }),
 });
 
+export const PluginNotificationDataSchema = z.object({
+  serverId: z.string(),
+  pluginId: z.string(),
+  screenId: z.string().optional(),
+  params: z.record(z.string(), z.string()).optional(),
+  agentId: z.string().optional(),
+  key: z.string().optional(),
+});
+export type PluginNotificationData = z.infer<typeof PluginNotificationDataSchema>;
+
+export const PluginNotificationPayloadSchema = z.object({
+  title: z.string(),
+  body: z.string(),
+  data: PluginNotificationDataSchema,
+});
+export type PluginNotificationPayload = z.infer<typeof PluginNotificationPayloadSchema>;
+
+export const PluginNotificationMessageSchema = z.object({
+  type: z.literal("plugin.notification"),
+  payload: z.object({
+    subscriptionId: z.string().optional(),
+    pluginId: z.string(),
+    timestamp: z.string(),
+    shouldNotify: z.boolean(),
+    notification: PluginNotificationPayloadSchema,
+  }),
+});
+
 export const DaemonUpdateResponseSchema = z.object({
   type: z.literal("daemon.update.response"),
   payload: z.object({
@@ -7036,6 +7092,16 @@ export const AgentTimelineAppendResponseSchema = z.object({
   }),
 });
 
+export const PluginNotificationSendResponseSchema = z.object({
+  type: z.literal("plugin.notification.send.response"),
+  payload: z.object({
+    requestId: z.string(),
+    delivered: z.boolean(),
+    // Why the daemon dropped it: "muted", "duplicate" or "rate_limited". Open-ended on purpose.
+    dropped: z.string().optional(),
+  }),
+});
+
 function agentSkillsStatusResponse<const Type extends string>(type: Type) {
   return z.object({
     type: z.literal(type),
@@ -7101,6 +7167,7 @@ export const SessionOutboundMessageSchema = z.discriminatedUnion("type", [
   PluginRemoveResponseSchema,
   PluginRpcInvokeResponseSchema,
   AgentTimelineAppendResponseSchema,
+  PluginNotificationSendResponseSchema,
   AgentSkillsGetStatusResponseSchema,
   AgentSkillsReconcileResponseSchema,
   AgentSkillsUninstallResponseSchema,
@@ -7282,6 +7349,7 @@ export const SessionOutboundMessageSchema = z.discriminatedUnion("type", [
   CaptureTerminalResponseSchema,
   TerminalStreamExitSchema,
   TerminalAttentionRequiredSchema,
+  PluginNotificationMessageSchema,
   ChatCreateResponseSchema,
   ChatListResponseSchema,
   ChatInspectResponseSchema,

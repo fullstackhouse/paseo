@@ -694,6 +694,14 @@ must be at most 64 KiB; the daemon rejects a larger append instead of storing a 
 be rendered intact. The daemon advertises this RPC through
 `server_info.features.pluginTimelineItems`.
 
+Plugin notifications (`paseo.notifications.send`, FSH-only) reuse agent attention's delivery plan:
+push when no client is present, else one in-app recipient. The in-app message is the
+`plugin.notification` event, so a client gets it only by subscribing, and the app subscribes only
+when the host advertises `server_info.features.pluginNotifications`; older daemons reject unknown
+event names. The per-plugin mute is top-level `pluginNotifications` in daemon config, not a field on
+the plugin's source entry: that entry is a strict schema, and older apps would fail to parse the
+whole config. Dedupe and the rate limit live in daemon memory and reset on restart.
+
 ## Contribute client slash commands
 
 `addSlashCommand` registers an agent- or workspace-context command in the composer. The

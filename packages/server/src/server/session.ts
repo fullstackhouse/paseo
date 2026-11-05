@@ -459,6 +459,10 @@ export interface SessionOptions {
   onLifecycleIntent?: (intent: SessionLifecycleIntent) => void;
   onWorkspaceRecovered?: (workspace: PersistedWorkspaceRecord) => Promise<void>;
   publishScriptStatusUpdate?: (message: ScriptStatusUpdateMessage) => void;
+  sendPluginNotification?: (
+    pluginId: string,
+    notification: import("./plugin-notifications.js").PluginNotificationInput,
+  ) => import("./plugin-notifications.js").PluginNotificationResult;
   logger: pino.Logger;
   downloadTokenStore: DownloadTokenStore;
   pushNotifications: PushNotifications;
@@ -825,6 +829,7 @@ export class Session {
   private readonly workspaceScripts: WorkspaceScriptsService;
   private readonly messageReceipts: Pick<MessageReceipts, "send">;
   private readonly agentMessages: AgentMessageDelivery;
+  private readonly sendPluginNotification: SessionOptions["sendPluginNotification"] | null;
   private readonly createAgentLifecycleDispatch: CreateAgentLifecycleDispatch;
   private readonly creationService: Pick<CreationService, "create" | "subscribe">;
 
@@ -911,6 +916,7 @@ export class Session {
     this.paseoHome = paseoHome;
     this.messageReceipts = options.messageReceipts;
     this.agentMessages = options.agentMessages;
+    this.sendPluginNotification = options.sendPluginNotification ?? null;
     this.creationService = options.creationService;
     this.projectIcons = new ProjectIconReader(paseoHome);
     this.worktreesRoot = worktreesRoot;
@@ -2803,6 +2809,8 @@ export class Session {
         return this.handleFetchAgentTimelineRequest(msg, source);
       case "agent.timeline.append.request":
         return this.handleAgentTimelineAppendRequest(msg);
+      case "plugin.notification.send.request":
+        return this.handlePluginNotificationSendRequest(msg);
       case "agent.timeline.search.request":
         return this.handleAgentTimelineSearchRequest(msg, source);
       case "agent.timeline.list_prompts.request":
@@ -7953,6 +7961,24 @@ export class Session {
     });
   }
 
+  private async handlePluginNotificationSendRequest(
+    msg: Extract<SessionInboundMessage, { type: "plugin.notification.send.request" }>,
+  ): Promise<void> {
+    const pluginId = parsePluginClientId(this.clientId);
+    if (!pluginId) throw new Error("Only plugin sessions can send plugin notifications");
+    if (!this.sendPluginNotification) throw new Error("Plugin notifications are unavailable");
+    const { type: _type, requestId, ...notification } = msg;
+    const result = this.sendPluginNotification(pluginId, notification);
+    this.emit({
+      type: "plugin.notification.send.response",
+      payload: {
+        requestId,
+        delivered: result.delivered,
+        ...(result.delivered ? {} : { dropped: result.dropped }),
+      },
+    });
+  }
+
   private async handleAgentTimelineSearchRequest(
     msg: Extract<SessionInboundMessage, { type: "agent.timeline.search.request" }>,
     source?: object,
@@ -8597,7 +8623,8 @@ export class Session {
   ): void {
     if (
       message.type !== "agent_attention_required" &&
-      message.type !== "terminal_attention_required"
+      message.type !== "terminal_attention_required" &&
+      message.type !== "plugin.notification"
     ) {
       subscription.owner.emit(message);
       return;
@@ -8606,11 +8633,11 @@ export class Session {
       message.payload.shouldNotify &&
       subscription.notifications &&
       !notified.has(subscription.owner.source);
-    subscription.owner.emit(
-      message.type === "agent_attention_required"
-        ? { ...message, payload: { ...message.payload, shouldNotify } }
-        : { ...message, payload: { ...message.payload, shouldNotify } },
-    );
+    if (message.type === "agent_attention_required")
+      subscription.owner.emit({ ...message, payload: { ...message.payload, shouldNotify } });
+    else if (message.type === "terminal_attention_required")
+      subscription.owner.emit({ ...message, payload: { ...message.payload, shouldNotify } });
+    else subscription.owner.emit({ ...message, payload: { ...message.payload, shouldNotify } });
     if (shouldNotify) notified.add(subscription.owner.source);
   }
 
@@ -8851,23 +8878,28 @@ function sessionEventCategory(message: SessionOutboundMessage): SessionEventSubs
     case "agent.provider_subagents.update":
     case "agent.background_work.update":
     case "terminal_attention_required":
+    case "plugin.notification":
     case "activity_log":
     case "hub.execution.agent.update":
     case "hub.execution.agent.stream":
       return message.type;
     case "status":
-      switch (message.payload.status) {
-        case "server_info":
-          return "status.server_info";
-        case "daemon_config_changed":
-          return "status.daemon_config_changed";
-        case "plugin_catalog_changed":
-          return "status.plugin_catalog_changed";
-        case "plugin_settings_changed":
-          return "status.plugin_settings_changed";
-        default:
-          return null;
-      }
+      return statusEventCategory(message.payload.status);
+    default:
+      return null;
+  }
+}
+
+function statusEventCategory(status: string): SessionEventSubscription | null {
+  switch (status) {
+    case "server_info":
+      return "status.server_info";
+    case "daemon_config_changed":
+      return "status.daemon_config_changed";
+    case "plugin_catalog_changed":
+      return "status.plugin_catalog_changed";
+    case "plugin_settings_changed":
+      return "status.plugin_settings_changed";
     default:
       return null;
   }
@@ -8888,8 +8920,9 @@ function legacyWantsEvent(
       return !capabilities.has(CLIENT_CAPS.explicitEventSubscriptions);
     case "agent.provider_subagents.update":
       return capabilities.has(CLIENT_CAPS.providerSubagents);
-    // Old apps parse outbound messages strictly and do not know this type.
+    // Old apps parse outbound messages strictly and do not know these types.
     case "agent.background_work.update":
+    case "plugin.notification":
       return false;
     default:
       return true;

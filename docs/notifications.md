@@ -10,6 +10,9 @@ Agent payloads name a host and agent. Ignore their workspace hint when opening:
 the agent can move after a notification is sent. Use `navigateToAgent`, which
 uses the current store record or the agent route to resolve the workspace from
 the host. Terminal payloads name their workspace and use `navigateToWorkspace`.
+Plugin payloads name a host, a plugin and a screen (`pluginId`, `screenId`,
+string `params`) and open the plugin surface route; a plugin payload with an
+`agentId` instead opens that agent.
 
 See [agent targets and deferred opens](expo-router.md#agent-targets) for route
 ownership and workspace recovery. Notification generation, presence, and push

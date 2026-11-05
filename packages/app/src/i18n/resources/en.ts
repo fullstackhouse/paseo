@@ -2414,6 +2414,8 @@ export const en = {
         disabling: "Disabling…",
         remove: "Remove",
         removing: "Removing…",
+        notificationsOff: "Turn off notifications",
+        notificationsOn: "Turn on notifications",
       },
       feedback: {
         installed: "Installed {{id}}",
@@ -2424,6 +2426,8 @@ export const en = {
         kept: "Kept {{id}}",
         globalEnabled: "Plugins enabled",
         globalDisabled: "Plugins disabled",
+        notificationsOff: "Notifications off for {{id}}",
+        notificationsOn: "Notifications on for {{id}}",
       },
       removeConfirmTitle: "Remove {{id}}?",
       removeConfirmMessage: "This removes the configuration. The source directory is not deleted.",
