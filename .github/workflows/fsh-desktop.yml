@@ -231,6 +231,12 @@ jobs:
   publish:
     needs: [macos-arm64, linux-x64]
     runs-on: ubuntu-latest
+    # The build jobs serialize per platform, but publish jobs from back-to-back pushes could still
+    # run out of order and make the older commit "latest". Never cancelled: a waiting publish that a
+    # newer one replaces is fine, a half-created release isn't.
+    concurrency:
+      group: fsh-desktop-publish-${{ github.event.pull_request.number || github.ref }}
+      cancel-in-progress: false
     env:
       FSH_PRERELEASE: ${{ github.ref != 'refs/heads/fsh' }}
       FSH_PR: ${{ github.event.pull_request.number }}
