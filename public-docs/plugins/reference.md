@@ -1265,6 +1265,60 @@ same plugin and `id`. If its renderer is missing, Paseo shows the existing unava
 reject `data` over the limit rather than truncating it. Daemons that support this operation
 advertise `server_info.features.pluginTimelineItems`.
 
+## Notifications
+
+Server code can tell the user something happened, with a notification whose tap opens one of your
+plugin's screens or an agent. Call it from an RPC handler or a lifecycle hook, through the
+`paseo` in its context:
+
+```ts
+import { defineRpc } from "@getpaseo/plugin";
+import type { PluginServerContext } from "@getpaseo/plugin/server";
+import { z } from "zod";
+
+const draftReady = defineRpc({
+  name: "draftReady",
+  input: z.object({ runId: z.string() }),
+  output: z.object({ delivered: z.boolean(), dropped: z.string().optional() }),
+});
+
+export default function contribute(server: PluginServerContext) {
+  server.handle(draftReady, ({ runId }, { paseo }) =>
+    paseo.notifications.send({
+      title: "Review draft ready",
+      body: "Open it to check the comments",
+      open: { screen: "review", params: { runId } },
+      key: runId,
+    }),
+  );
+  server.on("agent.turn_ended", async ({ agent, outcome }, { paseo }) => {
+    if (outcome.kind !== "failed") return;
+    await paseo.notifications.send({
+      title: "Turn failed",
+      body: outcome.error.message.slice(0, 500),
+      open: { agentId: agent.id },
+    });
+  });
+  return () => undefined;
+}
+```
+
+| Field   | Type                                   | Required | Behavior                                                                       |
+| ------- | -------------------------------------- | -------- | ------------------------------------------------------------------------------ |
+| `title` | `string`                               | Yes      | Up to 120 characters, not empty.                                               |
+| `body`  | `string`                               | Yes      | Up to 500 characters.                                                          |
+| `open`  | `{ screen, params? }` or `{ agentId }` | No       | A tap opens that `screens` entry with its params, or the agent. Else the host. |
+| `key`   | `string`                               | No       | A repeat of the same key within a minute is dropped.                           |
+
+Paseo shows it the way it shows agent attention: a phone push when no app is open, otherwise a
+desktop or browser notification in the app you used last, skipped when that app already shows the
+agent you named. The call resolves to `{ delivered }`, with `dropped` set to `"muted"`,
+`"duplicate"` or `"rate_limited"` when the daemon dropped it. Past 20 notifications a minute, a plugin's
+notifications are dropped. You can turn a plugin's notifications off from its actions menu
+in Settings → Plugins, or with `paseo daemon config set pluginNotifications.<plugin-id> false`. The
+daemon stamps your plugin id and rejects the call from non-plugin clients. Daemons that support it
+advertise `server_info.features.pluginNotifications`; on older ones the call throws.
+
 ## Theme and layout
 
 Plugin UI runs on desktop, browser, iOS, and Android, across every Paseo theme. `theme` is a typed `PluginTheme` mapped from the active host theme. Color and spacing must come from those props. Hardcoded colors and unstyled `Text` break when the host theme changes.

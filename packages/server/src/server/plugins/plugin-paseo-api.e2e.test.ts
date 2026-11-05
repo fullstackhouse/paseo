@@ -204,6 +204,102 @@ export default function contribute(server: PluginServerContext) {
   }
 }, 60_000);
 
+test("plugin handlers send notifications that open their own screen", async () => {
+  const pluginDirectory = await mkdtemp(path.join(tmpdir(), "paseo-notify-plugin-"));
+  roots.push(pluginDirectory);
+  await writeFile(
+    path.join(pluginDirectory, "paseo-plugin.json"),
+    JSON.stringify({
+      id: "paseo-notify",
+      requirements: { paseo: `>=${resolveDaemonVersion(import.meta.url)}` },
+    }),
+  );
+  await writeFile(
+    path.join(pluginDirectory, "index.server.ts"),
+    `import { defineRpc } from "@getpaseo/plugin";
+import { type PluginServerContext } from "@getpaseo/plugin/server";
+import { z } from "zod";
+
+const notify = defineRpc({
+  name: "notify",
+  input: z.object({ runId: z.string() }),
+  output: z.object({ delivered: z.boolean(), dropped: z.string().optional() }),
+});
+
+export default function contribute(server: PluginServerContext) {
+  server.handle(notify, ({ runId }, { paseo }) =>
+    paseo.notifications.send({
+      title: "Review draft ready",
+      body: "Open it to check the comments",
+      open: { screen: "review", params: { runId } },
+      key: runId,
+    }),
+  );
+  return () => undefined;
+}`,
+  );
+
+  const daemon = await createTestPaseoDaemon({ mcpEnabled: false });
+  const client = new DaemonClient({
+    url: `ws://127.0.0.1:${daemon.port}/ws`,
+    appVersion: "0.4.0",
+  });
+  try {
+    await client.connect();
+    await client.patchDaemonConfig({ pluginsEnabled: true });
+    await expect(client.installDirectoryPlugin(pluginDirectory)).resolves.toMatchObject({
+      id: "paseo-notify",
+      status: "running",
+    });
+    const received: unknown[] = [];
+    const feed = client.observeEvents(["plugin.notification"], { notifications: true });
+    feed.subscribe({
+      snapshot: () => {},
+      update: (message) => {
+        if (message.type === "plugin.notification") received.push(message.payload);
+      },
+    });
+    await feed.ready;
+
+    await expect(
+      client.invokePluginRpc("paseo-notify", "notify", { runId: "run-1" }),
+    ).resolves.toEqual({ delivered: true });
+    await expect(
+      client.invokePluginRpc("paseo-notify", "notify", { runId: "run-1" }),
+    ).resolves.toEqual({ delivered: false, dropped: "duplicate" });
+    await expect
+      .poll(() => received)
+      .toEqual([
+        expect.objectContaining({
+          pluginId: "paseo-notify",
+          notification: {
+            title: "Review draft ready",
+            body: "Open it to check the comments",
+            data: {
+              serverId: expect.any(String),
+              pluginId: "paseo-notify",
+              screenId: "review",
+              params: { runId: "run-1" },
+              key: "run-1",
+            },
+          },
+        }),
+      ]);
+
+    await client.patchDaemonConfig({ pluginNotifications: { "paseo-notify": false } });
+    await expect(
+      client.invokePluginRpc("paseo-notify", "notify", { runId: "run-2" }),
+    ).resolves.toEqual({ delivered: false, dropped: "muted" });
+    await expect(
+      client.sendPluginNotification({ title: "Not a plugin", body: "" }),
+    ).rejects.toThrow("Only plugin sessions");
+    await feed.release();
+  } finally {
+    await client.close().catch(() => undefined);
+    await daemon.close();
+  }
+}, 60_000);
+
 test("password-protected config reload preserves startup auth and session construction does not read config", async () => {
   const home = await mkdtemp(path.join(tmpdir(), "paseo-protected-config-reload-"));
   roots.push(home);

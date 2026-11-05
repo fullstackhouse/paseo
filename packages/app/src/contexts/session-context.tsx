@@ -37,6 +37,7 @@ import {
   type SessionState,
 } from "@/stores/session-store";
 import { sendOsNotification } from "@/utils/os-notifications";
+import { useHostFeature } from "@/runtime/host-features";
 import { getIsAppActivelyVisible, getIsAppVisible } from "@/utils/app-visibility";
 import {
   getInitKey,
@@ -709,6 +710,31 @@ function SessionProviderInternal({ children, serverId, client }: SessionProvider
     voiceRuntime,
     voiceAudioEngine,
   ]);
+
+  // COMPAT(pluginNotifications): FSH-only, added after v0.13.0, remove gate after 2027-05-05.
+  // Older hosts reject the event name, so subscribe only once the host advertises it.
+  const pluginNotificationsSupported = useHostFeature(serverId, "pluginNotifications");
+  useEffect(() => {
+    if (!pluginNotificationsSupported) return;
+    const feed = client.observeEvents(["plugin.notification"], { notifications: true });
+    feed.subscribe({
+      snapshot: () => {},
+      update: (message) => {
+        if (message.type !== "plugin.notification" || !message.payload.shouldNotify) return;
+        const { notification } = message.payload;
+        void sendOsNotification({
+          title: notification.title,
+          body: notification.body,
+          data: notification.data,
+        });
+      },
+    });
+    return () => {
+      void feed
+        .release()
+        .catch((error) => console.warn("[Session] Failed to release plugin notifications", error));
+    };
+  }, [client, pluginNotificationsSupported]);
 
   const _cancelAgentRun = useCallback(
     (agentId: string) => {

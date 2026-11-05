@@ -592,6 +592,7 @@ export type ResolvedDaemonSettings = Pick<
   | "skillSelection"
   | "pluginsEnabled"
   | "plugins"
+  | "pluginNotifications"
   | "relayEnabled"
   | "relayRequireProtectedSecurity"
   | "appBaseUrl"
@@ -682,6 +683,7 @@ export function resolveReloadableConfig(
     skillSelection: persisted.agents?.skills?.selection,
     pluginsEnabled: persisted.pluginsEnabled ?? false,
     plugins: persisted.plugins,
+    pluginNotifications: persisted.pluginNotifications,
     relayEnabled: relay.enabled,
     relayRequireProtectedSecurity: relay.requireProtectedSecurity,
     idleRuntimeCleanup: persisted.agents?.idleRuntimeCleanup ?? true,
