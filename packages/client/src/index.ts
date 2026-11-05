@@ -204,6 +204,11 @@ export interface PaseoWorkspaceHandle {
     requestId?: string;
   }): Promise<{ baseRef: string | null }>;
   /**
+   * Moves the workspace into (`true`) or out of (`false`) background discovery: default lists
+   * and the sidebar skip background workspaces. Needs `server_info.features.workspaceBackgroundSet`.
+   */
+  setBackground(background: boolean, requestId?: string): Promise<{ background: boolean }>;
+  /**
    * The prompt that asks an agent to open a pull request for this workspace's
    * branch: base branch, the repo's PR template and the project's PR preferences.
    * `merge` adds steps to get CI green and merge.
@@ -1021,6 +1026,8 @@ function createWorkspaceHandleFactory(
         }),
       setBaseBranch: (options) =>
         daemonClient.setWorkspaceBaseBranch({ ...options, workspaceId: id }),
+      setBackground: (background, requestId) =>
+        daemonClient.setWorkspaceBackground(id, background, requestId),
       pullRequestPrompt: async (options) => {
         // COMPAT(checkoutPrAgentPrompt): added in FSH v0.13.0-beta.1, remove gate after 2027-04-30.
         if (!daemonClient.getLastServerInfoMessage()?.features?.checkoutPrAgentPrompt) {

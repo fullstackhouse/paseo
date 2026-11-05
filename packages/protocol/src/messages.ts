@@ -1132,6 +1132,15 @@ export const WorkspaceBaseBranchSetRequestSchema = z.object({
   requestId: z.string(),
 });
 
+// COMPAT(workspaceBackgroundSet): FSH-only, added after v0.13.0, remove gate after 2027-05-05.
+// Moves an existing workspace into or out of background discovery.
+export const WorkspaceBackgroundSetRequestSchema = z.object({
+  type: z.literal("workspace.background.set.request"),
+  workspaceId: z.string(),
+  background: z.boolean(),
+  requestId: z.string(),
+});
+
 export const WorkspaceLabelColorSchema = z.enum(WORKSPACE_LABEL_COLORS);
 export const WorkspaceLabelDefinitionSchema = z.object({
   name: z.string(),
@@ -2388,6 +2397,19 @@ export const WorkspaceMetadataUpdateResponseSchema = z.object({
     metadata: EntityMetadataSchema.nullable(),
     error: z.string().nullable(),
   }),
+});
+
+export const WorkspaceBackgroundSetResponsePayloadSchema = z.object({
+  requestId: z.string(),
+  workspaceId: z.string(),
+  accepted: z.boolean(),
+  background: z.boolean().nullable(),
+  error: z.string().nullable(),
+});
+
+export const WorkspaceBackgroundSetResponseSchema = z.object({
+  type: z.literal("workspace.background.set.response"),
+  payload: WorkspaceBackgroundSetResponsePayloadSchema,
 });
 
 export const WorkspacePinSetResponsePayloadSchema = z.object({
@@ -3650,6 +3672,7 @@ export const SessionInboundMessageSchema = z.discriminatedUnion("type", [
   WorkspaceMetadataUpdateRequestSchema,
   WorkspacePinSetRequestSchema,
   WorkspaceBaseBranchSetRequestSchema,
+  WorkspaceBackgroundSetRequestSchema,
   WorkspaceLabelListRequestSchema,
   WorkspaceLabelAssignmentSetRequestSchema,
   WorkspaceLabelUpdateRequestSchema,
@@ -4120,6 +4143,8 @@ export const ServerInfoStatusPayloadSchema = z
         pluginSubscriptions: z.boolean().optional(),
         // COMPAT(pluginNotifications): FSH-only, added after v0.13.0, remove gate after 2027-05-05.
         pluginNotifications: z.boolean().optional(),
+        // COMPAT(workspaceBackgroundSet): FSH-only, added after v0.13.0, remove gate after 2027-05-05.
+        workspaceBackgroundSet: z.boolean().optional(),
         // COMPAT(skillManagement): added in v0.4.0, remove gate after 2027-08-16.
         skillManagement: z.boolean().optional(),
         // COMPAT(idleRuntimeCleanupSetting): added in v0.13.0, remove gate after 2027-04-26.
@@ -7915,6 +7940,7 @@ export const SessionOutboundMessageSchema = z.discriminatedUnion("type", [
   WorkspaceMetadataUpdateResponseSchema,
   WorkspacePinSetResponseSchema,
   WorkspaceBaseBranchSetResponseSchema,
+  WorkspaceBackgroundSetResponseSchema,
   WorkspaceRecoveryInspectResponseSchema,
   WorkspaceRecoveryRestoreResponseSchema,
   WorkspaceArchiveUndoResponseSchema,
@@ -8136,6 +8162,7 @@ export type WorkspaceTitleSetResponsePayload = z.infer<
 >;
 export type WorkspacePinSetResponse = z.infer<typeof WorkspacePinSetResponseSchema>;
 export type WorkspacePinSetResponsePayload = z.infer<typeof WorkspacePinSetResponsePayloadSchema>;
+export type WorkspaceBackgroundSetResponse = z.infer<typeof WorkspaceBackgroundSetResponseSchema>;
 export type WorkspaceRecoveryState = z.infer<typeof WorkspaceRecoveryStateSchema>;
 export type WorkspaceRecoveryInspectResponse = z.infer<
   typeof WorkspaceRecoveryInspectResponseSchema
@@ -8325,6 +8352,7 @@ export type WorkspaceMetadataUpdateRequest = z.infer<typeof WorkspaceMetadataUpd
 export type AgentMetadataUpdateResponse = z.infer<typeof AgentMetadataUpdateResponseSchema>;
 export type WorkspaceMetadataUpdateResponse = z.infer<typeof WorkspaceMetadataUpdateResponseSchema>;
 export type WorkspaceBaseBranchSetRequest = z.infer<typeof WorkspaceBaseBranchSetRequestSchema>;
+export type WorkspaceBackgroundSetRequest = z.infer<typeof WorkspaceBackgroundSetRequestSchema>;
 export type WorkspaceRecoveryInspectRequest = z.infer<typeof WorkspaceRecoveryInspectRequestSchema>;
 export type WorkspaceRecoveryRestoreRequest = z.infer<typeof WorkspaceRecoveryRestoreRequestSchema>;
 export type WorkspaceArchiveUndoRequest = z.infer<typeof WorkspaceArchiveUndoRequestSchema>;

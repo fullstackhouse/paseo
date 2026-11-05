@@ -2708,6 +2708,44 @@ export class AgentManager {
     this.emitState(agent, { persist: false });
   }
 
+  /**
+   * Re-announces a workspace's agents, live and stored, so sessions re-check their discovery
+   * filters after the workspace moved into or out of the background.
+   */
+  /**
+   * FSH: a workspace left the background, so its agents do too. Inside a background workspace an
+   * agent's own `background` only repeats the workspace's (a request that creates both sets it on
+   * each); kept, it would leave the agents hidden in a visible workspace. Callers republish after.
+   */
+  async clearWorkspaceAgentsBackground(workspaceId: string): Promise<void> {
+    const agentIds = new Set<string>();
+    for (const record of (await this.registry?.list()) ?? []) {
+      if (record.workspaceId === workspaceId && record.background) agentIds.add(record.id);
+    }
+    for (const agent of this.agents.values()) {
+      if (agent.workspaceId === workspaceId && agent.background) agentIds.add(agent.id);
+    }
+    if (agentIds.size === 0) return;
+    // The stored flag goes first: a live snapshot flush keeps a stored `background`.
+    await this.registry?.clearBackground([...agentIds]);
+    for (const agent of this.agents.values()) {
+      if (agentIds.has(agent.id)) agent.background = false;
+    }
+  }
+
+  async republishWorkspaceAgents(workspaceId: string): Promise<void> {
+    const liveIds = new Set<string>();
+    for (const agent of this.agents.values()) {
+      if (agent.workspaceId !== workspaceId || agent.internal) continue;
+      liveIds.add(agent.id);
+      this.emitState(agent, { persist: false });
+    }
+    for (const record of (await this.registry?.list()) ?? []) {
+      if (record.workspaceId !== workspaceId || record.internal || liveIds.has(record.id)) continue;
+      this.dispatchStoredAgentState(record);
+    }
+  }
+
   async setLabels(agentId: string, labels: Record<string, string>): Promise<void> {
     await this.runLifecycleMutation(agentId, async () => {
       const agent = this.requireAgent(agentId);

@@ -3828,6 +3828,30 @@ export class DaemonClient {
     return { baseRef: payload.baseRef };
   }
 
+  async setWorkspaceBackground(
+    workspaceId: string,
+    background: boolean,
+    requestId?: string,
+  ): Promise<{ background: boolean }> {
+    // COMPAT(workspaceBackgroundSet): FSH-only, added after v0.13.0, remove gate after 2027-05-05.
+    if (this.lastServerInfoMessage?.features?.workspaceBackgroundSet !== true) {
+      throw new Error("Update the host to change a workspace's visibility.");
+    }
+    const payload = await this.sendCorrelatedSessionRequest({
+      requestId,
+      message: {
+        type: "workspace.background.set.request",
+        workspaceId,
+        background,
+      },
+      responseType: "workspace.background.set.response",
+    });
+    if (!payload.accepted || payload.background === null) {
+      throw new Error(payload.error ?? "setWorkspaceBackground rejected");
+    }
+    return { background: payload.background };
+  }
+
   async inspectWorkspaceRecovery(
     workspaceId: string,
     requestId?: string,

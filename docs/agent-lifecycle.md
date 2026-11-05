@@ -205,7 +205,13 @@ An agent is effectively background when it or its workspace is background:
 `agent.background || workspace.background`. Background controls discovery only. Background agents
 and the agents in background workspaces are ordinary durable agents: provider history, plugin
 hooks, parentage, finish notifications to a caller, archive, and restart recovery keep their
-normal behavior. Both flags are fixed at creation.
+normal behavior. Both flags are fixed at creation, except that `workspace.background.set` (FSH-only,
+`workspaces.ref(id).setBackground()`, gated on `features.workspaceBackgroundSet`) moves an
+existing workspace. Moving a workspace out of the background also clears `background` on its
+agents: inside a background workspace that flag only repeats the workspace's, which a request
+that created both set on each, so keeping it would leave the agents hidden in a visible workspace.
+The RPC re-announces the workspace's agents, because agent lists filter on the owning workspace
+and would otherwise miss the flip.
 
 - **Agent.** `create_agent_request.background` marks the agent. Use it for helpers the user does
   not watch, such as a plugin's classifier in the user's open workspace. A background agent never

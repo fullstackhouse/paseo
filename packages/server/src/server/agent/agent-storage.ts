@@ -433,6 +433,19 @@ export class AgentStorage {
     );
   }
 
+  /** FSH: clears `background` on these agents' records; their workspace left the background. */
+  async clearBackground(agentIds: readonly string[]): Promise<void> {
+    await this.load();
+    await Promise.all(
+      agentIds.map(async (agentId) => {
+        await this.waitForPendingWrite(agentId);
+        const record = await this.get(agentId);
+        if (!record?.background) return;
+        await this.upsert({ ...record, background: undefined });
+      }),
+    );
+  }
+
   async setTitle(agentId: string, title: string): Promise<void> {
     await this.load();
     await this.waitForPendingWrite(agentId);
