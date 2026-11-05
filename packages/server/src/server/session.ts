@@ -3135,6 +3135,8 @@ export class Session {
         return this.handleWorkspaceTitleSetRequest(msg.workspaceId, msg.title, msg.requestId);
       case "workspace.pin.set.request":
         return this.handleWorkspacePinSetRequest(msg.workspaceId, msg.pinned, msg.requestId);
+      case "workspace.background.set.request":
+        return this.handleWorkspaceBackgroundSetRequest(msg);
       default:
         return undefined;
     }
@@ -4025,6 +4027,49 @@ export class Session {
         },
       });
       emitResponse(false, null, getErrorMessageOr(error, "Failed to pin workspace"));
+    }
+  }
+
+  private async handleWorkspaceBackgroundSetRequest(
+    request: Extract<SessionInboundMessage, { type: "workspace.background.set.request" }>,
+  ): Promise<void> {
+    const { workspaceId, background, requestId } = request;
+    const logContext = { workspaceId, background, requestId };
+    this.sessionLogger.info(logContext, "session: workspace.background.set.request");
+    const emitResponse = (accepted: boolean, error: string | null) => {
+      this.emit({
+        type: "workspace.background.set.response",
+        payload: {
+          requestId,
+          workspaceId,
+          accepted,
+          background: accepted ? background : null,
+          error,
+        },
+      });
+    };
+
+    try {
+      let changed = false;
+      const updated = await this.workspaceRegistry.update(workspaceId, (existing) => {
+        if (existing.background === background) return existing;
+        changed = true;
+        return { ...existing, background, updatedAt: new Date().toISOString() };
+      });
+      if (!updated) {
+        emitResponse(false, "Workspace not found");
+        return;
+      }
+      emitResponse(true, null);
+      if (!changed) return;
+      // Every session's agent lists filter on workspace visibility, so re-announce its agents.
+      await this.agentManager.republishWorkspaceAgents(workspaceId);
+    } catch (error) {
+      this.sessionLogger.error(
+        { ...logContext, err: error },
+        "session: workspace.background.set.request error",
+      );
+      emitResponse(false, getErrorMessageOr(error, "Failed to set workspace visibility"));
     }
   }
 

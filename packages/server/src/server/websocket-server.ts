@@ -2083,6 +2083,8 @@ export class VoiceAssistantWebSocketServer {
         pluginTimelineItems: true,
         // COMPAT(pluginNotifications): FSH-only, added after v0.13.0, remove gate after 2027-05-05.
         pluginNotifications: true,
+        // COMPAT(workspaceBackgroundSet): FSH-only, added after v0.13.0, remove gate after 2027-05-05.
+        workspaceBackgroundSet: true,
         // COMPAT(skillManagement): added in v0.4.0, remove gate after 2027-08-16.
         skillManagement: true,
         // COMPAT(idleRuntimeCleanupSetting): added in v0.13.0, remove gate after 2027-04-26.
