@@ -35,6 +35,7 @@ import { confirmDialog } from "@/utils/confirm-dialog";
 const pluginQueryKey = (serverId: string) => ["plugins", serverId] as const;
 const PLUGIN_SOURCE_DOCS_URL = "https://paseo.sh/docs/plugins/reference#plugin-sources";
 type PluginRowAction = "reload" | "enable" | "disable" | "remove";
+type PluginNotificationsToggle = (plugin: PluginListItem, enabled: boolean) => void;
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -55,6 +56,8 @@ function PluginActionsMenu({
   onAction,
   onOpenLogs,
   supportsLogs,
+  notificationsEnabled,
+  onToggleNotifications,
 }: {
   plugin: PluginListItem;
   serverId: string;
@@ -63,9 +66,16 @@ function PluginActionsMenu({
   onAction(action: PluginRowAction, plugin: PluginListItem): void;
   onOpenLogs(pluginId: string): void;
   supportsLogs: boolean;
+  /** null when the host cannot deliver plugin notifications. */
+  notificationsEnabled: boolean | null;
+  onToggleNotifications: PluginNotificationsToggle;
 }) {
   const { t } = useTranslation();
   const reload = useCallback(() => onAction("reload", plugin), [onAction, plugin]);
+  const toggleNotifications = useCallback(
+    () => onToggleNotifications(plugin, notificationsEnabled === false),
+    [notificationsEnabled, onToggleNotifications, plugin],
+  );
   const remove = useCallback(() => onAction("remove", plugin), [onAction, plugin]);
   const openLogs = useCallback(() => onOpenLogs(plugin.id), [onOpenLogs, plugin.id]);
   const removeIcon = useMemo(() => <Trash2 size={16} color={styles.dangerIcon.color} />, []);
@@ -89,6 +99,15 @@ function PluginActionsMenu({
             {t("settings.plugins.logs.action")}
           </DropdownMenuItem>
         ) : null}
+        {notificationsEnabled === null ? null : (
+          <DropdownMenuItem onSelect={toggleNotifications} disabled={pending}>
+            {t(
+              notificationsEnabled
+                ? "settings.plugins.actions.notificationsOff"
+                : "settings.plugins.actions.notificationsOn",
+            )}
+          </DropdownMenuItem>
+        )}
         <DropdownMenuItem
           onSelect={reload}
           disabled={pending || !plugin.enabled}
@@ -121,6 +140,8 @@ function PluginRow({
   onAction,
   onOpenLogs,
   supportsLogs,
+  notificationsEnabled,
+  onToggleNotifications,
 }: {
   plugin: PluginListItem;
   serverId: string;
@@ -130,6 +151,8 @@ function PluginRow({
   onAction(action: PluginRowAction, plugin: PluginListItem): void;
   onOpenLogs(pluginId: string): void;
   supportsLogs: boolean;
+  notificationsEnabled: boolean | null;
+  onToggleNotifications: PluginNotificationsToggle;
 }) {
   const { t } = useTranslation();
   const toggle = useCallback(
@@ -185,6 +208,8 @@ function PluginRow({
           onAction={onAction}
           onOpenLogs={onOpenLogs}
           supportsLogs={supportsLogs}
+          notificationsEnabled={notificationsEnabled}
+          onToggleNotifications={onToggleNotifications}
         />
       </View>
     </SettingsRow>
@@ -273,6 +298,8 @@ export function HostPluginsPage({ serverId }: { serverId: string }) {
   const sourceInstallSupported = useHostFeature(serverId, "pluginSourceInstallation");
   // COMPAT(pluginLogs): added in v0.4.0, remove gate after 2027-08-16.
   const logsSupported = useHostFeature(serverId, "pluginLogs");
+  // COMPAT(pluginNotifications): FSH-only, added after v0.13.0, remove gate after 2027-05-05.
+  const notificationsSupported = useHostFeature(serverId, "pluginNotifications");
   const { config, patchConfig } = useDaemonConfig(serverId);
   const refreshQueue = useRef(Promise.resolve());
   useInstalledPlugins();
@@ -398,6 +425,25 @@ export function HostPluginsPage({ serverId }: { serverId: string }) {
     },
     [mutation, patchConfig, t],
   );
+  const toggleNotifications = useCallback<PluginNotificationsToggle>(
+    (plugin, enabled) => {
+      setFeedback(null);
+      mutation.mutate({
+        action: "notifications",
+        pluginId: plugin.id,
+        run: async () => {
+          await patchConfig({ pluginNotifications: { [plugin.id]: enabled } });
+          return t(
+            enabled
+              ? "settings.plugins.feedback.notificationsOn"
+              : "settings.plugins.feedback.notificationsOff",
+            { id: plugin.id },
+          );
+        },
+      });
+    },
+    [mutation, patchConfig, t],
+  );
   const pageState = resolvePluginPageState({
     connected,
     supported,
@@ -456,6 +502,10 @@ export function HostPluginsPage({ serverId }: { serverId: string }) {
                 onAction={action}
                 onOpenLogs={setLogsPluginId}
                 supportsLogs={logsSupported}
+                notificationsEnabled={
+                  notificationsSupported ? config?.pluginNotifications?.[plugin.id] !== false : null
+                }
+                onToggleNotifications={toggleNotifications}
               />
             );
           })

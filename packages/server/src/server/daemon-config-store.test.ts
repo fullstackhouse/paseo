@@ -46,6 +46,7 @@ function reloadableConfig(
     app: { baseUrl: "https://app.paseo.sh" },
     pluginsEnabled: persisted.pluginsEnabled ?? false,
     plugins: persisted.plugins ?? {},
+    pluginNotifications: persisted.pluginNotifications,
   };
 }
 
@@ -1183,6 +1184,23 @@ describe("DaemonConfigStore reload", () => {
     });
     expect(store.get().pluginsEnabled).toBe(false);
     expect(changes).toEqual([true, false]);
+  });
+
+  test("keeps per-plugin notification switches across patches and hand edits", async () => {
+    const { paseoHome, store } = createReloadableStore({
+      initialPersisted: { version: 1, pluginNotifications: { a: false } },
+    });
+
+    await store.patch({ pluginNotifications: { b: false } });
+    await store.patch({ pluginNotifications: { a: true } });
+
+    expect(store.get().pluginNotifications).toEqual({ a: true, b: false });
+    const saved = JSON.parse(readFileSync(path.join(paseoHome, "config.json"), "utf8"));
+    expect(saved.pluginNotifications).toEqual({ a: true, b: false });
+
+    writeConfig(paseoHome, { ...saved, pluginNotifications: { a: false, b: false } });
+    expect(await store.reload()).toMatchObject({ appliedPaths: ["pluginNotifications"] });
+    expect(store.get().pluginNotifications).toEqual({ a: false, b: false });
   });
 
   test("classifies every leaf when a parent subtree is added", async () => {
