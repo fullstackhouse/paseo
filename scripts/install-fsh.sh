@@ -154,20 +154,29 @@ else
     # The build is unsigned; Gatekeeper refuses it while the quarantine flag is set.
     xattr -cr "$APP"
   else
-    # The RPM's release field carries the CI run number, so a newer build is an upgrade. --force on
-    # the same build needs reinstall: install would call it already installed and do nothing.
+    # The RPM's release field carries the CI run number, so a newer build is an upgrade. The same
+    # build (--force) needs reinstall, and an installed build newer than the latest release (a
+    # `deploy` prerelease from a later run) needs downgrade: install does nothing for the first, and
+    # on dnf4 for the second, and exits 0 either way.
     say "Installing the RPM (asks for your password)"
-    nevr="$(rpm -qp --qf '%{NAME}-%{VERSION}-%{RELEASE}' "$tmp/paseo.rpm")"
-    if [[ "$(rpm -q Paseo 2>/dev/null)" == "$nevr"* ]]; then
-      action=reinstall
-    else
-      action=install
+    new_vr="$(rpm -qp --qf '%{VERSION}-%{RELEASE}' "$tmp/paseo.rpm")"
+    # Not `rpm -q --qf … || true`: with the package missing, rpm prints "package Paseo is not
+    # installed" to stdout.
+    installed_vr() { if installed; then rpm -q --qf '%{VERSION}-%{RELEASE}' Paseo; fi; }
+    old_vr="$(installed_vr)"
+    action=install
+    if [[ -n "$old_vr" ]]; then
+      case "$(rpm --eval "%{lua: print(rpm.vercmp(\"$old_vr\", \"$new_vr\"))}")" in
+        0) action=reinstall ;;
+        1) action=downgrade ;;
+      esac
     fi
     # dnf runs as root and can't read a private mktemp dir; hand it a world-readable copy.
     chmod 755 "$tmp" && chmod 644 "$tmp/paseo.rpm"
-    if ! "${ROOT[@]}" dnf "$action" -y "$tmp/paseo.rpm"; then
+    if ! "${ROOT[@]}" dnf "$action" -y "$tmp/paseo.rpm" || [[ "$(installed_vr)" != "$new_vr" ]]; then
+      now_vr="$(installed_vr)"
       installed && open_app
-      die "dnf $action failed; the previous build is still installed."
+      die "dnf $action didn't install Paseo $new_vr (installed: ${now_vr:-nothing})."
     fi
   fi
   mkdir -p "$(dirname "$MARKER")"
