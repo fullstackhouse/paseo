@@ -2578,6 +2578,8 @@ export const en = {
         disabling: "Disabling…",
         remove: "Uninstall",
         removing: "Uninstalling…",
+        notificationsOff: "Turn off notifications",
+        notificationsOn: "Turn on notifications",
       },
       feedback: {
         installed: "Installed {{name}}",
@@ -2588,6 +2590,8 @@ export const en = {
         kept: "Kept {{name}}",
         globalEnabled: "Plugins enabled",
         globalDisabled: "Plugins disabled",
+        notificationsOff: "Notifications off for {{id}}",
+        notificationsOn: "Notifications on for {{id}}",
       },
       removeConfirmTitle: "Uninstall {{name}}?",
       removeConfirmMessage: "Its download and settings on this host are deleted.",

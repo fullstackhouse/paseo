@@ -4,6 +4,7 @@ import { Text, View, type PressableStateCallbackType } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import {
   ArrowUpRight,
+  Bell,
   FileText,
   MoreHorizontal,
   PackagePlus,
@@ -54,12 +55,14 @@ const ThemedArrow = withUnistyles(ArrowUpRight);
 const ThemedRotate = withUnistyles(RotateCw);
 const ThemedLogs = withUnistyles(FileText);
 const ThemedTrash = withUnistyles(Trash2);
+const ThemedBell = withUnistyles(Bell);
 const installIcon = <ThemedPackagePlus size={14} uniProps={mutedIconColorMapping} />;
 const powerIcon = <ThemedPower size={14} uniProps={mutedIconColorMapping} />;
 const linkIcon = <ThemedArrow size={14} uniProps={mutedIconColorMapping} />;
 const reloadIcon = <ThemedRotate size={14} uniProps={mutedIconColorMapping} />;
 const logsIcon = <ThemedLogs size={14} uniProps={mutedIconColorMapping} />;
 const removeIcon = <ThemedTrash size={14} uniProps={dangerIconMapping} />;
+const bellIcon = <ThemedBell size={14} uniProps={mutedIconColorMapping} />;
 
 type TriggerState = PressableStateCallbackType & { hovered?: boolean; open?: boolean };
 // The trigger hangs by how far its frame reaches past the glyph, so the glyph sits on the trailing
@@ -159,6 +162,7 @@ export function PluginActionsMenu({
   // COMPAT(pluginLogs): added in v0.4.0, remove gate after 2027-08-16.
   const logsSupported = useHostFeature(serverId, "pluginLogs");
   const [logsOpen, setLogsOpen] = useState(false);
+  const notifications = usePluginNotificationsToggle(serverId, plugin.id);
   const reload = useCallback(() => onAction("reload"), [onAction]);
   const remove = useCallback(() => onAction("remove"), [onAction]);
   const openLogs = useCallback(() => setLogsOpen(true), []);
@@ -186,6 +190,13 @@ export function PluginActionsMenu({
               {t("settings.plugins.logs.action")}
             </DropdownMenuItem>
           ) : null}
+          {notifications ? (
+            <DropdownMenuItem leading={bellIcon} onSelect={notifications.toggle}>
+              {notifications.enabled
+                ? t("settings.plugins.actions.notificationsOff")
+                : t("settings.plugins.actions.notificationsOn")}
+            </DropdownMenuItem>
+          ) : null}
           {repositoryUrl ? (
             <DropdownMenuItem leading={linkIcon} onSelect={openRepository}>
               {t("settings.plugins.gallery.actions.repository")}
@@ -208,6 +219,38 @@ export function PluginActionsMenu({
       ) : null}
     </>
   );
+}
+
+/**
+ * FSH: a plugin's notifications switch (`pluginNotifications.<id>` in daemon config); null when the
+ * host can't deliver plugin notifications.
+ */
+function usePluginNotificationsToggle(
+  serverId: string,
+  pluginId: string,
+): { enabled: boolean; toggle(): void } | null {
+  const { t } = useTranslation();
+  const toast = useToast();
+  // COMPAT(pluginNotifications): FSH-only, added after v0.13.0, remove gate after 2027-05-05.
+  const supported = useHostFeature(serverId, "pluginNotifications");
+  const { config, patchConfig } = useDaemonConfig(serverId);
+  const enabled = config?.pluginNotifications?.[pluginId] !== false;
+  const toggle = useCallback(async () => {
+    const next = !enabled;
+    try {
+      await patchConfig({ pluginNotifications: { [pluginId]: next } });
+      toast.show(
+        next
+          ? t("settings.plugins.feedback.notificationsOn", { id: pluginId })
+          : t("settings.plugins.feedback.notificationsOff", { id: pluginId }),
+        { variant: "success" },
+      );
+    } catch (error) {
+      toast.error(pluginErrorText(error));
+    }
+  }, [enabled, patchConfig, pluginId, t, toast]);
+  if (!supported || !config) return null;
+  return { enabled, toggle };
 }
 
 function PluginLogsSheet({

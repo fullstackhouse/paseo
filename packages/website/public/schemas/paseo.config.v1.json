@@ -333,6 +333,16 @@
         ]
       }
     },
+    "pluginNotifications": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9-]*$"
+      },
+      "additionalProperties": {
+        "type": "boolean"
+      }
+    },
     "worktrees": {
       "type": "object",
       "properties": {

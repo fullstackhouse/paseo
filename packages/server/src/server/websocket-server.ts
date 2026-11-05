@@ -111,6 +111,13 @@ import {
   buildAgentAttentionNotificationPayload,
   findLatestPermissionRequest,
 } from "@getpaseo/protocol/agent-attention-notification";
+import {
+  buildPluginNotificationPayload,
+  PluginNotificationThrottle,
+  validatePluginNotificationInput,
+  type PluginNotificationInput,
+  type PluginNotificationResult,
+} from "./plugin-notifications.js";
 import { createGitHubService } from "../services/github-service.js";
 import type { ForgeService } from "../services/forge-service.js";
 import {
@@ -606,6 +613,7 @@ export class VoiceAssistantWebSocketServer {
   private readonly worktreesRoot: string | undefined;
   private readonly daemonConfigStore: DaemonConfigStore;
   private readonly pushNotifications: PushNotifications;
+  private readonly pluginNotificationThrottle = new PluginNotificationThrottle();
   private readonly pushNotificationSender: PushNotificationSender;
   // Per agent, the unread finish (by its attention timestamp) that a notification was delivered for.
   private readonly notifiedUnreadFinishAt = new Map<string, number>();
@@ -1717,6 +1725,8 @@ export class VoiceAssistantWebSocketServer {
         );
       },
       publishScriptStatusUpdate: (message) => this.publishScriptStatusUpdate(message),
+      sendPluginNotification: (pluginId, notification) =>
+        this.sendPluginNotification(pluginId, notification),
       downloadTokenStore: this.downloadTokenStore,
       pushNotifications: this.pushNotifications,
       paseoHome: this.paseoHome,
@@ -2154,6 +2164,8 @@ export class VoiceAssistantWebSocketServer {
         pluginTimelineItems: true,
         // COMPAT(pluginSubscriptions): added in v0.15.0, remove gate after 2027-05-02.
         pluginSubscriptions: true,
+        // COMPAT(pluginNotifications): FSH-only, added after v0.13.0, remove gate after 2027-05-05.
+        pluginNotifications: true,
         // COMPAT(skillManagement): added in v0.4.0, remove gate after 2027-08-16.
         skillManagement: true,
         // COMPAT(idleRuntimeCleanupSetting): added in v0.13.0, remove gate after 2027-04-26.
@@ -3167,6 +3179,81 @@ export class VoiceAssistantWebSocketServer {
         this.sessions.get(ws)!.session.publishToSource(ws, message.message);
       else this.sendToClient(ws, message);
     }
+  }
+  /**
+   * Plugin-session-only (the session checks the caller). Applies the per-plugin mute,
+   * key dedupe and rate limit, then pushes or picks one connected client to show it,
+   * like agent attention.
+   */
+  sendPluginNotification(
+    pluginId: string,
+    input: PluginNotificationInput,
+  ): PluginNotificationResult {
+    validatePluginNotificationInput(input);
+    if (this.daemonConfigStore.get().pluginNotifications?.[pluginId] === false) {
+      this.logger.info({ pluginId }, "Dropped plugin notification: muted in host settings");
+      return { delivered: false, dropped: "muted" };
+    }
+    const admitted = this.pluginNotificationThrottle.admit({
+      pluginId,
+      key: input.key,
+      nowMs: Date.now(),
+    });
+    if (!admitted.delivered) {
+      this.logger.warn(
+        { pluginId, key: input.key, dropped: admitted.dropped },
+        "Dropped plugin notification",
+      );
+      return admitted;
+    }
+
+    const notification = buildPluginNotificationPayload({
+      serverId: this.serverId,
+      pluginId,
+      notification: input,
+    });
+    const recipients: Array<{ ws: WebSocketLike; state: ClientPresenceState }> = [];
+    for (const [ws, connection] of this.sessions) {
+      if (!connection.session.wantsSourceEvent(ws, "plugin.notification")) continue;
+      recipients.push({ ws, state: this.getClientActivityState(connection.session, ws) });
+    }
+    const notificationEntries = recipients.filter(({ ws }) =>
+      this.sessions.get(ws)?.session.wantsSourceNotification(ws, "plugin.notification"),
+    );
+    const plan = computeNotificationPlan({
+      allStates: notificationEntries.map((entry) => entry.state),
+      focusTarget:
+        notification.data.agentId !== undefined
+          ? { kind: "agent", id: notification.data.agentId }
+          : null,
+      pushEligible: true,
+      nowMs: Date.now(),
+    });
+    if (plan.shouldPush) {
+      void this.pushNotificationSender.send(notification).catch((err) => {
+        this.logger.warn({ err, pluginId }, "Failed to send plugin push notification");
+      });
+    }
+
+    const timestamp = new Date().toISOString();
+    for (const { ws } of recipients) {
+      const connection = this.sessions.get(ws);
+      if (!connection) continue;
+      const message = {
+        type: "plugin.notification" as const,
+        payload: {
+          pluginId,
+          timestamp,
+          shouldNotify:
+            plan.inAppRecipientIndex !== null &&
+            notificationEntries[plan.inAppRecipientIndex]?.ws === ws,
+          notification,
+        },
+      };
+      if (connection.session.delivery.isModern(ws)) connection.session.publishToSource(ws, message);
+      else this.sendToClient(ws, wrapSessionMessage(message));
+    }
+    return { delivered: true };
   }
 }
 

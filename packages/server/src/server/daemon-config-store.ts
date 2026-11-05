@@ -46,6 +46,7 @@ interface SupportedMutableConfigPatch {
   skills?: MutableDaemonConfig["skills"];
   pluginsEnabled?: boolean;
   plugins?: MutableDaemonConfig["plugins"];
+  pluginNotifications?: MutableDaemonConfig["pluginNotifications"];
   features?: SpeechSettingsPatch;
 }
 
@@ -268,6 +269,7 @@ const RELOADABLE_PATHS = [
   "agents.metadataGeneration",
   "agents.skills.selection",
   "pluginsEnabled",
+  "pluginNotifications",
 ] as const;
 
 const PERSISTED_TO_MUTABLE_PATH = new Map<string, string>([
@@ -296,6 +298,7 @@ const PERSISTED_TO_MUTABLE_PATH = new Map<string, string>([
   ["agents.metadataGeneration", "metadataGeneration"],
   ["agents.skills.selection", "skills.selection"],
   ["pluginsEnabled", "pluginsEnabled"],
+  ["pluginNotifications", "pluginNotifications"],
 ]);
 
 function pathBelongsTo(path: string, owner: string): boolean {
@@ -378,6 +381,9 @@ function pickSupportedPatchFields(patch: MutableDaemonConfigPatch): SupportedMut
     ...(patch.agentProfiles !== undefined ? { agentProfiles: patch.agentProfiles } : {}),
     ...(patch.pluginsEnabled !== undefined ? { pluginsEnabled: patch.pluginsEnabled } : {}),
     ...(patch.plugins !== undefined ? { plugins: patch.plugins } : {}),
+    ...(patch.pluginNotifications !== undefined
+      ? { pluginNotifications: patch.pluginNotifications }
+      : {}),
     ...(patch.features !== undefined ? { features: patch.features } : {}),
   };
 }
@@ -790,6 +796,15 @@ function mergeMutablePatchIntoPersistedConfig(params: {
     ...withSpeech,
     ...(patch.pluginsEnabled !== undefined ? { pluginsEnabled: patch.pluginsEnabled } : {}),
     ...(patch.plugins !== undefined ? { plugins: patch.plugins } : {}),
+    // A patch names only the plugins it changes; the rest keep their stored value.
+    ...(patch.pluginNotifications !== undefined
+      ? {
+          pluginNotifications: {
+            ...persisted.pluginNotifications,
+            ...patch.pluginNotifications,
+          },
+        }
+      : {}),
     ...(daemon ? { daemon } : { daemon: undefined }),
     ...(agents ? { agents } : { agents: undefined }),
   } as PersistedConfig;
