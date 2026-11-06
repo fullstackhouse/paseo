@@ -947,6 +947,8 @@ export const ar: TranslationResources = {
           deletedLines: "الخطوط المحذوفة{{count}}",
           unpushedCommit: "التزام{{count}}غير المدفوعة",
           unpushedCommits: "التزامات{{count}}غير المدفوعة",
+          openPullRequest: "طلب سحب مفتوح #{{number}}",
+          openPullRequest_mr: "طلب دمج مفتوح !{{number}}",
         },
       },
       sync: {

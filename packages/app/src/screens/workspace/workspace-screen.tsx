@@ -59,6 +59,7 @@ import {
 import { SplitContainer } from "@/components/split-container";
 import { RetainedPanel } from "@/components/retained-panel";
 import { WorkspaceActions } from "@/git/workspace-actions";
+import { selectPrHintFromStatus } from "@/git/pr-hint";
 import { WorkspaceOpenInEditorButton } from "@/workspace/open-in-editor/button";
 import { WorkspaceScriptsButton } from "@/screens/workspace/scripts";
 import { ImportSessionSheet } from "@/components/import-session-sheet";
@@ -495,6 +496,7 @@ function useWorkspaceHeaderArchive(input: {
     isDirty: workspace?.gitRuntime?.isDirty ?? null,
     aheadOfOrigin: workspace?.gitRuntime?.aheadOfOrigin ?? null,
     diffStat: workspace?.diffStat ?? null,
+    pullRequest: selectPrHintFromStatus(workspace?.githubRuntime?.pullRequest, workspace?.forge),
     onArchiveStarted: redirectAfterArchive,
     onSetHiding: setIsHiding,
   });

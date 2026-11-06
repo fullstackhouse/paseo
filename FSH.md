@@ -38,6 +38,7 @@ temporary by design: every patch is meant to go upstream and then drop out of `f
 - FSH-only (not upstream yet): plugins can send notifications. Plugin server code calls `paseo.notifications.send({ title, body, open, key })`; Paseo pushes it to the phone or shows it on desktop/web like agent attention, and a tap opens the plugin's screen (or an agent). Per-plugin switch in Settings → Plugins (actions menu) or `pluginNotifications.<id>` in daemon config; duplicate keys and more than 20 a minute are dropped. Gated on `server_info.features.pluginNotifications`
 - FSH-only (upstreamable): an existing workspace can move into or out of the background (`workspace.background.set`, `workspaces.ref(id).setBackground()` for plugins), so a plugin can show a hidden workspace in the sidebar once you start working in it. Gated on `server_info.features.workspaceBackgroundSet`
 - FSH-only (upstreamable): composer pills that don't fit wrap onto more rows instead of shrinking, so a narrow screen no longer cuts a plugin pill's label and count
+- Fork-only (upstreamable): archiving a worktree workspace with an open pull request asks first, like uncommitted changes and unpushed commits already do. The dialog names the PR (`Open pull request #42`, `Open merge request !7` on GitLab); merged and closed PRs archive without asking
 
 Keep this list in sync with what's merged into `fsh`.
 
