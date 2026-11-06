@@ -6,6 +6,7 @@ import {
   confirmRiskyWorktreeArchive,
   DEFAULT_WORKTREE_ARCHIVE_WARNING_LABELS,
   readWorktreeArchiveRisk,
+  type WorktreeArchiveRisk,
   type WorktreeArchiveWarningLabels,
 } from "@/git/worktree-archive-warning";
 import type { WorkspaceDescriptor } from "@/stores/session-store";
@@ -33,6 +34,7 @@ export interface ArchiveWorkspaceInput {
   name: string;
   /** Labels the warning's line counts. Whether to warn comes from the host's git state. */
   diffStat?: { additions: number; deletions: number } | null;
+  pullRequest?: WorktreeArchiveRisk["pullRequest"];
   warningLabels?: WorktreeArchiveWarningLabels;
   /** Runs once the archive starts, with the workspace being archived. */
   onArchiveStarted: (workspace: WorkspaceArchiveTarget) => void;
@@ -51,6 +53,7 @@ export function useWorkspaceArchive(input: ArchiveWorkspaceInput): WorkspaceArch
     workspaceDirectory,
     name,
     diffStat,
+    pullRequest,
     warningLabels = DEFAULT_WORKTREE_ARCHIVE_WARNING_LABELS,
     onArchiveStarted,
     onSetHiding,
@@ -113,10 +116,10 @@ export function useWorkspaceArchive(input: ArchiveWorkspaceInput): WorkspaceArch
       return false;
     }
     return await confirmRiskyWorktreeArchive(
-      { workspaceName: name, diffStat, ...risk },
+      { workspaceName: name, diffStat, pullRequest, ...risk },
       warningLabels,
     );
-  }, [diffStat, name, serverId, t, toast, warningLabels, workspaceDirectory]);
+  }, [diffStat, name, pullRequest, serverId, t, toast, warningLabels, workspaceDirectory]);
 
   const archive = useCallback(() => {
     void runWorkspaceArchiveAttempt({

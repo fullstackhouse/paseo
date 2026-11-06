@@ -1012,6 +1012,8 @@ export const fr: TranslationResources = {
           deletedLines: "{{count}} lignes supprimées",
           unpushedCommit: "{{count}} commit non poussé",
           unpushedCommits: "{{count}} commits non poussés",
+          openPullRequest: "Pull request ouverte #{{number}}",
+          openPullRequest_mr: "Merge request ouverte !{{number}}",
         },
       },
       sync: {

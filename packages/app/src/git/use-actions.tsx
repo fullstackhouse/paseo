@@ -6,6 +6,7 @@ import { z } from "zod";
 import { useTranslation } from "react-i18next";
 import type { Theme } from "@/styles/theme";
 import { getForgePresentation, type Forge } from "@/git/forge";
+import { selectPrHintFromStatus } from "@/git/pr-hint";
 import { ForgeBrandIcon, getForgeBrandColorMapping } from "@/git/forge-icon";
 import { type CheckoutGitActionStatus, useCheckoutGitActionsStore } from "@/git/actions-store";
 import { type CheckoutStatusPayload, useCheckoutStatusQuery } from "@/git/use-status-query";
@@ -304,6 +305,10 @@ function useWorkspaceScreenArchiveController({
     workspaceDirectory: workspaceDescriptor?.workspaceDirectory ?? "",
     name: workspaceDescriptor?.name ?? branchLabel,
     diffStat: workspaceDescriptor?.diffStat ?? null,
+    pullRequest: selectPrHintFromStatus(
+      workspaceDescriptor?.githubRuntime?.pullRequest,
+      workspaceDescriptor?.forge,
+    ),
     warningLabels: getWorktreeArchiveWarningLabels(t),
     onSetHiding: setIsHidingWorkspace,
     onArchiveStarted: (archived) => {
@@ -1146,5 +1151,10 @@ function getWorktreeArchiveWarningLabels(
           : "workspace.git.actions.archiveWarning.unpushedCommits",
         { count },
       ),
+    openPullRequest: ({ number, forge }) =>
+      t("workspace.git.actions.archiveWarning.openPullRequest", {
+        number,
+        context: getForgePresentation(forge).changeRequestContext,
+      }),
   };
 }
