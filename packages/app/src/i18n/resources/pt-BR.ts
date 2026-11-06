@@ -970,6 +970,8 @@ export const ptBR: TranslationResources = {
           deletedLines: "{{count}} linhas removidas",
           unpushedCommit: "{{count}} commit não enviado",
           unpushedCommits: "{{count}} commits não enviados",
+          openPullRequest: "Pull request aberto #{{number}}",
+          openPullRequest_mr: "Merge request aberto !{{number}}",
         },
       },
       sync: {

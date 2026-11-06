@@ -980,6 +980,8 @@ export const es: TranslationResources = {
           deletedLines: "{{count}}líneas eliminadas",
           unpushedCommit: "Confirmación no enviada de{{count}}",
           unpushedCommits: "Confirmaciones no enviadas de{{count}}",
+          openPullRequest: "Solicitud de extracción abierta n.°{{number}}",
+          openPullRequest_mr: "Solicitud de fusión abierta !{{number}}",
         },
       },
       sync: {

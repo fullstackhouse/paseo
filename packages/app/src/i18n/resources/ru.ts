@@ -964,6 +964,8 @@ export const ru: TranslationResources = {
           deletedLines: "Удалено строк: {{count}}",
           unpushedCommit: "Неотправленных коммитов: {{count}}",
           unpushedCommits: "Неотправленных коммитов: {{count}}",
+          openPullRequest: "Открытый PR #{{number}}",
+          openPullRequest_mr: "Открытый MR !{{number}}",
         },
       },
       sync: {
