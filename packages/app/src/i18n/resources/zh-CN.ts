@@ -940,6 +940,8 @@ export const zhCN: TranslationResources = {
           deletedLines: "删除 {{count}} 行",
           unpushedCommit: "{{count}} 个未 push 的 commit",
           unpushedCommits: "{{count}} 个未 push 的 commit",
+          openPullRequest: "未合并的 Pull request #{{number}}",
+          openPullRequest_mr: "未合并的合并请求 !{{number}}",
         },
       },
       sync: {

@@ -956,6 +956,8 @@ export const en = {
           deletedLines: "{{count}} deleted lines",
           unpushedCommit: "{{count}} unpushed commit",
           unpushedCommits: "{{count}} unpushed commits",
+          openPullRequest: "Open pull request #{{number}}",
+          openPullRequest_mr: "Open merge request !{{number}}",
         },
       },
       sync: {

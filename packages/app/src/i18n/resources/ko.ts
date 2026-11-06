@@ -955,6 +955,8 @@ export const ko: TranslationResources = {
           deletedLines: "삭제된 줄 {{count}}개",
           unpushedCommit: "푸시되지 않은 커밋 {{count}}개",
           unpushedCommits: "푸시되지 않은 커밋 {{count}}개",
+          openPullRequest: "열린 풀 리퀘스트 #{{number}}",
+          openPullRequest_mr: "열린 병합 요청 !{{number}}",
         },
       },
       sync: {

@@ -1,16 +1,20 @@
 import { confirmDialog } from "@/utils/confirm-dialog";
 import { i18n } from "@/i18n/i18next";
+import { getForgePresentation } from "@/git/forge";
+import type { PrHint } from "@/git/pr-hint";
 
 export interface WorktreeArchiveRisk {
   isDirty?: boolean | null;
   aheadOfOrigin?: number | null;
   diffStat?: { additions: number; deletions: number } | null;
+  pullRequest?: Pick<PrHint, "number" | "state" | "forge"> | null;
 }
 
 export interface WorktreeArchiveRiskInput {
   archiveHasUncommittedChanges?: boolean | null;
   archiveUnpushedCommitCount?: number | null;
   diffStat?: WorktreeArchiveRisk["diffStat"];
+  prHint?: WorktreeArchiveRisk["pullRequest"];
 }
 
 export interface WorktreeArchiveConfirmationInput extends WorktreeArchiveRisk {
@@ -26,6 +30,7 @@ export interface WorktreeArchiveWarningLabels {
   addedLine: (count: number) => string;
   deletedLine: (count: number) => string;
   unpushedCommit: (count: number) => string;
+  openPullRequest: (pullRequest: Pick<PrHint, "number" | "forge">) => string;
 }
 
 export const DEFAULT_WORKTREE_ARCHIVE_WARNING_LABELS: WorktreeArchiveWarningLabels = {
@@ -47,6 +52,11 @@ export const DEFAULT_WORKTREE_ARCHIVE_WARNING_LABELS: WorktreeArchiveWarningLabe
     count === 1
       ? i18n.t("workspace.git.actions.archiveWarning.unpushedCommit", { count })
       : i18n.t("workspace.git.actions.archiveWarning.unpushedCommits", { count }),
+  openPullRequest: ({ number, forge }) =>
+    i18n.t("workspace.git.actions.archiveWarning.openPullRequest", {
+      number,
+      context: getForgePresentation(forge).changeRequestContext,
+    }),
 };
 
 export function toWorktreeArchiveRisk(input: WorktreeArchiveRiskInput): WorktreeArchiveRisk {
@@ -54,6 +64,7 @@ export function toWorktreeArchiveRisk(input: WorktreeArchiveRiskInput): Worktree
     isDirty: input.archiveHasUncommittedChanges,
     aheadOfOrigin: input.archiveUnpushedCommitCount,
     diffStat: input.diffStat,
+    pullRequest: input.prHint,
   };
 }
 
@@ -96,6 +107,10 @@ export function buildWorktreeArchiveRiskReasons(
   if ((input.aheadOfOrigin ?? 0) > 0) {
     const aheadOfOrigin = input.aheadOfOrigin ?? 0;
     reasons.push(labels.unpushedCommit(aheadOfOrigin));
+  }
+
+  if (input.pullRequest?.state === "open") {
+    reasons.push(labels.openPullRequest(input.pullRequest));
   }
 
   return reasons;
