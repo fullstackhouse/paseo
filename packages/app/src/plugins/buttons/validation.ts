@@ -55,6 +55,12 @@ function validateBehavior(
       return { ...behavior };
     case "popover":
       if (!isComponent(behavior.Content)) throw new Error("Plugin button popover needs Content");
+      if (
+        behavior.presentation !== undefined &&
+        behavior.presentation !== "popover" &&
+        behavior.presentation !== "side-panel"
+      )
+        throw new Error("Invalid plugin button popover presentation");
       return { ...behavior };
     case "menu": {
       const ids = new Set<string>();

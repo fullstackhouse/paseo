@@ -151,3 +151,36 @@ it.each([1, 2])(
     expect(visible).toEqual(["agent-a"]);
   },
 );
+
+it("restores a composer button side tab with its stable plugin and agent identity", async () => {
+  const values = new Map<string, string>();
+  const storage: StateStorage = {
+    getItem: (name) => values.get(name) ?? null,
+    setItem: (name, value) => {
+      values.set(name, value);
+    },
+    removeItem: (name) => {
+      values.delete(name);
+    },
+  };
+  const store = createWorkspaceLayoutStore(undefined, storage);
+  await store.persist.rehydrate();
+  const workspaceKey = "server:workspace";
+  const target = {
+    kind: "plugin_button",
+    pluginId: "asks",
+    buttonId: "pending",
+    agentId: "agent-1",
+  } as const;
+  const tabId = store.getState().openTab({ workspaceKey, target, intent: "reveal" });
+  const restored = createWorkspaceLayoutStore(undefined, storage);
+  await restored.persist.rehydrate();
+  const tabs = collectAllTabs(restored.getState().layoutByWorkspace[workspaceKey]!.root);
+  expect(tabs.find((tab) => tab.tabId === tabId)?.target).toEqual(target);
+  expect(restored.getState().openTab({ workspaceKey, target, intent: "reveal" })).toBe(tabId);
+  expect(
+    collectAllTabs(restored.getState().layoutByWorkspace[workspaceKey]!.root).filter(
+      (tab) => tab.target.kind === "plugin_button",
+    ),
+  ).toHaveLength(1);
+});
