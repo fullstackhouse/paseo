@@ -99,9 +99,9 @@ export default function contribute(client) {
   header("locked", { title: "Production locked", icon: "Lock", disabled: true, behavior: { kind: "action", onPress() {} } });
   const review = pill("review", { title: "Run review", icon: "Scan", label: "Review", behavior: { kind: "action", async onPress() { await new Promise((resolve) => { finishReview = resolve; }); review.update({ label: "Reviewed" }); } } });
   const pillMenu = pill("checks", { title: "Composer checks", icon: "ListChecks", label: "Checks", behavior: menu });
-  const status = pill("usage", { title: "Composer status", icon: StatusIcon, label: "Status", behavior: { kind: "popover", Content: ComposerDetails } });
+  const status = pill("usage", { title: "Composer status", icon: StatusIcon, label: "Status", behavior: { kind: "popover", presentation: "side-panel", Content: ComposerDetails } });
   const command = (id, title, onSelect) => client.addCommandCenterItem({ id, title, icon: "Settings", context: "workspace", onSelect });
-  command("anchor-status", "Use status popover", () => status.update({ behavior: { kind: "popover", presentation: "popover", Content: ComposerDetails } }));
+  command("anchor-status", "Use default status popover", () => status.update({ behavior: { kind: "popover", Content: ComposerDetails } }));
   command("disable-status", "Disable composer status", () => status.update({ disabled: true }));
   command("enable-status", "Enable composer status", () => status.update({ disabled: false }));
   command("finish", "Finish deployment", () => finish());
@@ -533,7 +533,7 @@ export async function withButtonShowcase(
             .first()
             .click();
           await composer.fill("");
-          await command(page, "Use status popover");
+          await command(page, "Use default status popover");
           await press(page, "Composer status");
           await expectDetails(page);
           await expect(panel).toHaveCount(0);

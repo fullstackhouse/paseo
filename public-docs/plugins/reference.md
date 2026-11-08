@@ -2530,11 +2530,11 @@ An action runs on the client. Paseo marks the button busy until its promise sett
 presses, and shows failures in a toast. A failed action can be retried. Use the client's `paseo` for
 ordinary operations and `rpc` for plugin-specific backend work.
 
-On desktop split layouts, a composer pill's direct `popover` content opens as a tab in the
-resizable side pane, keeping the conversation usable beside it. Pressing the same pill toggles its
-tab closed or open; the content's `close()` closes that tab. Set `presentation: "popover"`
-on the behavior to keep a composer pill anchored to its trigger instead. Header popovers and menus keep anchored surfaces.
-Compact layouts use bottom sheets; other single-pane layouts retain anchored popovers.
+Popover content stays anchored to its trigger by default. Set `presentation: "side-panel"`
+on a composer pill's direct `popover` behavior to open a tab in the resizable side pane on desktop
+split layouts. Pressing the same pill toggles its tab closed or open; the content's `close()` closes
+that tab. Header popovers and menus keep anchored surfaces. Compact layouts use bottom sheets;
+other single-pane layouts retain anchored popovers.
 The whole trigger opens the surface; there is no split-button behavior.
 
 ### Menu entries

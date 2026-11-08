@@ -253,7 +253,7 @@ function useButtonSidePanel(view: ButtonView) {
     !view.props.layout.compact &&
     layoutMode === "split-panes" &&
     view.entry.button.behavior.kind === "popover" &&
-    view.entry.button.behavior.presentation !== "popover"
+    view.entry.button.behavior.presentation === "side-panel"
   );
 }
 

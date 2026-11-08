@@ -20,7 +20,7 @@ export type PluginButtonBehavior<Text extends PluginText = string> =
   | {
       kind: "popover";
       Content: ComponentType<PluginButtonContentProps>;
-      /** Desktop composer content defaults to a side panel; compact layouts use a sheet. */
+      /** Defaults to an anchored popover. Desktop composer pills can opt into a side panel; compact layouts use a sheet. */
       presentation?: "popover" | "side-panel";
     };
 export type PluginButtonMenuEntry<Text extends PluginText = string> =
