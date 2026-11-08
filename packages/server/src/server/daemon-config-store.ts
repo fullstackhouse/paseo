@@ -315,12 +315,18 @@ function pickSupportedPatchFields(patch: MutableDaemonConfigPatch): SupportedMut
       : {}),
     ...(patch.terminalProfiles !== undefined ? { terminalProfiles: patch.terminalProfiles } : {}),
     ...(patch.agentProfiles !== undefined ? { agentProfiles: patch.agentProfiles } : {}),
+    ...pickPluginPatch(patch),
+    ...(patch.features !== undefined ? { features: patch.features } : {}),
+  };
+}
+
+function pickPluginPatch(patch: MutableDaemonConfigPatch): SupportedMutableConfigPatch {
+  return {
     ...(patch.pluginsEnabled !== undefined ? { pluginsEnabled: patch.pluginsEnabled } : {}),
     ...(patch.plugins !== undefined ? { plugins: patch.plugins } : {}),
     ...(patch.pluginNotifications !== undefined
       ? { pluginNotifications: patch.pluginNotifications }
       : {}),
-    ...(patch.features !== undefined ? { features: patch.features } : {}),
   };
 }
 

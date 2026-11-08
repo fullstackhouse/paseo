@@ -575,6 +575,18 @@ function resolveReloadEnv(config: PaseoDaemonConfig): NodeJS.ProcessEnv {
   return config.configReload?.env ?? process.env;
 }
 
+function createInitialPluginConfig(
+  config: ResolvedDaemonSettings,
+): Pick<MutableDaemonConfig, "pluginsEnabled" | "plugins" | "pluginNotifications"> {
+  return {
+    pluginsEnabled: config.pluginsEnabled ?? false,
+    plugins: config.plugins ?? {},
+    ...(config.pluginNotifications !== undefined
+      ? { pluginNotifications: config.pluginNotifications }
+      : {}),
+  };
+}
+
 function createInitialMutableDaemonConfig(config: ResolvedDaemonSettings): MutableDaemonConfig {
   const providers = config.providerOverrides ?? {};
 
@@ -604,11 +616,7 @@ function createInitialMutableDaemonConfig(config: ResolvedDaemonSettings): Mutab
     resumeOnStartup: config.resumeOnStartup === true,
     resumePrompt: config.resumePrompt ?? "Resume working.",
     appendSystemPrompt: config.appendSystemPrompt ?? "",
-    pluginsEnabled: config.pluginsEnabled ?? false,
-    plugins: config.plugins ?? {},
-    ...(config.pluginNotifications !== undefined
-      ? { pluginNotifications: config.pluginNotifications }
-      : {}),
+    ...createInitialPluginConfig(config),
     skills: { selection: config.skillSelection },
   };
 

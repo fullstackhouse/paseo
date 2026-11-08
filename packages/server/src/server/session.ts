@@ -1991,6 +1991,17 @@ export class Session {
     }
   }
 
+  private handleProviderSubagentEvent(
+    update: Extract<AgentManagerEvent, { type: "provider_subagent" }>["event"],
+  ): void {
+    // The subagents track of an internal parent stays hidden.
+    const parentAgentId =
+      update.type === "upsert" ? update.subagent.parentAgentId : update.parentAgentId;
+    if (this.agentManager.getAgent(parentAgentId)?.internal) return;
+    this.emitProviderSubagentWorkspaceUpdate(update);
+    this.forwardProviderSubagentUpdate(update);
+  }
+
   private subscribeToAgentEvents(): void {
     if (this.unsubscribeAgentEvents) {
       this.unsubscribeAgentEvents();
@@ -2037,14 +2048,7 @@ export class Session {
         }
 
         if (event.type === "provider_subagent") {
-          // The subagents track of an internal parent stays hidden.
-          const parentAgentId =
-            event.event.type === "upsert"
-              ? event.event.subagent.parentAgentId
-              : event.event.parentAgentId;
-          if (this.agentManager.getAgent(parentAgentId)?.internal) return;
-          this.emitProviderSubagentWorkspaceUpdate(event.event);
-          this.forwardProviderSubagentUpdate(event.event);
+          this.handleProviderSubagentEvent(event.event);
           return;
         }
 
