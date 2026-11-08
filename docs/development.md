@@ -99,6 +99,20 @@ The `app-main` worktree service runs the branch's web app connected to the daemo
 
 Open it through its proxy URL (`http://app-main--<branch>--<project>.localhost:6767`), not Metro's own port: the daemon accepts the web client only from a same-port `*.localhost` origin. The client has full access to that daemon, so a broken branch can act on your real agents.
 
+### Testing UI in the running desktop app
+
+For a UI-only change requested in the installed macOS app, build the Electron-flavored web export
+with `PASEO_WEB_PLATFORM=electron`. Back up `/Applications/Paseo.app/Contents/Resources/app-dist`
+outside the app bundle before replacing its renderer assets. Force Reload the main window while
+an agent tab is active; with a browser tab active, the same action reloads that browser instead.
+The app process, preload, profile, and daemon remain in place. Verify the changed UI in that window
+and confirm the daemon PID is unchanged.
+
+This is a local test overlay, not a packaged release. Changing sealed resources makes the bundle's
+resource signature stale. Keep the backup for rollback, and restore it or install a normal build
+after testing. Do not re-sign running binaries. Changes to Electron main, preload, or the daemon
+need a different workflow; never restart the main daemon without permission.
+
 ### Expo Router
 
 Route ownership, startup restore, and native blank-screen gotchas live in
