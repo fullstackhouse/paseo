@@ -859,7 +859,7 @@ export function AdaptiveModalSheet({
   const desktopContent = (
     <View style={desktopOverlayStyle} testID={testID}>
       <DismissBackdrop label={t("common.actions.dismiss")} onPress={onClose} />
-      <View ref={setOverlayScope} style={desktopCardStyle} role="dialog" aria-modal tabIndex={-1}>
+      <View ref={setOverlayScope} style={desktopCardStyle} role="dialog" accessibilityLabel={header?.title} aria-modal tabIndex={-1}>
         {cardInner}
       </View>
     </View>

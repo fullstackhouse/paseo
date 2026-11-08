@@ -196,3 +196,40 @@ describe("plugin panel tab identity", () => {
     expect(agent).toBe("plugin_agent_6_review_7_details_7_agent-1");
   });
 });
+
+describe("composer button panel identity", () => {
+  const target = {
+    kind: "plugin_button",
+    pluginId: "asks",
+    buttonId: "pending",
+    agentId: "agent-1",
+  } as const;
+
+  it("normalizes restored button identity and rejects missing identifiers", () => {
+    expect(
+      normalizeWorkspaceTabTarget({
+        kind: "plugin_button",
+        pluginId: " asks ",
+        buttonId: " pending ",
+        agentId: " agent-1 ",
+      }),
+    ).toEqual(target);
+    for (const field of ["pluginId", "buttonId", "agentId"] as const) {
+      expect(normalizeWorkspaceTabTarget({ ...target, [field]: " " })).toBeNull();
+    }
+  });
+
+  it("reuses the same button tab and distinguishes agents, plugins, and buttons", () => {
+    expect(workspaceTabTargetsEqual(target, { ...target })).toBe(true);
+    expect(buildDeterministicWorkspaceTabId(target)).toBe(
+      "plugin_button_4_asks_7_pending_7_agent-1",
+    );
+    for (const field of ["pluginId", "buttonId", "agentId"] as const) {
+      const other = { ...target, [field]: "other" };
+      expect(workspaceTabTargetsEqual(target, other)).toBe(false);
+      expect(buildDeterministicWorkspaceTabId(other)).not.toBe(
+        buildDeterministicWorkspaceTabId(target),
+      );
+    }
+  });
+});

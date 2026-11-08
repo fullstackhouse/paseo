@@ -120,6 +120,7 @@ function getFallbackTabOptionDescription(
   if (tab.target.kind === "plugin") {
     return tab.target.panelId;
   }
+  if (tab.target.kind === "plugin_button") return tab.target.buttonId;
   return tab.target.path;
 }
 
