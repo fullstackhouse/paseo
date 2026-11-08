@@ -41,12 +41,8 @@ export function ComposerDiffStatPill({
     <Pressable
       testID="composer-diff-stat-pill"
       accessibilityRole="button"
-      accessibilityLabel={[
-        t("workspace.git.diff.openChangesTab"),
-        sync ? buildGitSyncAccessibilityLabel(sync.facts, t) : null,
-      ]
-        .filter(Boolean)
-        .join(", ")}
+      accessibilityLabel={t("workspace.git.diff.openChangesTab")}
+      accessibilityHint={sync ? buildGitSyncAccessibilityLabel(sync.facts, t) : undefined}
       onPress={onPress}
       onHoverIn={handleHoverIn}
       onHoverOut={handleHoverOut}
