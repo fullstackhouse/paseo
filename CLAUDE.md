@@ -125,6 +125,7 @@ and updating `next`, integrating it after a release, and releasing a hotfix from
 
 ## Critical rules
 
+- **Run plugin changes in Jacek's local Paseo for live testing.** Follow [Test a plugin change](docs/plugins.md#test-a-plugin-change) and leave the changed plugin running.
 - **Desktop asks belong beside the conversation.** Use the ordinary [side pane](docs/explorer-sidebar.md#side-pane), not a modal dialog.
 
 - **NEVER restart the main Paseo daemon on port 6767 without permission** — it manages all running agents. If you're an agent, restarting it kills your own process.
