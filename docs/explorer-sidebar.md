@@ -142,6 +142,12 @@ right split around the workspace root; later side opens reuse it. Only the `spli
 mode opens beside. Compact and single-pane layouts (touch tablets) open the same target in the main
 pane, so callers never check whether splits render.
 
+A composer plugin pill with custom content opens an ordinary side-pane tab on split layouts.
+Its identity is the plugin, button and agent, so repeated presses reuse it and resizing preserves
+its mounted form. The tab resolves the current button registration independently of the chat;
+see the [button lifecycle contract](../public-docs/plugins/reference.md#updates-and-lifecycle).
+Compact pills keep their existing sheet.
+
 Removing a pane clears its remembered id; a later side open creates a new pane. The last visible
 ordinary pane stays when its final tab closes and shows the New launcher. An empty workspace does
 not automatically create an agent draft tab; choosing Agent opens one. Explorer cannot replace the

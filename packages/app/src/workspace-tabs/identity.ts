@@ -38,6 +38,14 @@ export function normalizeWorkspaceTabTarget(
   if (value.kind === "plugin") {
     return normalizePluginTabTarget(value);
   }
+  if (value.kind === "plugin_button") {
+    const pluginId = trimNonEmpty(value.pluginId);
+    const buttonId = trimNonEmpty(value.buttonId);
+    const agentId = trimNonEmpty(value.agentId);
+    return pluginId && buttonId && agentId
+      ? { kind: "plugin_button", pluginId, buttonId, agentId }
+      : null;
+  }
   return normalizeSimpleWorkspaceTabTarget(value);
 }
 
@@ -131,6 +139,9 @@ function secondaryWorkspaceTabTargetsEqual(
   left: WorkspaceTabTarget,
   right: WorkspaceTabTarget,
 ): boolean {
+  if (left.kind === "plugin_button" && right.kind === "plugin_button") {
+    return buildDeterministicWorkspaceTabId(left) === buildDeterministicWorkspaceTabId(right);
+  }
   if (left.kind === "browser" && right.kind === "browser") {
     return left.browserId === right.browserId;
   }
@@ -227,6 +238,9 @@ export function buildDeterministicWorkspaceTabId(target: WorkspaceTabTarget): st
     return target.context === "workspace"
       ? `plugin_workspace_${identity}`
       : `plugin_agent_${identity}_${target.agentId.length}_${target.agentId}`;
+  }
+  if (target.kind === "plugin_button") {
+    return `plugin_button_${target.pluginId.length}_${target.pluginId}_${target.buttonId.length}_${target.buttonId}_${target.agentId.length}_${target.agentId}`;
   }
   return `file_${target.path}`;
 }

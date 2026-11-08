@@ -125,6 +125,8 @@ and updating `next`, integrating it after a release, and releasing a hotfix from
 
 ## Critical rules
 
+- **Desktop asks belong beside the conversation.** Use the ordinary [side pane](docs/explorer-sidebar.md#side-pane), not a modal dialog.
+
 - **NEVER restart the main Paseo daemon on port 6767 without permission** — it manages all running agents. If you're an agent, restarting it kills your own process.
 - **Verify local dev in its actual window:** check appearance and capture fresh console errors after reload. Do not dismiss React warnings as expected dev noise without tracing their cause.
 - **NEVER assume a timeout means the service needs restarting** — timeouts can be transient.

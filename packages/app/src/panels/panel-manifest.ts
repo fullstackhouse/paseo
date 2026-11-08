@@ -130,6 +130,14 @@ const manifests = {
     compactSheet: null,
     resourceKey: () => "working_diff",
   },
+  plugin_button: {
+    kind: "plugin_button",
+    supportedHosts: ["main"],
+    showCloseButton: true,
+    singleton: false,
+    compactSheet: null,
+    resourceKey: (target) => `${target.pluginId}:${target.buttonId}:${target.agentId}`,
+  },
   plugin: {
     kind: "plugin",
     // Plugin targets are narrowed by the target-aware plugin panel capability resolver.
