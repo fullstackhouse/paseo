@@ -90,6 +90,8 @@ never deletes it. The global `pluginsEnabled` switch remains available.
 
 During plugin development, run the local working copy on Jacek's local Paseo host so he can test changes live. Install or point the plugin's directory source at that working copy, reload the plugin after changes, and verify the loaded source and status. Leave it running and tell him where to test. Reload only the plugin; restarting the main daemon still requires permission.
 
+If the change is in Paseo's UI, start [app-main](development.md#previewing-a-branch-against-your-main-daemon), open its proxy URL in Paseo, and verify it connects to the main host before handing it over. Apply this to the current change when asked for live testing.
+
 For additional isolated checks, use a throwaway daemon started by the installed `paseo` CLI. Copy your config so the other plugins and providers match, give it a free port, and drop the password and relay:
 
 ```bash
