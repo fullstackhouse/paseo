@@ -1,7 +1,7 @@
 import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import type { Locator, TestInfo } from "@playwright/test";
+import type { ConsoleMessage, Locator, TestInfo } from "@playwright/test";
 import { test, expect, type Page } from "@playwright/test";
 import { gotoAppShell } from "./app";
 import { buildAgentRoute } from "./mock-agent";
@@ -22,7 +22,7 @@ const COMPACT = { width: 390, height: 844 };
 
 function clientSource(workspaceId: string, agentId: string): string {
   return `import React from "react";
-import { Text, View, Pressable } from "react-native";
+import { Text, TextInput, View, Pressable } from "react-native";
 import { useWorkspace, useRpc, usePaseo } from "@getpaseo/plugin/client";
 import { useQuery } from "@tanstack/react-query";
 import { summary } from "./shared/rpc";
@@ -31,12 +31,14 @@ function StatusIcon({ size, theme }) {
   return <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: theme.colors.statusSuccess }} />;
 }
 
-function Details({ workspaceId, theme, layout, close }) {
+function Details({ workspaceId, theme, layout, close, expandable = false }) {
   const workspace = useWorkspace(workspaceId, (workspace) => workspace.name);
   const paseo = usePaseo();
   const [ownerId, setOwnerId] = React.useState("");
   const [updates, setUpdates] = React.useState(0);
   const [failed, setFailed] = React.useState(false);
+  const [expanded, setExpanded] = React.useState(false);
+  const [reply, setReply] = React.useState("");
   React.useEffect(() => {
     const owner = paseo.observeEvents(["project.update"]);
     owner.subscribe({ snapshot(value) { setOwnerId(value.subscriptionId); }, update() { setUpdates((n) => n + 1); } });
@@ -55,7 +57,16 @@ function Details({ workspaceId, theme, layout, close }) {
     <Text style={{ color: theme.colors.foregroundMuted }}>3 checks passed · Production</Text>
     <Text style={{ color: theme.colors.foregroundMuted }}>Presentation: {layout.compact ? "compact" : "wide"}</Text>
     <Pressable accessibilityRole="button" accessibilityLabel="Close deployment details" onPress={close} style={{ padding: 8, borderRadius: 6, backgroundColor: theme.colors.surface2 }}><Text style={{ color: theme.colors.foreground }}>Done</Text></Pressable>
+    {expandable && <Pressable accessibilityRole="button" accessibilityLabel="Expand deployment evidence" onPress={() => setExpanded(true)}><Text style={{ color: theme.colors.foreground }}>Expand evidence</Text></Pressable>}
+    {expanded && <>
+      {Array.from({ length: 24 }, (_, index) => <Text key={index} style={{ color: theme.colors.foreground }}>Deployment evidence {index + 1}: checks passed and ready for review.</Text>)}
+      <TextInput accessibilityLabel="Deployment reply" value={reply} onChangeText={setReply} style={{ color: theme.colors.foreground, borderWidth: 1, borderColor: theme.colors.surface2, padding: 12 }} />
+    </>}
   </View>;
+}
+
+function ComposerDetails(props) {
+  return <Details {...props} expandable />;
 }
 
 export default function contribute(client) {
@@ -88,8 +99,11 @@ export default function contribute(client) {
   header("locked", { title: "Production locked", icon: "Lock", disabled: true, behavior: { kind: "action", onPress() {} } });
   const review = pill("review", { title: "Run review", icon: "Scan", label: "Review", behavior: { kind: "action", async onPress() { await new Promise((resolve) => { finishReview = resolve; }); review.update({ label: "Reviewed" }); } } });
   const pillMenu = pill("checks", { title: "Composer checks", icon: "ListChecks", label: "Checks", behavior: menu });
-  pill("usage", { title: "Composer status", icon: StatusIcon, label: "Status", behavior: { kind: "popover", Content: Details } });
+  const status = pill("usage", { title: "Composer status", icon: StatusIcon, label: "Status", behavior: { kind: "popover", presentation: "side-panel", Content: ComposerDetails } });
   const command = (id, title, onSelect) => client.addCommandCenterItem({ id, title, icon: "Settings", context: "workspace", onSelect });
+  command("anchor-status", "Use default status popover", () => status.update({ behavior: { kind: "popover", Content: ComposerDetails } }));
+  command("disable-status", "Disable composer status", () => status.update({ disabled: true }));
+  command("enable-status", "Enable composer status", () => status.update({ disabled: false }));
   command("finish", "Finish deployment", () => finish());
   command("finish-review", "Finish review", () => finishReview());
   command("hide-deploy", "Hide deployment button", () => deploy.update({ visible: false }));
@@ -319,6 +333,7 @@ export async function withButtonShowcase(
           await expect.poll(() => released.has(first)).toBe(true);
           await press(page, "Composer status");
           await expectDetails(page);
+          await expect(observation).not.toHaveText("");
           const second = (await observation.textContent())!;
           expect(second).not.toBe(first);
           await workspace.client.renameProject(workspace.projectId, "Observer control");
@@ -328,9 +343,13 @@ export async function withButtonShowcase(
             page.getByText("Plugin failed: Button content failed", { exact: true }),
           ).toBeVisible();
           await expect.poll(() => released.has(second)).toBe(true);
-          await page.keyboard.press("Escape");
+          await page.getByTestId(/^workspace-tab-plugin_button_/).click({ button: "middle" });
+          await expect(
+            page.getByText("Plugin failed: Button content failed", { exact: true }),
+          ).not.toBeVisible();
           await press(page, "Header status");
           await expectDetails(page);
+          await expect(observation).not.toHaveText("");
           const recovered = (await observation.textContent())!;
           expect([first, second]).not.toContain(recovered);
           await showcase.setTitle("Healthy app after button failure");
@@ -413,11 +432,147 @@ export async function withButtonShowcase(
           await press(page, "Close deployment details");
           await press(page, "Composer status");
           await expectDetails(page);
+          const panel = page.getByTestId("plugin-button-panel");
+          const explorer = page.getByTestId("workspace-explorer-sidebar").filter({ visible: true });
+          const main = page.getByTestId("workspace-pane-main");
+          const composerBadge = main.getByRole("button", { name: "Composer status", exact: true });
+          const explorerTab = explorer.getByTestId(/^workspace-tab-plugin_button_/);
+          const composer = page.getByRole("textbox", { name: "Message agent...", exact: true });
+          const diagnostics: string[] = [];
+          const recordConsole = (message: ConsoleMessage) => {
+            if (message.type() === "warning" || message.type() === "error") {
+              diagnostics.push(`${message.type()}: ${message.text()}`);
+            }
+          };
+          const recordError = (error: Error) => diagnostics.push(`pageerror: ${error.message}`);
+          page.on("console", recordConsole);
+          page.on("pageerror", recordError);
+          await expect(panel).toBeVisible();
+          await expect(explorer.getByTestId("plugin-button-panel")).toBeVisible();
+          await expect(explorerTab).toHaveAttribute("aria-selected", "true");
+          await expect(explorer.getByTestId("workspace-tab-files")).toBeVisible();
+          await expect(main).toHaveCount(1);
+          await expect(page.getByTestId("workspace-split-resize-handle")).toHaveCount(0);
+          await expect(
+            page.getByRole("dialog", { name: "Composer status", exact: true }),
+          ).toHaveCount(0);
+          const expectBesideConversation = async () => {
+            await expect(composer).toBeVisible();
+            await expect
+              .poll(async () => {
+                const contentBox = await panel.boundingBox();
+                const chatBox = await composer.boundingBox();
+                return contentBox && chatBox
+                  ? contentBox.x - (chatBox.x + chatBox.width)
+                  : -Infinity;
+              })
+              .toBeGreaterThanOrEqual(0);
+            const box = (await panel.boundingBox())!;
+            expect(box.height).toBeGreaterThan(440);
+            expect(box.width).toBeGreaterThan(230);
+            expect(box.x + box.width).toBeLessThanOrEqual(page.viewportSize()!.width);
+          };
+          await expectBesideConversation();
+          await captureSchemes(page, info, "desktop-composer-panel", panel);
+          await press(page, "Expand deployment evidence");
+          const reply = panel.getByRole("textbox", { name: "Deployment reply" });
+          await reply.fill("Ready to approve after checking the evidence.");
+          await expect(reply).toBeInViewport();
+          const resizeHandle = page
+            .getByTestId("workspace-explorer-sidebar-resize-handle")
+            .getByRole("separator");
+          const handleBox = (await resizeHandle.boundingBox())!;
+          const originalWidth = (await panel.boundingBox())!.width;
+          await page.mouse.move(
+            handleBox.x + handleBox.width / 2,
+            handleBox.y + handleBox.height / 2,
+          );
+          await page.mouse.down();
+          await page.mouse.move(handleBox.x - 60, handleBox.y + handleBox.height / 2, { steps: 8 });
+          await page.mouse.up();
+          await expect
+            .poll(async () => (await panel.boundingBox())?.width ?? 0)
+            .toBeGreaterThan(originalWidth + 30);
+          await expect(reply).toHaveValue("Ready to approve after checking the evidence.");
+          await page.setViewportSize({ width: 1000, height: 700 });
+          await expectBesideConversation();
+          await expect(reply).toHaveValue("Ready to approve after checking the evidence.");
+          await reply.scrollIntoViewIfNeeded();
+          await expect(reply).toBeInViewport();
+          await info.attach("desktop-composer-panel-scrolled", {
+            body: await page.screenshot({
+              path: info.outputPath("desktop-composer-panel-scrolled.png"),
+            }),
+            contentType: "image/png",
+          });
+          await composer.fill("Compare the evidence while asks stays open.");
+          await expect(panel).toBeVisible();
+          await expect(reply).toHaveValue("Ready to approve after checking the evidence.");
+          await page.getByTestId("workspace-explorer-toggle").first().click();
+          await expect(explorer).toHaveCount(0);
+          await composerBadge.click();
+          await expect(explorer.getByTestId("plugin-button-panel")).toBeVisible();
+          await expect(explorerTab).toHaveAttribute("aria-selected", "true");
+          await expect(reply).toHaveValue("Ready to approve after checking the evidence.");
+          await explorer.getByTestId("workspace-tab-files").click();
+          await expect(panel).not.toBeVisible();
+          await composerBadge.click();
+          await expect(panel).toBeVisible();
+          await expect(explorerTab).toHaveAttribute("aria-selected", "true");
+          await expect(reply).toHaveValue("Ready to approve after checking the evidence.");
+          await composerBadge.click();
+          await expect(panel).not.toBeVisible();
+          await expect(explorerTab).toHaveCount(0);
+          await expect(explorer.getByTestId("workspace-tab-files")).toBeVisible();
+          await composerBadge.click();
+          await expect(explorer.getByTestId("plugin-button-panel")).toBeVisible();
+          await expect(page.getByTestId("workspace-split-resize-handle")).toHaveCount(0);
+          await expectDetails(page);
+          await expect(panel).toHaveCount(1);
+          await page.setViewportSize(WIDE);
+          await command(page, "Disable composer status");
+          await expect(
+            panel.getByText("This plugin button is unavailable.", { exact: true }),
+          ).toBeVisible();
+          await expect(panel.getByRole("textbox", { name: "Deployment reply" })).toHaveCount(0);
+          await command(page, "Enable composer status");
+          await expectDetails(page);
+          await press(page, "Close deployment details");
+          await expect(panel).not.toBeVisible();
+          await press(page, "Composer status");
+          await expectDetails(page);
           await expectSurfaceVisible(
             page,
             page.getByRole("button", { name: "Close deployment details", exact: true }),
           );
           await press(page, "Close deployment details");
+          await expect(panel).not.toBeVisible();
+          await page
+            .getByTestId(`workspace-tab-agent_${agent.id}`)
+            .filter({ visible: true })
+            .first()
+            .click();
+          await composer.fill("");
+          await command(page, "Use default status popover");
+          await press(page, "Composer status");
+          await expectDetails(page);
+          await expect(panel).toHaveCount(0);
+          await expect(page.getByRole("dialog")).toHaveCount(0);
+          await expectSurfaceVisible(page);
+          await page.keyboard.press("Escape");
+          await expect(
+            page.getByRole("button", { name: "Close deployment details", exact: true }),
+          ).not.toBeVisible();
+          page.off("console", recordConsole);
+          page.off("pageerror", recordError);
+          await writeFile(
+            info.outputPath("desktop-composer-panel-console.txt"),
+            diagnostics.join("\n") || "No console warnings, errors, or page errors.",
+          );
+          await info.attach("desktop-composer-panel-console", {
+            body: diagnostics.join("\n") || "No console warnings, errors, or page errors.",
+            contentType: "text/plain",
+          });
         }),
       runAndUpdateActions: () =>
         test.step("actions fail visibly, retry, and remain busy until completion", async () => {

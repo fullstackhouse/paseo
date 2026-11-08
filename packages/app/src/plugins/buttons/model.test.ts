@@ -100,6 +100,39 @@ describe("plugin buttons", () => {
     expect(buttons.getSnapshot()[0].button.title).toBe("Review");
   });
 
+  it("preserves popover presentation and rejects invalid updates atomically", () => {
+    const buttons = store();
+    const Content = () => null;
+    const registration = buttons.addComposerPill(installation(), {
+      id: "review",
+      workspaceId: "workspace",
+      agentId: "agent",
+      button: { ...button(), behavior: { kind: "popover", Content } },
+    });
+    expect(buttons.getSnapshot()[0].button.behavior).toEqual({ kind: "popover", Content });
+    for (const presentation of ["popover", "side-panel"] as const) {
+      registration.update({ behavior: { kind: "popover", Content, presentation } });
+      expect(buttons.getSnapshot()[0].button.behavior).toEqual({
+        kind: "popover",
+        Content,
+        presentation,
+      });
+    }
+    const invalid = {
+      kind: "popover",
+      Content,
+      presentation: "dialog",
+    } as unknown as PluginButton["behavior"];
+    expect(() => registration.update({ behavior: invalid })).toThrow(
+      "Invalid plugin button popover presentation",
+    );
+    expect(buttons.getSnapshot()[0].button.behavior).toEqual({
+      kind: "popover",
+      Content,
+      presentation: "side-panel",
+    });
+  });
+
   it("prevents repeated presses and cannot resurrect a removed pending button", async () => {
     const buttons = store();
     let finish = () => {};

@@ -36,6 +36,14 @@ describe("plugin Command Center agent context", () => {
     ).toBe("agent-1");
   });
 
+  it("preserves agent context while its composer button panel is focused", () => {
+    expect(
+      getFocusedAgentId(
+        layout({ kind: "plugin_button", pluginId: "asks", buttonId: "pill", agentId: "agent-1" }),
+      ),
+    ).toBe("agent-1");
+  });
+
   it("does not invent agent context for workspace panels", () => {
     expect(
       getFocusedAgentId(

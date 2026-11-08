@@ -25,6 +25,15 @@ import {
   type MenuPageDefinition,
 } from "@/components/ui/menu";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
+import {
+  collectAllTabs,
+  findPaneById,
+  selectExplorerSidebarPaneId,
+  selectIsExplorerSidebarVisible,
+  useWorkspaceLayoutStore,
+} from "@/stores/workspace-layout-store";
+import { buildWorkspaceTabPersistenceKey } from "@/workspace-tabs/model";
+import { showExplorerSidebar } from "@/workspace-tabs/explorer-sidebar";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { HEADER_CONTROL_HEIGHT } from "@/components/ui/control-geometry";
 import {
@@ -243,17 +252,74 @@ function buttonPages(
   });
 }
 
+function useButtonSidePanel(view: ButtonView) {
+  const layoutMode = useWorkspaceLayoutStore((state) => state.layoutMode);
+  return (
+    view.entry.placement === "composer" &&
+    !view.props.layout.compact &&
+    layoutMode === "split-panes" &&
+    view.entry.button.behavior.kind === "popover" &&
+    view.entry.button.behavior.presentation === "side-panel"
+  );
+}
+
 function ButtonControl({ view }: { view: ButtonView }) {
   const { entry, props } = view;
   const { button } = entry;
   const composer = entry.placement === "composer";
   const disabled = button.disabled || entry.pending;
+  const sidePanel = useButtonSidePanel(view);
+  const workspaceKey = buildWorkspaceTabPersistenceKey({
+    serverId: entry.installation.serverId,
+    workspaceId: entry.context.workspaceId,
+  });
+  const sidePanelTabId = useWorkspaceLayoutStore((state) => {
+    if (!sidePanel || !workspaceKey || entry.context.context !== "agent") return null;
+    const layout = state.layoutByWorkspace[workspaceKey];
+    if (!layout) return null;
+    const paneId = selectExplorerSidebarPaneId(state, workspaceKey);
+    const pane = paneId ? findPaneById(layout.root, paneId) : null;
+    if (!pane || !selectIsExplorerSidebarVisible(state, workspaceKey)) return null;
+    const agentId = entry.context.agentId;
+    return (
+      collectAllTabs(layout.root).find(
+        ({ tabId, target }) =>
+          tabId === pane.focusedTabId &&
+          target.kind === "plugin_button" &&
+          target.pluginId === entry.installation.id &&
+          target.buttonId === entry.id &&
+          target.agentId === agentId,
+      )?.tabId ?? null
+    );
+  });
   const expanded = button.behavior.kind !== "action";
   const chevron = !composer && !props.layout.compact && expanded;
   let label = button.label;
   if (composer) label = button.label ?? button.title;
   else if (props.layout.compact) label = undefined;
-  const press = useCallback(() => pressButton(view, []), [view]);
+  const press = useCallback(() => {
+    if (sidePanel && workspaceKey && entry.context.context === "agent") {
+      if (sidePanelTabId) {
+        useWorkspaceLayoutStore.getState().closeTab(workspaceKey, sidePanelTabId);
+        return;
+      }
+      const paneId = showExplorerSidebar({ workspaceKey, isCompact: false });
+      if (!paneId) return;
+      useWorkspaceLayoutStore.getState().openTab({
+        workspaceKey,
+        intent: "reveal",
+        placement: { mode: "pane", paneId },
+        target: {
+          kind: "plugin_button",
+          pluginId: entry.installation.id,
+          buttonId: entry.id,
+          agentId: entry.context.agentId,
+        },
+      });
+      return;
+    }
+    pressButton(view, []);
+  }, [view, entry, sidePanel, sidePanelTabId, workspaceKey]);
   const setOpen = useCallback(
     (open: boolean) => pluginButtonStore.setOpen(entry.key, open),
     [entry.key],
@@ -264,11 +330,11 @@ function ButtonControl({ view }: { view: ButtonView }) {
         ? [
             composerPillStyles.body,
             styles.button,
-            (hovered || pressed || entry.open) && styles.active,
+            (hovered || pressed || entry.open || sidePanelTabId !== null) && styles.active,
             disabled && styles.disabled,
           ]
         : headerButtonStyle(props.layout.compact, { hovered, pressed, open: entry.open }, disabled),
-    [composer, disabled, entry.open, props.layout.compact],
+    [composer, disabled, entry.open, props.layout.compact, sidePanelTabId],
   );
   const contents = (
     <>
@@ -291,32 +357,38 @@ function ButtonControl({ view }: { view: ButtonView }) {
       ) : null}
     </>
   );
+  const contentOpen = sidePanel ? sidePanelTabId !== null : entry.open;
   const accessibilityState = useMemo(
-    () => ({ busy: entry.pending, disabled }),
-    [entry.pending, disabled],
+    () => ({
+      busy: entry.pending,
+      disabled,
+      expanded: expanded ? contentOpen : undefined,
+    }),
+    [entry.pending, disabled, expanded, contentOpen],
   );
-  const trigger = expanded ? (
-    <MenuTrigger
-      accessibilityRole="button"
-      accessibilityLabel={button.title}
-      accessibilityState={accessibilityState}
-      disabled={disabled}
-      style={buttonStyle}
-    >
-      {contents}
-    </MenuTrigger>
-  ) : (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={button.title}
-      accessibilityState={accessibilityState}
-      disabled={disabled}
-      onPress={press}
-      style={buttonStyle}
-    >
-      {contents}
-    </Pressable>
-  );
+  const trigger =
+    expanded && !sidePanel ? (
+      <MenuTrigger
+        accessibilityRole="button"
+        accessibilityLabel={button.title}
+        accessibilityState={accessibilityState}
+        disabled={disabled}
+        style={buttonStyle}
+      >
+        {contents}
+      </MenuTrigger>
+    ) : (
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={button.title}
+        accessibilityState={accessibilityState}
+        disabled={disabled}
+        onPress={press}
+        style={buttonStyle}
+      >
+        {contents}
+      </Pressable>
+    );
   const pages = useMemo(
     () =>
       buttonPages(entry.key, button.behavior, ROOT_PATH, (behavior, path) => (
@@ -332,7 +404,7 @@ function ButtonControl({ view }: { view: ButtonView }) {
           <Text style={styles.tooltipLabel}>{button.title}</Text>
         </TooltipContent>
       </Tooltip>
-      {expanded ? (
+      {expanded && !sidePanel ? (
         <PluginPopoverSurface
           sheetTitle={button.title}
           side={composer ? "top" : "bottom"}
@@ -547,6 +619,72 @@ function OverflowSurface({ entries }: { entries: readonly RegisteredPluginButton
       {menu.rows}
     </PluginPopoverSurface>
   );
+}
+
+function PluginButtonPanelIconBody({
+  entry,
+  theme,
+  size,
+  color,
+}: {
+  entry: RegisteredPluginButton;
+  theme: PluginTheme;
+  size: number;
+  color: string;
+}) {
+  const view = useMenuButtonView(entry, theme);
+  if (!view) return null;
+  const Icon = pluginIconComponent(entry.button.icon);
+  return (
+    <SurfaceErrorBoundary installation={entry.installation} Surface={Icon}>
+      <ButtonEnvironment view={view}>
+        <Icon {...view.props} size={size} color={color} />
+      </ButtonEnvironment>
+    </SurfaceErrorBoundary>
+  );
+}
+
+const ThemedPluginButtonPanelIcon = withUnistyles(PluginButtonPanelIconBody);
+
+export function PluginButtonPanelIcon(props: {
+  entry: RegisteredPluginButton;
+  size: number;
+  color: string;
+}) {
+  return <ThemedPluginButtonPanelIcon {...props} uniProps={pluginThemeMapping} />;
+}
+
+function PluginButtonPanelContentBody({
+  entry,
+  onClose,
+  theme,
+}: {
+  entry: RegisteredPluginButton;
+  onClose: () => void;
+  theme: PluginTheme;
+}) {
+  const view = useMenuButtonView(entry, theme);
+  const navigation = usePluginHostNavigation(entry.installation.serverId);
+  if (!view || entry.button.behavior.kind !== "popover") return null;
+  const Content = entry.button.behavior.Content;
+  return (
+    <SurfaceErrorBoundary installation={entry.installation} Surface={Content}>
+      <ButtonEnvironment view={view}>
+        <PluginPopoverContent>
+          <Content {...view.props} navigation={navigation} close={onClose} />
+        </PluginPopoverContent>
+      </ButtonEnvironment>
+    </SurfaceErrorBoundary>
+  );
+}
+
+const ThemedPluginButtonPanelContent = withUnistyles(PluginButtonPanelContentBody);
+
+export function PluginButtonPanelContent(props: {
+  entry: RegisteredPluginButton;
+  onClose: () => void;
+}) {
+  return <ThemedPluginButtonPanelContent {...props} uniProps={pluginThemeMapping} />;
 }
 
 function useButtons(serverId: string, workspaceId: string, agentId: string | null) {

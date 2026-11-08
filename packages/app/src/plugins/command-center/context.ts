@@ -11,7 +11,9 @@ export function getFocusedAgentId(layout: WorkspaceLayout | null): string | null
   const tab = collectAllTabs(layout.root).find(
     (candidate) => candidate.tabId === pane.focusedTabId,
   );
-  if (tab?.target.kind === "agent") return tab.target.agentId;
+  if (tab?.target.kind === "agent" || tab?.target.kind === "plugin_button") {
+    return tab.target.agentId;
+  }
   return tab?.target.kind === "plugin" && tab.target.context === "agent"
     ? tab.target.agentId
     : null;
