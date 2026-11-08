@@ -1,7 +1,7 @@
 import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import type { Locator, TestInfo } from "@playwright/test";
+import type { ConsoleMessage, Locator, TestInfo } from "@playwright/test";
 import { test, expect, type Page } from "@playwright/test";
 import { gotoAppShell } from "./app";
 import { buildAgentRoute } from "./mock-agent";
@@ -22,7 +22,7 @@ const COMPACT = { width: 390, height: 844 };
 
 function clientSource(workspaceId: string, agentId: string): string {
   return `import React from "react";
-import { Text, View, Pressable } from "react-native";
+import { Text, TextInput, View, Pressable } from "react-native";
 import { useWorkspace, useRpc, usePaseo } from "@getpaseo/plugin/client";
 import { useQuery } from "@tanstack/react-query";
 import { summary } from "./shared/rpc";
@@ -31,12 +31,14 @@ function StatusIcon({ size, theme }) {
   return <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: theme.colors.statusSuccess }} />;
 }
 
-function Details({ workspaceId, theme, layout, close }) {
+function Details({ workspaceId, theme, layout, close, expandable = false }) {
   const workspace = useWorkspace(workspaceId, (workspace) => workspace.name);
   const paseo = usePaseo();
   const [ownerId, setOwnerId] = React.useState("");
   const [updates, setUpdates] = React.useState(0);
   const [failed, setFailed] = React.useState(false);
+  const [expanded, setExpanded] = React.useState(false);
+  const [reply, setReply] = React.useState("");
   React.useEffect(() => {
     const owner = paseo.observeEvents(["project.update"]);
     owner.subscribe({ snapshot(value) { setOwnerId(value.subscriptionId); }, update() { setUpdates((n) => n + 1); } });
@@ -55,7 +57,16 @@ function Details({ workspaceId, theme, layout, close }) {
     <Text style={{ color: theme.colors.foregroundMuted }}>3 checks passed · Production</Text>
     <Text style={{ color: theme.colors.foregroundMuted }}>Presentation: {layout.compact ? "compact" : "wide"}</Text>
     <Pressable accessibilityRole="button" accessibilityLabel="Close deployment details" onPress={close} style={{ padding: 8, borderRadius: 6, backgroundColor: theme.colors.surface2 }}><Text style={{ color: theme.colors.foreground }}>Done</Text></Pressable>
+    {expandable && <Pressable accessibilityRole="button" accessibilityLabel="Expand deployment evidence" onPress={() => setExpanded(true)}><Text style={{ color: theme.colors.foreground }}>Expand evidence</Text></Pressable>}
+    {expanded && <>
+      {Array.from({ length: 24 }, (_, index) => <Text key={index} style={{ color: theme.colors.foreground }}>Deployment evidence {index + 1}: checks passed and ready for review.</Text>)}
+      <TextInput accessibilityLabel="Deployment reply" value={reply} onChangeText={setReply} style={{ color: theme.colors.foreground, borderWidth: 1, borderColor: theme.colors.surface2, padding: 12 }} />
+    </>}
   </View>;
+}
+
+function ComposerDetails(props) {
+  return <Details {...props} expandable />;
 }
 
 export default function contribute(client) {
@@ -88,7 +99,7 @@ export default function contribute(client) {
   header("locked", { title: "Production locked", icon: "Lock", disabled: true, behavior: { kind: "action", onPress() {} } });
   const review = pill("review", { title: "Run review", icon: "Scan", label: "Review", behavior: { kind: "action", async onPress() { await new Promise((resolve) => { finishReview = resolve; }); review.update({ label: "Reviewed" }); } } });
   const pillMenu = pill("checks", { title: "Composer checks", icon: "ListChecks", label: "Checks", behavior: menu });
-  pill("usage", { title: "Composer status", icon: StatusIcon, label: "Status", behavior: { kind: "popover", Content: Details } });
+  pill("usage", { title: "Composer status", icon: StatusIcon, label: "Status", behavior: { kind: "popover", Content: ComposerDetails } });
   const command = (id, title, onSelect) => client.addCommandCenterItem({ id, title, icon: "Settings", context: "workspace", onSelect });
   command("finish", "Finish deployment", () => finish());
   command("finish-review", "Finish review", () => finishReview());
@@ -413,11 +424,75 @@ export async function withButtonShowcase(
           await press(page, "Close deployment details");
           await press(page, "Composer status");
           await expectDetails(page);
+          const dialog = page.getByRole("dialog", { name: "Composer status", exact: true });
+          const diagnostics: string[] = [];
+          const recordConsole = (message: ConsoleMessage) => {
+            if (message.type() === "warning" || message.type() === "error") {
+              diagnostics.push(`${message.type()}: ${message.text()}`);
+            }
+          };
+          const recordError = (error: Error) => diagnostics.push(`pageerror: ${error.message}`);
+          page.on("console", recordConsole);
+          page.on("pageerror", recordError);
+          await expect(dialog).toBeVisible();
+          const expectCenteredDialog = async (width: number, height: number) => {
+            await expect
+              .poll(async () => {
+                const box = await dialog.boundingBox();
+                return box ? Math.abs(box.x + box.width / 2 - width / 2) : Infinity;
+              })
+              .toBeLessThan(2);
+            await expect
+              .poll(async () => {
+                const box = await dialog.boundingBox();
+                return box ? Math.abs(box.y + box.height / 2 - height / 2) : Infinity;
+              })
+              .toBeLessThan(2);
+            const box = (await dialog.boundingBox())!;
+            expect(box.width).toBeGreaterThan(700);
+            expect(box.height).toBeGreaterThan(440);
+            expect(box.x).toBeGreaterThanOrEqual(0);
+            expect(box.y).toBeGreaterThanOrEqual(0);
+            expect(box.x + box.width).toBeLessThanOrEqual(width);
+            expect(box.y + box.height).toBeLessThanOrEqual(height);
+          };
+          await expectCenteredDialog(WIDE.width, WIDE.height);
+          await captureSchemes(page, info, "desktop-composer-dialog", dialog);
+          await press(page, "Expand deployment evidence");
+          const reply = dialog.getByRole("textbox", { name: "Deployment reply" });
+          await reply.fill("Ready to approve after checking the evidence.");
+          await expect(reply).toBeInViewport();
+          await page.setViewportSize({ width: 1000, height: 700 });
+          await expectCenteredDialog(1000, 700);
+          await expect(reply).toHaveValue("Ready to approve after checking the evidence.");
+          await reply.scrollIntoViewIfNeeded();
+          await expect(reply).toBeInViewport();
+          await info.attach("desktop-composer-dialog-scrolled", {
+            body: await page.screenshot({
+              path: info.outputPath("desktop-composer-dialog-scrolled.png"),
+            }),
+            contentType: "image/png",
+          });
+          await page.keyboard.press("Escape");
+          await expect(dialog).not.toBeVisible();
+          await page.setViewportSize(WIDE);
+          await press(page, "Composer status");
+          await expectDetails(page);
           await expectSurfaceVisible(
             page,
             page.getByRole("button", { name: "Close deployment details", exact: true }),
           );
           await press(page, "Close deployment details");
+          page.off("console", recordConsole);
+          page.off("pageerror", recordError);
+          await writeFile(
+            info.outputPath("desktop-composer-dialog-console.txt"),
+            diagnostics.join("\n") || "No console warnings, errors, or page errors.",
+          );
+          await info.attach("desktop-composer-dialog-console", {
+            body: diagnostics.join("\n") || "No console warnings, errors, or page errors.",
+            contentType: "text/plain",
+          });
         }),
       runAndUpdateActions: () =>
         test.step("actions fail visibly, retry, and remain busy until completion", async () => {

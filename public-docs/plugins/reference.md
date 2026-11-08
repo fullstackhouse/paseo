@@ -2526,7 +2526,9 @@ An action runs on the client. Paseo marks the button busy until its promise sett
 presses, and shows failures in a toast. A failed action can be retried. Use the client's `paseo` for
 ordinary operations and `rpc` for plugin-specific backend work.
 
-Menus and popovers open anchored surfaces on wide layouts and bottom sheets on compact layouts.
+On wide layouts, a composer pill's direct `popover` content opens in a centered dialog with a
+fixed header and scrollable body, giving forms and long lists room independent of the pill's
+position. Header popovers and menus keep anchored surfaces. Compact layouts use bottom sheets.
 The whole trigger opens the surface; there is no split-button behavior.
 
 ### Menu entries
