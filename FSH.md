@@ -40,6 +40,8 @@ temporary by design: every patch is meant to go upstream and then drop out of `f
 - FSH-only (upstreamable): composer pills that don't fit wrap onto more rows instead of shrinking, so a narrow screen no longer cuts a plugin pill's label and count
 - Fork-only (upstreamable): archiving a worktree workspace with an open pull request asks first, like uncommitted changes and unpushed commits already do. The dialog names the PR (`Open pull request #42`, `Open merge request !7` on GitLab); merged and closed PRs archive without asking
 
+- FSH-only (not upstream yet): composer plugins can opt into a resizable side-pane tab on desktop; clicking the badge toggles it. Existing plugins retain anchored popovers, and compact layouts retain bottom sheets. Asks opts in.
+
 Keep this list in sync with what's merged into `fsh`.
 
 ## Install the desktop app and plugins (macOS, Fedora)
