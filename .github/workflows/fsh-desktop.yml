@@ -10,8 +10,8 @@
 # because upstream signs with a real Developer ID, so every nested binary shares one Team
 # ID and library validation passes. Ad-hoc signatures carry no Team ID, so on macOS 26 the
 # main binary is refused its own Electron Framework ("different Team IDs") and the app dies
-# at launch in dyld. The runner below is macOS 14, which does not enforce this, so the
-# packaged-app smoke test cannot catch it — keep the flag rather than relying on the gate.
+# at launch in dyld. Keep the flag rather than relying on the packaged-app smoke test: the
+# runner's macOS version decides whether that test can catch it.
 #
 # Only `fsh` publishes a normal release: install-fsh.sh and the in-app updater install GitHub's
 # "latest" release, so a normal release from any other ref would reach every install. A PR with
@@ -38,7 +38,7 @@ jobs:
       (github.event.action != 'closed' &&
        contains(github.event.pull_request.labels.*.name, 'deploy') &&
        (github.event.action != 'labeled' || github.event.label.name == 'deploy'))
-    runs-on: macos-14
+    runs-on: macos-latest
     # Job-level, so PR events that skip this job (other labels, close) don't cancel a running build.
     concurrency:
       group: fsh-desktop-${{ github.event.pull_request.number || github.ref }}
