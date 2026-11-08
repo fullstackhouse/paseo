@@ -2187,6 +2187,7 @@ export class Session {
     }
   }
 
+
   private subscribeToAgentEvents(): void {
     if (this.unsubscribeAgentEvents) {
       this.unsubscribeAgentEvents();
