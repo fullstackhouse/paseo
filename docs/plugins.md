@@ -88,7 +88,11 @@ never deletes it. The global `pluginsEnabled` switch remains available.
 
 ### Test a plugin change
 
-Reloading a plugin on the daemon you work from swaps it under your running agents. Test a plugin worktree on a throwaway daemon started by the installed `paseo` CLI instead. Copy your config so the other plugins and providers match, give it a free port, and drop the password and relay:
+During plugin development, run the local working copy on Jacek's local Paseo host so he can test changes live. Install or point the plugin's directory source at that working copy, reload the plugin after changes, and verify the loaded source and status. Leave it running and tell him where to test. Reload only the plugin; restarting the main daemon still requires permission.
+
+Live testing means the desktop app Jacek is currently running. If plugin work needs a host UI change, use the [installed desktop renderer workflow](development.md#testing-ui-in-the-running-desktop-app). Apply this to the current change before handing it over; a browser preview or second app does not satisfy this request.
+
+For additional isolated checks, use a throwaway daemon started by the installed `paseo` CLI. Copy your config so the other plugins and providers match, give it a free port, and drop the password and relay:
 
 ```bash
 H="$PWD/.dev/paseo-home"   # keep it out of git

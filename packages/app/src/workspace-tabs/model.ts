@@ -45,6 +45,7 @@ export type WorkspaceTabTarget =
   | WorkspaceFileTabTarget
   | WorkspaceWorkingDiffTabTarget
   | PluginWorkspaceTabTarget
+  | { kind: "plugin_button"; pluginId: string; buttonId: string; agentId: string }
   | { kind: "setup"; workspaceId: string }
   | { kind: "commit_diff"; sha: string };
 

@@ -2038,14 +2038,22 @@ These contracts are exported from `@getpaseo/plugin/client`.
 type PluginButtonBehavior =
   | { kind: "action"; onPress(): void | Promise<void> }
   | { kind: "menu"; items: readonly PluginButtonMenuEntry[] }
-  | { kind: "popover"; Content: React.ComponentType<PluginButtonContentProps> };
+  | {
+      kind: "popover";
+      Content: React.ComponentType<PluginButtonContentProps>;
+      presentation?: "popover" | "side-panel";
+    };
 ```
 
 An action runs on the client. Paseo marks the button busy until its promise settles, blocks repeated
 presses, and shows failures in a toast. A failed action can be retried. Use the client's `paseo` for
 ordinary operations and `rpc` for plugin-specific backend work.
 
-Menus and popovers open anchored surfaces on wide layouts and bottom sheets on compact layouts.
+Popover content stays anchored to its trigger by default. Set `presentation: "side-panel"`
+on a composer pill's direct `popover` behavior to open a tab in the existing Explorer sidebar on
+desktop split layouts. Pressing the pill closes its selected visible tab, or reveals Explorer and
+selects the tab if it is hidden or another tab is selected. The content's `close()` closes that tab. Header popovers and menus keep anchored surfaces. Compact layouts use bottom sheets;
+other single-pane layouts retain anchored popovers.
 The whole trigger opens the surface; there is no split-button behavior.
 
 ### Menu entries
@@ -2111,9 +2119,11 @@ order. When changing `behavior`, supply the complete new behavior object. Invali
 without changing the existing button. Subscribe to your own model or the client API and call
 `update` to publish reactive changes; mutating the original descriptor does not update the UI.
 
-Hiding or disabling a button closes its surface. Updating its behavior also closes the surface.
-Hiding preserves the registration, so showing it again restores its position. It does not cancel
-an action already in progress.
+Hiding or disabling a button closes its menu or sheet. Updating its behavior also closes those
+surfaces. An Explorer tab stays open: hidden, disabled, removed, or non-popover buttons show an
+unavailable state until a matching popover button returns. A new popover component renders in the
+same tab. Hiding preserves the registration, so showing it again restores the button's position.
+It does not cancel an action already in progress.
 
 `remove()` is idempotent. Updates after removal do nothing. Paseo removes outstanding buttons when
 the plugin installation is disposed (see [Hosts and lifecycle](#hosts-and-lifecycle)). Return cleanup from the client entry for
