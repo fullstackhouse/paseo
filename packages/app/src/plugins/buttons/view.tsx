@@ -6,7 +6,6 @@ import type { PluginButtonIcon, PluginHostProps } from "@getpaseo/plugin/client"
 import type { PluginTheme } from "@getpaseo/plugin";
 import {
   useCallback,
-  useEffect,
   useMemo,
   useSyncExternalStore,
   type ReactElement,
@@ -26,9 +25,9 @@ import {
   type MenuPageDefinition,
 } from "@/components/ui/menu";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
-import { AdaptiveModalSheet } from "@/components/adaptive-modal-sheet";
-import { useRetainedPanelActive } from "@/components/retained-panel";
-import { MenuContextProvider } from "@/components/ui/menu/menu-context";
+import { collectAllTabs, useWorkspaceLayoutStore } from "@/stores/workspace-layout-store";
+import { buildWorkspaceTabPersistenceKey } from "@/workspace-tabs/model";
+import { openWorkspaceTargetBeside } from "@/workspace-tabs/open-beside";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { HEADER_CONTROL_HEIGHT } from "@/components/ui/control-geometry";
 import {
@@ -216,36 +215,6 @@ function ButtonSurfaceBody({
   );
 }
 
-function ComposerDialog({ view }: { view: ButtonView }) {
-  const menu = useMenuContext("ComposerDialog");
-  const active = useRetainedPanelActive();
-  const close = useCallback(() => menu.setOpen(false), [menu]);
-  const header = useMemo(() => ({ title: view.entry.button.title }), [view.entry.button.title]);
-  const contextBridge = useCallback(
-    (content: ReactNode) => <MenuContextProvider value={menu}>{content}</MenuContextProvider>,
-    [menu],
-  );
-  useEffect(() => {
-    if (!active && menu.open) close();
-  }, [active, menu.open, close]);
-
-  // Retained chats freeze after becoming inactive; remove their portal immediately.
-  if (!active) return null;
-  return (
-    <AdaptiveModalSheet
-      visible={menu.open}
-      onClose={close}
-      header={header}
-      contextBridge={contextBridge}
-      desktopMaxWidth={800}
-      desktopHeight="85%"
-      testID="plugin-composer-dialog"
-    >
-      <ButtonSurfaceBody view={view} behavior={view.entry.button.behavior} path={ROOT_PATH} />
-    </AdaptiveModalSheet>
-  );
-}
-
 // Prefixed so plugin pages can share a surface with the host's own pages.
 function buttonPageId(key: number, path: readonly string[]): string {
   return ["plugin-button", key, ...path].join("/");
@@ -277,17 +246,65 @@ function buttonPages(
   });
 }
 
+function useButtonSidePanel(view: ButtonView) {
+  const layoutMode = useWorkspaceLayoutStore((state) => state.layoutMode);
+  return (
+    view.entry.placement === "composer" &&
+    !view.props.layout.compact &&
+    layoutMode === "split-panes" &&
+    view.entry.button.behavior.kind === "popover" &&
+    view.entry.button.behavior.presentation !== "popover"
+  );
+}
+
 function ButtonControl({ view }: { view: ButtonView }) {
   const { entry, props } = view;
   const { button } = entry;
   const composer = entry.placement === "composer";
   const disabled = button.disabled || entry.pending;
+  const sidePanel = useButtonSidePanel(view);
+  const workspaceKey = buildWorkspaceTabPersistenceKey({
+    serverId: entry.installation.serverId,
+    workspaceId: entry.context.workspaceId,
+  });
+  const sidePanelTabId = useWorkspaceLayoutStore((state) => {
+    if (!sidePanel || !workspaceKey || entry.context.context !== "agent") return null;
+    const layout = state.layoutByWorkspace[workspaceKey];
+    const agentId = entry.context.agentId;
+    return layout
+      ? (collectAllTabs(layout.root).find(
+          ({ target }) =>
+            target.kind === "plugin_button" &&
+            target.pluginId === entry.installation.id &&
+            target.buttonId === entry.id &&
+            target.agentId === agentId,
+        )?.tabId ?? null)
+      : null;
+  });
   const expanded = button.behavior.kind !== "action";
   const chevron = !composer && !props.layout.compact && expanded;
   let label = button.label;
   if (composer) label = button.label ?? button.title;
   else if (props.layout.compact) label = undefined;
-  const press = useCallback(() => pressButton(view, []), [view]);
+  const press = useCallback(() => {
+    if (sidePanel && workspaceKey && entry.context.context === "agent") {
+      if (sidePanelTabId) {
+        useWorkspaceLayoutStore.getState().closeTab(workspaceKey, sidePanelTabId);
+        return;
+      }
+      openWorkspaceTargetBeside({
+        workspaceKey,
+        target: {
+          kind: "plugin_button",
+          pluginId: entry.installation.id,
+          buttonId: entry.id,
+          agentId: entry.context.agentId,
+        },
+      });
+      return;
+    }
+    pressButton(view, []);
+  }, [view, entry, sidePanel, sidePanelTabId, workspaceKey]);
   const setOpen = useCallback(
     (open: boolean) => pluginButtonStore.setOpen(entry.key, open),
     [entry.key],
@@ -298,11 +315,11 @@ function ButtonControl({ view }: { view: ButtonView }) {
         ? [
             composerPillStyles.body,
             styles.button,
-            (hovered || pressed || entry.open) && styles.active,
+            (hovered || pressed || entry.open || sidePanelTabId !== null) && styles.active,
             disabled && styles.disabled,
           ]
         : headerButtonStyle(props.layout.compact, { hovered, pressed, open: entry.open }, disabled),
-    [composer, disabled, entry.open, props.layout.compact],
+    [composer, disabled, entry.open, props.layout.compact, sidePanelTabId],
   );
   const contents = (
     <>
@@ -325,32 +342,38 @@ function ButtonControl({ view }: { view: ButtonView }) {
       ) : null}
     </>
   );
+  const contentOpen = sidePanel ? sidePanelTabId !== null : entry.open;
   const accessibilityState = useMemo(
-    () => ({ busy: entry.pending, disabled }),
-    [entry.pending, disabled],
+    () => ({
+      busy: entry.pending,
+      disabled,
+      expanded: expanded ? contentOpen : undefined,
+    }),
+    [entry.pending, disabled, expanded, contentOpen],
   );
-  const trigger = expanded ? (
-    <MenuTrigger
-      accessibilityRole="button"
-      accessibilityLabel={button.title}
-      accessibilityState={accessibilityState}
-      disabled={disabled}
-      style={buttonStyle}
-    >
-      {contents}
-    </MenuTrigger>
-  ) : (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={button.title}
-      accessibilityState={accessibilityState}
-      disabled={disabled}
-      onPress={press}
-      style={buttonStyle}
-    >
-      {contents}
-    </Pressable>
-  );
+  const trigger =
+    expanded && !sidePanel ? (
+      <MenuTrigger
+        accessibilityRole="button"
+        accessibilityLabel={button.title}
+        accessibilityState={accessibilityState}
+        disabled={disabled}
+        style={buttonStyle}
+      >
+        {contents}
+      </MenuTrigger>
+    ) : (
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={button.title}
+        accessibilityState={accessibilityState}
+        disabled={disabled}
+        onPress={press}
+        style={buttonStyle}
+      >
+        {contents}
+      </Pressable>
+    );
   const pages = useMemo(
     () =>
       buttonPages(entry.key, button.behavior, ROOT_PATH, (behavior, path) => (
@@ -358,7 +381,6 @@ function ButtonControl({ view }: { view: ButtonView }) {
       )),
     [view, entry.key, button.behavior],
   );
-  const dialog = composer && !props.layout.compact && button.behavior.kind === "popover";
   return (
     <MenuRoot compactMode="sheet" open={entry.open} onOpenChange={setOpen}>
       <Tooltip enabledOnMobile={false}>
@@ -367,8 +389,7 @@ function ButtonControl({ view }: { view: ButtonView }) {
           <Text style={styles.tooltipLabel}>{button.title}</Text>
         </TooltipContent>
       </Tooltip>
-      {dialog ? <ComposerDialog view={view} /> : null}
-      {expanded && !dialog ? (
+      {expanded && !sidePanel ? (
         <PluginPopoverSurface
           sheetTitle={button.title}
           side={composer ? "top" : "bottom"}
@@ -585,7 +606,6 @@ function OverflowSurface({ entries }: { entries: readonly RegisteredPluginButton
   );
 }
 
-// COMPAT(composerButtonPanel): local 0.14.0 side-pane preview; retain saved tabs until 2027-02-08.
 function PluginButtonPanelIconBody({
   entry,
   theme,

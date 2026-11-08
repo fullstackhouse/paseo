@@ -126,7 +126,7 @@ and updating `next`, integrating it after a release, and releasing a hotfix from
 ## Critical rules
 
 - **Run plugin changes in Jacek's local Paseo for live testing.** Follow [Test a plugin change](docs/plugins.md#test-a-plugin-change) and leave the changed plugin running.
-- **Desktop asks use a roomy centered dialog** with a fixed header and scrollable content. Avoid adding another sidebar.
+- **Desktop asks belong beside the conversation.** Use the ordinary [side pane](docs/explorer-sidebar.md#side-pane); the badge toggles its tab. Status keeps its anchored popover. Mobile keeps bottom sheets.
 
 - **NEVER restart the main Paseo daemon on port 6767 without permission** — it manages all running agents. If you're an agent, restarting it kills your own process.
 - **Verify local dev in its actual window:** check appearance and capture fresh console errors after reload. Do not dismiss React warnings as expected dev noise without tracing their cause.

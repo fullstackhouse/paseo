@@ -99,8 +99,11 @@ export default function contribute(client) {
   header("locked", { title: "Production locked", icon: "Lock", disabled: true, behavior: { kind: "action", onPress() {} } });
   const review = pill("review", { title: "Run review", icon: "Scan", label: "Review", behavior: { kind: "action", async onPress() { await new Promise((resolve) => { finishReview = resolve; }); review.update({ label: "Reviewed" }); } } });
   const pillMenu = pill("checks", { title: "Composer checks", icon: "ListChecks", label: "Checks", behavior: menu });
-  pill("usage", { title: "Composer status", icon: StatusIcon, label: "Status", behavior: { kind: "popover", Content: ComposerDetails } });
+  const status = pill("usage", { title: "Composer status", icon: StatusIcon, label: "Status", behavior: { kind: "popover", Content: ComposerDetails } });
   const command = (id, title, onSelect) => client.addCommandCenterItem({ id, title, icon: "Settings", context: "workspace", onSelect });
+  command("anchor-status", "Use status popover", () => status.update({ behavior: { kind: "popover", presentation: "popover", Content: ComposerDetails } }));
+  command("disable-status", "Disable composer status", () => status.update({ disabled: true }));
+  command("enable-status", "Enable composer status", () => status.update({ disabled: false }));
   command("finish", "Finish deployment", () => finish());
   command("finish-review", "Finish review", () => finishReview());
   command("hide-deploy", "Hide deployment button", () => deploy.update({ visible: false }));
@@ -340,7 +343,10 @@ export async function withButtonShowcase(
             page.getByText("Plugin failed: Button content failed", { exact: true }),
           ).toBeVisible();
           await expect.poll(() => released.has(second)).toBe(true);
-          await page.keyboard.press("Escape");
+          await page.getByTestId(/^workspace-tab-plugin_button_/).click({ button: "middle" });
+          await expect(
+            page.getByText("Plugin failed: Button content failed", { exact: true }),
+          ).not.toBeVisible();
           await press(page, "Header status");
           await expectDetails(page);
           await expect(observation).not.toHaveText("");
@@ -426,7 +432,8 @@ export async function withButtonShowcase(
           await press(page, "Close deployment details");
           await press(page, "Composer status");
           await expectDetails(page);
-          const dialog = page.getByRole("dialog", { name: "Composer status", exact: true });
+          const panel = page.getByTestId("plugin-button-panel");
+          const composer = page.getByRole("textbox", { name: "Message agent...", exact: true });
           const diagnostics: string[] = [];
           const recordConsole = (message: ConsoleMessage) => {
             if (message.type() === "warning" || message.type() === "error") {
@@ -436,53 +443,82 @@ export async function withButtonShowcase(
           const recordError = (error: Error) => diagnostics.push(`pageerror: ${error.message}`);
           page.on("console", recordConsole);
           page.on("pageerror", recordError);
-          await expect(dialog).toBeVisible();
-          await expect(page.getByTestId("plugin-button-panel")).toHaveCount(0);
-          const expectCenteredDialog = async (width: number, height: number) => {
+          await expect(panel).toBeVisible();
+          await expect(
+            page.getByRole("dialog", { name: "Composer status", exact: true }),
+          ).toHaveCount(0);
+          const expectBesideConversation = async () => {
+            await expect(composer).toBeVisible();
             await expect
               .poll(async () => {
-                const box = await dialog.boundingBox();
-                return box ? Math.abs(box.x + box.width / 2 - width / 2) : Infinity;
+                const contentBox = await panel.boundingBox();
+                const chatBox = await composer.boundingBox();
+                return contentBox && chatBox
+                  ? contentBox.x - (chatBox.x + chatBox.width)
+                  : -Infinity;
               })
-              .toBeLessThan(2);
-            await expect
-              .poll(async () => {
-                const box = await dialog.boundingBox();
-                return box ? Math.abs(box.y + box.height / 2 - height / 2) : Infinity;
-              })
-              .toBeLessThan(2);
-            const box = (await dialog.boundingBox())!;
-            expect(box.width).toBeGreaterThan(700);
+              .toBeGreaterThanOrEqual(0);
+            const box = (await panel.boundingBox())!;
             expect(box.height).toBeGreaterThan(440);
-            expect(box.x).toBeGreaterThanOrEqual(0);
-            expect(box.y).toBeGreaterThanOrEqual(0);
-            expect(box.x + box.width).toBeLessThanOrEqual(width);
-            expect(box.y + box.height).toBeLessThanOrEqual(height);
+            expect(box.width).toBeGreaterThan(230);
+            expect(box.x + box.width).toBeLessThanOrEqual(page.viewportSize()!.width);
           };
-          await expectCenteredDialog(WIDE.width, WIDE.height);
-          await captureSchemes(page, info, "desktop-composer-dialog", dialog);
-          const header = dialog.getByText("Composer status", { exact: true });
-          const headerBefore = (await header.boundingBox())!;
+          await expectBesideConversation();
+          await captureSchemes(page, info, "desktop-composer-panel", panel);
           await press(page, "Expand deployment evidence");
-          const reply = dialog.getByRole("textbox", { name: "Deployment reply" });
+          const reply = panel.getByRole("textbox", { name: "Deployment reply" });
           await reply.fill("Ready to approve after checking the evidence.");
           await expect(reply).toBeInViewport();
-          await expect(header).toBeInViewport();
-          expect(Math.abs((await header.boundingBox())!.y - headerBefore.y)).toBeLessThan(2);
+          const resizeHandle = page.getByTestId("workspace-split-resize-handle").first();
+          const handleBox = (await resizeHandle.boundingBox())!;
+          const originalWidth = (await panel.boundingBox())!.width;
+          await page.mouse.move(
+            handleBox.x + handleBox.width / 2,
+            handleBox.y + handleBox.height / 2,
+          );
+          await page.mouse.down();
+          await page.mouse.move(handleBox.x - 60, handleBox.y + handleBox.height / 2, { steps: 8 });
+          await page.mouse.up();
+          await expect
+            .poll(async () => (await panel.boundingBox())?.width ?? 0)
+            .toBeGreaterThan(originalWidth + 30);
+          await expect(reply).toHaveValue("Ready to approve after checking the evidence.");
           await page.setViewportSize({ width: 1000, height: 700 });
-          await expectCenteredDialog(1000, 700);
+          await expectBesideConversation();
           await expect(reply).toHaveValue("Ready to approve after checking the evidence.");
           await reply.scrollIntoViewIfNeeded();
           await expect(reply).toBeInViewport();
-          await info.attach("desktop-composer-dialog-scrolled", {
+          await info.attach("desktop-composer-panel-scrolled", {
             body: await page.screenshot({
-              path: info.outputPath("desktop-composer-dialog-scrolled.png"),
+              path: info.outputPath("desktop-composer-panel-scrolled.png"),
             }),
             contentType: "image/png",
           });
-          await page.keyboard.press("Escape");
-          await expect(dialog).not.toBeVisible();
+          await composer.fill("Compare the evidence while asks stays open.");
+          await expect(panel).toBeVisible();
+          await expect(reply).toHaveValue("Ready to approve after checking the evidence.");
+          await page
+            .getByTestId("workspace-pane-main")
+            .getByRole("button", { name: "Composer status", exact: true })
+            .click();
+          await expect(panel).not.toBeVisible();
+          await page
+            .getByTestId("workspace-pane-main")
+            .getByRole("button", { name: "Composer status", exact: true })
+            .click();
+          await expect(panel).toBeVisible();
+          await expectDetails(page);
+          await expect(panel).toHaveCount(1);
           await page.setViewportSize(WIDE);
+          await command(page, "Disable composer status");
+          await expect(
+            panel.getByText("This plugin button is unavailable.", { exact: true }),
+          ).toBeVisible();
+          await expect(panel.getByRole("textbox", { name: "Deployment reply" })).toHaveCount(0);
+          await command(page, "Enable composer status");
+          await expectDetails(page);
+          await press(page, "Close deployment details");
+          await expect(panel).not.toBeVisible();
           await press(page, "Composer status");
           await expectDetails(page);
           await expectSurfaceVisible(
@@ -490,13 +526,30 @@ export async function withButtonShowcase(
             page.getByRole("button", { name: "Close deployment details", exact: true }),
           );
           await press(page, "Close deployment details");
+          await expect(panel).not.toBeVisible();
+          await page
+            .getByTestId(`workspace-tab-agent_${agent.id}`)
+            .filter({ visible: true })
+            .first()
+            .click();
+          await composer.fill("");
+          await command(page, "Use status popover");
+          await press(page, "Composer status");
+          await expectDetails(page);
+          await expect(panel).toHaveCount(0);
+          await expect(page.getByRole("dialog")).toHaveCount(0);
+          await expectSurfaceVisible(page);
+          await page.keyboard.press("Escape");
+          await expect(
+            page.getByRole("button", { name: "Close deployment details", exact: true }),
+          ).not.toBeVisible();
           page.off("console", recordConsole);
           page.off("pageerror", recordError);
           await writeFile(
-            info.outputPath("desktop-composer-dialog-console.txt"),
+            info.outputPath("desktop-composer-panel-console.txt"),
             diagnostics.join("\n") || "No console warnings, errors, or page errors.",
           );
-          await info.attach("desktop-composer-dialog-console", {
+          await info.attach("desktop-composer-panel-console", {
             body: diagnostics.join("\n") || "No console warnings, errors, or page errors.",
             contentType: "text/plain",
           });

@@ -17,7 +17,12 @@ export type PluginButtonIcon = PluginIcon<PluginButtonIconProps>;
 export type PluginButtonBehavior<Text extends PluginText = string> =
   | { kind: "action"; onPress(): void | Promise<void> }
   | { kind: "menu"; items: readonly PluginButtonMenuEntry<Text>[] }
-  | { kind: "popover"; Content: ComponentType<PluginButtonContentProps> };
+  | {
+      kind: "popover";
+      Content: ComponentType<PluginButtonContentProps>;
+      /** Desktop composer content defaults to a side panel; compact layouts use a sheet. */
+      presentation?: "popover" | "side-panel";
+    };
 export type PluginButtonMenuEntry<Text extends PluginText = string> =
   | { kind: "separator"; id: string }
   | {
