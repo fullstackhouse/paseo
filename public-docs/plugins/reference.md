@@ -2526,10 +2526,9 @@ An action runs on the client. Paseo marks the button busy until its promise sett
 presses, and shows failures in a toast. A failed action can be retried. Use the client's `paseo` for
 ordinary operations and `rpc` for plugin-specific backend work.
 
-On desktop split layouts, a composer pill's direct `popover` content opens as a tab in the
-resizable side pane, keeping the conversation usable beside it. Pressing the same pill reuses its
-tab; the content's `close()` closes that tab. Header popovers and menus keep anchored surfaces.
-Compact layouts use bottom sheets; other single-pane layouts retain anchored popovers.
+On wide layouts, a composer pill's direct `popover` content opens in a centered dialog with a
+fixed header and scrollable body, giving forms and long lists room independent of the pill's
+position. Header popovers and menus keep anchored surfaces. Compact layouts use bottom sheets.
 The whole trigger opens the surface; there is no split-button behavior.
 
 ### Menu entries
@@ -2595,11 +2594,9 @@ order. When changing `behavior`, supply the complete new behavior object. Invali
 without changing the existing button. Subscribe to your own model or the client API and call
 `update` to publish reactive changes; mutating the original descriptor does not update the UI.
 
-Hiding or disabling a button closes its menu or sheet. Updating its behavior also closes those
-surfaces. A side-pane tab stays open: hidden, disabled, removed, or non-popover buttons show an
-unavailable state until a matching popover button returns. A new popover component renders in the
-same tab. Hiding preserves the registration, so showing it again restores the button's position.
-It does not cancel an action already in progress.
+Hiding or disabling a button closes its surface. Updating its behavior also closes the surface.
+Hiding preserves the registration, so showing it again restores its position. It does not cancel
+an action already in progress.
 
 `remove()` is idempotent. Updates after removal do nothing. Paseo removes outstanding buttons when
 the plugin installation or host connection is torn down. Return cleanup from the client entry for
