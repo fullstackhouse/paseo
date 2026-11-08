@@ -25,9 +25,15 @@ import {
   type MenuPageDefinition,
 } from "@/components/ui/menu";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
-import { collectAllTabs, useWorkspaceLayoutStore } from "@/stores/workspace-layout-store";
+import {
+  collectAllTabs,
+  findPaneById,
+  selectExplorerSidebarPaneId,
+  selectIsExplorerSidebarVisible,
+  useWorkspaceLayoutStore,
+} from "@/stores/workspace-layout-store";
 import { buildWorkspaceTabPersistenceKey } from "@/workspace-tabs/model";
-import { openWorkspaceTargetBeside } from "@/workspace-tabs/open-beside";
+import { showExplorerSidebar } from "@/workspace-tabs/explorer-sidebar";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { HEADER_CONTROL_HEIGHT } from "@/components/ui/control-geometry";
 import {
@@ -270,16 +276,21 @@ function ButtonControl({ view }: { view: ButtonView }) {
   const sidePanelTabId = useWorkspaceLayoutStore((state) => {
     if (!sidePanel || !workspaceKey || entry.context.context !== "agent") return null;
     const layout = state.layoutByWorkspace[workspaceKey];
+    if (!layout) return null;
+    const paneId = selectExplorerSidebarPaneId(state, workspaceKey);
+    const pane = paneId ? findPaneById(layout.root, paneId) : null;
+    if (!pane || !selectIsExplorerSidebarVisible(state, workspaceKey)) return null;
     const agentId = entry.context.agentId;
-    return layout
-      ? (collectAllTabs(layout.root).find(
-          ({ target }) =>
-            target.kind === "plugin_button" &&
-            target.pluginId === entry.installation.id &&
-            target.buttonId === entry.id &&
-            target.agentId === agentId,
-        )?.tabId ?? null)
-      : null;
+    return (
+      collectAllTabs(layout.root).find(
+        ({ tabId, target }) =>
+          tabId === pane.focusedTabId &&
+          target.kind === "plugin_button" &&
+          target.pluginId === entry.installation.id &&
+          target.buttonId === entry.id &&
+          target.agentId === agentId,
+      )?.tabId ?? null
+    );
   });
   const expanded = button.behavior.kind !== "action";
   const chevron = !composer && !props.layout.compact && expanded;
@@ -292,8 +303,12 @@ function ButtonControl({ view }: { view: ButtonView }) {
         useWorkspaceLayoutStore.getState().closeTab(workspaceKey, sidePanelTabId);
         return;
       }
-      openWorkspaceTargetBeside({
+      const paneId = showExplorerSidebar({ workspaceKey, isCompact: false });
+      if (!paneId) return;
+      useWorkspaceLayoutStore.getState().openTab({
         workspaceKey,
+        intent: "reveal",
+        placement: { mode: "pane", paneId },
         target: {
           kind: "plugin_button",
           pluginId: entry.installation.id,

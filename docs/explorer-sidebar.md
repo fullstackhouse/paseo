@@ -109,6 +109,14 @@ between compatible panes, but the dock cannot be split or maximized. Selecting a
 does not change workspace focus. Web dragging shares the workspace drag scope; compact layouts
 accept only reordering inside the source pane.
 
+A composer plugin pill opts into an Explorer tab with `presentation: "side-panel"`.
+Its identity is the plugin, button and agent. The badge closes the selected visible tab; otherwise
+it reveals Explorer and selects that tab. Existing tabs in a main split move into Explorer when
+opened from the badge. Resizing preserves the mounted form. The tab resolves the current button
+registration independently of the chat; see the
+[button lifecycle contract](../public-docs/plugins/reference.md#updates-and-lifecycle).
+Compact pills keep their existing sheet.
+
 Cmd+E shows or hides Explorer without changing its selected view. All layouts use the same
 workspace tabs, launcher, and panel host. Below 600 points the shell is the swipeable Explorer
 overlay; at 600 points and above it reserves width beside the workspace. Native docking keeps its
@@ -141,12 +149,6 @@ layout store remembers one ordinary pane per workspace. The first side open crea
 right split around the workspace root; later side opens reuse it. Only the `split-panes` layout
 mode opens beside. Compact and single-pane layouts (touch tablets) open the same target in the main
 pane, so callers never check whether splits render.
-
-A composer plugin pill opts into an ordinary side-pane tab with `presentation: "side-panel"`.
-Its identity is the plugin, button and agent; the badge toggles that tab, and resizing preserves
-its mounted form. The tab resolves the current button registration independently of the chat;
-see the [button lifecycle contract](../public-docs/plugins/reference.md#updates-and-lifecycle).
-Compact pills keep their existing sheet.
 
 Removing a pane clears its remembered id; a later side open creates a new pane. The last visible
 ordinary pane stays when its final tab closes and shows the New launcher. An empty workspace does

@@ -433,6 +433,10 @@ export async function withButtonShowcase(
           await press(page, "Composer status");
           await expectDetails(page);
           const panel = page.getByTestId("plugin-button-panel");
+          const explorer = page.getByTestId("workspace-explorer-sidebar").filter({ visible: true });
+          const main = page.getByTestId("workspace-pane-main");
+          const composerBadge = main.getByRole("button", { name: "Composer status", exact: true });
+          const explorerTab = explorer.getByTestId(/^workspace-tab-plugin_button_/);
           const composer = page.getByRole("textbox", { name: "Message agent...", exact: true });
           const diagnostics: string[] = [];
           const recordConsole = (message: ConsoleMessage) => {
@@ -444,6 +448,11 @@ export async function withButtonShowcase(
           page.on("console", recordConsole);
           page.on("pageerror", recordError);
           await expect(panel).toBeVisible();
+          await expect(explorer.getByTestId("plugin-button-panel")).toBeVisible();
+          await expect(explorerTab).toHaveAttribute("aria-selected", "true");
+          await expect(explorer.getByTestId("workspace-tab-files")).toBeVisible();
+          await expect(main).toHaveCount(1);
+          await expect(page.getByTestId("workspace-split-resize-handle")).toHaveCount(0);
           await expect(
             page.getByRole("dialog", { name: "Composer status", exact: true }),
           ).toHaveCount(0);
@@ -469,7 +478,9 @@ export async function withButtonShowcase(
           const reply = panel.getByRole("textbox", { name: "Deployment reply" });
           await reply.fill("Ready to approve after checking the evidence.");
           await expect(reply).toBeInViewport();
-          const resizeHandle = page.getByTestId("workspace-split-resize-handle").first();
+          const resizeHandle = page
+            .getByTestId("workspace-explorer-sidebar-resize-handle")
+            .getByRole("separator");
           const handleBox = (await resizeHandle.boundingBox())!;
           const originalWidth = (await panel.boundingBox())!.width;
           await page.mouse.move(
@@ -497,16 +508,25 @@ export async function withButtonShowcase(
           await composer.fill("Compare the evidence while asks stays open.");
           await expect(panel).toBeVisible();
           await expect(reply).toHaveValue("Ready to approve after checking the evidence.");
-          await page
-            .getByTestId("workspace-pane-main")
-            .getByRole("button", { name: "Composer status", exact: true })
-            .click();
+          await page.getByTestId("workspace-explorer-toggle").first().click();
+          await expect(explorer).toHaveCount(0);
+          await composerBadge.click();
+          await expect(explorer.getByTestId("plugin-button-panel")).toBeVisible();
+          await expect(explorerTab).toHaveAttribute("aria-selected", "true");
+          await expect(reply).toHaveValue("Ready to approve after checking the evidence.");
+          await explorer.getByTestId("workspace-tab-files").click();
           await expect(panel).not.toBeVisible();
-          await page
-            .getByTestId("workspace-pane-main")
-            .getByRole("button", { name: "Composer status", exact: true })
-            .click();
+          await composerBadge.click();
           await expect(panel).toBeVisible();
+          await expect(explorerTab).toHaveAttribute("aria-selected", "true");
+          await expect(reply).toHaveValue("Ready to approve after checking the evidence.");
+          await composerBadge.click();
+          await expect(panel).not.toBeVisible();
+          await expect(explorerTab).toHaveCount(0);
+          await expect(explorer.getByTestId("workspace-tab-files")).toBeVisible();
+          await composerBadge.click();
+          await expect(explorer.getByTestId("plugin-button-panel")).toBeVisible();
+          await expect(page.getByTestId("workspace-split-resize-handle")).toHaveCount(0);
           await expectDetails(page);
           await expect(panel).toHaveCount(1);
           await page.setViewportSize(WIDE);

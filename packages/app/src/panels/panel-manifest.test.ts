@@ -17,7 +17,7 @@ describe("panel manifest", () => {
     expect(panelSupportsHost("files", "main")).toBe(false);
     expect(panelSupportsHost("setup", "explorer")).toBe(false);
     expect(panelSupportsHost("plugin_button", "main")).toBe(true);
-    expect(panelSupportsHost("plugin_button", "explorer")).toBe(false);
+    expect(panelSupportsHost("plugin_button", "explorer")).toBe(true);
     expect(panelSupportsHost("plugin_button", "sheet")).toBe(false);
   });
 

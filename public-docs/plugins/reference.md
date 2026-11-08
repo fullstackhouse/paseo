@@ -2531,9 +2531,9 @@ presses, and shows failures in a toast. A failed action can be retried. Use the 
 ordinary operations and `rpc` for plugin-specific backend work.
 
 Popover content stays anchored to its trigger by default. Set `presentation: "side-panel"`
-on a composer pill's direct `popover` behavior to open a tab in the resizable side pane on desktop
-split layouts. Pressing the same pill toggles its tab closed or open; the content's `close()` closes
-that tab. Header popovers and menus keep anchored surfaces. Compact layouts use bottom sheets;
+on a composer pill's direct `popover` behavior to open a tab in the existing Explorer sidebar on
+desktop split layouts. Pressing the pill closes its selected visible tab, or reveals Explorer and
+selects the tab if it is hidden or another tab is selected. The content's `close()` closes that tab. Header popovers and menus keep anchored surfaces. Compact layouts use bottom sheets;
 other single-pane layouts retain anchored popovers.
 The whole trigger opens the surface; there is no split-button behavior.
 
@@ -2601,7 +2601,7 @@ without changing the existing button. Subscribe to your own model or the client 
 `update` to publish reactive changes; mutating the original descriptor does not update the UI.
 
 Hiding or disabling a button closes its menu or sheet. Updating its behavior also closes those
-surfaces. A side-pane tab stays open: hidden, disabled, removed, or non-popover buttons show an
+surfaces. An Explorer tab stays open: hidden, disabled, removed, or non-popover buttons show an
 unavailable state until a matching popover button returns. A new popover component renders in the
 same tab. Hiding preserves the registration, so showing it again restores the button's position.
 It does not cancel an action already in progress.

@@ -132,7 +132,7 @@ const manifests = {
   },
   plugin_button: {
     kind: "plugin_button",
-    supportedHosts: ["main"],
+    supportedHosts: ["main", "explorer"],
     showCloseButton: true,
     singleton: false,
     compactSheet: null,
