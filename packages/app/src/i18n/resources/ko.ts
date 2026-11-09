@@ -1392,6 +1392,7 @@ export const ko: TranslationResources = {
       },
       snooze: {
         title: "다시 알림",
+        continueTitle: "다시 알림 후 이어서 진행…",
         wake: "깨우기",
         tonight: "오늘 밤까지",
         tomorrow: "내일 아침까지",

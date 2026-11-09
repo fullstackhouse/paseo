@@ -107,6 +107,7 @@ function workspaceRecord(overrides?: Partial<PersistedWorkspaceRecord>): Persist
     archivedAt: null,
     snoozedAt: null,
     snoozedUntil: null,
+    snoozeWakePrompt: null,
     ...overrides,
   };
 }

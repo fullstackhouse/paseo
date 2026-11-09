@@ -111,6 +111,12 @@ const PersistedWorkspaceRecordSchema = z.object({
     .nullable()
     .optional()
     .transform((value) => value ?? null),
+  // Sent to the workspace's agent when a timed snooze ends.
+  snoozeWakePrompt: z
+    .string()
+    .nullable()
+    .optional()
+    .transform((value) => value ?? null),
   labels: z.array(z.string()).optional(),
   untrustedSource: UntrustedWorkspaceSourceSchema.optional(),
   // Public discovery visibility. Contents retain their ordinary lifecycle.
@@ -690,6 +696,7 @@ export function createPersistedWorkspaceRecord(input: {
   pinnedAt?: string | null;
   snoozedAt?: string | null;
   snoozedUntil?: string | null;
+  snoozeWakePrompt?: string | null;
   labels?: string[];
   untrustedSource?: UntrustedWorkspaceSource;
   background?: boolean;
@@ -709,6 +716,7 @@ export function createPersistedWorkspaceRecord(input: {
     pinnedAt: input.pinnedAt ?? null,
     snoozedAt: input.snoozedAt ?? null,
     snoozedUntil: input.snoozedUntil ?? null,
+    snoozeWakePrompt: input.snoozeWakePrompt ?? null,
   });
 }
 

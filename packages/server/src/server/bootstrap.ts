@@ -181,6 +181,7 @@ import {
 } from "./workspace-archive-service.js";
 import { setupAutoArchiveOnMerge } from "./auto-archive-on-merge/index.js";
 import { setupWorkspaceSnoozeWaker } from "./workspace-snooze/index.js";
+import { continueSnoozedWorkspace } from "./workspace-snooze/continue.js";
 import type { SnoozedPermissionBehavior } from "@getpaseo/protocol/messages";
 import { wrapSessionMessage, type SessionOutboundMessage } from "./messages.js";
 import type { TerminalManager } from "../terminal/terminal-manager.js";
@@ -1220,7 +1221,12 @@ export async function createPaseoDaemon(
     logger,
   });
 
-  const workspaceSnoozeWaker = setupWorkspaceSnoozeWaker({ workspaceRegistry, logger });
+  const workspaceSnoozeWaker = setupWorkspaceSnoozeWaker({
+    workspaceRegistry,
+    logger,
+    onWakePrompt: (workspace) =>
+      continueSnoozedWorkspace({ workspace, agentManager, agentStorage, logger }),
+  });
 
   setupAutoArchiveOnMerge({
     paseoHome: config.paseoHome,

@@ -2092,6 +2092,8 @@ export class VoiceAssistantWebSocketServer {
         workspaceBackgroundSet: true,
         // COMPAT(workspaceSnooze): FSH-only, added after v0.13.0, remove gate after 2027-05-09.
         workspaceSnooze: true,
+        // COMPAT(workspaceSnoozeWakePrompt): FSH-only, added after v0.13.0, remove gate after 2027-05-10.
+        workspaceSnoozeWakePrompt: true,
         // COMPAT(skillManagement): added in v0.4.0, remove gate after 2027-08-16.
         skillManagement: true,
         // COMPAT(idleRuntimeCleanupSetting): added in v0.13.0, remove gate after 2027-04-26.
