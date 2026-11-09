@@ -1,24 +1,73 @@
 import { describe, expect, it } from "vitest";
 import { createPluginHostNavigation } from "./host-navigation-model";
+import type { InstalledPlugin } from "./types";
 
 describe("plugin host navigation", () => {
   function setup(electron = true) {
     const destinations: unknown[] = [];
     const browsers: string[] = [];
     const workspaces = new Set(["selected:one", "remote:two"]);
+    const screens: unknown[] = [];
+    const plugins = [
+      { serverId: "selected", id: "inbox", surfaces: [{ id: "review" }] },
+      { serverId: "remote", id: "inbox", surfaces: [{ id: "review" }] },
+    ] as unknown as InstalledPlugin[];
     const navigation = createPluginHostNavigation("selected", {
       browserAvailable: electron,
       resolveWorkspace: ({ serverId, workspaceId }) =>
         workspaces.has(`${serverId}:${workspaceId}`) ? workspaceId : null,
       openAgent: (input) => destinations.push(input),
       openWorkspace: (input) => destinations.push(input),
+      findPlugin: ({ serverId, pluginId }) =>
+        plugins.find((plugin) => plugin.serverId === serverId && plugin.id === pluginId) ?? null,
+      openScreen: (input) => screens.push(input),
       createBrowser: ({ initialUrl }) => {
         browsers.push(initialUrl);
         return { browserId: `browser-${browsers.length}` };
       },
     });
-    return { navigation, destinations, browsers, workspaces };
+    return { navigation, destinations, browsers, workspaces, screens };
   }
+
+  it("opens another plugin's screen on the selected or explicit host", () => {
+    const { navigation, screens } = setup();
+    navigation.openPluginScreen!({
+      pluginId: "inbox",
+      screenId: "review",
+      params: { repo: "acme/shop", number: "12" },
+    });
+    navigation.openPluginScreen!({ pluginId: "inbox", screenId: "review", serverId: "remote" });
+    expect(screens).toEqual([
+      {
+        serverId: "selected",
+        pluginId: "inbox",
+        screenId: "review",
+        params: { repo: "acme/shop", number: "12" },
+      },
+      { serverId: "remote", pluginId: "inbox", screenId: "review", params: {} },
+    ]);
+  });
+
+  it("reports and refuses screens that are not on the host", () => {
+    const { navigation, screens } = setup();
+    expect(navigation.hasPluginScreen!({ pluginId: "inbox", screenId: "review" })).toBe(true);
+    for (const target of [
+      { pluginId: "missing", screenId: "review" },
+      { pluginId: "inbox", screenId: "missing" },
+      { pluginId: "inbox", screenId: "review", serverId: "unknown" },
+    ]) {
+      expect(navigation.hasPluginScreen!(target)).toBe(false);
+      expect(() => navigation.openPluginScreen!(target)).toThrow("Plugin screen is unavailable");
+    }
+    expect(() =>
+      navigation.openPluginScreen!({
+        pluginId: "inbox",
+        screenId: "review",
+        params: { number: 12 } as unknown as Record<string, string>,
+      }),
+    ).toThrow("must be a string");
+    expect(screens).toEqual([]);
+  });
 
   it("creates and focuses a local browser in the selected or explicit host workspace", () => {
     const { navigation, destinations, browsers } = setup();
