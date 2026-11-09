@@ -46,6 +46,12 @@ describe("describeScheduleRun", () => {
     expect(describeScheduleRun(run({ error: "stale" }), NOW).error).toBeNull();
   });
 
+  it("keeps the agent's final message as the run's report", () => {
+    expect(describeScheduleRun(run({ output: "\n## Done\n" }), NOW).output).toBe("## Done");
+    expect(describeScheduleRun(run({ output: " " }), NOW).output).toBeNull();
+    expect(describeScheduleRun(run({ output: null }), NOW).output).toBeNull();
+  });
+
   it("treats a missing workspace as null", () => {
     expect(describeScheduleRun(run({ workspaceId: undefined }), NOW).workspaceId).toBeNull();
   });
