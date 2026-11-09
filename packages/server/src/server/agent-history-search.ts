@@ -1,5 +1,5 @@
 import type { AgentSnapshotPayload, ProjectPlacementPayload } from "@getpaseo/protocol/messages";
-import { scoreTextFields } from "@getpaseo/protocol/search/text-match";
+import { RECALL_MATCH_OPTIONS, scoreTextFields } from "@getpaseo/protocol/search/text-match";
 
 export interface AgentHistorySearchCandidate {
   agent: AgentSnapshotPayload;
@@ -20,7 +20,7 @@ export function matchesAgentHistoryQuery(
         project.checkout.currentBranch ?? "",
         project.projectName,
       ],
-      { typoTolerant: true },
+      RECALL_MATCH_OPTIONS,
     ) !== null
   );
 }

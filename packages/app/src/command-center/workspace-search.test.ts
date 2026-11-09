@@ -8,6 +8,7 @@ function workspace(input: {
   subtitle?: string;
   changeRequestNumber?: number | null;
   activityAt?: Date | null;
+  archived?: boolean;
 }): CommandCenterWorkspaceResult {
   return {
     kind: "workspace",
@@ -19,6 +20,7 @@ function workspace(input: {
     project: { viewKey: "project", name: "project", iconDataUri: null },
     changeRequestNumber: input.changeRequestNumber ?? null,
     activityAt: input.activityAt ?? null,
+    archived: input.archived ?? false,
     run: () => undefined,
   };
 }
@@ -95,5 +97,40 @@ describe("filterAndRankWorkspaces", () => {
       activityAt: new Date("2026-10-17T00:00:00Z"),
     });
     expect(ids([older, newer], "usage")).toEqual(["newer", "older"]);
+  });
+
+  describe("an archived workspace recalled by its title", () => {
+    const archived = workspace({
+      id: "grant-max",
+      title: "Grant Max access to production",
+      subtitle: "groomershop-mercato · docs/offboarding-maks",
+      activityAt: new Date("2026-11-09T10:00:00Z"),
+      archived: true,
+    });
+    // "grant" only lands as letters scattered through the branch name.
+    const scattered = workspace({
+      id: "sfera",
+      title: "Review PR 974 GSM-755 sfera contract",
+      subtitle: "groomershop-mercato · maxidragon/gsm-755-sfera-contract-ecp-hours-set",
+      activityAt: new Date("2026-11-09T10:50:00Z"),
+    });
+
+    it("ranks above an active workspace that only matched scattered letters", () => {
+      expect(ids([scattered, archived], "grant max")).toEqual(["grant-max", "sfera"]);
+      expect(ids([scattered, archived], "max")[0]).toBe("grant-max");
+    });
+
+    it("ranks below an active workspace that matches as well", () => {
+      const active = workspace({
+        id: "active",
+        title: "Grant Max access to staging",
+        activityAt: new Date("2026-11-01T00:00:00Z"),
+      });
+      expect(ids([archived, active], "grant max")).toEqual(["active", "grant-max"]);
+    });
+
+    it("forgives a typo, as History search does", () => {
+      expect(ids([archived], "grnat")).toEqual(["grant-max"]);
+    });
   });
 });

@@ -118,6 +118,7 @@ function workspace(
     project: { viewKey: "project", name: "project", iconDataUri: null },
     changeRequestNumber: null,
     activityAt,
+    archived: false,
     run: () => undefined,
   };
 }

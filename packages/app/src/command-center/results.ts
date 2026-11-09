@@ -2,7 +2,9 @@ import type { AggregatedAgent } from "@/hooks/use-aggregated-agents";
 import {
   compareMatchScores,
   type MatchScore,
+  RECALL_MATCH_OPTIONS,
   scoreTextFields,
+  type TextFieldsOptions,
 } from "@getpaseo/protocol/search/text-match";
 import type { CommandCenterContribution } from "./contributions";
 import type { CommandCenterListMetrics } from "./list-metrics";
@@ -61,6 +63,8 @@ export interface CommandCenterWorkspaceResult {
   /** PR/MR number backing this workspace, so a number query can match it exactly. */
   changeRequestNumber: number | null;
   activityAt: Date | null;
+  /** Found through History search. Ranks after an active row that matches as well. */
+  archived: boolean;
   run(): void;
 }
 
@@ -71,6 +75,8 @@ export interface CommandCenterAgentResult {
   title: string;
   subtitle: string;
   activityAt: Date | null;
+  /** Found through History search. Ranks after an active row that matches as well. */
+  archived: boolean;
   run(): void;
 }
 
@@ -154,11 +160,12 @@ export interface CommandCenterSearchFields {
 export function scoreSearchFields(
   query: string,
   fields: CommandCenterSearchFields,
+  options: TextFieldsOptions = {},
 ): CommandCenterScore | null {
-  const visible = scoreTextFields(query, [...fields.visible]);
+  const visible = scoreTextFields(query, [...fields.visible], options);
   if (visible) return { fieldRank: VISIBLE_FIELD_RANK, match: visible };
   if (fields.hidden.length === 0) return null;
-  const match = scoreTextFields(query, [...fields.visible, ...fields.hidden]);
+  const match = scoreTextFields(query, [...fields.visible, ...fields.hidden], options);
   return match ? { fieldRank: KEYWORD_FIELD_RANK, match } : null;
 }
 
@@ -217,6 +224,23 @@ const DEFAULT_CATEGORY_RESULT_LIMIT = 5;
 /** A built-in row (workspace or agent) that orders by how recently it saw activity. */
 export interface CommandCenterRecentRow {
   activityAt: Date | null;
+  archived: boolean;
+}
+
+/**
+ * Workspace and agent rows are recalled by name, like History, so they match with the same
+ * options History uses: typo-tolerant, ranked below every exact tier.
+ */
+export function scoreBuiltInFields(
+  query: string,
+  fields: CommandCenterSearchFields,
+): CommandCenterScore | null {
+  return scoreSearchFields(query, fields, RECALL_MATCH_OPTIONS);
+}
+
+/** Active rows before archived ones, then most recent first. */
+export function compareBuiltInRows(left: CommandCenterRecentRow, right: CommandCenterRecentRow) {
+  return Number(left.archived) - Number(right.archived) || compareByRecency(left, right);
 }
 
 /** Most recent first. A row with no timestamp sorts after every row that has one. */
@@ -226,7 +250,8 @@ export function compareByRecency(left: CommandCenterRecentRow, right: CommandCen
 
 /**
  * Rank built-in rows by the kind of match they made: which fields matched, then the matcher's
- * tier. Offset and spread are deliberately left out. They only say where in the title the word
+ * tier. The tier is summed over query tokens, so two whole-word hits in a title ("grant max")
+ * beat a word-start hit plus a scattered subsequence through a long branch name. Offset and spread are deliberately left out. They only say where in the title the word
  * happened to sit, so "usage" in "Deliver sidebar usage" and in "expose usage data" would be
  * ordered by sentence position. Leaving them out makes those rows equal, and recency decides.
  */
@@ -240,7 +265,9 @@ export function compareBuiltInScores(left: CommandCenterScore, right: CommandCen
  * with the caller and this stays testable without mounting React.
  *
  * Rows rank by `compareBuiltInScores`; rows that rank equally, including every row of an empty
- * query, go most recent first.
+ * query, go active first, then most recent first. Match quality comes before archived state, so
+ * an archived workspace whose title matches every word outranks an active one that only matched
+ * letters scattered through its branch.
  */
 export function filterAndRankBuiltInResults<Row extends CommandCenterRecentRow>(
   rows: readonly Row[],
@@ -248,17 +275,17 @@ export function filterAndRankBuiltInResults<Row extends CommandCenterRecentRow>(
   fieldsOf: (row: Row) => CommandCenterSearchFields,
 ): Row[] {
   if (!query.trim()) {
-    return [...rows].sort(compareByRecency).slice(0, DEFAULT_CATEGORY_RESULT_LIMIT);
+    return [...rows].sort(compareBuiltInRows).slice(0, DEFAULT_CATEGORY_RESULT_LIMIT);
   }
 
   const scored: { row: Row; score: CommandCenterScore }[] = [];
   for (const row of rows) {
-    const score = scoreSearchFields(query, fieldsOf(row));
+    const score = scoreBuiltInFields(query, fieldsOf(row));
     if (score) scored.push({ row, score });
   }
   scored.sort(
     (left, right) =>
-      compareBuiltInScores(left.score, right.score) || compareByRecency(left.row, right.row),
+      compareBuiltInScores(left.score, right.score) || compareBuiltInRows(left.row, right.row),
   );
   return scored.map((entry) => entry.row);
 }

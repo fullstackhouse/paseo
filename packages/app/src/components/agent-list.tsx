@@ -24,6 +24,7 @@ import { useArchiveAgent } from "@/hooks/use-archive-agent";
 import { HighlightedText } from "@/components/ui/highlighted-text";
 import { StatusBadge, type StatusBadgeVariant } from "@/components/ui/status-badge";
 import { findHighlightRanges } from "@/components/ui/highlighted-text-segments";
+import { RECALL_MATCH_OPTIONS } from "@getpaseo/protocol/search/text-match";
 
 interface AgentListProps {
   agents: AggregatedAgent[];
@@ -47,8 +48,6 @@ const DATE_SECTION_ORDER = [
   "thisMonth",
   "older",
 ] as const satisfies readonly DateSectionKey[];
-
-const HISTORY_MATCH_OPTIONS = { typoTolerant: true } as const;
 
 type FlatListItem =
   | { type: "header"; key: string; section: DateSectionKey }
@@ -193,10 +192,10 @@ function SessionRow({
   const ranges = useMemo(
     () => ({
       // History search matches typo-tolerantly on the daemon, so the marks do too.
-      workspace: findHighlightRanges(search ?? "", workspaceName, HISTORY_MATCH_OPTIONS),
-      title: findHighlightRanges(search ?? "", agent.title ?? "", HISTORY_MATCH_OPTIONS),
-      branch: findHighlightRanges(search ?? "", branch, HISTORY_MATCH_OPTIONS),
-      project: findHighlightRanges(search ?? "", projectName, HISTORY_MATCH_OPTIONS),
+      workspace: findHighlightRanges(search ?? "", workspaceName, RECALL_MATCH_OPTIONS),
+      title: findHighlightRanges(search ?? "", agent.title ?? "", RECALL_MATCH_OPTIONS),
+      branch: findHighlightRanges(search ?? "", branch, RECALL_MATCH_OPTIONS),
+      project: findHighlightRanges(search ?? "", projectName, RECALL_MATCH_OPTIONS),
     }),
     [search, workspaceName, agent.title, branch, projectName],
   );
