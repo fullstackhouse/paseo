@@ -1446,7 +1446,7 @@ export const en = {
       },
       snooze: {
         title: "Snooze",
-        continueTitle: "Snooze and continue at…",
+        continueToggle: "Continue work when it ends",
         wake: "Wake up",
         tonight: "Until tonight",
         tomorrow: "Until tomorrow morning",
