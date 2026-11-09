@@ -2185,6 +2185,7 @@ export const ja: TranslationResources = {
       noAgent: "エージェントを開くと系譜が表示されます",
       notLoaded: "未読み込み",
       archived: "アーカイブ済み",
+      detached: "切り離し済み",
       agent: "エージェント",
     },
     diff: {

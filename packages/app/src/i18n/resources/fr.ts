@@ -2212,6 +2212,7 @@ export const fr: TranslationResources = {
       noAgent: "Ouvrez un agent pour voir sa lignée",
       notLoaded: "Non chargé",
       archived: "Archivé",
+      detached: "Détaché",
       agent: "Agent",
     },
     diff: {
