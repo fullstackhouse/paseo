@@ -3750,7 +3750,6 @@ function WorkspaceScreenContent({
       <ExplorerFrame
         presentation={isMobile ? "overlay" : "dock"}
         isWorkspaceActive={isRouteFocused}
-        persistenceKey={persistenceKey}
         isOpen={isExplorerSidebarShowing && !desktopFocusModeEnabled}
       >
         {dock}

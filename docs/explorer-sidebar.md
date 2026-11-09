@@ -78,7 +78,7 @@ providers and gesture roots at the same React position when width or appearance 
 workspace route preserves panel ancestry during appearance updates. Appearance-dependent leaves
 subscribe to theme changes; the file editor reconfigures its existing editor theme compartment.
 Ordinary leaf routes retain the stack appearance policy.
-The shell is outside the workspace split canvas so it divides the full workspace, including the header. It has its own persisted width and resize handle. Main-pane splits
+The shell is outside the workspace split canvas so it divides the full workspace, including the header. It has its own resize handle and one persisted width shared by every workspace, so switching workspaces never resizes it. Main-pane splits
 never read or modify that width.
 
 `packages/app/src/workspace-tabs/open-supporting-view.ts` owns semantic Changes and pull-request
