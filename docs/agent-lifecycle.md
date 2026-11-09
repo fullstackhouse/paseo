@@ -197,6 +197,10 @@ The daemon owns both halves so every client and plugin agrees:
 - `setupWorkspaceSnoozeWaker` (`packages/server/src/server/workspace-snooze/`) clears timed snoozes
   when they end, including any that ended while the daemon was down. A snooze past its end counts
   as awake before the waker gets to it.
+- A timed snooze can carry a `wakePrompt` (`features.workspaceSnoozeWakePrompt`; the menu's
+  **Snooze and continue at…**). When the waker ends it, the prompt goes to the workspace's most
+  recently active top-level agent as `<paseo-system>` context, steering a turn already in flight.
+  Waking by hand or by a permission prompt drops it: you are back, so nothing needs resuming.
 
 Plugins read `snoozedAt` on `PluginWorkspaceSnapshot` and leave snoozed work out of their counters.
 

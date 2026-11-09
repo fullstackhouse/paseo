@@ -1384,6 +1384,7 @@ export const ar: TranslationResources = {
       },
       snooze: {
         title: "تأجيل",
+        continueTitle: "تأجيل والمتابعة في…",
         wake: "إيقاظ",
         tonight: "حتى الليلة",
         tomorrow: "حتى صباح الغد",

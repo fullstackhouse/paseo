@@ -1374,6 +1374,7 @@ export const zhCN: TranslationResources = {
       },
       snooze: {
         title: "暂缓",
+        continueTitle: "暂缓并在…继续",
         wake: "恢复",
         tonight: "直到今晚",
         tomorrow: "直到明天早上",
