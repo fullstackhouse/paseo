@@ -1,4 +1,4 @@
-import { MoreVertical, Pause, Pencil, Play, RotateCw, Trash2 } from "lucide-react-native";
+import { History, MoreVertical, Pause, Pencil, Play, RotateCw, Trash2 } from "lucide-react-native";
 import { useCallback, useState, type ReactElement } from "react";
 import { Pressable, Text, View, type PressableStateCallbackType } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
@@ -28,6 +28,7 @@ import type { ScheduleSummary } from "@getpaseo/protocol/schedule/types";
 // Themed lucide wrappers — module-scope so only the icon re-renders on theme
 // change (never call useUnistyles in render). See docs/unistyles.md.
 const ThemedPencil = withUnistyles(Pencil);
+const ThemedHistory = withUnistyles(History);
 const ThemedPause = withUnistyles(Pause);
 const ThemedPlay = withUnistyles(Play);
 const ThemedRotateCw = withUnistyles(RotateCw);
@@ -52,6 +53,7 @@ export interface ScheduleRowPending {
 
 export interface ScheduleRowActions {
   onEdit: () => void;
+  onViewRuns: () => void;
   onPause: () => void;
   onResume: () => void;
   onRunNow: () => void;
@@ -179,6 +181,7 @@ export function ScheduleRow({
   pending,
   isFirst,
   onEdit,
+  onViewRuns,
   onPause,
   onResume,
   onRunNow,
@@ -245,6 +248,7 @@ export function ScheduleRow({
             canRun={canRun}
             pending={pending}
             onEdit={onEdit}
+            onViewRuns={onViewRuns}
             onPause={onPause}
             onResume={onResume}
             onRunNow={onRunNow}
@@ -257,6 +261,7 @@ export function ScheduleRow({
 }
 
 const editLeading = <ThemedPencil size={MENU_ICON_SIZE} uniProps={mutedColorMapping} />;
+const runsLeading = <ThemedHistory size={MENU_ICON_SIZE} uniProps={mutedColorMapping} />;
 const pauseLeading = <ThemedPause size={MENU_ICON_SIZE} uniProps={mutedColorMapping} />;
 const resumeLeading = <ThemedPlay size={MENU_ICON_SIZE} uniProps={mutedColorMapping} />;
 const runLeading = <ThemedRotateCw size={MENU_ICON_SIZE} uniProps={mutedColorMapping} />;
@@ -336,13 +341,21 @@ function ScheduleKebabMenu({
   canRun,
   pending,
   onEdit,
+  onViewRuns,
   onPause,
   onResume,
   onRunNow,
   onDelete,
 }: Pick<
   ScheduleRowProps,
-  "schedule" | "pending" | "onEdit" | "onPause" | "onResume" | "onRunNow" | "onDelete"
+  | "schedule"
+  | "pending"
+  | "onEdit"
+  | "onViewRuns"
+  | "onPause"
+  | "onResume"
+  | "onRunNow"
+  | "onDelete"
 > & {
   canRun: boolean;
 }): ReactElement {
@@ -366,6 +379,13 @@ function ScheduleKebabMenu({
           testID={`schedule-menu-edit-${schedule.id}`}
         >
           Edit {productNameLower}
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          leading={runsLeading}
+          onSelect={onViewRuns}
+          testID={`schedule-menu-runs-${schedule.id}`}
+        >
+          View runs
         </DropdownMenuItem>
         <ScheduleExecutionMenuItems
           schedule={schedule}
