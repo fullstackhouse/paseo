@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   computeNotificationPlan,
   isPushEligibleAttentionReason,
+  isQuietBackgroundAttention,
   type ClientPresenceState,
   PRESENCE_THRESHOLD_MS,
 } from "./agent-attention-policy.js";
@@ -230,5 +231,15 @@ describe("isPushEligibleAttentionReason", () => {
     expect(isPushEligibleAttentionReason("finished")).toBe(true);
     expect(isPushEligibleAttentionReason("permission")).toBe(true);
     expect(isPushEligibleAttentionReason("error")).toBe(false);
+  });
+});
+
+describe("isQuietBackgroundAttention", () => {
+  it("quiets only finished turns in background workspaces", () => {
+    expect(isQuietBackgroundAttention({ background: true }, "finished")).toBe(true);
+    expect(isQuietBackgroundAttention({ background: true }, "error")).toBe(false);
+    expect(isQuietBackgroundAttention({ background: true }, "permission")).toBe(false);
+    expect(isQuietBackgroundAttention({ background: false }, "finished")).toBe(false);
+    expect(isQuietBackgroundAttention(null, "finished")).toBe(false);
   });
 });

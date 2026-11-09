@@ -90,6 +90,7 @@ import {
 import {
   computeNotificationPlan,
   isPushEligibleAttentionReason,
+  isQuietBackgroundAttention,
   type ClientPresenceState,
 } from "./agent-attention-policy.js";
 import {
@@ -2824,8 +2825,9 @@ export class VoiceAssistantWebSocketServer {
     if (!agent?.workspaceId) {
       return;
     }
+    const workspace = await this.workspaceRegistry.get(agent.workspaceId);
     const snoozedAttention = resolveSnoozedAttention({
-      workspace: await this.workspaceRegistry.get(agent.workspaceId),
+      workspace,
       reason: params.reason,
       permissionBehavior: this.daemonConfigStore.get().snoozedPermission,
       nowMs: Date.now(),
@@ -2870,9 +2872,10 @@ export class VoiceAssistantWebSocketServer {
       permissionRequest: findLatestPermissionRequest(agent.pendingPermissions),
     });
 
-    // A snoozed workspace still records attention for its rows, but nobody is notified.
+    // A snoozed workspace, or a background one finishing a turn, still records attention for its
+    // rows, but nobody is notified.
     const plan =
-      snoozedAttention === "quiet"
+      snoozedAttention === "quiet" || isQuietBackgroundAttention(workspace, params.reason)
         ? { inAppRecipientIndex: null, shouldPush: false }
         : computeNotificationPlan({
             allStates,
