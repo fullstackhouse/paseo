@@ -133,7 +133,8 @@ All other children archive with the parent. After the workspace layout hydrates,
 every managed subagent present in its tabs with `paseo.open-agent-tab.<client-id>=true` through the
 generic agent metadata update. This includes background and restored tabs; navigation does not own
 the marker. Closing a tab sets that client's label to `false`. Any `true` client label keeps the child
-open. Detach clears the parent and every open-tab label. The surviving child therefore becomes a
+open. Detach clears the parent and every open-tab label, and records the former parent in
+`paseo.detached-from` (and `paseo.detached-from-server-id` for another host) so lineage survives. The surviving child therefore becomes a
 normal root agent immediately, and closing its still-open tab archives it.
 
 Runtime ownership is resolved from explicit workspace ID and caller context, never from `cwd`. Workspace creation is a separate operation with `local | worktree` isolation; agent creation reuses that workspace unless a new workspace is explicitly requested.
@@ -143,7 +144,7 @@ Setup belongs to the workspace, including combined workspace-plus-agent creation
 The parent pill and the subagents track show a relationship from inside one chat. The Explorer
 [Lineage tab](explorer-sidebar.md#explorer-sidebar) shows it across workspaces.
 
-Users can also detach an existing subagent from the subagents track. Detach is deliberately a manual lifecycle gesture, not an agent-facing MCP tool. It removes the parent and open-tab lifecycle labels: it does not stop, archive, move, or restart the agent. The agent keeps its current `cwd` and `workspaceId`, leaves the former parent's track, and behaves like a root agent for tab close, workspace activity, and future parent archive.
+Users can also detach an existing subagent from the subagents track. Detach is deliberately a manual lifecycle gesture, not an agent-facing MCP tool. It removes the parent and open-tab lifecycle labels, keeping the former parent only as `paseo.detached-from`: it does not stop, archive, move, or restart the agent. The agent keeps its current `cwd` and `workspaceId`, leaves the former parent's track, and behaves like a root agent for tab close, workspace activity, and future parent archive.
 
 `notifyOnFinish` defaults to `true` for agent-scoped creation and prompt follow-ups because most delegated work needs to report back to the creating agent. Set it to `false` for explicit reporting or no completion callback.
 

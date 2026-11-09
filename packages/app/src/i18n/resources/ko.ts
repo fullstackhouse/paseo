@@ -2172,6 +2172,7 @@ export const ko: TranslationResources = {
       noAgent: "에이전트를 열면 계보가 표시됩니다",
       notLoaded: "로드되지 않음",
       archived: "보관됨",
+      detached: "분리됨",
       agent: "에이전트",
     },
     diff: {

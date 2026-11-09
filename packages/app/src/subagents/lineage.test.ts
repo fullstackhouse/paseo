@@ -115,7 +115,7 @@ describe("deriveLineage", () => {
     const lineage = deriveLineage(useSessionStore.getState(), at("focus"));
 
     expect(lineage.ancestors).toEqual([
-      { address: at("gone"), workspaceId: null, archived: false, missing: true },
+      { address: at("gone"), workspaceId: null, archived: false, missing: true, detached: false },
     ]);
   });
 
@@ -181,6 +181,66 @@ describe("deriveLineage", () => {
     const lineage = deriveLineage(useSessionStore.getState(), at(`agent-${agents.length - 1}`));
 
     expect(lineage.ancestors).toHaveLength(MAX_LINEAGE_DEPTH);
+  });
+});
+
+describe("deriveLineage after detach", () => {
+  it("keeps the former parent as a detached ancestor and keeps walking above it", () => {
+    setAgents(SERVER_ID, [
+      makeAgent({ id: "root", workspaceId: "ws-a" }),
+      makeAgent({ id: "former-parent", parentAgentId: "root", workspaceId: "ws-a" }),
+      makeAgent({
+        id: "focus",
+        workspaceId: "ws-b",
+        labels: { "paseo.detached-from": "former-parent" },
+      }),
+    ]);
+
+    const lineage = deriveLineage(useSessionStore.getState(), at("focus"));
+
+    expect(lineage.ancestors).toEqual([
+      expect.objectContaining({ address: at("root"), detached: false }),
+      expect.objectContaining({ address: at("former-parent"), detached: true }),
+    ]);
+  });
+
+  it("lists a detached former child, marked detached", () => {
+    setAgents(SERVER_ID, [
+      makeAgent({ id: "focus", workspaceId: "ws-a" }),
+      makeAgent({ id: "child", parentAgentId: "focus", workspaceId: "ws-a" }),
+      makeAgent({
+        id: "detached-child",
+        workspaceId: "ws-b",
+        labels: { "paseo.detached-from": "focus" },
+      }),
+    ]);
+
+    const lineage = deriveLineage(useSessionStore.getState(), at("focus"));
+
+    expect(lineage.children).toEqual([
+      expect.objectContaining({ address: at("child"), detached: false }),
+      expect.objectContaining({ address: at("detached-child"), detached: true }),
+    ]);
+  });
+
+  it("follows a detached-from host label", () => {
+    setAgents(OTHER_SERVER_ID, [makeAgent({ id: "remote-parent", workspaceId: "ws-r" })]);
+    setAgents(SERVER_ID, [
+      makeAgent({
+        id: "focus",
+        workspaceId: "ws-a",
+        labels: {
+          "paseo.detached-from": "remote-parent",
+          "paseo.detached-from-server-id": OTHER_SERVER_ID,
+        },
+      }),
+    ]);
+
+    const lineage = deriveLineage(useSessionStore.getState(), at("focus"));
+
+    expect(lineage.ancestors).toEqual([
+      expect.objectContaining({ address: at("remote-parent", OTHER_SERVER_ID), detached: true }),
+    ]);
   });
 });
 

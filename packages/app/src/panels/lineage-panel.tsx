@@ -151,7 +151,8 @@ function useNodeFacts(
     project: entry.projectCustomName || entry.projectDisplayName,
   }));
   if (node.missing) return t("panels.lineage.notLoaded");
-  const parts: string[] = [];
+  // Detached leads: the workspace name can be long, and truncation must not hide the link state.
+  const parts: string[] = node.detached ? [t("panels.lineage.detached")] : [];
   if (!isInWorkspace(node, workspace) && workspaceFacts) {
     parts.push(workspaceFacts.name, workspaceFacts.project);
   }

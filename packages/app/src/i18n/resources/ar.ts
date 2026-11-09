@@ -2160,6 +2160,7 @@ export const ar: TranslationResources = {
       noAgent: "افتح وكيلًا لعرض سلالته",
       notLoaded: "غير محمَّل",
       archived: "مؤرشف",
+      detached: "منفصل",
       agent: "وكيل",
     },
     diff: {

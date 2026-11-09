@@ -2212,6 +2212,7 @@ export const es: TranslationResources = {
       noAgent: "Abre un agente para ver su linaje",
       notLoaded: "No cargado",
       archived: "Archivado",
+      detached: "Separado",
       agent: "Agente",
     },
     diff: {

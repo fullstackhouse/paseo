@@ -19,6 +19,9 @@ import {
   isDelegatedAgent,
   isOpenAgentTabLabel,
   PARENT_AGENT_ID_LABEL,
+  PARENT_SERVER_ID_LABEL,
+  DETACHED_FROM_AGENT_ID_LABEL,
+  DETACHED_FROM_SERVER_ID_LABEL,
 } from "@getpaseo/protocol/agent-labels";
 import type { Logger } from "pino";
 import type { ToolPolicy } from "@getpaseo/protocol/agent-types";
@@ -726,8 +729,19 @@ function shouldDetachFromArchivedParent(
   return isCrossWorkspace || hasOpenAgentTab(child.labels);
 }
 
+/**
+ * Detach drops the parent and open-tab labels, and records the former parent under
+ * `paseo.detached-from` so lineage survives. The caller only detaches agents that have a parent.
+ */
 function detachedAgentLabelPatch(labels: Record<string, string>): AgentLabelPatch {
-  const patch: AgentLabelPatch = { [PARENT_AGENT_ID_LABEL]: null };
+  const patch: AgentLabelPatch = {
+    [PARENT_AGENT_ID_LABEL]: null,
+    [DETACHED_FROM_AGENT_ID_LABEL]: getParentAgentIdFromLabels(labels),
+  };
+  if (labels[PARENT_SERVER_ID_LABEL] !== undefined) {
+    patch[PARENT_SERVER_ID_LABEL] = null;
+    patch[DETACHED_FROM_SERVER_ID_LABEL] = labels[PARENT_SERVER_ID_LABEL];
+  }
   for (const label of Object.keys(labels)) {
     if (isOpenAgentTabLabel(label)) {
       patch[label] = null;
