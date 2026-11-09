@@ -1411,7 +1411,7 @@ export const ptBR: TranslationResources = {
       },
       snooze: {
         title: "Adiar",
-        continueTitle: "Adiar e continuar às…",
+        continueToggle: "Continuar o trabalho ao terminar",
         wake: "Retomar",
         tonight: "Até hoje à noite",
         tomorrow: "Até amanhã de manhã",

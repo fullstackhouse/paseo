@@ -1399,7 +1399,7 @@ export const ja: TranslationResources = {
       },
       snooze: {
         title: "スヌーズ",
-        continueTitle: "スヌーズして再開…",
+        continueToggle: "終了時に作業を再開",
         wake: "スヌーズを解除",
         tonight: "今夜まで",
         tomorrow: "明日の朝まで",
