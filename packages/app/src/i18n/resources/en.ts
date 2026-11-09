@@ -2278,6 +2278,7 @@ export const en = {
       noAgent: "Open an agent to see its lineage",
       notLoaded: "Not loaded",
       archived: "Archived",
+      detached: "Detached",
       agent: "Agent",
     },
     diff: {

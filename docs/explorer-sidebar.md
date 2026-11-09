@@ -149,7 +149,8 @@ selecting the Lineage tab doesn't change it, because Explorer tabs never take wo
 sidebar shows nothing that links two workspaces, so the tab is added in the background, once per
 workspace, the first time a relative runs in a different workspace. It uses the same close opt-out
 as the PR tab (`lineageTabAutoOpenedByWorkspace`). Relatives come from parent labels already in
-the session store. A parent the client hasn't loaded stays in the chain as "Not loaded".
+the session store, including `paseo.detached-from`, so a detached relative stays listed and is marked
+"Detached". A parent the client hasn't loaded stays in the chain as "Not loaded".
 
 ## Side pane
 

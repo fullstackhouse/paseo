@@ -29,7 +29,13 @@ import { limitAgentTimelineItemContent } from "./agent-timeline-content.js";
 import { buildStoredAgentPayload, toAgentPayload } from "./agent-projections.js";
 import type { ProviderOptions } from "@getpaseo/protocol/agent-types";
 import { projectTimelineRows } from "./timeline-projection.js";
-import { getOpenAgentTabLabel, PARENT_AGENT_ID_LABEL } from "@getpaseo/protocol/agent-labels";
+import {
+  DETACHED_FROM_AGENT_ID_LABEL,
+  DETACHED_FROM_SERVER_ID_LABEL,
+  getOpenAgentTabLabel,
+  PARENT_AGENT_ID_LABEL,
+  PARENT_SERVER_ID_LABEL,
+} from "@getpaseo/protocol/agent-labels";
 import { createAgentMessageDelivery } from "./agent-messages/index.js";
 import { AgentTurnBusyError, sendPreparedPromptToAgent, startAgentRun } from "./agent-prompt.js";
 import { StaleProviderSessionError } from "./stale-provider-session-error.js";
@@ -6381,10 +6387,11 @@ test("detachAgent removes relationship lifecycle labels from a live agent and em
 
   expect(result.previousParentAgentId).toBe(parent.id);
   expect(result.live).toBe(true);
-  expect(result.record.labels).toEqual({ team: "infra" });
-  expect(manager.getAgent(child.id)?.labels).toEqual({ team: "infra" });
-  expect((await storage.get(child.id))?.labels).toEqual({ team: "infra" });
-  expect(emittedLabels).toContainEqual({ team: "infra" });
+  const detachedLabels = { team: "infra", [DETACHED_FROM_AGENT_ID_LABEL]: parent.id };
+  expect(result.record.labels).toEqual(detachedLabels);
+  expect(manager.getAgent(child.id)?.labels).toEqual(detachedLabels);
+  expect((await storage.get(child.id))?.labels).toEqual(detachedLabels);
+  expect(emittedLabels).toContainEqual(detachedLabels);
 });
 
 test("detachAgent removes relationship lifecycle labels from a stored-only agent", async () => {
@@ -6431,8 +6438,37 @@ test("detachAgent removes relationship lifecycle labels from a stored-only agent
 
   expect(result.previousParentAgentId).toBe(parent.id);
   expect(result.live).toBe(false);
-  expect(result.record.labels).toEqual({ role: "reviewer" });
-  expect((await storage.get(child.id))?.labels).toEqual({ role: "reviewer" });
+  const detachedLabels = { role: "reviewer", [DETACHED_FROM_AGENT_ID_LABEL]: parent.id };
+  expect(result.record.labels).toEqual(detachedLabels);
+  expect((await storage.get(child.id))?.labels).toEqual(detachedLabels);
+});
+
+test("detachAgent moves the parent's host label to the detached-from host label", async () => {
+  const workdir = mkdtempSync(join(tmpdir(), "agent-manager-detach-host-"));
+  const storage = new AgentStorage(join(workdir, "agents"), logger);
+  const manager = new AgentManager({
+    clients: { codex: new TestAgentClient() },
+    registry: storage,
+    logger,
+  });
+  const child = await manager.createAgent(
+    { provider: "codex", cwd: workdir, title: "Remote child" },
+    undefined,
+    {
+      labels: {
+        [PARENT_AGENT_ID_LABEL]: "remote-parent",
+        [PARENT_SERVER_ID_LABEL]: "server-2",
+      },
+      workspaceId: undefined,
+    },
+  );
+
+  const result = await manager.detachAgent(child.id);
+
+  expect(result.record.labels).toEqual({
+    [DETACHED_FROM_AGENT_ID_LABEL]: "remote-parent",
+    [DETACHED_FROM_SERVER_ID_LABEL]: "server-2",
+  });
 });
 
 test("archiveAgent does not cascade to a detached former child", async () => {
@@ -10918,6 +10954,7 @@ test("archiveAgent detaches a cross-workspace child even when its tab is closed"
   expect(storedChild?.archivedAt).toBeUndefined();
   expect(storedChild?.workspaceId).toBe("workspace-b");
   expect(storedChild?.labels[PARENT_AGENT_ID_LABEL]).toBeUndefined();
+  expect(storedChild?.labels[DETACHED_FROM_AGENT_ID_LABEL]).toBe(parent.id);
 });
 
 test.each([

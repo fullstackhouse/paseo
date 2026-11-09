@@ -1,17 +1,24 @@
 import type { AgentAddress } from "@getpaseo/protocol/addresses";
-import { getParentAddressFromLabels } from "@getpaseo/protocol/agent-labels";
+import {
+  getDetachedFromAddressFromLabels,
+  getParentAddressFromLabels,
+} from "@getpaseo/protocol/agent-labels";
 import equal from "fast-deep-equal";
 import type { Agent, useSessionStore } from "@/stores/session-store";
 import { normalizeWorkspaceOpaqueId } from "@/utils/workspace-identity";
 
 type SessionStoreSnapshot = ReturnType<typeof useSessionStore.getState>;
 
-/** One agent in a lineage. `missing` means a parent label points at an agent this client hasn't loaded. */
+/**
+ * One agent in a lineage. `missing` means a label points at an agent this client hasn't loaded;
+ * `detached` means the link between this node and its neighbour toward the focus agent was detached.
+ */
 export interface LineageNode {
   address: AgentAddress;
   workspaceId: string | null;
   archived: boolean;
   missing: boolean;
+  detached: boolean;
 }
 
 export interface Lineage {
@@ -31,13 +38,25 @@ function findAgent(state: SessionStoreSnapshot, address: AgentAddress): Agent | 
   return session?.agents.get(address.agentId) ?? session?.agentDetails.get(address.agentId) ?? null;
 }
 
-function toNode(address: AgentAddress, agent: Agent | null): LineageNode {
+function toNode(address: AgentAddress, agent: Agent | null, detached: boolean): LineageNode {
   return {
     address,
     workspaceId: agent?.workspaceId ?? null,
     archived: Boolean(agent?.archivedAt),
     missing: agent === null,
+    detached,
   };
+}
+
+/** Who started an agent: its parent, or the parent it was detached from. */
+function startedBy(
+  agent: Agent,
+  serverId: string,
+): { address: AgentAddress; detached: boolean } | null {
+  const parent = getParentAddressFromLabels(agent.labels, serverId);
+  if (parent) return { address: parent, detached: false };
+  const former = getDetachedFromAddressFromLabels(agent.labels, serverId);
+  return former ? { address: former, detached: true } : null;
 }
 
 function sameAddress(left: AgentAddress, right: AgentAddress): boolean {
@@ -50,22 +69,22 @@ export function deriveLineage(state: SessionStoreSnapshot, focus: AgentAddress):
   let current = findAgent(state, focus);
   let currentServerId = focus.serverId;
   while (current && ancestors.length < MAX_LINEAGE_DEPTH) {
-    const parent = getParentAddressFromLabels(current.labels, currentServerId);
-    if (!parent || seen.some((address) => sameAddress(address, parent))) break;
-    seen.push(parent);
-    current = findAgent(state, parent);
-    currentServerId = parent.serverId;
-    ancestors.unshift(toNode(parent, current));
+    const link = startedBy(current, currentServerId);
+    if (!link || seen.some((address) => sameAddress(address, link.address))) break;
+    seen.push(link.address);
+    current = findAgent(state, link.address);
+    currentServerId = link.address.serverId;
+    ancestors.unshift(toNode(link.address, current, link.detached));
   }
 
   const children: Array<{ node: LineageNode; createdAt: number }> = [];
   for (const [serverId, session] of Object.entries(state.sessions)) {
     for (const agent of session.agents.values()) {
       if (agent.archivedAt) continue;
-      const parent = getParentAddressFromLabels(agent.labels, serverId);
-      if (!parent || !sameAddress(parent, focus)) continue;
+      const link = startedBy(agent, serverId);
+      if (!link || !sameAddress(link.address, focus)) continue;
       children.push({
-        node: toNode({ serverId, agentId: agent.id }, agent),
+        node: toNode({ serverId, agentId: agent.id }, agent, link.detached),
         createdAt: agent.createdAt.getTime(),
       });
     }

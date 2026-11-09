@@ -2288,6 +2288,7 @@ export const ru: TranslationResources = {
       noAgent: "Откройте агента, чтобы увидеть его происхождение",
       notLoaded: "Не загружен",
       archived: "В архиве",
+      detached: "Отсоединён",
       agent: "Агент",
     },
     diff: {
