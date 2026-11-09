@@ -27,6 +27,7 @@ const WorkspaceTabTargetStorageSchema = z.discriminatedUnion("kind", [
   z.strictObject({ kind: z.literal("changes_tree") }),
   z.strictObject({ kind: z.literal("files") }),
   z.strictObject({ kind: z.literal("pull_request") }),
+  z.strictObject({ kind: z.literal("lineage") }),
   z.strictObject({
     kind: z.literal("file"),
     path: z.string(),
@@ -117,6 +118,7 @@ export const WorkspaceLayoutPersistedStateSchema = z.strictObject({
   explorerSidebarPaneIdByWorkspace: z.record(z.string(), z.string().nullable()).optional(),
   sidePaneIdByWorkspace: z.record(z.string(), z.string().nullable()).optional(),
   pullRequestTabAutoOpenedByWorkspace: z.record(z.string(), z.literal(true)).optional(),
+  lineageTabAutoOpenedByWorkspace: z.record(z.string(), z.literal(true)).optional(),
   // COMPAT(pullRequestAutoAdd): PR detection stopped opening a tab in v0.5; accepted
   // and ignored so upgrading does not discard the layout. Remove after 2027-08-20.
   acknowledgedPullRequestByWorkspace: z.record(z.string(), z.string()).optional(),

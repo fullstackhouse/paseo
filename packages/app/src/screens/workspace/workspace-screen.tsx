@@ -227,6 +227,7 @@ import {
 import { RenderProfile } from "@/utils/render-profiler";
 import { useWorkspaceCheckoutStatus } from "@/screens/workspace/use-workspace-checkout-status";
 import { useWorkspacePullRequestDiscovery } from "@/panels/pull-request";
+import { useLineageAutoOpen } from "@/subagents/lineage-discovery";
 
 const NO_SHEETS: readonly SheetTab[] = [];
 const WORKSPACE_FLOATING_PANEL_PORTAL_HOST_PREFIX = "workspace-floating-panels";
@@ -1307,6 +1308,12 @@ function WorkspaceScreenContent({
     isGit: isGitCheckout,
     layoutMode,
     explorerOpen: isExplorerSidebarShowing,
+  });
+  useLineageAutoOpen({
+    serverId: normalizedServerId,
+    workspaceId: normalizedWorkspaceId,
+    workspaceKey: persistenceKey,
+    workspaceActive: isRouteFocused,
   });
 
   const explorerSidebarToggleAccessibilityState = useMemo(

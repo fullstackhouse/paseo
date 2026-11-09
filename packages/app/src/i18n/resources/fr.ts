@@ -2201,6 +2201,19 @@ export const fr: TranslationResources = {
       emptyDescription:
         "Créez une pull request pour cette copie de travail afin d’en voir les détails ici.",
     },
+    lineage: {
+      label: "Lignée",
+      subtitle: "Agents parents et enfants",
+      tooltip: "Agents dont celui-ci provient et qu'il a lancés",
+      startedBy: "Lancé par",
+      inOtherWorkspaces: "Dans d'autres espaces de travail",
+      inThisWorkspace: "Dans cet espace de travail",
+      empty: "Aucun agent parent ou enfant",
+      noAgent: "Ouvrez un agent pour voir sa lignée",
+      notLoaded: "Non chargé",
+      archived: "Archivé",
+      agent: "Agent",
+    },
     diff: {
       changesLabel: "Modifications",
       diffLabel: "Diff",

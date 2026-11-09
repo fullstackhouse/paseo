@@ -2174,6 +2174,19 @@ export const ja: TranslationResources = {
       emptyDescription:
         "このチェックアウトのプルリクエストを作成すると、ここに詳細が表示されます。",
     },
+    lineage: {
+      label: "系譜",
+      subtitle: "親エージェントと子エージェント",
+      tooltip: "このエージェントの起点と、起動したエージェント",
+      startedBy: "起動元",
+      inOtherWorkspaces: "他のワークスペース",
+      inThisWorkspace: "このワークスペース",
+      empty: "親エージェントも子エージェントもありません",
+      noAgent: "エージェントを開くと系譜が表示されます",
+      notLoaded: "未読み込み",
+      archived: "アーカイブ済み",
+      agent: "エージェント",
+    },
     diff: {
       changesLabel: "変更",
       diffLabel: "差分",
