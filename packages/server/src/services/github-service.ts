@@ -1093,6 +1093,10 @@ interface GitHubBatchPollEntry {
   owner: string;
   name: string;
   headRepositoryOwner?: string;
+  /** Addressed to the fork's parent through a remembered redirect. */
+  redirected?: boolean;
+  /** Re-queried on the fork itself after its parent had no matching PR. */
+  skipRedirect?: boolean;
 }
 
 interface PendingBatchPullRequestChecks {
@@ -1112,6 +1116,7 @@ interface GitHubBatchDistribution {
   pendingChecks: PendingBatchPullRequestChecks[];
   legacyFallback: GitHubPollTarget[];
   redirected: GitHubBatchPollEntry[];
+  forkRetry: GitHubBatchPollEntry[];
 }
 
 interface ResolvedPullRequestCandidate {
@@ -1662,6 +1667,9 @@ export function createGitHubService(options: CreateGitHubServiceOptions = {}): G
     if (distribution.redirected.length > 0) {
       await runGitHubPollBatch(distribution.redirected, startedAt);
     }
+    if (distribution.forkRetry.length > 0) {
+      await runGitHubPollBatch(distribution.forkRetry, startedAt);
+    }
   }
 
   async function loadGitHubPollBatchResponse(input: {
@@ -1700,6 +1708,7 @@ export function createGitHubService(options: CreateGitHubServiceOptions = {}): G
       pendingChecks: [],
       legacyFallback: [],
       redirected: [],
+      forkRetry: [],
     };
     for (const [index, entry] of input.entries.entries()) {
       const aliasValue = input.aliases[batchAlias(index)];
@@ -1716,36 +1725,14 @@ export function createGitHubService(options: CreateGitHubServiceOptions = {}): G
         );
         continue;
       }
-      if (repository.data.isFork && repository.data.parent) {
-        const forkOwner = repository.data.owner?.login ?? entry.owner;
-        pollRepositoryRedirects.set(batchRepositoryRedirectKey(entry), {
-          owner: repository.data.parent.owner.login,
-          name: repository.data.parent.name,
-          headRepositoryOwner: forkOwner,
-        });
-        distribution.redirected.push(entry);
-        continue;
-      }
       const node = selectBatchPollNode(entry, repository.data);
       if (!node) {
-        // Legacy fallback covers the two ways "no match" can be wrong: a fork
-        // whose PR lives in the parent repository, and a full candidate page —
-        // ten newer same-named fork PRs can crowd the checkout's own PR out of
-        // the first:N window, so absence is only conclusive on a partial page.
-        if (
-          repository.data.isFork ||
-          repository.data.pullRequests.nodes.length >= BATCH_PR_CANDIDATE_LIMIT
-        ) {
-          distribution.legacyFallback.push(entry.target);
-        } else {
-          finalizeBatchPollTarget({
-            entry,
-            node: null,
-            repository: repository.data,
-            rollup: null,
-            startedAt: input.startedAt,
-          });
-        }
+        routeUnmatchedBatchEntry({
+          entry,
+          repository: repository.data,
+          distribution,
+          startedAt: input.startedAt,
+        });
         continue;
       }
       const frozenKey =
@@ -1774,16 +1761,68 @@ export function createGitHubService(options: CreateGitHubServiceOptions = {}): G
     return distribution;
   }
 
+  function routeUnmatchedBatchEntry(input: {
+    entry: GitHubBatchPollEntry;
+    repository: BatchPollRepository;
+    distribution: GitHubBatchDistribution;
+    startedAt: number;
+  }): void {
+    const { entry, repository, distribution } = input;
+    // Reached only when the fork has no PR of its own for the branch: a long-lived
+    // fork can merge PRs into itself, so its own match wins over the parent.
+    if (repository.isFork && repository.parent && !entry.skipRedirect) {
+      pollRepositoryRedirects.set(batchRepositoryRedirectKey(entry), {
+        owner: repository.parent.owner.login,
+        name: repository.parent.name,
+        headRepositoryOwner: repository.owner?.login ?? entry.owner,
+      });
+      distribution.redirected.push(entry);
+      return;
+    }
+    if (entry.redirected) {
+      // The redirect is remembered per origin repository, so a PR opened in the
+      // fork after the first redirect is only found by asking the fork again.
+      distribution.forkRetry.push({ ...unredirectedBatchEntry(entry), skipRedirect: true });
+      return;
+    }
+    // Legacy fallback covers the two ways "no match" can be wrong: a fork
+    // whose PR lives in the parent repository, and a full candidate page —
+    // ten newer same-named fork PRs can crowd the checkout's own PR out of
+    // the first:N window, so absence is only conclusive on a partial page.
+    if (
+      (repository.isFork && !entry.skipRedirect) ||
+      repository.pullRequests.nodes.length >= BATCH_PR_CANDIDATE_LIMIT
+    ) {
+      distribution.legacyFallback.push(entry.target);
+      return;
+    }
+    finalizeBatchPollTarget({
+      entry,
+      node: null,
+      repository,
+      rollup: null,
+      startedAt: input.startedAt,
+    });
+  }
+
   function addressGitHubBatchEntry(entry: GitHubBatchPollEntry): GitHubBatchPollEntry {
-    const redirect = pollRepositoryRedirects.get(batchRepositoryRedirectKey(entry));
+    const redirect = entry.skipRedirect
+      ? undefined
+      : pollRepositoryRedirects.get(batchRepositoryRedirectKey(entry));
     return redirect
       ? {
           ...entry,
           owner: redirect.owner,
           name: redirect.name,
           headRepositoryOwner: redirect.headRepositoryOwner,
+          redirected: true,
         }
       : entry;
+  }
+
+  function unredirectedBatchEntry(entry: GitHubBatchPollEntry): GitHubBatchPollEntry {
+    const { redirected: _redirected, headRepositoryOwner: _owner, ...rest } = entry;
+    return { ...rest, owner: entry.originOwner, name: entry.originName };
   }
 
   function batchRepositoryRedirectKey(entry: GitHubBatchPollEntry): string {
