@@ -26,6 +26,8 @@ export interface WorkspaceSnoozeWakerOptions {
   workspaceRegistry: Pick<WorkspaceRegistry, "list" | "update" | "subscribeToMutations">;
   logger: Logger;
   now?: () => number;
+  /** Called once per timed snooze that ends with a wake prompt, with the record as it was snoozed. */
+  onWakePrompt?: (workspace: PersistedWorkspaceRecord) => Promise<void>;
 }
 
 export interface WorkspaceSnoozeWaker {
@@ -49,14 +51,26 @@ export function resolveSnoozedAttention(input: ResolveSnoozedAttentionInput): Sn
   return (input.permissionBehavior ?? "wake") === "wake" ? "wake" : "quiet";
 }
 
-export async function wakeWorkspace(input: WakeWorkspaceInput): Promise<boolean> {
-  let woke = false;
+/**
+ * Ends a snooze and drops its wake prompt. Returns the record as it was while snoozed, or null
+ * when it was already awake, so concurrent wakers act on a snooze exactly once.
+ */
+export async function wakeWorkspace(
+  input: WakeWorkspaceInput,
+): Promise<PersistedWorkspaceRecord | null> {
+  let snoozed: PersistedWorkspaceRecord | null = null;
   await input.registry.update(input.workspaceId, (existing) => {
     if (!existing.snoozedAt) return existing;
-    woke = true;
-    return { ...existing, snoozedAt: null, snoozedUntil: null, updatedAt: input.nowIso };
+    snoozed = existing;
+    return {
+      ...existing,
+      snoozedAt: null,
+      snoozedUntil: null,
+      snoozeWakePrompt: null,
+      updatedAt: input.nowIso,
+    };
   });
-  return woke;
+  return snoozed;
 }
 
 /** Clears timed snoozes when they end, so every client sees the workspace wake. */
@@ -85,15 +99,23 @@ export function setupWorkspaceSnoozeWaker(
         nextMs = Math.min(nextMs, untilMs);
         continue;
       }
-      const nowIso = new Date(nowMs).toISOString();
-      if (
-        await wakeWorkspace({
-          registry: options.workspaceRegistry,
-          workspaceId: workspace.workspaceId,
-          nowIso,
-        })
-      ) {
-        log.info({ workspaceId: workspace.workspaceId }, "snooze ended");
+      const snoozed = await wakeWorkspace({
+        registry: options.workspaceRegistry,
+        workspaceId: workspace.workspaceId,
+        nowIso: new Date(nowMs).toISOString(),
+      });
+      if (!snoozed) continue;
+      log.info({ workspaceId: workspace.workspaceId }, "snooze ended");
+      if (snoozed.snoozeWakePrompt && options.onWakePrompt) {
+        // Never block other wake-ups on an agent run.
+        options
+          .onWakePrompt(snoozed)
+          .catch((err) =>
+            log.warn(
+              { err, workspaceId: workspace.workspaceId },
+              "failed to send snooze wake prompt",
+            ),
+          );
       }
     }
     // Concurrent arms each read the full list, so the last one to finish holds the right timer.

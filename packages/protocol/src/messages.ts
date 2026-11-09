@@ -1063,6 +1063,9 @@ export const WorkspaceSnoozeSetRequestSchema = z.object({
   workspaceId: z.string(),
   snoozed: z.boolean(),
   until: z.string().nullable(),
+  // COMPAT(workspaceSnoozeWakePrompt): FSH-only, added after v0.13.0, remove gate after 2027-05-10.
+  // Sent to the workspace's agent when a timed snooze ends. Requires `until`.
+  wakePrompt: z.string().optional(),
   requestId: z.string(),
 });
 
@@ -3882,6 +3885,8 @@ export const ServerInfoStatusPayloadSchema = z
         workspaceBackgroundSet: z.boolean().optional(),
         // COMPAT(workspaceSnooze): FSH-only, added after v0.13.0, remove gate after 2027-05-09.
         workspaceSnooze: z.boolean().optional(),
+        // COMPAT(workspaceSnoozeWakePrompt): FSH-only, added after v0.13.0, remove gate after 2027-05-10.
+        workspaceSnoozeWakePrompt: z.boolean().optional(),
         // COMPAT(skillManagement): added in v0.4.0, remove gate after 2027-08-16.
         skillManagement: z.boolean().optional(),
         // COMPAT(idleRuntimeCleanupSetting): added in v0.13.0, remove gate after 2027-04-26.
@@ -4321,6 +4326,8 @@ export const WorkspaceDescriptorPayloadSchema = z
     // Set while snoozed; `snoozedUntil` null means until the user wakes it.
     snoozedAt: z.string().nullable().optional(),
     snoozedUntil: z.string().nullable().optional(),
+    // COMPAT(workspaceSnoozeWakePrompt): set while a timed snooze will prompt its agent on waking.
+    snoozeWakePrompt: z.string().nullable().optional(),
     // COMPAT(workspaceLabels): added in v0.5.0, remove optional after 2027-08-14.
     labels: z.array(z.string()).optional(),
     // Retained for wire parsing of older daemon descriptors.

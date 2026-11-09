@@ -4041,7 +4041,14 @@ export class Session {
   ): Promise<void> {
     const { workspaceId, snoozed, requestId } = request;
     const until = snoozed ? request.until : null;
-    const logContext = { workspaceId, snoozed, until, requestId };
+    const wakePrompt = snoozed ? request.wakePrompt?.trim() || null : null;
+    const logContext = {
+      workspaceId,
+      snoozed,
+      until,
+      hasWakePrompt: wakePrompt !== null,
+      requestId,
+    };
     this.sessionLogger.info(logContext, "session: workspace.snooze.set.request");
     const emitResponse = (input: {
       accepted: boolean;
@@ -4059,6 +4066,16 @@ export class Session {
       emitResponse({ accepted: false, snoozedAt: null, snoozedUntil: null, error: "Invalid time" });
       return;
     }
+    // Only a timed snooze ends by itself, so only a timed snooze has a moment to prompt at.
+    if (wakePrompt !== null && until === null) {
+      emitResponse({
+        accepted: false,
+        snoozedAt: null,
+        snoozedUntil: null,
+        error: "A wake prompt needs a time to wake at",
+      });
+      return;
+    }
     try {
       const nowIso = new Date().toISOString();
       const snoozedAt = snoozed ? nowIso : null;
@@ -4066,6 +4083,7 @@ export class Session {
         ...existing,
         snoozedAt,
         snoozedUntil: until,
+        snoozeWakePrompt: wakePrompt,
         // Snoozed and pinned pull a workspace opposite ways; snoozing wins.
         pinnedAt: snoozed ? null : existing.pinnedAt,
         updatedAt: nowIso,
@@ -5861,6 +5879,7 @@ export class Session {
       pinnedAt: workspace.pinnedAt,
       snoozedAt: workspace.snoozedAt,
       snoozedUntil: workspace.snoozedUntil,
+      snoozeWakePrompt: workspace.snoozeWakePrompt,
       ...(workspace.labels && workspace.labels.length > 0 ? { labels: workspace.labels } : {}),
       background: workspace.background,
       archivingAt: null,
