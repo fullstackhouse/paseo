@@ -8399,6 +8399,68 @@ test("workspace.snooze.set.request snoozes until a time, unpins, and wakes", asy
   expect(workspaces.get("ws-1")).toMatchObject({ snoozedAt: null, snoozedUntil: null });
 });
 
+test("workspace.snooze.set.request stores a wake prompt for a timed snooze only", async () => {
+  const emitted: SessionOutboundMessage[] = [];
+  const session = asTestSession(
+    createSessionForWorkspaceTests({ onMessage: (message) => emitted.push(message) }),
+  );
+  const workspace = createPersistedWorkspaceRecord({
+    workspaceId: "ws-1",
+    projectId: "proj-1",
+    cwd: REPO_CWD,
+    kind: "local_checkout",
+    displayName: "main",
+    createdAt: "2026-03-01T12:00:00.000Z",
+    updatedAt: "2026-03-01T12:00:00.000Z",
+  });
+  const workspaces = new Map([[workspace.workspaceId, workspace]]);
+  session.workspaceRegistry.list = async () => Array.from(workspaces.values());
+  session.workspaceRegistry.update = async (id, updater) => {
+    const existing = workspaces.get(id);
+    if (!existing) return null;
+    const updated = updater(existing);
+    workspaces.set(id, updated);
+    return updated;
+  };
+
+  await session.handleMessage({
+    type: "workspace.snooze.set.request",
+    workspaceId: "ws-1",
+    snoozed: true,
+    until: null,
+    wakePrompt: "Continue.",
+    requestId: "req-open-ended",
+  });
+  expect(findByType(emitted, "workspace.snooze.set.response")?.payload).toMatchObject({
+    accepted: false,
+    error: "A wake prompt needs a time to wake at",
+  });
+  expect(workspaces.get("ws-1")?.snoozedAt).toBeNull();
+
+  emitted.length = 0;
+  await session.handleMessage({
+    type: "workspace.snooze.set.request",
+    workspaceId: "ws-1",
+    snoozed: true,
+    until: "2026-03-02T09:00:00.000Z",
+    wakePrompt: "  Continue where you left off.  ",
+    requestId: "req-continue",
+  });
+  expect(findByType(emitted, "workspace.snooze.set.response")?.payload).toMatchObject({
+    accepted: true,
+  });
+  expect(workspaces.get("ws-1")?.snoozeWakePrompt).toBe("Continue where you left off.");
+
+  await session.handleMessage({
+    type: "workspace.snooze.set.request",
+    workspaceId: "ws-1",
+    snoozed: false,
+    until: null,
+    requestId: "req-wake",
+  });
+  expect(workspaces.get("ws-1")?.snoozeWakePrompt).toBeNull();
+});
+
 test("workspace.snooze.set.request rejects an unparseable time and a missing workspace", async () => {
   const emitted: SessionOutboundMessage[] = [];
   const session = asTestSession(

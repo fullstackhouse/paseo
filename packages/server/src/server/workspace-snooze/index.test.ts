@@ -103,7 +103,10 @@ describe("setupWorkspaceSnoozeWaker", () => {
     await rm(dir, { recursive: true, force: true });
   });
 
-  function workspace(id: string, snooze: { snoozedAt: string; snoozedUntil: string | null }) {
+  function workspace(
+    id: string,
+    snooze: { snoozedAt: string; snoozedUntil: string | null; snoozeWakePrompt?: string | null },
+  ) {
     return createPersistedWorkspaceRecord({
       workspaceId: id,
       projectId: "prj_1",
@@ -164,5 +167,32 @@ describe("setupWorkspaceSnoozeWaker", () => {
     await vi.advanceTimersByTimeAsync(60 * 60_000);
 
     await vi.waitFor(async () => expect(await snoozedAt("ws_new")).toBeNull());
+  });
+
+  test("hands a timed snooze's wake prompt over once, and clears it with the snooze", async () => {
+    await registry.upsert(
+      workspace("ws_continue", {
+        snoozedAt: EARLIER,
+        snoozedUntil: EARLIER,
+        snoozeWakePrompt: "Continue where you left off.",
+      }),
+    );
+    await registry.upsert(workspace("ws_plain", { snoozedAt: EARLIER, snoozedUntil: EARLIER }));
+    const onWakePrompt = vi.fn(async () => {});
+    close = setupWorkspaceSnoozeWaker({
+      workspaceRegistry: registry,
+      logger: createTestLogger(),
+      onWakePrompt,
+    }).close;
+
+    await vi.waitFor(async () => expect(await snoozedAt("ws_plain")).toBeNull());
+    await vi.waitFor(() => expect(onWakePrompt).toHaveBeenCalledTimes(1));
+    expect(onWakePrompt).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workspaceId: "ws_continue",
+        snoozeWakePrompt: "Continue where you left off.",
+      }),
+    );
+    expect((await registry.get("ws_continue"))?.snoozeWakePrompt).toBeNull();
   });
 });
