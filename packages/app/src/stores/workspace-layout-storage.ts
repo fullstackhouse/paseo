@@ -104,6 +104,8 @@ export const WorkspaceLayoutPersistedStateSchema = z.strictObject({
   pinnedAgentIdsByWorkspace: z.record(z.string(), z.array(z.string())).optional(),
   layoutByWorkspace: z.record(z.string(), WorkspaceLayoutStorageSchema),
   splitSizesByWorkspace: z.record(z.string(), z.record(z.string(), z.array(z.number()))).optional(),
+  explorerSidebarWidth: z.number().optional(),
+  // COMPAT(explorerSidebarWidth): per-workspace widths before v0.7, remove after 2027-11-09.
   explorerSidebarWidthByWorkspace: z.record(z.string(), z.number()).optional(),
   // COMPAT(explorerSidebarWidth): added in v0.6, remove after 2027-08-25.
   explorerSidebarRatioByWorkspace: z.record(z.string(), z.number()).optional(),
