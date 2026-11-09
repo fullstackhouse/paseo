@@ -158,6 +158,8 @@ interface WorkspaceLayoutStore {
   sidePaneIdByWorkspace: Record<string, string | null>;
   /** Workspaces where PR detection already added its tab once; a closed tab never returns. */
   pullRequestTabAutoOpenedByWorkspace: Record<string, true>;
+  /** Workspaces where a cross-workspace lineage already added its tab once; a closed tab never returns. */
+  lineageTabAutoOpenedByWorkspace: Record<string, true>;
   /**
    * The one entry point for showing a target. On compact layouts a target whose panel declares
    * `compactSheet` opens in a sheet; the returned tab id is the sheet tab's id.
@@ -174,6 +176,8 @@ interface WorkspaceLayoutStore {
     workspaceKey: string,
     resolvePlacement: () => Pick<OpenWorkspaceTabInput, "placement" | "insertionPosition">,
   ) => string | null;
+  /** Adds the Lineage tab to Explorer in the background, once per workspace. */
+  autoOpenLineageTab: (workspaceKey: string) => string | null;
   /** Reveals the Explorer sidebar without selecting a view. Returns its pane id. */
   ensureExplorerSidebar: (workspaceKey: string) => string | null;
   showExplorerSidebar: (workspaceKey: string) => string | null;
@@ -999,6 +1003,7 @@ const PERSISTED_SLICES = [
   "explorerSidebarPaneIdByWorkspace",
   "sidePaneIdByWorkspace",
   "pullRequestTabAutoOpenedByWorkspace",
+  "lineageTabAutoOpenedByWorkspace",
 ] as const;
 
 // Zustand persist re-runs partialize after every set, including ones that return the state
@@ -1035,6 +1040,7 @@ function createPersistedStateProjection() {
       explorerPaneIdByWorkspace: source.explorerSidebarPaneIdByWorkspace,
       sidePaneIdByWorkspace: source.sidePaneIdByWorkspace,
       pullRequestTabAutoOpenedByWorkspace: source.pullRequestTabAutoOpenedByWorkspace,
+      lineageTabAutoOpenedByWorkspace: source.lineageTabAutoOpenedByWorkspace,
     };
     previous = { source, state };
     return state;
@@ -1083,6 +1089,31 @@ export function createWorkspaceLayoutStore(
           }
           return tabId;
         },
+        // Same once-per-workspace rule as the PR tab: the flag outlives the tab, so closing it
+        // is the user's answer for that workspace.
+        autoOpenLineageTab: (workspaceKey) => {
+          const key = trimNonEmpty(workspaceKey);
+          if (!key || get().lineageTabAutoOpenedByWorkspace[key]) return null;
+          const paneId = resolveExplorerSidebarPaneId(
+            getWorkspaceLayout(get().layoutByWorkspace, key),
+            get().explorerSidebarPaneIdByWorkspace[key],
+          );
+          const tabId = get().openTab({
+            workspaceKey: key,
+            target: { kind: "lineage" },
+            intent: "background",
+            placement: paneId ? { mode: "prefer", paneId } : undefined,
+          });
+          if (tabId) {
+            set((state) => ({
+              lineageTabAutoOpenedByWorkspace: {
+                ...state.lineageTabAutoOpenedByWorkspace,
+                [key]: true,
+              },
+            }));
+          }
+          return tabId;
+        },
         panelRevisionByWorkspace: {},
         pendingOpenByWorkspace: {},
         deferOpenTab: (input) => {
@@ -1116,6 +1147,7 @@ export function createWorkspaceLayoutStore(
         explorerSidebarPaneIdByWorkspace: {},
         sidePaneIdByWorkspace: {},
         pullRequestTabAutoOpenedByWorkspace: {},
+        lineageTabAutoOpenedByWorkspace: {},
         openTab: (input) => {
           const normalizedWorkspaceKey = trimNonEmpty(input.workspaceKey);
           const normalizedTarget = normalizeWorkspaceTabTarget(input.target);
@@ -2275,6 +2307,7 @@ export function createWorkspaceLayoutStore(
               normalizedWorkspaceKey in state.explorerSidebarPaneIdByWorkspace ||
               normalizedWorkspaceKey in state.sidePaneIdByWorkspace ||
               normalizedWorkspaceKey in state.pullRequestTabAutoOpenedByWorkspace ||
+              normalizedWorkspaceKey in state.lineageTabAutoOpenedByWorkspace ||
               normalizedWorkspaceKey in state.sheetsByWorkspace;
             if (!hasAny) {
               return state;
@@ -2285,6 +2318,10 @@ export function createWorkspaceLayoutStore(
               [normalizedWorkspaceKey]: _autoOpened,
               ...pullRequestTabAutoOpenedByWorkspace
             } = state.pullRequestTabAutoOpenedByWorkspace;
+            const {
+              [normalizedWorkspaceKey]: _lineageAutoOpened,
+              ...lineageTabAutoOpenedByWorkspace
+            } = state.lineageTabAutoOpenedByWorkspace;
             const { [normalizedWorkspaceKey]: _layout, ...layoutByWorkspace } =
               state.layoutByWorkspace;
             const { [normalizedWorkspaceKey]: _splits, ...splitSizesByWorkspace } =
@@ -2305,6 +2342,7 @@ export function createWorkspaceLayoutStore(
               ...withSheets(state, normalizedWorkspaceKey, NO_SHEETS),
               pendingOpenByWorkspace,
               pullRequestTabAutoOpenedByWorkspace,
+              lineageTabAutoOpenedByWorkspace,
               layoutByWorkspace,
               splitSizesByWorkspace,
               pinnedAgentIdsByWorkspace,
@@ -2371,6 +2409,7 @@ export function createWorkspaceLayoutStore(
             sidePaneIdByWorkspace: result.data.sidePaneIdByWorkspace ?? {},
             pullRequestTabAutoOpenedByWorkspace:
               result.data.pullRequestTabAutoOpenedByWorkspace ?? {},
+            lineageTabAutoOpenedByWorkspace: result.data.lineageTabAutoOpenedByWorkspace ?? {},
           };
         },
       },
