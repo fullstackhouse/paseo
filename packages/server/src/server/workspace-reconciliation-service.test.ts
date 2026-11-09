@@ -1185,6 +1185,8 @@ describe("WorkspaceReconciliationService", () => {
       background: false,
       title: null,
       pinnedAt: null,
+      snoozedAt: null,
+      snoozedUntil: null,
       branch: null,
       worktreeRoot: null,
       baseBranch: null,
