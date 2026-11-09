@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { readValidatedJson } from "@/storage/validated-storage";
 import { APP_SETTINGS_KEY, SETTINGS_MIGRATIONS_KEY } from "./keys";
-import type { AppSettings, KeyValueStorage, PersistedAppSettings } from "./storage";
+import type { AppSettings, KeyValueStorage } from "./storage";
 
 const AppliedMigrationsSchema = z.strictObject({ applied: z.array(z.string()) });
 
@@ -13,8 +13,31 @@ const AppliedMigrationsSchema = z.strictObject({ applied: z.array(z.string()) })
  */
 const STEER_DEFAULT_MIGRATION = "steer-default";
 
+/**
+ * Existing installs carry whichever chat display v0.14 materialized for them (Full or collapse
+ * tool calls from the legacy tool call preference, collapse turns on new installs), which cannot
+ * be told apart from a deliberate pick. This moves every
+ * existing install to collapse tool calls once; picking another display afterwards sticks.
+ * Only installs that have run migrations before are moved: a fresh profile has nothing stale,
+ * and keeps whatever its storage was seeded with.
+ */
+const COLLAPSE_TOOL_CALLS_DEFAULT_MIGRATION = "collapse-tool-calls-default";
+
 /** Existing mobile installs materialized the old 15px content default in storage. */
 const MOBILE_CONTENT_16_MIGRATION = "mobile-content-16";
+
+async function readRawSettings(storage: KeyValueStorage): Promise<Record<string, unknown>> {
+  const raw = await storage.getItem(APP_SETTINGS_KEY);
+  if (raw === null) return {};
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : {};
+  } catch {
+    return {};
+  }
+}
 
 /**
  * Brings stored settings up to date, returning what the caller should use. Owns both writes so
@@ -25,7 +48,6 @@ const MOBILE_CONTENT_16_MIGRATION = "mobile-content-16";
 export async function migrateAppSettings(
   settings: AppSettings,
   storage: KeyValueStorage,
-  stored?: PersistedAppSettings,
   options: { native?: boolean } = {},
 ): Promise<AppSettings> {
   const migrationMarker = await readValidatedJson(
@@ -44,6 +66,15 @@ export async function migrateAppSettings(
     addedMigration = true;
   }
 
+  if (!applied.has(COLLAPSE_TOOL_CALLS_DEFAULT_MIGRATION)) {
+    migrated =
+      migrationMarker === null || migrated.chatDisplay === "collapseToolCalls"
+        ? migrated
+        : { ...migrated, chatDisplay: "collapseToolCalls" };
+    applied.add(COLLAPSE_TOOL_CALLS_DEFAULT_MIGRATION);
+    addedMigration = true;
+  }
+
   if (options.native && !applied.has(MOBILE_CONTENT_16_MIGRATION)) {
     migrated = migrated.contentFontSize === 15 ? { ...migrated, contentFontSize: 16 } : migrated;
     applied.add(MOBILE_CONTENT_16_MIGRATION);
@@ -55,14 +86,16 @@ export async function migrateAppSettings(
   }
 
   if (migrated !== settings) {
-    const storedSidebarRowItems = stored?.sidebarRowItems ?? {};
+    // Patch only what a migration changed onto the raw blob, so values this build cannot parse
+    // (written by a newer one) survive.
+    const changed = Object.fromEntries(
+      Object.entries(migrated).filter(
+        ([key, value]) => settings[key as keyof AppSettings] !== value,
+      ),
+    );
     await storage.setItem(
       APP_SETTINGS_KEY,
-      JSON.stringify({
-        ...stored,
-        ...migrated,
-        sidebarRowItems: { ...storedSidebarRowItems, ...migrated.sidebarRowItems },
-      }),
+      JSON.stringify({ ...(await readRawSettings(storage)), ...changed }),
     );
   }
 
