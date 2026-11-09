@@ -1,4 +1,3 @@
-import { useCallback } from "react";
 import { View } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import {
@@ -19,7 +18,6 @@ function ExplorerFrameBase({
   presentation,
   isOpen,
   isWorkspaceActive,
-  persistenceKey,
   containerWidth,
 }: ExplorerFrameProps) {
   const overlay = presentation === "overlay";
@@ -27,14 +25,8 @@ function ExplorerFrameBase({
   const active = isWorkspaceActive && (overlay ? settledOpen : isOpen);
   const resizeEnabled = isWorkspaceActive && !overlay && isOpen;
   const { gesture, gestureRef } = useCloseFileExplorerGesture(isWorkspaceActive && overlay);
-  const storedWidth = useWorkspaceLayoutStore(
-    (state) => state.explorerSidebarWidthByWorkspace[persistenceKey],
-  );
-  const resize = useWorkspaceLayoutStore((state) => state.resizeExplorerSidebar);
-  const onResize = useCallback(
-    (width: number) => resize(persistenceKey, width),
-    [persistenceKey, resize],
-  );
+  const storedWidth = useWorkspaceLayoutStore((state) => state.explorerSidebarWidth) ?? undefined;
+  const onResize = useWorkspaceLayoutStore((state) => state.resizeExplorerSidebar);
   const geometry = useExplorerGeometry({
     width: resolveExplorerSidebarWidth({ requestedWidth: storedWidth, containerWidth }),
     containerWidth,

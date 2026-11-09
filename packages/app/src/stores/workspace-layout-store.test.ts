@@ -587,7 +587,6 @@ describe("workspace-layout-store version 2 migration", () => {
       expect(persisted.version).toBe(2);
       expect(Object.keys(persisted.state).sort()).toEqual([
         "explorerPaneIdByWorkspace",
-        "explorerSidebarWidthByWorkspace",
         "layoutByWorkspace",
         "pinnedAgentIdsByWorkspace",
         "pullRequestTabAutoOpenedByWorkspace",
@@ -634,6 +633,60 @@ describe("workspace-layout-store version 2 migration", () => {
     expect(findPaneContainingTab(reloadedLayout.root, addedTabId as string)?.id).toBe(
       reloadedExplorer?.id,
     );
+  });
+});
+
+describe("workspace-layout-store Explorer width", () => {
+  async function restoreFrom(state: Record<string, unknown>) {
+    await AsyncStorage.setItem(
+      "workspace-layout-state",
+      JSON.stringify({ state: { layoutByWorkspace: {}, ...state }, version: 2 }),
+    );
+    const store = createWorkspaceLayoutStore(createDeterministicWorkspaceLayoutIds());
+    await store.persist.rehydrate();
+    return store;
+  }
+
+  it("shares one width across workspaces and persists it", async () => {
+    await AsyncStorage.removeItem("workspace-layout-state");
+    const store = createWorkspaceLayoutStore(createDeterministicWorkspaceLayoutIds());
+    await store.persist.rehydrate();
+    store.getState().resizeExplorerSidebar(412);
+    expect(store.getState().explorerSidebarWidth).toBe(412);
+
+    await vi.waitFor(async () => {
+      const persisted = JSON.parse((await AsyncStorage.getItem("workspace-layout-state")) ?? "{}");
+      expect(persisted.state.explorerSidebarWidth).toBe(412);
+    });
+    const reloaded = createWorkspaceLayoutStore(createDeterministicWorkspaceLayoutIds());
+    await reloaded.persist.rehydrate();
+    expect(reloaded.getState().explorerSidebarWidth).toBe(412);
+  });
+
+  it("ignores invalid widths", () => {
+    const store = createWorkspaceLayoutStore(createDeterministicWorkspaceLayoutIds());
+    store.getState().resizeExplorerSidebar(300);
+    store.getState().resizeExplorerSidebar(0);
+    store.getState().resizeExplorerSidebar(Number.NaN);
+    expect(store.getState().explorerSidebarWidth).toBe(300);
+  });
+
+  it("adopts the last per-workspace width saved by older builds", async () => {
+    const store = await restoreFrom({ explorerSidebarWidthByWorkspace: { a: 280, b: 450 } });
+    expect(store.getState().explorerSidebarWidth).toBe(450);
+  });
+
+  it("converts legacy ratios", async () => {
+    const store = await restoreFrom({ explorerSidebarRatioByWorkspace: { a: 0.25 } });
+    expect(store.getState().explorerSidebarWidth).toBe(360);
+  });
+
+  it("prefers the shared width over legacy per-workspace widths", async () => {
+    const store = await restoreFrom({
+      explorerSidebarWidth: 333,
+      explorerSidebarWidthByWorkspace: { a: 280 },
+    });
+    expect(store.getState().explorerSidebarWidth).toBe(333);
   });
 });
 
@@ -3182,7 +3235,6 @@ describe("workspace-layout-store actions", () => {
       layoutByWorkspace: { [workspaceKey]: layout },
       pinnedAgentIdsByWorkspace: {},
       splitSizesByWorkspace: currentState.splitSizesByWorkspace,
-      explorerSidebarWidthByWorkspace: currentState.explorerSidebarWidthByWorkspace,
       explorerPaneIdByWorkspace: {},
       pullRequestTabAutoOpenedByWorkspace: currentState.pullRequestTabAutoOpenedByWorkspace,
       sidePaneIdByWorkspace: currentState.sidePaneIdByWorkspace,
@@ -3417,7 +3469,6 @@ describe("workspace-layout-store actions", () => {
       layoutByWorkspace: {},
       pinnedAgentIdsByWorkspace: {},
       splitSizesByWorkspace: {},
-      explorerSidebarWidthByWorkspace: {},
       explorerPaneIdByWorkspace: {},
       sidePaneIdByWorkspace: {},
     });
