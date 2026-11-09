@@ -236,8 +236,8 @@ const LEGACY_EXPLORER_SIDEBAR_REFERENCE_WIDTH = 1440;
 const WORKSPACE_LAYOUT_PERSIST_VERSION = 2;
 type WorkspaceLayoutPersistedState = z.infer<typeof WorkspaceLayoutPersistedStateSchema>;
 
-// COMPAT(explorerSidebarWidth): widths were saved per workspace before v0.7; adopt the most
-// recently added one. Remove after 2027-11-09.
+// COMPAT(explorerSidebarWidthPerWorkspace): builds through v0.14.x saved a width per workspace;
+// adopt the most recently added one. Remove after 2027-11-09.
 function restoreExplorerSidebarWidth(state: WorkspaceLayoutPersistedState): number | null {
   if (state.explorerSidebarWidth !== undefined) return state.explorerSidebarWidth;
   const widths = state.explorerSidebarWidthByWorkspace
