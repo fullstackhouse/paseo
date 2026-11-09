@@ -449,4 +449,57 @@ describe("VoiceAssistantWebSocketServer notification payloads", () => {
       expect(pushNotifications.sent).toEqual([]);
     });
   });
+
+  describe("background workspaces", () => {
+    function useBackgroundWorkspace(server: VoiceAssistantWebSocketServer) {
+      const workspace = createPersistedWorkspaceRecord({
+        workspaceId: WORKSPACE_ID,
+        projectId: "project-1",
+        cwd: "/tmp/worktree",
+        kind: "worktree",
+        displayName: "worktree",
+        createdAt: "2026-11-09T08:00:00.000Z",
+        updatedAt: "2026-11-09T08:00:00.000Z",
+        background: true,
+      });
+      asInternals<WebSocketServerInternals>(server).workspaceRegistry = {
+        get: async () => workspace,
+        update: async () => workspace,
+      };
+    }
+
+    it("neither pushes nor notifies in app when a turn finishes, but still records attention", async () => {
+      const { server, pushNotifications } = createServer();
+      useBackgroundWorkspace(server);
+      const ws = connectClient(server, {
+        deviceType: "web",
+        focusedAgentId: null,
+        lastActivityAt: new Date(),
+        appVisible: true,
+      });
+
+      await asInternals<WebSocketServerInternals>(server).broadcastAgentAttention({
+        agentId: "agent-background",
+        provider: "claude",
+        reason: "finished",
+      });
+
+      expect(readAttentionRequiredMessage(ws).shouldNotify).toBe(false);
+      expect(pushNotifications.sent).toEqual([]);
+    });
+
+    it("still pushes on a permission prompt", async () => {
+      const { server, pushNotifications } = createServer();
+      useBackgroundWorkspace(server);
+      connectClient(server, null);
+
+      await asInternals<WebSocketServerInternals>(server).broadcastAgentAttention({
+        agentId: "agent-background",
+        provider: "claude",
+        reason: "permission",
+      });
+
+      expect(pushNotifications.sent).toHaveLength(1);
+    });
+  });
 });
