@@ -77,6 +77,8 @@ function projectionInput(options?: {
       pinnedAtByKey: { [pinned.placement.workspaceKey]: "2026-07-12T12:00:00.000Z" },
     },
     pinnedWorkspaceOrder: [],
+    snoozedKeys: new Map<string, string | null>(),
+    snoozedCollapsed: true,
     workspaceEntriesByKey: new Map([
       [pinned.entry.workspaceKey, pinned.entry],
       [unpinned.entry.workspaceKey, unpinned.entry],
@@ -174,5 +176,60 @@ describe("buildSidebarProjection", () => {
     expect(projection.shortcutModel.shortcutTargets).toEqual([
       { serverId: "srv", workspaceId: "unpinned" },
     ]);
+  });
+
+  it("moves snoozed chats out of their project into Snoozed, soonest to wake first", () => {
+    const forever = makeWorkspace("forever", "running");
+    const soon = makeWorkspace("soon", "needs_input");
+    const later = makeWorkspace("later", "done");
+    const awake = makeWorkspace("awake", "done");
+    const input = {
+      ...projectionInput({ groupMode: "status" }),
+      projects: [
+        makeProject([forever.placement, later.placement, awake.placement, soon.placement]),
+      ],
+      pinnedKeys: { pinnedWorkspaceKeys: [], pinnedAtByKey: {} },
+      snoozedKeys: new Map<string, string | null>([
+        [forever.placement.workspaceKey, null],
+        [later.placement.workspaceKey, "2026-11-10T09:00:00.000Z"],
+        [soon.placement.workspaceKey, "2026-11-09T20:00:00.000Z"],
+      ]),
+      snoozedCollapsed: false,
+      workspaceEntriesByKey: new Map(
+        [forever, soon, later, awake].map(({ entry }) => [entry.workspaceKey, entry]),
+      ),
+    };
+
+    const projection = buildSidebarProjection(input);
+
+    expect(projection.snoozedWorkspaces.map((entry) => entry.workspaceId)).toEqual([
+      "soon",
+      "later",
+      "forever",
+    ]);
+    const groupedRows = projection.workspaceGroups.flatMap((group) => group.rows);
+    expect(groupedRows.map((row) => row.workspaceId)).toEqual(["awake"]);
+    expect(
+      projection.pinnedGroups.unpinnedProjects[0]?.workspaces.map((entry) => entry.workspaceId),
+    ).toEqual(["awake"]);
+    expect(projection.shortcutModel.shortcutTargets.map((target) => target.workspaceId)).toEqual([
+      "awake",
+      "soon",
+      "later",
+      "forever",
+    ]);
+  });
+
+  it("does not number snoozed chats while Snoozed is collapsed", () => {
+    const snoozed = makeWorkspace("snoozed", "running");
+    const projection = buildSidebarProjection({
+      ...projectionInput(),
+      projects: [makeProject([snoozed.placement])],
+      pinnedKeys: { pinnedWorkspaceKeys: [], pinnedAtByKey: {} },
+      snoozedKeys: new Map([[snoozed.placement.workspaceKey, null]]),
+      workspaceEntriesByKey: new Map([[snoozed.entry.workspaceKey, snoozed.entry]]),
+    });
+
+    expect(projection.shortcutModel.shortcutTargets).toEqual([]);
   });
 });

@@ -315,6 +315,9 @@ const StoredWorkspaceSchema = z.strictObject({
   name: z.string(),
   title: z.string().nullable(),
   pinnedAt: z.string().nullable(),
+  // Required so rows cached before snooze existed invalidate the workspace cursor.
+  snoozedAt: z.string().nullable(),
+  snoozedUntil: z.string().nullable(),
   // Optional because entries written before labels existed have none. A cached workspace that
   // dropped them painted its row without its chips and stayed that way: the directory cursor is
   // current on reconnect, so the daemon has nothing newer to send back.
@@ -714,6 +717,8 @@ function serializeWorkspace(workspace: WorkspaceDescriptor): StoredWorkspace {
     name: workspace.name,
     title: workspace.title ?? null,
     pinnedAt: workspace.pinnedAt ?? null,
+    snoozedAt: workspace.snoozedAt ?? null,
+    snoozedUntil: workspace.snoozedUntil ?? null,
     labels: workspace.labels,
     status: workspace.status,
     statusEnteredAt: workspace.statusEnteredAt?.toISOString() ?? null,

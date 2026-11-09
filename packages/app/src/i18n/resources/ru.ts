@@ -1300,6 +1300,10 @@ export const ru: TranslationResources = {
     pinned: {
       title: "Закреплённые",
     },
+    snoozed: {
+      title: "Отложенные",
+      blocked: "Ждут вас: {{count}}",
+    },
     host: {
       noHost: "Нет хоста",
       switchTitle: "Сменить хост",
@@ -1395,6 +1399,15 @@ export const ru: TranslationResources = {
         hideFromSidebar: "Скрыть на боковой панели",
         archiving: "Архивирование...",
         hiding: "Скрытие...",
+      },
+      snooze: {
+        title: "Отложить",
+        continueTitle: "Отложить и продолжить в…",
+        wake: "Вернуть",
+        tonight: "До вечера",
+        tomorrow: "До завтрашнего утра",
+        nextWeek: "До следующей недели",
+        indefinite: "Пока не верну",
       },
       confirmations: {
         hideTitle: "Скрыть рабочее пространство?",
@@ -2892,6 +2905,16 @@ export const ru: TranslationResources = {
       },
       workspaces: {
         unavailable: "Подключитесь к этому хосту, чтобы управлять рабочими пространствами",
+        snoozedPermission: {
+          title: "Отложенные рабочие пространства и запросы разрешений",
+          hint: "Что происходит, когда агент в отложенном пространстве запрашивает разрешение. О завершённых ходах отложенные пространства не уведомляют.",
+          updateFailed: "Не удалось обновить настройку откладывания",
+          options: {
+            wake: "Вернуть и уведомить",
+            badge: "Считать в «Отложенных»",
+            silent: "Без сигнала",
+          },
+        },
       },
       terminalProfiles: {
         unavailable: "Подключитесь к этому хосту, чтобы управлять профилями терминала",

@@ -1,4 +1,10 @@
-import { useMemo, type ComponentProps, type PropsWithChildren, type ReactNode } from "react";
+import {
+  useCallback,
+  useMemo,
+  type ComponentProps,
+  type PropsWithChildren,
+  type ReactNode,
+} from "react";
 import { useTranslation } from "react-i18next";
 import { type PressableStateCallbackType } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
@@ -8,6 +14,9 @@ import {
   CircleCheck,
   Copy,
   MoreVertical,
+  AlarmClock,
+  AlarmClockOff,
+  AlarmClockPlus,
   Pencil,
   Pin,
   PinOff,
@@ -45,6 +54,15 @@ import {
   WORKSPACE_LABEL_PAGE_ID,
   type WorkspaceLabelTarget,
 } from "@/workspace-labels/picker";
+import {
+  useSetWorkspaceSnooze,
+  useWorkspaceSnoozeMenuPages,
+  WORKSPACE_SNOOZE_CONTINUE_PAGE_ID,
+  WORKSPACE_SNOOZE_PAGE_ID,
+  type SnoozeTarget,
+} from "@/workspace/snooze/menu";
+import { useHostFeature } from "@/runtime/host-features";
+import { useSessionStore } from "@/stores/session-store";
 
 const foregroundColorMapping = (theme: Theme) => ({ color: theme.colors.foreground });
 const foregroundMutedColorMapping = (theme: Theme) => ({
@@ -60,6 +78,9 @@ const ThemedCircleCheck = withUnistyles(CircleCheck);
 const ThemedPin = withUnistyles(Pin);
 const ThemedPinOff = withUnistyles(PinOff);
 const ThemedTag = withUnistyles(Tag);
+const ThemedAlarmClock = withUnistyles(AlarmClock);
+const ThemedAlarmClockOff = withUnistyles(AlarmClockOff);
+const ThemedAlarmClockPlus = withUnistyles(AlarmClockPlus);
 
 const copyLeadingIcon = <ThemedCopy size={14} uniProps={foregroundMutedColorMapping} />;
 const renameLeadingIcon = <ThemedPencil size={14} uniProps={foregroundMutedColorMapping} />;
@@ -70,6 +91,11 @@ const markAsUnreadLeadingIcon = <ThemedCircle size={14} uniProps={foregroundMute
 const archiveLeadingIcon = <ThemedArchive size={14} uniProps={foregroundMutedColorMapping} />;
 const pinLeadingIcon = <ThemedPin size={14} uniProps={foregroundMutedColorMapping} />;
 const unpinLeadingIcon = <ThemedPinOff size={14} uniProps={foregroundMutedColorMapping} />;
+const snoozeLeadingIcon = <ThemedAlarmClock size={14} uniProps={foregroundMutedColorMapping} />;
+const snoozeContinueLeadingIcon = (
+  <ThemedAlarmClockPlus size={14} uniProps={foregroundMutedColorMapping} />
+);
+const wakeLeadingIcon = <ThemedAlarmClockOff size={14} uniProps={foregroundMutedColorMapping} />;
 
 const triggerIconProps = densityIconProps("sm", foregroundMutedColorMapping);
 const triggerIconHoveredProps = densityIconProps("sm", foregroundColorMapping);
@@ -113,6 +139,36 @@ interface SidebarWorkspaceMenuItemsProps extends Omit<
 
 type MenuSurface = "context" | "dropdown";
 
+// Read here rather than threaded through every row: the menu already knows which workspace it is.
+function useWorkspaceSnoozeTarget(
+  serverId: string | undefined,
+  workspaceId: string | undefined,
+): { target: SnoozeTarget | null; isSnoozed: boolean } {
+  const supported = useHostFeature(serverId, "workspaceSnooze");
+  const canContinue = useHostFeature(serverId, "workspaceSnoozeWakePrompt");
+  const isSnoozed = useSessionStore((state) =>
+    serverId && workspaceId
+      ? state.sessions[serverId]?.workspaces?.get(workspaceId)?.snoozedAt != null
+      : false,
+  );
+  const target = useMemo(
+    () => (supported && serverId && workspaceId ? { serverId, workspaceId, canContinue } : null),
+    [canContinue, supported, serverId, workspaceId],
+  );
+  return { target, isSnoozed };
+}
+
+function useWorkspaceMenuPages(
+  serverId: string | undefined,
+  workspaceId: string | undefined,
+  labelTarget: WorkspaceLabelTarget | null,
+) {
+  const labelPages = useWorkspaceLabelMenuPages(labelTarget);
+  const { target } = useWorkspaceSnoozeTarget(serverId, workspaceId);
+  const snoozePages = useWorkspaceSnoozeMenuPages(target);
+  return useMemo(() => [...labelPages, ...snoozePages], [labelPages, snoozePages]);
+}
+
 function WorkspaceMenuItem({
   surface,
   children,
@@ -154,6 +210,7 @@ function SidebarWorkspaceMenuItems({
     () => <ThemedTag size={14} uniProps={foregroundMutedColorMapping} />,
     [],
   );
+  const { target: snoozeTarget, isSnoozed } = useWorkspaceSnoozeTarget(serverId, workspaceId);
 
   return (
     <>
@@ -207,7 +264,8 @@ function SidebarWorkspaceMenuItems({
           Mark as unread
         </WorkspaceMenuItem>
       ) : null}
-      {onTogglePin ? (
+      {/* A snoozed workspace cannot sit in Pinned; wake it first. */}
+      {onTogglePin && !isSnoozed ? (
         <WorkspaceMenuItem
           surface={surface}
           testID={`sidebar-workspace-menu-pin-${workspaceKey}`}
@@ -216,6 +274,14 @@ function SidebarWorkspaceMenuItems({
         >
           {isPinned ? t("sidebar.workspace.actions.unpin") : t("sidebar.workspace.actions.pin")}
         </WorkspaceMenuItem>
+      ) : null}
+      {snoozeTarget ? (
+        <WorkspaceSnoozeMenuItems
+          surface={surface}
+          workspaceKey={workspaceKey}
+          target={snoozeTarget}
+          isSnoozed={isSnoozed}
+        />
       ) : null}
       {serverId && workspaceId ? (
         <DropdownMenuSubTrigger
@@ -248,6 +314,58 @@ function SidebarWorkspaceMenuItems({
   );
 }
 
+// Wake for a snoozed workspace; otherwise the two ways to snooze it.
+function WorkspaceSnoozeMenuItems({
+  surface,
+  workspaceKey,
+  target,
+  isSnoozed,
+}: {
+  surface: MenuSurface;
+  workspaceKey: string;
+  target: SnoozeTarget;
+  isSnoozed: boolean;
+}): ReactNode {
+  const { t } = useTranslation();
+  const setSnooze = useSetWorkspaceSnooze();
+  const handleWake = useCallback(
+    () => setSnooze({ target, snoozed: false, until: null }),
+    [setSnooze, target],
+  );
+  if (isSnoozed) {
+    return (
+      <WorkspaceMenuItem
+        surface={surface}
+        testID={`sidebar-workspace-menu-wake-${workspaceKey}`}
+        leading={wakeLeadingIcon}
+        onSelect={handleWake}
+      >
+        {t("sidebar.workspace.snooze.wake")}
+      </WorkspaceMenuItem>
+    );
+  }
+  return (
+    <>
+      <DropdownMenuSubTrigger
+        id={WORKSPACE_SNOOZE_PAGE_ID}
+        leading={snoozeLeadingIcon}
+        testID={`sidebar-workspace-menu-snooze-${workspaceKey}`}
+      >
+        {t("sidebar.workspace.snooze.title")}
+      </DropdownMenuSubTrigger>
+      {target.canContinue ? (
+        <DropdownMenuSubTrigger
+          id={WORKSPACE_SNOOZE_CONTINUE_PAGE_ID}
+          leading={snoozeContinueLeadingIcon}
+          testID={`sidebar-workspace-menu-snooze-continue-${workspaceKey}`}
+        >
+          {t("sidebar.workspace.snooze.continueTitle")}
+        </DropdownMenuSubTrigger>
+      ) : null}
+    </>
+  );
+}
+
 export function SidebarWorkspaceMenu({
   workspaceKey,
   serverId,
@@ -275,7 +393,7 @@ export function SidebarWorkspaceMenu({
       serverId && workspaceId ? { serverId, workspaceId, labels: workspaceLabels ?? [] } : null,
     [serverId, workspaceId, workspaceLabels],
   );
-  const pages = useWorkspaceLabelMenuPages(workspaceTarget);
+  const pages = useWorkspaceMenuPages(serverId, workspaceId, workspaceTarget);
   return (
     <DropdownMenu compactMode="sheet" open={open} onOpenChange={onOpenChange}>
       <DropdownMenuTrigger
@@ -389,7 +507,11 @@ export function SidebarWorkspaceContextMenu({
     }),
     [workspace],
   );
-  const pages = useWorkspaceLabelMenuPages(workspaceTarget);
+  const pages = useWorkspaceMenuPages(
+    workspaceTarget.serverId,
+    workspaceTarget.workspaceId,
+    workspaceTarget,
+  );
 
   return (
     <ContextMenu open={contextMenuOpen} onOpenChange={onContextMenuOpenChange}>

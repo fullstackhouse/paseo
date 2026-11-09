@@ -1501,6 +1501,123 @@ describe("ForgeService", () => {
     service.dispose?.();
   });
 
+  it("keeps a fork poll on the fork when the PR was opened inside the fork", async () => {
+    const parent = { owner: { login: "upstream" }, name: "widgets" };
+    const ownPr = batchPollPrNodeJson({
+      number: 56,
+      url: "https://github.com/forkowner/widgets/pull/56",
+      headRefName: "feat-a",
+      headRefOid: "oid-a",
+      headRepositoryOwner: { login: "forkowner" },
+    });
+    const runner = createScriptedRunner([
+      batchPollStatusJson({
+        t0: batchPollRepositoryJson([ownPr], {
+          isFork: true,
+          parent,
+          owner: { login: "forkowner" },
+        }),
+      }),
+      batchPollStatusJson({
+        t0: batchPollChecksAliasJson([
+          { __typename: "StatusContext", context: "ci", state: "SUCCESS" },
+        ]),
+      }),
+    ]);
+    const service = createGitHubService({
+      ttlMs: 0,
+      runner: runner.runner,
+      resolveGhPath: async () => "/usr/bin/gh",
+      resolveRepoHost: async () => null,
+      resolveRepoSlug: async () => "forkowner/widgets",
+      now: () => 0,
+    });
+    const statuses: Array<CurrentPullRequestStatus | null> = [];
+
+    const subscription = service.retainCurrentPullRequestStatusPoll?.({
+      cwd: "/ws-a",
+      headRef: "feat-a",
+      headSha: "oid-a",
+      onStatus: (status) => statuses.push(status),
+    });
+    await vi.advanceTimersByTimeAsync(0);
+    await flushMicrotasks();
+
+    expect(runner.calls.map((call) => call.args[3])).not.toContainEqual(
+      expect.stringContaining('repository(owner: "upstream"'),
+    );
+    expect(statuses).toEqual([
+      expect.objectContaining({ number: 56, isMerged: true, repoOwner: "forkowner" }),
+    ]);
+
+    subscription?.unsubscribe();
+    service.dispose?.();
+  });
+
+  it("finds a PR opened inside the fork after the poll was redirected to the parent", async () => {
+    let now = 0;
+    const parent = { owner: { login: "upstream" }, name: "widgets" };
+    const fork = { isFork: true, parent, owner: { login: "forkowner" } };
+    const ownPr = batchPollPrNodeJson({
+      number: 56,
+      url: "https://github.com/forkowner/widgets/pull/56",
+      headRefName: "feat-a",
+      headRefOid: "oid-a",
+      headRepositoryOwner: { login: "forkowner" },
+    });
+    const runner = createScriptedRunner([
+      batchPollStatusJson({ t0: batchPollRepositoryJson([], fork) }),
+      batchPollStatusJson({ t0: batchPollRepositoryJson([]) }),
+      batchPollStatusJson({ t0: batchPollRepositoryJson([], fork) }),
+      batchPollStatusJson({ t0: batchPollRepositoryJson([]) }),
+      batchPollStatusJson({ t0: batchPollRepositoryJson([ownPr], fork) }),
+      batchPollStatusJson({
+        t0: batchPollChecksAliasJson([
+          { __typename: "StatusContext", context: "ci", state: "SUCCESS" },
+        ]),
+      }),
+    ]);
+    const service = createGitHubService({
+      ttlMs: 0,
+      runner: runner.runner,
+      resolveGhPath: async () => "/usr/bin/gh",
+      resolveRepoHost: async () => null,
+      resolveRepoSlug: async () => "forkowner/widgets",
+      now: () => now,
+    });
+    const statuses: Array<CurrentPullRequestStatus | null> = [];
+
+    const subscription = service.retainCurrentPullRequestStatusPoll?.({
+      cwd: "/ws-a",
+      headRef: "feat-a",
+      headSha: "oid-a",
+      onStatus: (status) => statuses.push(status),
+    });
+    await vi.advanceTimersByTimeAsync(0);
+    await flushMicrotasks();
+
+    expect(currentPullRequestStatusCalls(runner.calls)).toHaveLength(0);
+    expect(runner.calls).toHaveLength(3);
+    expect(statuses).toEqual([null]);
+
+    now = EXPECTED_GITHUB_SLOW_POLL_MS;
+    await vi.advanceTimersByTimeAsync(EXPECTED_GITHUB_SLOW_POLL_MS);
+    await flushMicrotasks();
+
+    expect(runner.calls[3]?.args[3]).toContain(
+      't0: repository(owner: "upstream", name: "widgets")',
+    );
+    expect(runner.calls[4]?.args[3]).toContain(
+      't0: repository(owner: "forkowner", name: "widgets")',
+    );
+    expect(statuses.at(-1)).toEqual(
+      expect.objectContaining({ number: 56, isMerged: true, repoOwner: "forkowner" }),
+    );
+
+    subscription?.unsubscribe();
+    service.dispose?.();
+  });
+
   it("treats a missing pullRequests connection as a failed alias", async () => {
     let now = 0;
     const runner = createScriptedRunner([

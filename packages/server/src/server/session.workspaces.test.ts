@@ -8326,6 +8326,174 @@ test("workspace.pin.set.request stores the pin timestamp and emits an updated de
   });
 });
 
+test("workspace.snooze.set.request snoozes until a time, unpins, and wakes", async () => {
+  const emitted: SessionOutboundMessage[] = [];
+  const session = asTestSession(
+    createSessionForWorkspaceTests({ onMessage: (message) => emitted.push(message) }),
+  );
+  const workspace = createPersistedWorkspaceRecord({
+    workspaceId: "ws-1",
+    projectId: "proj-1",
+    cwd: REPO_CWD,
+    kind: "local_checkout",
+    displayName: "main",
+    pinnedAt: "2026-03-01T12:00:00.000Z",
+    createdAt: "2026-03-01T12:00:00.000Z",
+    updatedAt: "2026-03-01T12:00:00.000Z",
+  });
+  const workspaces = new Map([[workspace.workspaceId, workspace]]);
+  session.workspaceRegistry.list = async () => Array.from(workspaces.values());
+  session.workspaceRegistry.update = async (id, updater) => {
+    const existing = workspaces.get(id);
+    if (!existing) return null;
+    const updated = updater(existing);
+    workspaces.set(id, updated);
+    return updated;
+  };
+  await session.handleMessage({
+    type: "fetch_workspaces_request",
+    requestId: "sub-workspaces",
+    subscribe: { subscriptionId: "sub-workspaces" },
+  });
+
+  const until = "2026-03-02T09:00:00.000Z";
+  await session.handleMessage({
+    type: "workspace.snooze.set.request",
+    workspaceId: "ws-1",
+    snoozed: true,
+    until,
+    requestId: "req-snooze",
+  });
+
+  const response = findByType(emitted, "workspace.snooze.set.response");
+  expect(response?.payload).toMatchObject({
+    requestId: "req-snooze",
+    accepted: true,
+    snoozedUntil: until,
+    error: null,
+  });
+  expect(response?.payload.snoozedAt).toEqual(expect.any(String));
+  expect(workspaces.get("ws-1")).toMatchObject({
+    snoozedAt: response?.payload.snoozedAt,
+    snoozedUntil: until,
+    pinnedAt: null,
+  });
+  expect(findByType(emitted, "workspace_update")?.payload).toMatchObject({
+    kind: "upsert",
+    workspace: { id: "ws-1", snoozedUntil: until, pinnedAt: null },
+  });
+
+  emitted.length = 0;
+  await session.handleMessage({
+    type: "workspace.snooze.set.request",
+    workspaceId: "ws-1",
+    snoozed: false,
+    until: null,
+    requestId: "req-wake",
+  });
+  expect(findByType(emitted, "workspace.snooze.set.response")?.payload).toMatchObject({
+    accepted: true,
+    snoozedAt: null,
+    snoozedUntil: null,
+  });
+  expect(workspaces.get("ws-1")).toMatchObject({ snoozedAt: null, snoozedUntil: null });
+});
+
+test("workspace.snooze.set.request stores a wake prompt for a timed snooze only", async () => {
+  const emitted: SessionOutboundMessage[] = [];
+  const session = asTestSession(
+    createSessionForWorkspaceTests({ onMessage: (message) => emitted.push(message) }),
+  );
+  const workspace = createPersistedWorkspaceRecord({
+    workspaceId: "ws-1",
+    projectId: "proj-1",
+    cwd: REPO_CWD,
+    kind: "local_checkout",
+    displayName: "main",
+    createdAt: "2026-03-01T12:00:00.000Z",
+    updatedAt: "2026-03-01T12:00:00.000Z",
+  });
+  const workspaces = new Map([[workspace.workspaceId, workspace]]);
+  session.workspaceRegistry.list = async () => Array.from(workspaces.values());
+  session.workspaceRegistry.update = async (id, updater) => {
+    const existing = workspaces.get(id);
+    if (!existing) return null;
+    const updated = updater(existing);
+    workspaces.set(id, updated);
+    return updated;
+  };
+
+  await session.handleMessage({
+    type: "workspace.snooze.set.request",
+    workspaceId: "ws-1",
+    snoozed: true,
+    until: null,
+    wakePrompt: "Continue.",
+    requestId: "req-open-ended",
+  });
+  expect(findByType(emitted, "workspace.snooze.set.response")?.payload).toMatchObject({
+    accepted: false,
+    error: "A wake prompt needs a time to wake at",
+  });
+  expect(workspaces.get("ws-1")?.snoozedAt).toBeNull();
+
+  emitted.length = 0;
+  await session.handleMessage({
+    type: "workspace.snooze.set.request",
+    workspaceId: "ws-1",
+    snoozed: true,
+    until: "2026-03-02T09:00:00.000Z",
+    wakePrompt: "  Continue where you left off.  ",
+    requestId: "req-continue",
+  });
+  expect(findByType(emitted, "workspace.snooze.set.response")?.payload).toMatchObject({
+    accepted: true,
+  });
+  expect(workspaces.get("ws-1")?.snoozeWakePrompt).toBe("Continue where you left off.");
+
+  await session.handleMessage({
+    type: "workspace.snooze.set.request",
+    workspaceId: "ws-1",
+    snoozed: false,
+    until: null,
+    requestId: "req-wake",
+  });
+  expect(workspaces.get("ws-1")?.snoozeWakePrompt).toBeNull();
+});
+
+test("workspace.snooze.set.request rejects an unparseable time and a missing workspace", async () => {
+  const emitted: SessionOutboundMessage[] = [];
+  const session = asTestSession(
+    createSessionForWorkspaceTests({ onMessage: (message) => emitted.push(message) }),
+  );
+  session.workspaceRegistry.update = async () => null;
+
+  await session.handleMessage({
+    type: "workspace.snooze.set.request",
+    workspaceId: "ws-1",
+    snoozed: true,
+    until: "tomorrow-ish",
+    requestId: "req-bad",
+  });
+  expect(findByType(emitted, "workspace.snooze.set.response")?.payload).toMatchObject({
+    accepted: false,
+    error: "Invalid time",
+  });
+
+  emitted.length = 0;
+  await session.handleMessage({
+    type: "workspace.snooze.set.request",
+    workspaceId: "missing",
+    snoozed: true,
+    until: null,
+    requestId: "req-missing",
+  });
+  expect(findByType(emitted, "workspace.snooze.set.response")?.payload).toMatchObject({
+    accepted: false,
+    error: "Workspace not found",
+  });
+});
+
 test("workspace.title.set.request with whitespace-only title clears the title", async () => {
   const emitted: SessionOutboundMessage[] = [];
   const session = asTestSession(

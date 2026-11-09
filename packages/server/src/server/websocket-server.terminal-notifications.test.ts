@@ -105,6 +105,9 @@ function workspaceRecord(overrides?: Partial<PersistedWorkspaceRecord>): Persist
     createdAt: "2026-01-01T00:00:00.000Z",
     updatedAt: "2026-01-01T00:00:00.000Z",
     archivedAt: null,
+    snoozedAt: null,
+    snoozedUntil: null,
+    snoozeWakePrompt: null,
     ...overrides,
   };
 }
@@ -112,6 +115,11 @@ function workspaceRecord(overrides?: Partial<PersistedWorkspaceRecord>): Persist
 function createWorkspaceRegistry(records: PersistedWorkspaceRecord[]): WorkspaceRegistry {
   return createStub<WorkspaceRegistry>({
     list: vi.fn(async () => records),
+    // Read only for snooze state; ownership still comes from the terminal event.
+    get: vi.fn(
+      async (workspaceId: string) =>
+        records.find((record) => record.workspaceId === workspaceId) ?? null,
+    ),
   });
 }
 
@@ -473,6 +481,29 @@ describe("VoiceAssistantWebSocketServer terminal attention notifications", () =>
     const payload = readTerminalAttentionMessage(ws);
     expect(payload.reason).toBe("needs_input");
     expect(payload.title).toBe("Terminal needs input");
+  });
+
+  it("stays quiet for a terminal in a snoozed workspace", async () => {
+    const { manager, emit } = createTerminalManager();
+    const { pushNotifications } = createServer(
+      manager,
+      createWorkspaceRegistry([
+        workspaceRecord({ snoozedAt: "2026-02-01T00:00:00.000Z", snoozedUntil: null }),
+      ]),
+    );
+
+    emit(
+      transition({
+        previousState: "working",
+        previousChangedAt: 0,
+        state: "idle",
+        changedAt: 15000,
+      }),
+    );
+
+    await flushAsync();
+
+    expect(pushNotifications.sent).toEqual([]);
   });
 
   it("sends push notification when no clients are present", async () => {

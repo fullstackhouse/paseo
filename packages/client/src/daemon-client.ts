@@ -3450,6 +3450,43 @@ export class DaemonClient {
     return { background: payload.background };
   }
 
+  /**
+   * Snoozes until `until` (ISO), or indefinitely when null; `snoozed: false` wakes it.
+   * `wakePrompt` is sent to the workspace's agent when a timed snooze ends.
+   */
+  async setWorkspaceSnoozed(
+    workspaceId: string,
+    snoozed: boolean,
+    until: string | null = null,
+    options: { wakePrompt?: string; requestId?: string } = {},
+  ): Promise<{ snoozedAt: string | null; snoozedUntil: string | null }> {
+    const { wakePrompt, requestId } = options;
+    const features = this.lastServerInfoMessage?.features;
+    // COMPAT(workspaceSnooze): FSH-only, added after v0.13.0, remove gate after 2027-05-09.
+    if (features?.workspaceSnooze !== true) {
+      throw new Error("Update the host to snooze workspaces.");
+    }
+    // COMPAT(workspaceSnoozeWakePrompt): FSH-only, added after v0.13.0, remove gate after 2027-05-10.
+    if (wakePrompt !== undefined && features.workspaceSnoozeWakePrompt !== true) {
+      throw new Error("Update the host to continue work when a snooze ends.");
+    }
+    const payload = await this.sendCorrelatedSessionRequest({
+      requestId,
+      message: {
+        type: "workspace.snooze.set.request",
+        workspaceId,
+        snoozed,
+        until: snoozed ? until : null,
+        ...(snoozed && wakePrompt !== undefined ? { wakePrompt } : {}),
+      },
+      responseType: "workspace.snooze.set.response",
+    });
+    if (!payload.accepted) {
+      throw new Error(payload.error ?? "setWorkspaceSnoozed rejected");
+    }
+    return { snoozedAt: payload.snoozedAt, snoozedUntil: payload.snoozedUntil };
+  }
+
   async inspectWorkspaceRecovery(
     workspaceId: string,
     requestId?: string,
