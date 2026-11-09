@@ -100,6 +100,17 @@ const PersistedWorkspaceRecordSchema = z.object({
     .nullable()
     .optional()
     .transform((value) => value ?? null),
+  // COMPAT(workspaceSnooze): FSH-only. Set while snoozed; snoozedUntil null means indefinitely.
+  snoozedAt: z
+    .string()
+    .nullable()
+    .optional()
+    .transform((value) => value ?? null),
+  snoozedUntil: z
+    .string()
+    .nullable()
+    .optional()
+    .transform((value) => value ?? null),
   labels: z.array(z.string()).optional(),
   untrustedSource: UntrustedWorkspaceSourceSchema.optional(),
   // Public discovery visibility. Contents retain their ordinary lifecycle.
@@ -677,6 +688,8 @@ export function createPersistedWorkspaceRecord(input: {
   archivedAt?: string | null;
   autoArchivedChangeRequestUrl?: string | null;
   pinnedAt?: string | null;
+  snoozedAt?: string | null;
+  snoozedUntil?: string | null;
   labels?: string[];
   untrustedSource?: UntrustedWorkspaceSource;
   background?: boolean;
@@ -694,6 +707,8 @@ export function createPersistedWorkspaceRecord(input: {
     archivedAt: input.archivedAt ?? null,
     autoArchivedChangeRequestUrl: input.autoArchivedChangeRequestUrl ?? null,
     pinnedAt: input.pinnedAt ?? null,
+    snoozedAt: input.snoozedAt ?? null,
+    snoozedUntil: input.snoozedUntil ?? null,
   });
 }
 

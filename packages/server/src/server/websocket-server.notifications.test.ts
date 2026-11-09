@@ -13,6 +13,12 @@ import { asInternals, createStub } from "./test-utils/class-mocks.js";
 import { createProviderSnapshotManagerStub } from "./test-utils/session-stubs.js";
 import type { PushNotificationSender, PushPayload } from "./push/index.js";
 import type { WorkspaceAutoName } from "./workspace-auto-name.js";
+import {
+  createPersistedWorkspaceRecord,
+  type PersistedWorkspaceRecord,
+  type WorkspaceRegistry,
+} from "./workspace-registry.js";
+import type { SnoozedPermissionBehavior } from "@getpaseo/protocol/messages";
 
 const WORKSPACE_ID = "workspace-1";
 
@@ -47,6 +53,7 @@ import { VoiceAssistantWebSocketServer } from "./websocket-server.js";
 
 interface WebSocketServerInternals {
   sessions: Map<unknown, unknown>;
+  workspaceRegistry: Pick<WorkspaceRegistry, "get" | "update">;
   broadcastAgentAttention(params: {
     agentId: string;
     reason: string;
@@ -83,7 +90,10 @@ class RecordingPushNotificationSender implements PushNotificationSender {
   }
 }
 
-function createServer(agentManagerOverrides?: Record<string, unknown>) {
+function createServer(
+  agentManagerOverrides?: Record<string, unknown>,
+  config: { snoozedPermission?: SnoozedPermissionBehavior } = {},
+) {
   const pushNotifications = new RecordingPushNotificationSender();
   const agentManager = {
     subscribe: vi.fn(() => () => {}),
@@ -104,6 +114,7 @@ function createServer(agentManagerOverrides?: Record<string, unknown>) {
   const daemonConfigStore = {
     onApply: vi.fn(() => () => {}),
     onChange: vi.fn(() => () => {}),
+    get: vi.fn(() => config),
   };
 
   const server = new VoiceAssistantWebSocketServer(
@@ -363,5 +374,79 @@ describe("VoiceAssistantWebSocketServer notification payloads", () => {
 
     expect(readAttentionRequiredMessage(ws).shouldNotify).toBe(false);
     expect(pushNotifications.sent).toEqual([]);
+  });
+
+  describe("snoozed workspaces", () => {
+    function useSnoozedWorkspace(server: VoiceAssistantWebSocketServer) {
+      let workspace: PersistedWorkspaceRecord = createPersistedWorkspaceRecord({
+        workspaceId: WORKSPACE_ID,
+        projectId: "project-1",
+        cwd: "/tmp/worktree",
+        kind: "worktree",
+        displayName: "worktree",
+        createdAt: "2026-11-09T08:00:00.000Z",
+        updatedAt: "2026-11-09T08:00:00.000Z",
+        snoozedAt: "2026-11-09T08:00:00.000Z",
+        snoozedUntil: null,
+      });
+      asInternals<WebSocketServerInternals>(server).workspaceRegistry = {
+        get: async () => workspace,
+        update: async (_id, updater) => {
+          workspace = updater(workspace);
+          return workspace;
+        },
+      };
+      return () => workspace;
+    }
+
+    it("neither pushes nor notifies in app when a turn finishes", async () => {
+      const { server, pushNotifications } = createServer();
+      useSnoozedWorkspace(server);
+      const ws = connectClient(server, {
+        deviceType: "web",
+        focusedAgentId: null,
+        lastActivityAt: new Date(),
+        appVisible: true,
+      });
+
+      await asInternals<WebSocketServerInternals>(server).broadcastAgentAttention({
+        agentId: "agent-snoozed",
+        provider: "claude",
+        reason: "finished",
+      });
+
+      expect(readAttentionRequiredMessage(ws).shouldNotify).toBe(false);
+      expect(pushNotifications.sent).toEqual([]);
+    });
+
+    it("wakes the workspace and pushes on a permission prompt by default", async () => {
+      const { server, pushNotifications } = createServer();
+      const current = useSnoozedWorkspace(server);
+      connectClient(server, null);
+
+      await asInternals<WebSocketServerInternals>(server).broadcastAgentAttention({
+        agentId: "agent-snoozed",
+        provider: "claude",
+        reason: "permission",
+      });
+
+      expect(current().snoozedAt).toBeNull();
+      expect(pushNotifications.sent).toHaveLength(1);
+    });
+
+    it("stays snoozed and quiet on a permission prompt when set to badge", async () => {
+      const { server, pushNotifications } = createServer(undefined, { snoozedPermission: "badge" });
+      const current = useSnoozedWorkspace(server);
+      connectClient(server, null);
+
+      await asInternals<WebSocketServerInternals>(server).broadcastAgentAttention({
+        agentId: "agent-snoozed",
+        provider: "claude",
+        reason: "permission",
+      });
+
+      expect(current().snoozedAt).toBe("2026-11-09T08:00:00.000Z");
+      expect(pushNotifications.sent).toEqual([]);
+    });
   });
 });

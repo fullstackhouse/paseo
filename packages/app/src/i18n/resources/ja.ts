@@ -1297,6 +1297,10 @@ export const ja: TranslationResources = {
     pinned: {
       title: "固定済み",
     },
+    snoozed: {
+      title: "スヌーズ中",
+      blocked: "あなたを待機中: {{count}}",
+    },
     host: {
       noHost: "ホストなし",
       switchTitle: "ホストを切り替え",
@@ -1392,6 +1396,14 @@ export const ja: TranslationResources = {
         hideFromSidebar: "サイドバーから非表示",
         archiving: "アーカイブ中...",
         hiding: "非表示にしています...",
+      },
+      snooze: {
+        title: "スヌーズ",
+        wake: "スヌーズを解除",
+        tonight: "今夜まで",
+        tomorrow: "明日の朝まで",
+        nextWeek: "来週まで",
+        indefinite: "解除するまで",
       },
       confirmations: {
         hideTitle: "ワークスペースを非表示にしますか？",
@@ -2942,6 +2954,16 @@ export const ja: TranslationResources = {
       },
       workspaces: {
         unavailable: "ワークスペースを管理するにはこのホストに接続してください",
+        snoozedPermission: {
+          title: "スヌーズ中のワークスペースと権限リクエスト",
+          hint: "スヌーズ中のワークスペースでエージェントが権限を求めたときの動作です。スヌーズ中はターン完了の通知は送られません。",
+          updateFailed: "スヌーズ設定を更新できませんでした",
+          options: {
+            wake: "起こして通知",
+            badge: "スヌーズ中に件数表示",
+            silent: "表示しない",
+          },
+        },
       },
       terminalProfiles: {
         unavailable: "ターミナルプロファイルを管理するにはこのホストに接続してください",

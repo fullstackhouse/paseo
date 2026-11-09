@@ -1319,6 +1319,10 @@ export const es: TranslationResources = {
     pinned: {
       title: "Anclados",
     },
+    snoozed: {
+      title: "Pospuestos",
+      blocked: "Esperándote: {{count}}",
+    },
     host: {
       noHost: "Sin anfitrión",
       switchTitle: "Cambiar de anfitrión",
@@ -1414,6 +1418,14 @@ export const es: TranslationResources = {
         hideFromSidebar: "Ocultar de la barra lateral",
         archiving: "Archivando...",
         hiding: "Ocultación...",
+      },
+      snooze: {
+        title: "Posponer",
+        wake: "Reactivar",
+        tonight: "Hasta esta noche",
+        tomorrow: "Hasta mañana por la mañana",
+        nextWeek: "Hasta la próxima semana",
+        indefinite: "Hasta que lo reactive",
       },
       confirmations: {
         hideTitle: "¿Ocultar espacio de trabajo?",
@@ -2973,6 +2985,16 @@ export const es: TranslationResources = {
       },
       workspaces: {
         unavailable: "Connect to this host to manage workspaces",
+        snoozedPermission: {
+          title: "Espacios pospuestos y solicitudes de permiso",
+          hint: "Qué ocurre cuando un agente en un espacio pospuesto pide permiso. Los turnos terminados nunca notifican mientras está pospuesto.",
+          updateFailed: "No se pudo actualizar el ajuste de posponer",
+          options: {
+            wake: "Reactivar y avisar",
+            badge: "Contar en Pospuestos",
+            silent: "Silencio",
+          },
+        },
       },
       terminalProfiles: {
         unavailable: "Connect to this host to manage terminal profiles",

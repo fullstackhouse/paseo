@@ -1,4 +1,10 @@
-import { useMemo, type ComponentProps, type PropsWithChildren, type ReactNode } from "react";
+import {
+  useCallback,
+  useMemo,
+  type ComponentProps,
+  type PropsWithChildren,
+  type ReactNode,
+} from "react";
 import { useTranslation } from "react-i18next";
 import { type PressableStateCallbackType } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
@@ -8,6 +14,8 @@ import {
   CircleCheck,
   Copy,
   MoreVertical,
+  AlarmClock,
+  AlarmClockOff,
   Pencil,
   Pin,
   PinOff,
@@ -45,6 +53,14 @@ import {
   WORKSPACE_LABEL_PAGE_ID,
   type WorkspaceLabelTarget,
 } from "@/workspace-labels/picker";
+import {
+  useSetWorkspaceSnooze,
+  useWorkspaceSnoozeMenuPages,
+  WORKSPACE_SNOOZE_PAGE_ID,
+  type SnoozeTarget,
+} from "@/workspace/snooze/menu";
+import { useHostFeature } from "@/runtime/host-features";
+import { useSessionStore } from "@/stores/session-store";
 
 const foregroundColorMapping = (theme: Theme) => ({ color: theme.colors.foreground });
 const foregroundMutedColorMapping = (theme: Theme) => ({
@@ -60,6 +76,8 @@ const ThemedCircleCheck = withUnistyles(CircleCheck);
 const ThemedPin = withUnistyles(Pin);
 const ThemedPinOff = withUnistyles(PinOff);
 const ThemedTag = withUnistyles(Tag);
+const ThemedAlarmClock = withUnistyles(AlarmClock);
+const ThemedAlarmClockOff = withUnistyles(AlarmClockOff);
 
 const copyLeadingIcon = <ThemedCopy size={14} uniProps={foregroundMutedColorMapping} />;
 const renameLeadingIcon = <ThemedPencil size={14} uniProps={foregroundMutedColorMapping} />;
@@ -70,6 +88,8 @@ const markAsUnreadLeadingIcon = <ThemedCircle size={14} uniProps={foregroundMute
 const archiveLeadingIcon = <ThemedArchive size={14} uniProps={foregroundMutedColorMapping} />;
 const pinLeadingIcon = <ThemedPin size={14} uniProps={foregroundMutedColorMapping} />;
 const unpinLeadingIcon = <ThemedPinOff size={14} uniProps={foregroundMutedColorMapping} />;
+const snoozeLeadingIcon = <ThemedAlarmClock size={14} uniProps={foregroundMutedColorMapping} />;
+const wakeLeadingIcon = <ThemedAlarmClockOff size={14} uniProps={foregroundMutedColorMapping} />;
 
 const triggerIconProps = densityIconProps("sm", foregroundMutedColorMapping);
 const triggerIconHoveredProps = densityIconProps("sm", foregroundColorMapping);
@@ -113,6 +133,35 @@ interface SidebarWorkspaceMenuItemsProps extends Omit<
 
 type MenuSurface = "context" | "dropdown";
 
+// Read here rather than threaded through every row: the menu already knows which workspace it is.
+function useWorkspaceSnoozeTarget(
+  serverId: string | undefined,
+  workspaceId: string | undefined,
+): { target: SnoozeTarget | null; isSnoozed: boolean } {
+  const supported = useHostFeature(serverId, "workspaceSnooze");
+  const isSnoozed = useSessionStore((state) =>
+    serverId && workspaceId
+      ? state.sessions[serverId]?.workspaces?.get(workspaceId)?.snoozedAt != null
+      : false,
+  );
+  const target = useMemo(
+    () => (supported && serverId && workspaceId ? { serverId, workspaceId } : null),
+    [supported, serverId, workspaceId],
+  );
+  return { target, isSnoozed };
+}
+
+function useWorkspaceMenuPages(
+  serverId: string | undefined,
+  workspaceId: string | undefined,
+  labelTarget: WorkspaceLabelTarget | null,
+) {
+  const labelPages = useWorkspaceLabelMenuPages(labelTarget);
+  const { target } = useWorkspaceSnoozeTarget(serverId, workspaceId);
+  const snoozePages = useWorkspaceSnoozeMenuPages(target);
+  return useMemo(() => [...labelPages, ...snoozePages], [labelPages, snoozePages]);
+}
+
 function WorkspaceMenuItem({
   surface,
   children,
@@ -154,6 +203,11 @@ function SidebarWorkspaceMenuItems({
     () => <ThemedTag size={14} uniProps={foregroundMutedColorMapping} />,
     [],
   );
+  const { target: snoozeTarget, isSnoozed } = useWorkspaceSnoozeTarget(serverId, workspaceId);
+  const setSnooze = useSetWorkspaceSnooze();
+  const handleWake = useCallback(() => {
+    if (snoozeTarget) setSnooze({ target: snoozeTarget, snoozed: false, until: null });
+  }, [setSnooze, snoozeTarget]);
 
   return (
     <>
@@ -207,7 +261,8 @@ function SidebarWorkspaceMenuItems({
           Mark as unread
         </WorkspaceMenuItem>
       ) : null}
-      {onTogglePin ? (
+      {/* A snoozed workspace cannot sit in Pinned; wake it first. */}
+      {onTogglePin && !isSnoozed ? (
         <WorkspaceMenuItem
           surface={surface}
           testID={`sidebar-workspace-menu-pin-${workspaceKey}`}
@@ -216,6 +271,25 @@ function SidebarWorkspaceMenuItems({
         >
           {isPinned ? t("sidebar.workspace.actions.unpin") : t("sidebar.workspace.actions.pin")}
         </WorkspaceMenuItem>
+      ) : null}
+      {snoozeTarget && isSnoozed ? (
+        <WorkspaceMenuItem
+          surface={surface}
+          testID={`sidebar-workspace-menu-wake-${workspaceKey}`}
+          leading={wakeLeadingIcon}
+          onSelect={handleWake}
+        >
+          {t("sidebar.workspace.snooze.wake")}
+        </WorkspaceMenuItem>
+      ) : null}
+      {snoozeTarget && !isSnoozed ? (
+        <DropdownMenuSubTrigger
+          id={WORKSPACE_SNOOZE_PAGE_ID}
+          leading={snoozeLeadingIcon}
+          testID={`sidebar-workspace-menu-snooze-${workspaceKey}`}
+        >
+          {t("sidebar.workspace.snooze.title")}
+        </DropdownMenuSubTrigger>
       ) : null}
       {serverId && workspaceId ? (
         <DropdownMenuSubTrigger
@@ -275,7 +349,7 @@ export function SidebarWorkspaceMenu({
       serverId && workspaceId ? { serverId, workspaceId, labels: workspaceLabels ?? [] } : null,
     [serverId, workspaceId, workspaceLabels],
   );
-  const pages = useWorkspaceLabelMenuPages(workspaceTarget);
+  const pages = useWorkspaceMenuPages(serverId, workspaceId, workspaceTarget);
   return (
     <DropdownMenu compactMode="sheet" open={open} onOpenChange={onOpenChange}>
       <DropdownMenuTrigger
@@ -389,7 +463,11 @@ export function SidebarWorkspaceContextMenu({
     }),
     [workspace],
   );
-  const pages = useWorkspaceLabelMenuPages(workspaceTarget);
+  const pages = useWorkspaceMenuPages(
+    workspaceTarget.serverId,
+    workspaceTarget.workspaceId,
+    workspaceTarget,
+  );
 
   return (
     <ContextMenu open={contextMenuOpen} onOpenChange={onContextMenuOpenChange}>

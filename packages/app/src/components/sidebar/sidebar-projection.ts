@@ -5,6 +5,7 @@ import {
   type PinnedSidebarGroups,
   type PinnedSidebarKeys,
 } from "@/hooks/use-sidebar-pins";
+import { splitSnoozedSidebarGroups, type SnoozedSidebarKeys } from "@/hooks/use-sidebar-snoozes";
 import type {
   SidebarProjectEntry,
   SidebarWorkspaceEntry,
@@ -23,6 +24,8 @@ import { statusWorkspaceGroups, type SidebarWorkspaceGroup } from "./sidebar-lab
 
 export interface SidebarProjection {
   pinnedGroups: PinnedSidebarGroups;
+  /** Rows for the Snoozed section at the bottom, soonest to wake first. */
+  snoozedWorkspaces: SidebarWorkspaceEntry[];
   workspaceGroups: SidebarWorkspaceGroup[];
   /**
    * The project icons this projection needs fetched, keyed by `projectViewKey` — one per project,
@@ -40,6 +43,8 @@ export interface SidebarProjectionInput {
   projects: SidebarProjectEntry[];
   pinnedKeys: PinnedSidebarKeys;
   pinnedWorkspaceOrder: string[];
+  snoozedKeys: SnoozedSidebarKeys;
+  snoozedCollapsed: boolean;
   workspaceEntriesByKey: ReadonlyMap<string, SidebarWorkspaceEntry>;
   projectNamesByViewKey: Map<string, string>;
   groupMode: SidebarGroupMode;
@@ -50,14 +55,25 @@ export interface SidebarProjectionInput {
 }
 
 export function buildSidebarProjection(input: SidebarProjectionInput): SidebarProjection {
-  const pinnedGroups = splitPinnedSidebarGroups({
+  // Snoozed chats come out first, so neither Pinned nor any group below lists them.
+  const { snoozedChats, awakeProjects } = splitSnoozedSidebarGroups({
     projects: input.projects,
+    keys: input.snoozedKeys,
+  });
+  const snoozedWorkspaces = snoozedChats.flatMap((workspace) => {
+    const entry = input.workspaceEntriesByKey.get(workspace.workspaceKey);
+    return entry ? [entry] : [];
+  });
+  const pinnedGroups = splitPinnedSidebarGroups({
+    projects: awakeProjects,
     keys: input.pinnedKeys,
     pinnedWorkspaceOrder: input.pinnedWorkspaceOrder,
   });
   const pinnedWorkspaceKeys = new Set(input.pinnedKeys.pinnedWorkspaceKeys);
   const unpinnedWorkspaces = Array.from(input.workspaceEntriesByKey.values()).filter(
-    (workspace) => !pinnedWorkspaceKeys.has(workspace.workspaceKey),
+    (workspace) =>
+      !pinnedWorkspaceKeys.has(workspace.workspaceKey) &&
+      !input.snoozedKeys.has(workspace.workspaceKey),
   );
   // One switch decides both what the list groups by and what the keyboard shortcuts walk, so the
   // two cannot disagree and a new grouping mode is a compile error here rather than a silent
@@ -83,9 +99,13 @@ export function buildSidebarProjection(input: SidebarProjectionInput): SidebarPr
       })),
     );
   }
+  if (!input.snoozedCollapsed) {
+    sections.push({ workspaces: snoozedChats });
+  }
 
   return {
     pinnedGroups,
+    snoozedWorkspaces,
     workspaceGroups,
     projectIconTargets: resolveSidebarProjectIconTargets(input.projects),
     shortcutModel: buildSidebarShortcutSections({ sections }),

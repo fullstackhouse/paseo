@@ -79,6 +79,7 @@ interface SidebarSharedProps {
   workspaceGroups: SidebarWorkspaceGroup[];
   projectIconTargets: SidebarProjectIconTarget[];
   pinnedGroups: PinnedSidebarGroups;
+  snoozedWorkspaces: SidebarWorkspaceEntry[];
   projects: SidebarProjectEntry[];
   hasProjectsBeforeFilter: boolean;
   hasActiveProjectFilter: boolean;
@@ -138,6 +139,7 @@ export const LeftSidebar = memo(function LeftSidebar({ active }: { active: boole
     workspaceGroups,
     projectIconTargets,
     pinnedGroups,
+    snoozedWorkspaces,
     collapsedProjectKeys,
     toggleProjectCollapsed,
     groupMode,
@@ -220,6 +222,7 @@ export const LeftSidebar = memo(function LeftSidebar({ active }: { active: boole
     workspaceGroups,
     projectIconTargets,
     pinnedGroups,
+    snoozedWorkspaces,
     projects,
     hasProjectsBeforeFilter,
     hasActiveProjectFilter: resolvedProjectFilters.length > 0,
@@ -510,6 +513,7 @@ function MobileSidebar({
   workspaceGroups,
   projectIconTargets,
   pinnedGroups,
+  snoozedWorkspaces,
   projects,
   hasProjectsBeforeFilter,
   hasActiveProjectFilter,
@@ -586,6 +590,7 @@ function MobileSidebar({
             workspaceGroups={workspaceGroups}
             projectIconTargets={projectIconTargets}
             pinnedGroups={pinnedGroups}
+            snoozedWorkspaces={snoozedWorkspaces}
             projects={projects}
             hasProjectsBeforeFilter={hasProjectsBeforeFilter}
             hasActiveProjectFilter={hasActiveProjectFilter}
@@ -619,6 +624,7 @@ function DesktopSidebar({
   workspaceGroups,
   projectIconTargets,
   pinnedGroups,
+  snoozedWorkspaces,
   projects,
   hasProjectsBeforeFilter,
   hasActiveProjectFilter,
@@ -768,6 +774,7 @@ function DesktopSidebar({
             workspaceGroups={workspaceGroups}
             projectIconTargets={projectIconTargets}
             pinnedGroups={pinnedGroups}
+            snoozedWorkspaces={snoozedWorkspaces}
             projects={projects}
             hasProjectsBeforeFilter={hasProjectsBeforeFilter}
             hasActiveProjectFilter={hasActiveProjectFilter}

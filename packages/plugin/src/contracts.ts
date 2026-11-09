@@ -34,6 +34,10 @@ export interface PluginWorkspaceSnapshot {
   readonly status: "needs_input" | "failed" | "running" | "attention" | "done";
   readonly statusEnteredAt: string | null;
   readonly archivingAt: string | null;
+  /** Set while the user has snoozed the workspace; plugins should leave it out of counters. */
+  readonly snoozedAt: string | null;
+  /** When the snooze ends; null means until the user wakes it. */
+  readonly snoozedUntil: string | null;
   readonly diffStat: { readonly additions: number; readonly deletions: number } | null;
 }
 

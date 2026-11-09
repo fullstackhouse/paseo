@@ -3565,6 +3565,33 @@ export class DaemonClient {
     return { background: payload.background };
   }
 
+  /** Snoozes until `until` (ISO), or indefinitely when null; `snoozed: false` wakes it. */
+  async setWorkspaceSnoozed(
+    workspaceId: string,
+    snoozed: boolean,
+    until: string | null = null,
+    requestId?: string,
+  ): Promise<{ snoozedAt: string | null; snoozedUntil: string | null }> {
+    // COMPAT(workspaceSnooze): FSH-only, added after v0.13.0, remove gate after 2027-05-09.
+    if (this.lastServerInfoMessage?.features?.workspaceSnooze !== true) {
+      throw new Error("Update the host to snooze workspaces.");
+    }
+    const payload = await this.sendCorrelatedSessionRequest({
+      requestId,
+      message: {
+        type: "workspace.snooze.set.request",
+        workspaceId,
+        snoozed,
+        until: snoozed ? until : null,
+      },
+      responseType: "workspace.snooze.set.response",
+    });
+    if (!payload.accepted) {
+      throw new Error(payload.error ?? "setWorkspaceSnoozed rejected");
+    }
+    return { snoozedAt: payload.snoozedAt, snoozedUntil: payload.snoozedUntil };
+  }
+
   async inspectWorkspaceRecovery(
     workspaceId: string,
     requestId?: string,
