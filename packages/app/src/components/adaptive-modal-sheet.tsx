@@ -817,7 +817,7 @@ export function AdaptiveModalSheet({
         ref={setWebOverlayScope}
         style={desktopCardStyle}
         role="dialog"
-        accessibilityLabel={header.title}
+        accessibilityLabel={header?.title}
         aria-modal
         tabIndex={-1}
       >
