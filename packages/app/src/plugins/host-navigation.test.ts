@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { buildHostAgentDetailRoute, buildHostWorkspaceRoute } from "@/utils/host-routes";
 import { createPluginHostNavigation } from "./host-navigation-model";
 import { useSidebarViewStore } from "../stores/sidebar-view-store";
+import type { InstalledPlugin } from "./types";
 
 describe("plugin host navigation", () => {
   function setup(electron = true) {
@@ -9,6 +10,11 @@ describe("plugin host navigation", () => {
     const browsers: string[] = [];
     const focusedHosts: string[] = [];
     const workspaces = new Set(["selected:one", "remote:two"]);
+    const screens: unknown[] = [];
+    const plugins = [
+      { serverId: "selected", id: "inbox", surfaces: [{ id: "review" }] },
+      { serverId: "remote", id: "inbox", surfaces: [{ id: "review" }] },
+    ] as unknown as InstalledPlugin[];
     const navigation = createPluginHostNavigation("selected", {
       browserAvailable: electron,
       isHostRegistered: (serverId: string) => serverId === "selected" || serverId === "remote",
@@ -26,13 +32,55 @@ describe("plugin host navigation", () => {
         focusedHosts.push(serverId);
         useSidebarViewStore.getState().focusHost(serverId);
       },
+      findPlugin: ({ serverId, pluginId }) =>
+        plugins.find((plugin) => plugin.serverId === serverId && plugin.id === pluginId) ?? null,
+      openScreen: (input) => screens.push(input),
       createBrowser: ({ initialUrl }) => {
         browsers.push(initialUrl);
         return { browserId: `browser-${browsers.length}` };
       },
     });
-    return { navigation, destinations, browsers, workspaces, focusedHosts };
+    return { navigation, destinations, browsers, workspaces, focusedHosts, screens };
   }
+
+  it("opens another plugin's screen on the selected or explicit host", () => {
+    const { navigation, screens } = setup();
+    navigation.openPluginScreen!({
+      pluginId: "inbox",
+      screenId: "review",
+      params: { repo: "acme/shop", number: "12" },
+    });
+    navigation.openPluginScreen!({ pluginId: "inbox", screenId: "review", serverId: "remote" });
+    expect(screens).toEqual([
+      {
+        serverId: "selected",
+        pluginId: "inbox",
+        screenId: "review",
+        params: { repo: "acme/shop", number: "12" },
+      },
+      { serverId: "remote", pluginId: "inbox", screenId: "review", params: {} },
+    ]);
+  });
+
+  it("reports and refuses screens that are not on the host", () => {
+    const { navigation, screens } = setup();
+    expect(navigation.hasPluginScreen!({ pluginId: "inbox", screenId: "review" })).toBe(true);
+    for (const target of [
+      { pluginId: "missing", screenId: "review" },
+      { pluginId: "inbox", screenId: "missing" },
+      { pluginId: "inbox", screenId: "review", serverId: "unknown" },
+    ]) {
+      expect(navigation.hasPluginScreen!(target)).toBe(false);
+      expect(() => navigation.openPluginScreen!(target)).toThrow("Plugin screen is unavailable");
+    }
+    expect(() =>
+      navigation.openPluginScreen!({
+        pluginId: "inbox",
+        screenId: "review",
+        params: { number: 12 } as unknown as Record<string, string>,
+      }),
+    ).toThrow("must be a string");
+    expect(screens).toEqual([]);
 
   it("focuses the destination host and clears filters that could hide its workspace", () => {
     useSidebarViewStore.setState({
