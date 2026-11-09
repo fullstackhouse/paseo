@@ -1403,7 +1403,7 @@ export const ru: TranslationResources = {
       },
       snooze: {
         title: "Отложить",
-        continueTitle: "Отложить и продолжить в…",
+        continueToggle: "Продолжить работу по окончании",
         wake: "Вернуть",
         tonight: "До вечера",
         tomorrow: "До завтрашнего утра",

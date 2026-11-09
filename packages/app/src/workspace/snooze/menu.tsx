@@ -1,15 +1,13 @@
-import { useCallback, useMemo, type ReactElement } from "react";
+import { useCallback, useMemo, useState, type ReactElement } from "react";
 import { useTranslation } from "react-i18next";
 import { useMutation } from "@tanstack/react-query";
-import { MenuItem, type MenuPageDefinition } from "@/components/ui/menu";
+import { MenuItem, MenuSeparator, type MenuPageDefinition } from "@/components/ui/menu";
 import { useToast } from "@/contexts/toast-context";
 import { getHostRuntimeStore } from "@/runtime/host-runtime";
 import { snoozePresets, type SnoozePreset, type SnoozePresetId } from "./presets";
 
 /** The `MenuSubTrigger` on a workspace's menu that opens the snooze choices. */
 export const WORKSPACE_SNOOZE_PAGE_ID = "workspaceSnooze";
-/** The `MenuSubTrigger` for snoozing and having the agent continue when the snooze ends. */
-export const WORKSPACE_SNOOZE_CONTINUE_PAGE_ID = "workspaceSnoozeContinue";
 
 /** What the agent hears when a "Snooze and continue" ends. Agent-facing, so not translated. */
 const CONTINUE_PROMPT = "Continue where you left off.";
@@ -62,34 +60,26 @@ export function useWorkspaceSnoozeMenuPages(
   const { t } = useTranslation();
   return useMemo(() => {
     if (!target) return [];
-    const pages: MenuPageDefinition[] = [
+    return [
       {
         id: WORKSPACE_SNOOZE_PAGE_ID,
         title: t("sidebar.workspace.snooze.title"),
-        content: <WorkspaceSnoozePage target={target} continueWork={false} />,
+        content: <WorkspaceSnoozePage target={target} />,
       },
     ];
-    if (target.canContinue) {
-      pages.push({
-        id: WORKSPACE_SNOOZE_CONTINUE_PAGE_ID,
-        title: t("sidebar.workspace.snooze.continueTitle"),
-        content: <WorkspaceSnoozePage target={target} continueWork />,
-      });
-    }
-    return pages;
   }, [t, target]);
 }
 
-// "Snooze and continue" lists only timed presets: an open-ended snooze has no moment to resume at.
-function WorkspaceSnoozePage({
-  target,
-  continueWork,
-}: {
-  target: SnoozeTarget;
-  continueWork: boolean;
-}): ReactElement {
+/**
+ * One page for both kinds of snooze. "Continue work when it ends" toggles in place and keeps the
+ * menu open; while it is on, "Until I wake it" goes away: an open-ended snooze has no moment to
+ * resume at.
+ */
+function WorkspaceSnoozePage({ target }: { target: SnoozeTarget }): ReactElement {
   const { t, i18n } = useTranslation();
   const setSnooze = useSetWorkspaceSnooze();
+  const [continueWork, setContinueWork] = useState(false);
+  const toggleContinueWork = useCallback(() => setContinueWork((value) => !value), []);
   const snoozeUntil = useCallback(
     (until: string | null) =>
       setSnooze({
@@ -116,6 +106,20 @@ function WorkspaceSnoozePage({
   );
   return (
     <>
+      {target.canContinue ? (
+        <>
+          <MenuItem
+            selected={continueWork}
+            showSelectedCheck
+            closeOnSelect={false}
+            onSelect={toggleContinueWork}
+            testID="workspace-snooze-continue-toggle"
+          >
+            {t("sidebar.workspace.snooze.continueToggle")}
+          </MenuItem>
+          <MenuSeparator />
+        </>
+      ) : null}
       {presets.map((preset) => (
         <SnoozePresetRow
           key={preset.id}
@@ -123,7 +127,7 @@ function WorkspaceSnoozePage({
           label={t(PRESET_LABEL_KEYS[preset.id])}
           description={preset.until ? formatter.format(new Date(preset.until)) : undefined}
           onSnooze={snoozeUntil}
-          testIdPrefix={continueWork ? "continue-" : ""}
+          alignWithToggle={target.canContinue}
         />
       ))}
     </>
@@ -135,20 +139,22 @@ function SnoozePresetRow({
   label,
   description,
   onSnooze,
-  testIdPrefix,
+  alignWithToggle,
 }: {
   preset: SnoozePreset;
   label: string;
   description: string | undefined;
   onSnooze: (until: string | null) => void;
-  testIdPrefix: string;
+  /** Reserve the toggle's check column so every label on the page starts on one rail. */
+  alignWithToggle: boolean;
 }): ReactElement {
   const handleSelect = useCallback(() => onSnooze(preset.until), [onSnooze, preset.until]);
   return (
     <MenuItem
       description={description}
+      showSelectedCheck={alignWithToggle}
       onSelect={handleSelect}
-      testID={`workspace-snooze-${testIdPrefix}${preset.id}`}
+      testID={`workspace-snooze-${preset.id}`}
     >
       {label}
     </MenuItem>

@@ -1415,7 +1415,7 @@ export const fr: TranslationResources = {
       },
       snooze: {
         title: "Mettre en veille",
-        continueTitle: "Mettre en veille et reprendre à…",
+        continueToggle: "Reprendre le travail à la fin",
         wake: "Réveiller",
         tonight: "Jusqu’à ce soir",
         tomorrow: "Jusqu’à demain matin",

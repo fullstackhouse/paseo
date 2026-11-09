@@ -16,7 +16,6 @@ import {
   MoreVertical,
   AlarmClock,
   AlarmClockOff,
-  AlarmClockPlus,
   Pencil,
   Pin,
   PinOff,
@@ -57,7 +56,6 @@ import {
 import {
   useSetWorkspaceSnooze,
   useWorkspaceSnoozeMenuPages,
-  WORKSPACE_SNOOZE_CONTINUE_PAGE_ID,
   WORKSPACE_SNOOZE_PAGE_ID,
   type SnoozeTarget,
 } from "@/workspace/snooze/menu";
@@ -80,7 +78,6 @@ const ThemedPinOff = withUnistyles(PinOff);
 const ThemedTag = withUnistyles(Tag);
 const ThemedAlarmClock = withUnistyles(AlarmClock);
 const ThemedAlarmClockOff = withUnistyles(AlarmClockOff);
-const ThemedAlarmClockPlus = withUnistyles(AlarmClockPlus);
 
 const copyLeadingIcon = <ThemedCopy size={14} uniProps={foregroundMutedColorMapping} />;
 const renameLeadingIcon = <ThemedPencil size={14} uniProps={foregroundMutedColorMapping} />;
@@ -92,9 +89,6 @@ const archiveLeadingIcon = <ThemedArchive size={14} uniProps={foregroundMutedCol
 const pinLeadingIcon = <ThemedPin size={14} uniProps={foregroundMutedColorMapping} />;
 const unpinLeadingIcon = <ThemedPinOff size={14} uniProps={foregroundMutedColorMapping} />;
 const snoozeLeadingIcon = <ThemedAlarmClock size={14} uniProps={foregroundMutedColorMapping} />;
-const snoozeContinueLeadingIcon = (
-  <ThemedAlarmClockPlus size={14} uniProps={foregroundMutedColorMapping} />
-);
 const wakeLeadingIcon = <ThemedAlarmClockOff size={14} uniProps={foregroundMutedColorMapping} />;
 
 const triggerIconProps = densityIconProps("sm", foregroundMutedColorMapping);
@@ -314,7 +308,7 @@ function SidebarWorkspaceMenuItems({
   );
 }
 
-// Wake for a snoozed workspace; otherwise the two ways to snooze it.
+// Wake for a snoozed workspace; otherwise the Snooze page.
 function WorkspaceSnoozeMenuItems({
   surface,
   workspaceKey,
@@ -345,24 +339,13 @@ function WorkspaceSnoozeMenuItems({
     );
   }
   return (
-    <>
-      <DropdownMenuSubTrigger
-        id={WORKSPACE_SNOOZE_PAGE_ID}
-        leading={snoozeLeadingIcon}
-        testID={`sidebar-workspace-menu-snooze-${workspaceKey}`}
-      >
-        {t("sidebar.workspace.snooze.title")}
-      </DropdownMenuSubTrigger>
-      {target.canContinue ? (
-        <DropdownMenuSubTrigger
-          id={WORKSPACE_SNOOZE_CONTINUE_PAGE_ID}
-          leading={snoozeContinueLeadingIcon}
-          testID={`sidebar-workspace-menu-snooze-continue-${workspaceKey}`}
-        >
-          {t("sidebar.workspace.snooze.continueTitle")}
-        </DropdownMenuSubTrigger>
-      ) : null}
-    </>
+    <DropdownMenuSubTrigger
+      id={WORKSPACE_SNOOZE_PAGE_ID}
+      leading={snoozeLeadingIcon}
+      testID={`sidebar-workspace-menu-snooze-${workspaceKey}`}
+    >
+      {t("sidebar.workspace.snooze.title")}
+    </DropdownMenuSubTrigger>
   );
 }
 
