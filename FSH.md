@@ -41,6 +41,7 @@ temporary by design: every patch is meant to go upstream and then drop out of `f
 - Fork-only (upstreamable): archiving a worktree workspace with an open pull request asks first, like uncommitted changes and unpushed commits already do. The dialog names the PR (`Open pull request #42`, `Open merge request !7` on GitLab); merged and closed PRs archive without asking
 
 - FSH-only (not upstream yet): composer plugins can opt into a tab in the existing resizable Explorer sidebar on desktop; clicking the badge shows or closes it. Existing plugins retain anchored popovers, and compact layouts retain bottom sheets. Asks opts in.
+- FSH-only (upstreamable): a schedule's **View runs** menu item lists its runs newest first, each with its status, start time, how long it took and the error if it failed. Tapping a run opens the agent it started
 - FSH-only (upstreamable): **Collapse turns** is the chat display for every install, not just new ones. A one-time settings migration moves existing installs off the Full or Collapse tool calls value they were migrated to in v0.14; picking another display afterwards sticks
 
 Keep this list in sync with what's merged into `fsh`.
