@@ -70,6 +70,7 @@ import {
 import { useSidebarOrderStore } from "@/stores/sidebar-order-store";
 import { useSidebarViewStore, type SidebarGroupMode } from "@/stores/sidebar-view-store";
 import { useShowShortcutBadges } from "@/hooks/use-show-shortcut-badges";
+import { SidebarSnoozedSection } from "@/components/sidebar/sidebar-snoozed-section";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -227,6 +228,8 @@ interface SidebarWorkspaceListProps {
   /** What `useProjectIcons` is asked for, straight from the projection. See `SidebarProjection`. */
   projectIconTargets: SidebarProjectIconTarget[];
   pinnedGroups: PinnedSidebarGroups;
+  /** Rows for the Snoozed section, rendered at the bottom in every grouping mode. */
+  snoozedWorkspaces: SidebarWorkspaceEntry[];
   projects: SidebarProjectEntry[];
   hasProjectsBeforeFilter: boolean;
   /** Whether a project filter is actually being applied — the resolved list, not the stored one. */
@@ -1955,6 +1958,7 @@ export function SidebarWorkspaceList({
   workspaceGroups,
   projectIconTargets,
   pinnedGroups,
+  snoozedWorkspaces,
   projects,
   hasProjectsBeforeFilter,
   hasActiveProjectFilter,
@@ -2024,6 +2028,38 @@ export function SidebarWorkspaceList({
   // whenever a local filter empties an otherwise populated directory, so users can
   // reach the display menu to reveal their work again.
   const sidebarFilterEmpty = hasProjectsBeforeFilter && projects.length === 0;
+  const showShortcutBadges = useShowShortcutBadges();
+  const snoozedSection = useMemo(
+    () => (
+      <SidebarSnoozedSection
+        workspaces={snoozedWorkspaces}
+        projectIconByProjectViewKey={projectIconByProjectViewKey}
+        hostBadgeByServerId={hostBadgeByServerId}
+        shortcutIndexByWorkspaceKey={shortcutIndexByWorkspaceKey}
+        showShortcutBadges={showShortcutBadges}
+        supportsPinningByServerId={supportsPinningByServerId}
+        onToggleWorkspacePin={onToggleWorkspacePin}
+      />
+    ),
+    [
+      hostBadgeByServerId,
+      onToggleWorkspacePin,
+      projectIconByProjectViewKey,
+      shortcutIndexByWorkspaceKey,
+      showShortcutBadges,
+      snoozedWorkspaces,
+      supportsPinningByServerId,
+    ],
+  );
+  const projectModeFooter = useMemo(
+    () => (
+      <>
+        {snoozedSection}
+        {listFooterComponent}
+      </>
+    ),
+    [listFooterComponent, snoozedSection],
+  );
 
   // Project mode is the one that keeps its project headers; every other grouping mode is a flat
   // list of grouped rows, so a new mode lands in the grouped branch rather than silently in this
@@ -2042,6 +2078,7 @@ export function SidebarWorkspaceList({
         onToggleWorkspacePin={onToggleWorkspacePin}
         onPinnedWorkspaceReorder={handlePinnedWorkspaceReorder}
         listHeaderComponent={listHeaderComponent}
+        listFooterComponent={snoozedSection}
         sidebarFilterEmpty={sidebarFilterEmpty}
         parentGestureRef={parentGestureRef}
         dragGestureHostActive={dragGestureHostActive}
@@ -2058,7 +2095,7 @@ export function SidebarWorkspaceList({
         onWorkspacePress={onWorkspacePress}
         onAddProject={onAddProject}
         onImportSession={onImportSession}
-        listFooterComponent={listFooterComponent}
+        listFooterComponent={projectModeFooter}
         listHeaderComponent={listHeaderComponent}
         sidebarFilterEmpty={sidebarFilterEmpty}
         hasActiveProjectFilter={hasActiveProjectFilter}
@@ -2094,6 +2131,7 @@ function SidebarGroupedModeList({
   onToggleWorkspacePin,
   onPinnedWorkspaceReorder,
   listHeaderComponent,
+  listFooterComponent,
   sidebarFilterEmpty,
   parentGestureRef,
   dragGestureHostActive,
@@ -2109,6 +2147,7 @@ function SidebarGroupedModeList({
   onToggleWorkspacePin: ToggleSidebarWorkspacePin;
   onPinnedWorkspaceReorder: (workspaces: SidebarWorkspacePlacement[]) => void;
   listHeaderComponent?: ReactElement | null;
+  listFooterComponent?: ReactElement | null;
   sidebarFilterEmpty: boolean;
   parentGestureRef?: MutableRefObject<GestureType | undefined>;
   dragGestureHostActive?: boolean;
@@ -2136,6 +2175,7 @@ function SidebarGroupedModeList({
       onToggleWorkspacePin={onToggleWorkspacePin}
       onPinnedWorkspaceReorder={onPinnedWorkspaceReorder}
       listHeaderComponent={listHeaderComponent}
+      listFooterComponent={listFooterComponent}
       sidebarFilterEmpty={sidebarFilterEmpty}
       parentGestureRef={parentGestureRef}
       dragGestureHostActive={dragGestureHostActive}
@@ -2168,6 +2208,7 @@ function ProjectModeList({
   onPinnedWorkspaceReorder,
 }: Omit<
   SidebarWorkspaceListProps,
+  | "snoozedWorkspaces"
   | "workspaceGroups"
   | "projectIconTargets"
   | "groupMode"

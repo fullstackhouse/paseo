@@ -23,6 +23,8 @@ export function createPluginWorkspaceSnapshot(
     status: workspace.status,
     statusEnteredAt: workspace.statusEnteredAt?.toISOString() ?? null,
     archivingAt: workspace.archivingAt,
+    snoozedAt: workspace.snoozedAt ?? null,
+    snoozedUntil: workspace.snoozedUntil ?? null,
     diffStat,
   });
   workspaceSnapshots.set(workspace, snapshot);

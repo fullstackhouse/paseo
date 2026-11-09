@@ -1312,6 +1312,10 @@ export const fr: TranslationResources = {
     pinned: {
       title: "Épinglés",
     },
+    snoozed: {
+      title: "En veille",
+      blocked: "En attente de vous : {{count}}",
+    },
     host: {
       noHost: "Aucun hôte",
       switchTitle: "Changer d’hôte",
@@ -1407,6 +1411,14 @@ export const fr: TranslationResources = {
         hideFromSidebar: "Masquer de la barre latérale",
         archiving: "Archivage…",
         hiding: "Masquage…",
+      },
+      snooze: {
+        title: "Mettre en veille",
+        wake: "Réveiller",
+        tonight: "Jusqu’à ce soir",
+        tomorrow: "Jusqu’à demain matin",
+        nextWeek: "Jusqu’à la semaine prochaine",
+        indefinite: "Jusqu’à ce que je le réveille",
       },
       confirmations: {
         hideTitle: "Masquer l’espace de travail ?",
@@ -2902,6 +2914,16 @@ export const fr: TranslationResources = {
       },
       workspaces: {
         unavailable: "Connectez-vous à cet hôte pour gérer les espaces de travail",
+        snoozedPermission: {
+          title: "Espaces en veille et demandes d’autorisation",
+          hint: "Ce qui se passe quand un agent d’un espace en veille demande une autorisation. Les tours terminés ne notifient jamais pendant la veille.",
+          updateFailed: "Impossible de mettre à jour le réglage de veille",
+          options: {
+            wake: "Réveiller et notifier",
+            badge: "Compter dans En veille",
+            silent: "Silencieux",
+          },
+        },
       },
       terminalProfiles: {
         unavailable: "Connectez-vous à cet hôte pour gérer les profils de terminal",

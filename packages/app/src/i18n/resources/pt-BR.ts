@@ -1308,6 +1308,10 @@ export const ptBR: TranslationResources = {
     pinned: {
       title: "Fixados",
     },
+    snoozed: {
+      title: "Adiados",
+      blocked: "Esperando você: {{count}}",
+    },
     host: {
       noHost: "Nenhum host",
       switchTitle: "Trocar host",
@@ -1403,6 +1407,14 @@ export const ptBR: TranslationResources = {
         hideFromSidebar: "Ocultar da barra lateral",
         archiving: "Arquivando...",
         hiding: "Ocultando...",
+      },
+      snooze: {
+        title: "Adiar",
+        wake: "Retomar",
+        tonight: "Até hoje à noite",
+        tomorrow: "Até amanhã de manhã",
+        nextWeek: "Até a próxima semana",
+        indefinite: "Até eu retomar",
       },
       confirmations: {
         hideTitle: "Ocultar workspace?",
@@ -2882,6 +2894,16 @@ export const ptBR: TranslationResources = {
       },
       workspaces: {
         unavailable: "Conecte-se a este host para gerenciar workspaces",
+        snoozedPermission: {
+          title: "Espaços adiados e pedidos de permissão",
+          hint: "O que acontece quando um agente em um espaço adiado pede permissão. Turnos concluídos nunca notificam enquanto adiado.",
+          updateFailed: "Não foi possível atualizar a configuração de adiamento",
+          options: {
+            wake: "Retomar e avisar",
+            badge: "Contar em Adiados",
+            silent: "Silencioso",
+          },
+        },
       },
       terminalProfiles: {
         unavailable: "Conecte-se a este host para gerenciar perfis de terminal",

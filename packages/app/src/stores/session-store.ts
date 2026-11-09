@@ -122,6 +122,9 @@ export interface WorkspaceDescriptor {
   name: string;
   title?: string | null;
   pinnedAt?: string | null;
+  // Set while snoozed; snoozedUntil null means until the user wakes it.
+  snoozedAt?: string | null;
+  snoozedUntil?: string | null;
   labels?: string[];
   status: WorkspaceDescriptorPayload["status"];
   statusEnteredAt: Date | null;
@@ -165,6 +168,9 @@ export function normalizeWorkspaceDescriptor(
     name: payload.name,
     title: payload.title ?? null,
     pinnedAt: payload.pinnedAt ?? null,
+    // COMPAT(workspaceSnooze): hosts without snooze omit both.
+    snoozedAt: payload.snoozedAt ?? null,
+    snoozedUntil: payload.snoozedUntil ?? null,
     // COMPAT(workspaceLabels): old daemons omit assignments.
     labels: payload.labels ?? [],
     status: payload.status,

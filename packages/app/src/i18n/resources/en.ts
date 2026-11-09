@@ -1290,6 +1290,10 @@ export const en = {
     pinned: {
       title: "Pinned",
     },
+    snoozed: {
+      title: "Snoozed",
+      blocked: "Waiting on you: {{count}}",
+    },
     host: {
       noHost: "No host",
       switchTitle: "Switch host",
@@ -1385,6 +1389,14 @@ export const en = {
         hideFromSidebar: "Hide from sidebar",
         archiving: "Archiving...",
         hiding: "Hiding...",
+      },
+      snooze: {
+        title: "Snooze",
+        wake: "Wake up",
+        tonight: "Until tonight",
+        tomorrow: "Until tomorrow morning",
+        nextWeek: "Until next week",
+        indefinite: "Until I wake it",
       },
       confirmations: {
         hideTitle: "Hide workspace?",
@@ -2971,6 +2983,16 @@ export const en = {
       },
       workspaces: {
         unavailable: "Connect to this host to manage workspaces",
+        snoozedPermission: {
+          title: "Snoozed workspaces and permission prompts",
+          hint: "What happens when an agent in a snoozed workspace asks for permission. Finished turns never notify while snoozed.",
+          updateFailed: "Unable to update snooze setting",
+          options: {
+            wake: "Wake and notify",
+            badge: "Count on Snoozed",
+            silent: "Stay silent",
+          },
+        },
       },
       terminalProfiles: {
         unavailable: "Connect to this host to manage terminal profiles",
