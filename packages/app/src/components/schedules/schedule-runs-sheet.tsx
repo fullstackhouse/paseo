@@ -1,6 +1,7 @@
 import { ChevronRight } from "lucide-react-native";
 import { useCallback, useMemo, type ReactElement } from "react";
 import { Text, View, type PressableStateCallbackType } from "react-native";
+import { useTranslation } from "react-i18next";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import type { ScheduleRun } from "@getpaseo/protocol/schedule/types";
 import { AdaptiveModalSheet, type SheetHeader } from "@/components/adaptive-modal-sheet";
@@ -33,10 +34,13 @@ interface ScheduleRunsSheetProps {
   onClose: () => void;
 }
 
-async function fetchScheduleRuns(target: ScheduleRunsTarget): Promise<ScheduleRun[]> {
+async function fetchScheduleRuns(
+  target: ScheduleRunsTarget,
+  unavailableMessage: string,
+): Promise<ScheduleRun[]> {
   const client = useSessionStore.getState().sessions[target.serverId]?.client ?? null;
   if (!client) {
-    throw new Error("Host is not connected");
+    throw new Error(unavailableMessage);
   }
   const payload = await client.scheduleLogs({ id: target.scheduleId });
   if (payload.error) {
@@ -77,9 +81,10 @@ function ScheduleRunsBody({
   target: ScheduleRunsTarget;
   onClose: () => void;
 }): ReactElement {
+  const { t } = useTranslation();
   const query = useFetchQuery({
     queryKey: ["schedule-runs", target.serverId, target.scheduleId],
-    queryFn: () => fetchScheduleRuns(target),
+    queryFn: () => fetchScheduleRuns(target, t("common.errors.daemonClientUnavailable")),
     dataShape: "list",
     staleTimeMs: 5_000,
   });
