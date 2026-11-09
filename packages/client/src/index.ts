@@ -196,6 +196,15 @@ export interface PaseoWorkspaceHandle {
    */
   setBackground(background: boolean, requestId?: string): Promise<{ background: boolean }>;
   /**
+   * Snoozes the workspace until `until` (ISO), or indefinitely when `until` is null or omitted;
+   * `snoozed: false` wakes it. Needs `server_info.features.workspaceSnooze`.
+   */
+  setSnoozed(
+    snoozed: boolean,
+    until?: string | null,
+    requestId?: string,
+  ): Promise<{ snoozedAt: string | null; snoozedUntil: string | null }>;
+  /**
    * The prompt that asks an agent to open a pull request for this workspace's
    * branch: base branch, the repo's PR template and the project's PR preferences.
    * `merge` adds steps to get CI green and merge.
@@ -952,6 +961,8 @@ function createWorkspaceHandleFactory(
       setTitle: (title, requestId) => daemonClient.setWorkspaceTitle(id, title, requestId),
       setBackground: (background, requestId) =>
         daemonClient.setWorkspaceBackground(id, background, requestId),
+      setSnoozed: (snoozed, until, requestId) =>
+        daemonClient.setWorkspaceSnoozed(id, snoozed, until ?? null, requestId),
       pullRequestPrompt: async (options) => {
         // COMPAT(checkoutPrAgentPrompt): added in FSH v0.13.0-beta.1, remove gate after 2027-04-30.
         if (!daemonClient.getLastServerInfoMessage()?.features?.checkoutPrAgentPrompt) {

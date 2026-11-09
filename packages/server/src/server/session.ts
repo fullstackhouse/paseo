@@ -3141,6 +3141,8 @@ export class Session {
         return this.handleWorkspacePinSetRequest(msg.workspaceId, msg.pinned, msg.requestId);
       case "workspace.background.set.request":
         return this.handleWorkspaceBackgroundSetRequest(msg);
+      case "workspace.snooze.set.request":
+        return this.handleWorkspaceSnoozeSetRequest(msg);
       default:
         return undefined;
     }
@@ -4031,6 +4033,65 @@ export class Session {
         },
       });
       emitResponse(false, null, getErrorMessageOr(error, "Failed to pin workspace"));
+    }
+  }
+
+  private async handleWorkspaceSnoozeSetRequest(
+    request: Extract<SessionInboundMessage, { type: "workspace.snooze.set.request" }>,
+  ): Promise<void> {
+    const { workspaceId, snoozed, requestId } = request;
+    const until = snoozed ? request.until : null;
+    const logContext = { workspaceId, snoozed, until, requestId };
+    this.sessionLogger.info(logContext, "session: workspace.snooze.set.request");
+    const emitResponse = (input: {
+      accepted: boolean;
+      snoozedAt: string | null;
+      snoozedUntil: string | null;
+      error: string | null;
+    }) => {
+      this.emit({
+        type: "workspace.snooze.set.response",
+        payload: { requestId, workspaceId, ...input },
+      });
+    };
+
+    if (until !== null && Number.isNaN(Date.parse(until))) {
+      emitResponse({ accepted: false, snoozedAt: null, snoozedUntil: null, error: "Invalid time" });
+      return;
+    }
+    try {
+      const nowIso = new Date().toISOString();
+      const snoozedAt = snoozed ? nowIso : null;
+      const updated = await this.workspaceRegistry.update(workspaceId, (existing) => ({
+        ...existing,
+        snoozedAt,
+        snoozedUntil: until,
+        // Snoozed and pinned pull a workspace opposite ways; snoozing wins.
+        pinnedAt: snoozed ? null : existing.pinnedAt,
+        updatedAt: nowIso,
+      }));
+      if (!updated) {
+        emitResponse({
+          accepted: false,
+          snoozedAt: null,
+          snoozedUntil: null,
+          error: "Workspace not found",
+        });
+        return;
+      }
+      emitResponse({ accepted: true, snoozedAt, snoozedUntil: until, error: null });
+      await this.emitWorkspaceUpdatesForWorkspaceIds([workspaceId]);
+    } catch (error) {
+      this.sessionLogger.error(
+        { ...logContext, err: error },
+        "session: workspace.snooze.set.request error",
+      );
+      emitResponse({
+        accepted: false,
+        snoozedAt: null,
+        snoozedUntil: null,
+        error: getErrorMessageOr(error, "Failed to snooze workspace"),
+      });
     }
   }
 
@@ -5798,6 +5859,8 @@ export class Session {
       name: resolveWorkspaceDisplayName(workspace),
       title: workspace.title,
       pinnedAt: workspace.pinnedAt,
+      snoozedAt: workspace.snoozedAt,
+      snoozedUntil: workspace.snoozedUntil,
       ...(workspace.labels && workspace.labels.length > 0 ? { labels: workspace.labels } : {}),
       background: workspace.background,
       archivingAt: null,

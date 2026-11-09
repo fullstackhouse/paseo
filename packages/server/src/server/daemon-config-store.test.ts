@@ -985,6 +985,31 @@ describe("DaemonConfigStore", () => {
     });
   });
 
+  test("patch persists what a permission prompt does to a snoozed workspace", async () => {
+    const paseoHome = mkdtempSync(path.join(tmpdir(), "paseo-daemon-config-store-"));
+    tempDirs.push(paseoHome);
+    writeFileSync(path.join(paseoHome, "config.json"), `${JSON.stringify({ version: 1 })}\n`);
+    const store = new DaemonConfigStore(
+      paseoHome,
+      {
+        mcp: { injectIntoAgents: false },
+        browserTools: { enabled: false },
+        providers: {},
+        autoArchiveAfterMerge: false,
+        enableTerminalAgentHooks: false,
+        appendSystemPrompt: "",
+        metadataGeneration: { providers: [] },
+      },
+      undefined,
+    );
+    expect(store.get().snoozedPermission).toBeUndefined();
+
+    expect((await store.patch({ snoozedPermission: "badge" })).snoozedPermission).toBe("badge");
+
+    expect(loadPersistedConfig(paseoHome).daemon?.snoozedPermission).toBe("badge");
+    expect(loadConfig(paseoHome, { env: {} }).snoozedPermission).toBe("badge");
+  });
+
   test("patch persists custom ACP provider overrides into config.json", async () => {
     const paseoHome = mkdtempSync(path.join(tmpdir(), "paseo-daemon-config-store-"));
     tempDirs.push(paseoHome);

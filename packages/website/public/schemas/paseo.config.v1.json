@@ -109,6 +109,10 @@
         "enableTerminalAgentHooks": {
           "type": "boolean"
         },
+        "snoozedPermission": {
+          "type": "string",
+          "enum": ["wake", "badge", "silent"]
+        },
         "appendSystemPrompt": {
           "type": "string"
         },

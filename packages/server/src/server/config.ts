@@ -555,6 +555,7 @@ function resolveStaticLoadConfigSettings(
     usageEnabled: resolveUsageEnabled(persisted),
     browserToolsEnabled: resolveBrowserToolsEnabled(persisted),
     autoArchiveAfterMerge: persisted.daemon?.autoArchiveAfterMerge ?? false,
+    snoozedPermission: persisted.daemon?.snoozedPermission,
     appendSystemPrompt: resolveAppendSystemPrompt(persisted),
     ...resolveProfileLists(persisted),
     hostnames: mergeHostnames([
@@ -585,6 +586,7 @@ export type ResolvedDaemonSettings = Pick<
   | "browserToolsEnabled"
   | "git"
   | "autoArchiveAfterMerge"
+  | "snoozedPermission"
   | "enableTerminalAgentHooks"
   | "appendSystemPrompt"
   | "terminalProfiles"

@@ -1283,6 +1283,10 @@ export const ar: TranslationResources = {
     pinned: {
       title: "المثبتة",
     },
+    snoozed: {
+      title: "مؤجلة",
+      blocked: "بانتظارك: {{count}}",
+    },
     host: {
       noHost: "لا مضيف",
       switchTitle: "تبديل المضيف",
@@ -1378,6 +1382,14 @@ export const ar: TranslationResources = {
         hideFromSidebar: "إخفاء من الشريط الجانبي",
         archiving: "أرشفة...",
         hiding: "إخفاء...",
+      },
+      snooze: {
+        title: "تأجيل",
+        wake: "إيقاظ",
+        tonight: "حتى الليلة",
+        tomorrow: "حتى صباح الغد",
+        nextWeek: "حتى الأسبوع القادم",
+        indefinite: "حتى أوقظها",
       },
       confirmations: {
         hideTitle: "إخفاء مساحة العمل؟",
@@ -2946,6 +2958,16 @@ export const ar: TranslationResources = {
       },
       workspaces: {
         unavailable: "Connect to this host to manage workspaces",
+        snoozedPermission: {
+          title: "مساحات العمل المؤجلة وطلبات الأذونات",
+          hint: "ما يحدث عندما يطلب وكيل في مساحة عمل مؤجلة إذنًا. لا تُرسل إشعارات بانتهاء الأدوار أثناء التأجيل.",
+          updateFailed: "تعذر تحديث إعداد التأجيل",
+          options: {
+            wake: "إيقاظ وإشعار",
+            badge: "العدّ في المؤجلة",
+            silent: "البقاء صامتًا",
+          },
+        },
       },
       terminalProfiles: {
         unavailable: "Connect to this host to manage terminal profiles",

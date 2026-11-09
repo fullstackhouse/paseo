@@ -275,6 +275,8 @@ export const PersistedConfigSchema = z
           .optional(),
         autoArchiveAfterMerge: z.boolean().optional(),
         enableTerminalAgentHooks: z.boolean().optional(),
+        // FSH-only: what a permission prompt does to a snoozed workspace (default wake).
+        snoozedPermission: z.enum(["wake", "badge", "silent"]).optional(),
         appendSystemPrompt: z.string().optional(),
         terminalProfiles: z.array(TerminalProfileSchema).optional(),
         agentProfiles: z.array(AgentProfileSchema).optional(),
