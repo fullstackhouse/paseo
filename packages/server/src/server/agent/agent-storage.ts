@@ -273,18 +273,6 @@ export class AgentStorage {
     });
   }
 
-  /** Marks agents whose turn a daemon stop cut short, so clients can offer to resume them. */
-  async markInterrupted(agentIds: readonly string[], interruptedAt: string): Promise<void> {
-    await this.load();
-    await Promise.all(
-      agentIds.map(async (agentId) => {
-        await this.waitForPendingWrite(agentId);
-        const record = await this.get(agentId);
-        if (record) await this.upsert({ ...record, interruptedAt });
-      }),
-    );
-  }
-
   async setTitle(agentId: string, title: string): Promise<void> {
     await this.load();
     await this.waitForPendingWrite(agentId);
