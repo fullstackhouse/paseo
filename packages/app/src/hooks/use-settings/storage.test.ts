@@ -20,6 +20,7 @@ import {
   type SettingsDeps,
 } from "./storage";
 import { createFakeDesktopBridge, createInMemoryKeyValueStorage } from "./fakes";
+import { SETTINGS_MIGRATIONS_KEY } from "./keys";
 import {
   DEFAULT_SIDEBAR_ROW_ITEMS,
   SIDEBAR_ROW_ITEMS,
@@ -185,7 +186,7 @@ describe("loadAppSettingsFromStorage", () => {
 
     expect(result).toEqual(DEFAULT_CLIENT_SETTINGS);
     expect(DEFAULT_CLIENT_SETTINGS.language).toBe("system");
-    expect(DEFAULT_CLIENT_SETTINGS.chatDisplay).toBe("collapseTurns");
+    expect(DEFAULT_CLIENT_SETTINGS.chatDisplay).toBe("collapseToolCalls");
     expect(JSON.parse(deps.storage.entries.get(APP_SETTINGS_KEY) ?? "null")).toEqual(
       DEFAULT_CLIENT_SETTINGS,
     );
@@ -820,45 +821,68 @@ describe("appearance settings", () => {
     expect(result.contentFontSize).toBe(DEFAULT_UI_BASE_FONT_SIZE);
     expect(result.codeFontSize).toBe(DEFAULT_CODE_FONT_SIZE);
     expect(result.syntaxTheme).toBe("one");
-    expect(result.chatDisplay).toBe("collapseTurns");
+    expect(result.chatDisplay).toBe("collapseToolCalls");
   });
 
   it.each([
     [{ compactToolCalls: true }],
     [{ toolCallDetailLevel: "overview" }],
     [{ toolCallDetailLevel: "detailed" }],
-  ])("collapses turns for a blob with only a legacy tool call preference: %j", async (legacy) => {
-    const deps = makeDeps({
-      storage: createInMemoryKeyValueStorage({ [APP_SETTINGS_KEY]: JSON.stringify(legacy) }),
-    });
+  ])(
+    "collapses tool calls for a blob with only a legacy tool call preference: %j",
+    async (legacy) => {
+      const deps = makeDeps({
+        storage: createInMemoryKeyValueStorage({ [APP_SETTINGS_KEY]: JSON.stringify(legacy) }),
+      });
 
-    expect((await loadAppSettingsFromStorage(deps)).chatDisplay).toBe("collapseTurns");
-  });
+      expect((await loadAppSettingsFromStorage(deps)).chatDisplay).toBe("collapseToolCalls");
+    },
+  );
 
-  it("moves a stored full chat display to collapse turns once, keeping a newer build's values", async () => {
-    const stored = { chatDisplay: "full", sendBehavior: "future-mode", contentFontSize: 16 };
-    const deps = makeDeps({
-      storage: createInMemoryKeyValueStorage({ [APP_SETTINGS_KEY]: JSON.stringify(stored) }),
-    });
-
-    expect((await loadAppSettingsFromStorage(deps)).chatDisplay).toBe("collapseTurns");
-    expect(JSON.parse(deps.storage.entries.get(APP_SETTINGS_KEY) ?? "null")).toEqual({
-      ...stored,
+  it("moves an existing install to collapse tool calls once, keeping a newer build's values", async () => {
+    const stored = {
       chatDisplay: "collapseTurns",
-    });
-  });
-
-  it("keeps a stored chat display over the tool call detail level it replaced", async () => {
+      sendBehavior: "future-mode",
+      contentFontSize: 16,
+    };
     const deps = makeDeps({
       storage: createInMemoryKeyValueStorage({
-        [APP_SETTINGS_KEY]: JSON.stringify({
-          chatDisplay: "collapseTurns",
-          toolCallDetailLevel: "detailed",
-        }),
+        [APP_SETTINGS_KEY]: JSON.stringify(stored),
+        [SETTINGS_MIGRATIONS_KEY]: JSON.stringify({ applied: ["steer-default"] }),
+      }),
+    });
+
+    expect((await loadAppSettingsFromStorage(deps)).chatDisplay).toBe("collapseToolCalls");
+    expect(JSON.parse(deps.storage.entries.get(APP_SETTINGS_KEY) ?? "null")).toEqual({
+      ...stored,
+      chatDisplay: "collapseToolCalls",
+    });
+  });
+
+  it("keeps the chat display a fresh profile was seeded with", async () => {
+    const deps = makeDeps({
+      storage: createInMemoryKeyValueStorage({
+        [APP_SETTINGS_KEY]: JSON.stringify({ chatDisplay: "collapseTurns" }),
       }),
     });
 
     expect((await loadAppSettingsFromStorage(deps)).chatDisplay).toBe("collapseTurns");
+  });
+
+  it("keeps a display picked after the migration over the legacy preference", async () => {
+    const deps = makeDeps({
+      storage: createInMemoryKeyValueStorage({
+        [APP_SETTINGS_KEY]: JSON.stringify({
+          chatDisplay: "full",
+          toolCallDetailLevel: "overview",
+        }),
+        [SETTINGS_MIGRATIONS_KEY]: JSON.stringify({
+          applied: ["steer-default", "collapse-tool-calls-default"],
+        }),
+      }),
+    });
+
+    expect((await loadAppSettingsFromStorage(deps)).chatDisplay).toBe("full");
   });
 
   it("migrates a switched-off checks row item to the hidden checks display", async () => {

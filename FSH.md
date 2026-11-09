@@ -42,7 +42,7 @@ temporary by design: every patch is meant to go upstream and then drop out of `f
 
 - FSH-only (not upstream yet): composer plugins can opt into a tab in the existing resizable Explorer sidebar on desktop; clicking the badge shows or closes it. Existing plugins retain anchored popovers, and compact layouts retain bottom sheets. Asks opts in.
 - FSH-only (upstreamable): a schedule's **View runs** menu item lists its runs newest first, each with its status, start time, how long it took and the error if it failed. Tapping a run opens the agent it started
-- FSH-only (upstreamable): **Collapse turns** is the chat display for every install, not just new ones. A one-time settings migration moves existing installs off the Full or Collapse tool calls value they were migrated to in v0.14; picking another display afterwards sticks
+- FSH-only (upstreamable): **Collapse tool calls** is the default chat display. Upstream defaults new installs to Collapse turns and left existing ones on Full; a one-time settings migration moves every existing install to Collapse tool calls, and picking another display afterwards sticks
 
 Keep this list in sync with what's merged into `fsh`.
 

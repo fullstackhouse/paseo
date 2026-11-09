@@ -20,6 +20,11 @@ function storedSendBehavior(storage: Storage): SendBehavior | undefined {
   return raw === undefined ? undefined : JSON.parse(raw).sendBehavior;
 }
 
+function storedChatDisplay(storage: Storage): string | undefined {
+  const raw = storage.entries.get(APP_SETTINGS_KEY);
+  return raw === undefined ? undefined : JSON.parse(raw).chatDisplay;
+}
+
 function storedContentFontSize(storage: Storage): number | undefined {
   const raw = storage.entries.get(APP_SETTINGS_KEY);
   return raw === undefined ? undefined : JSON.parse(raw).contentFontSize;
@@ -45,7 +50,7 @@ describe("migrateAppSettings", () => {
 
     expect(result.sendBehavior).toBe("steer");
     expect(storedSendBehavior(storage)).toBe("steer");
-    expect(appliedIds(storage)).toEqual(["steer-default", "collapse-turns-default"]);
+    expect(appliedIds(storage)).toEqual(["steer-default", "collapse-tool-calls-default"]);
   });
 
   it("leaves interrupt alone once the migration has run", async () => {
@@ -64,7 +69,7 @@ describe("migrateAppSettings", () => {
 
     expect(result.sendBehavior).toBe("queue");
     expect(storage.entries.has(APP_SETTINGS_KEY)).toBe(false);
-    expect(appliedIds(storage)).toEqual(["steer-default", "collapse-turns-default"]);
+    expect(appliedIds(storage)).toEqual(["steer-default", "collapse-tool-calls-default"]);
   });
 
   it("marks itself applied on a fresh install without rewriting settings", async () => {
@@ -73,7 +78,7 @@ describe("migrateAppSettings", () => {
     await migrateAppSettings(settingsWith("steer"), storage);
 
     expect(storage.entries.has(APP_SETTINGS_KEY)).toBe(false);
-    expect(appliedIds(storage)).toEqual(["steer-default", "collapse-turns-default"]);
+    expect(appliedIds(storage)).toEqual(["steer-default", "collapse-tool-calls-default"]);
   });
 
   it("keeps unknown migration ids written by a newer client", async () => {
@@ -86,7 +91,7 @@ describe("migrateAppSettings", () => {
     expect(appliedIds(storage)).toEqual([
       "some-later-migration",
       "steer-default",
-      "collapse-turns-default",
+      "collapse-tool-calls-default",
     ]);
   });
 
@@ -100,7 +105,7 @@ describe("migrateAppSettings", () => {
     expect(storedContentFontSize(storage)).toBe(16);
     expect(appliedIds(storage)).toEqual([
       "steer-default",
-      "collapse-turns-default",
+      "collapse-tool-calls-default",
       "mobile-content-16",
     ]);
   });
@@ -113,7 +118,7 @@ describe("migrateAppSettings", () => {
 
     expect(result.contentFontSize).toBe(15);
     expect(storedContentFontSize(storage)).toBeUndefined();
-    expect(appliedIds(storage)).toEqual(["steer-default", "collapse-turns-default"]);
+    expect(appliedIds(storage)).toEqual(["steer-default", "collapse-tool-calls-default"]);
   });
 
   it("lets a mobile user choose 15px after the default migration ran", async () => {
@@ -131,20 +136,37 @@ describe("migrateAppSettings", () => {
     expect(result.contentFontSize).toBe(15);
   });
 
-  it.each(["full", "collapseToolCalls"] as const)(
-    "moves a stored %s chat display to collapse turns once",
+  it.each(["full", "collapseTurns"] as const)(
+    "moves an existing install's %s chat display to collapse tool calls once",
     async (chatDisplay) => {
-      const storage = createInMemoryKeyValueStorage();
+      const storage = createInMemoryKeyValueStorage({
+        [SETTINGS_MIGRATIONS_KEY]: JSON.stringify({ applied: ["steer-default"] }),
+      });
 
       const result = await migrateAppSettings({ ...settingsWith("steer"), chatDisplay }, storage);
 
-      expect(result.chatDisplay).toBe("collapseTurns");
-      expect(JSON.parse(storage.entries.get(APP_SETTINGS_KEY)!).chatDisplay).toBe("collapseTurns");
+      expect(result.chatDisplay).toBe("collapseToolCalls");
+      expect(storedChatDisplay(storage)).toBe("collapseToolCalls");
     },
   );
 
-  it("lets a user choose full after the collapse turns migration ran", async () => {
+  it("keeps a fresh profile's chat display and marks the migration applied", async () => {
     const storage = createInMemoryKeyValueStorage();
+
+    const result = await migrateAppSettings(
+      { ...settingsWith("steer"), chatDisplay: "full" },
+      storage,
+    );
+
+    expect(result.chatDisplay).toBe("full");
+    expect(storage.entries.has(APP_SETTINGS_KEY)).toBe(false);
+    expect(appliedIds(storage)).toContain("collapse-tool-calls-default");
+  });
+
+  it("lets a user choose full after the collapse tool calls migration ran", async () => {
+    const storage = createInMemoryKeyValueStorage({
+      [SETTINGS_MIGRATIONS_KEY]: JSON.stringify({ applied: ["steer-default"] }),
+    });
     await migrateAppSettings({ ...settingsWith("steer"), chatDisplay: "full" }, storage);
 
     const result = await migrateAppSettings(
@@ -172,6 +194,6 @@ describe("migrateAppSettings", () => {
     const result = await migrateAppSettings(settingsWith("steer"), recovered);
 
     expect(result.sendBehavior).toBe("steer");
-    expect(appliedIds(recovered)).toEqual(["steer-default", "collapse-turns-default"]);
+    expect(appliedIds(recovered)).toEqual(["steer-default", "collapse-tool-calls-default"]);
   });
 });

@@ -14,11 +14,13 @@ const AppliedMigrationsSchema = z.strictObject({ applied: z.array(z.string()) })
 const STEER_DEFAULT_MIGRATION = "steer-default";
 
 /**
- * Collapse turns shipped in v0.14 as the default for new installs only; existing installs were
- * mapped from the legacy tool call detail level and that value was then materialized, so it
- * cannot be told apart from a deliberate pick. This moves everyone to collapse turns once.
+ * Existing installs carry whichever chat display v0.14 materialized for them (Full, or collapse
+ * turns on new installs), which cannot be told apart from a deliberate pick. This moves every
+ * existing install to collapse tool calls once; picking another display afterwards sticks.
+ * Only installs that have run migrations before are moved: a fresh profile has nothing stale,
+ * and keeps whatever its storage was seeded with.
  */
-const COLLAPSE_TURNS_DEFAULT_MIGRATION = "collapse-turns-default";
+const COLLAPSE_TOOL_CALLS_DEFAULT_MIGRATION = "collapse-tool-calls-default";
 
 /** Existing mobile installs materialized the old 15px content default in storage. */
 const MOBILE_CONTENT_16_MIGRATION = "mobile-content-16";
@@ -63,12 +65,12 @@ export async function migrateAppSettings(
     addedMigration = true;
   }
 
-  if (!applied.has(COLLAPSE_TURNS_DEFAULT_MIGRATION)) {
+  if (!applied.has(COLLAPSE_TOOL_CALLS_DEFAULT_MIGRATION)) {
     migrated =
-      migrated.chatDisplay === "collapseTurns"
+      migrationMarker === null || migrated.chatDisplay === "collapseToolCalls"
         ? migrated
-        : { ...migrated, chatDisplay: "collapseTurns" };
-    applied.add(COLLAPSE_TURNS_DEFAULT_MIGRATION);
+        : { ...migrated, chatDisplay: "collapseToolCalls" };
+    applied.add(COLLAPSE_TOOL_CALLS_DEFAULT_MIGRATION);
     addedMigration = true;
   }
 

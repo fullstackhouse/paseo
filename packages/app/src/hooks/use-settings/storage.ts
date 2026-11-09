@@ -169,7 +169,7 @@ export const DEFAULT_CLIENT_SETTINGS: AppSettings = {
   sidebarFooterItems: [],
   usage: DEFAULT_USAGE_PREFERENCES,
   autoExpandReasoning: false,
-  chatDisplay: "collapseTurns",
+  chatDisplay: "collapseToolCalls",
   chatOutlineEnabled: true,
   vimKeybindings: false,
   sendShortcut: "enter",
