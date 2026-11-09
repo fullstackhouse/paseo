@@ -114,6 +114,14 @@ const manifests = {
     compactSheet: null,
     resourceKey: () => "pull_request",
   },
+  lineage: {
+    kind: "lineage",
+    supportedHosts: ["explorer"],
+    showCloseButton: true,
+    singleton: true,
+    compactSheet: null,
+    resourceKey: () => "lineage",
+  },
   file: {
     kind: "file",
     supportedHosts: ["main", "explorer"],

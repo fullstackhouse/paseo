@@ -587,6 +587,7 @@ describe("workspace-layout-store version 2 migration", () => {
       expect(Object.keys(persisted.state).sort()).toEqual([
         "explorerPaneIdByWorkspace",
         "layoutByWorkspace",
+        "lineageTabAutoOpenedByWorkspace",
         "pinnedAgentIdsByWorkspace",
         "pullRequestTabAutoOpenedByWorkspace",
         "sidePaneIdByWorkspace",
@@ -3236,6 +3237,7 @@ describe("workspace-layout-store actions", () => {
       splitSizesByWorkspace: currentState.splitSizesByWorkspace,
       explorerPaneIdByWorkspace: {},
       pullRequestTabAutoOpenedByWorkspace: currentState.pullRequestTabAutoOpenedByWorkspace,
+      lineageTabAutoOpenedByWorkspace: currentState.lineageTabAutoOpenedByWorkspace,
       sidePaneIdByWorkspace: currentState.sidePaneIdByWorkspace,
     });
     expect(layout && collectAllTabs(layout.root).map((tab) => tab.target)).toEqual([
@@ -3465,6 +3467,7 @@ describe("workspace-layout-store actions", () => {
     expect(partialize).toBeTypeOf("function");
     expect(partialize?.(state)).toEqual({
       pullRequestTabAutoOpenedByWorkspace: {},
+      lineageTabAutoOpenedByWorkspace: {},
       layoutByWorkspace: {},
       pinnedAgentIdsByWorkspace: {},
       splitSizesByWorkspace: {},
@@ -4525,6 +4528,32 @@ it("persists the once-only PR add after closing, and clears it when purging the 
   restored.getState().purgeWorkspace(workspaceKey);
   expect(restored.getState().pullRequestTabAutoOpenedByWorkspace[workspaceKey]).toBeUndefined();
   expect(restored.getState().autoOpenPullRequestTab(workspaceKey, placement)).toBe("pull_request");
+});
+
+it("adds Lineage to Explorer once, keeps it closed across reloads, and forgets on purge", async () => {
+  await AsyncStorage.removeItem("workspace-layout-state");
+  const source = createWorkspaceLayoutStore(workspaceLayoutIds);
+  await source.persist.rehydrate();
+  const workspaceKey = "server-1:lineage-once";
+  source.getState().openTab({
+    workspaceKey,
+    target: { kind: "terminal", terminalId: "term-1" },
+    intent: "reveal",
+  });
+
+  const tabId = source.getState().autoOpenLineageTab(workspaceKey);
+  expect(tabId).toBe("lineage");
+  const layout = source.getState().layoutByWorkspace[workspaceKey];
+  expect(findPaneContainingTab(layout.root, "lineage")?.id).toBe("explorer");
+  // A background add never steals focus from the user's tab.
+  expect(findPaneContainingTab(layout.root, "lineage")?.focusedTabId).not.toBe("lineage");
+
+  source.getState().closeTab(workspaceKey, "lineage");
+  const restored = createWorkspaceLayoutStore(workspaceLayoutIds);
+  await restored.persist.rehydrate();
+  expect(restored.getState().autoOpenLineageTab(workspaceKey)).toBeNull();
+  restored.getState().purgeWorkspace(workspaceKey);
+  expect(restored.getState().lineageTabAutoOpenedByWorkspace[workspaceKey]).toBeUndefined();
 });
 
 describe("compact workspace sheet", () => {
