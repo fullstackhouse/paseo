@@ -39,6 +39,8 @@ const workspace: PluginWorkspaceSnapshot = {
   status: "running",
   statusEnteredAt: null,
   archivingAt: null,
+  snoozedAt: null,
+  snoozedUntil: null,
   diffStat: null,
 };
 

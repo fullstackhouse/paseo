@@ -65,6 +65,8 @@ export function createPluginWorkspaceSnapshot(
     status: workspace.status,
     statusEnteredAt: serializeTimestamp(workspace.statusEnteredAt),
     archivingAt: workspace.archivingAt,
+    snoozedAt: workspace.snoozedAt ?? null,
+    snoozedUntil: workspace.snoozedUntil ?? null,
     diffStat,
   });
   const byHost = workspaceSnapshots.get(workspace) ?? new Map<string, CachedWorkspace>();

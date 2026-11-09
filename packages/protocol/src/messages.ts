@@ -210,6 +210,11 @@ const MutableRelayConfigSchema = z
   })
   .passthrough();
 
+// wake: un-snooze and notify as usual. badge: stay snoozed, counted on the Snoozed section.
+// silent: stay snoozed with no sign until the snooze ends.
+export const SnoozedPermissionBehaviorSchema = z.enum(["wake", "badge", "silent"]);
+export type SnoozedPermissionBehavior = z.infer<typeof SnoozedPermissionBehaviorSchema>;
+
 export const MutableDaemonConfigSchema = z
   .object({
     // COMPAT(relayConfig): added in v0.2.6, remove after 2027-01-31 when old daemons are unsupported.
@@ -249,6 +254,9 @@ export const MutableDaemonConfigSchema = z
     // COMPAT(restartRecovery): added in v0.14.0, keep optional for older hosts.
     resumeOnStartup: z.boolean().optional(),
     resumePrompt: z.string().optional(),
+    // COMPAT(workspaceSnooze): FSH-only, added after v0.13.0, optional while old daemons are supported.
+    // What an agent blocked on a permission prompt does to its snoozed workspace.
+    snoozedPermission: SnoozedPermissionBehaviorSchema.optional(),
     appendSystemPrompt: z.string().default(""),
     terminalProfiles: z.array(TerminalProfileSchema).optional(),
     agentProfiles: z.array(AgentProfileSchema).optional(),
@@ -279,6 +287,7 @@ export const MutableDaemonConfigPatchSchema = z
     idleRuntimeCleanup: z.boolean().optional(),
     resumeOnStartup: z.boolean().optional(),
     resumePrompt: z.string().optional(),
+    snoozedPermission: SnoozedPermissionBehaviorSchema.optional(),
     appendSystemPrompt: z.string().optional(),
     terminalProfiles: z.array(TerminalProfileSchema).optional(),
     agentProfiles: z.array(AgentProfileSchema).optional(),
@@ -1129,6 +1138,17 @@ export const WorkspaceBaseBranchSetRequestSchema = z.object({
   type: z.literal("workspace.base_branch.set.request"),
   workspaceId: z.string(),
   baseRef: z.string(),
+  requestId: z.string(),
+});
+
+// COMPAT(workspaceSnooze): FSH-only, added after v0.13.0, remove gate after 2027-05-09.
+// Snoozes a workspace until `until` (ISO), or indefinitely when `until` is null.
+// `snoozed: false` wakes it. Snoozing also unpins it.
+export const WorkspaceSnoozeSetRequestSchema = z.object({
+  type: z.literal("workspace.snooze.set.request"),
+  workspaceId: z.string(),
+  snoozed: z.boolean(),
+  until: z.string().nullable(),
   requestId: z.string(),
 });
 
@@ -2412,6 +2432,20 @@ export const WorkspaceBackgroundSetResponseSchema = z.object({
   payload: WorkspaceBackgroundSetResponsePayloadSchema,
 });
 
+export const WorkspaceSnoozeSetResponsePayloadSchema = z.object({
+  requestId: z.string(),
+  workspaceId: z.string(),
+  accepted: z.boolean(),
+  snoozedAt: z.string().nullable(),
+  snoozedUntil: z.string().nullable(),
+  error: z.string().nullable(),
+});
+
+export const WorkspaceSnoozeSetResponseSchema = z.object({
+  type: z.literal("workspace.snooze.set.response"),
+  payload: WorkspaceSnoozeSetResponsePayloadSchema,
+});
+
 export const WorkspacePinSetResponsePayloadSchema = z.object({
   requestId: z.string(),
   workspaceId: z.string(),
@@ -3673,6 +3707,7 @@ export const SessionInboundMessageSchema = z.discriminatedUnion("type", [
   WorkspacePinSetRequestSchema,
   WorkspaceBaseBranchSetRequestSchema,
   WorkspaceBackgroundSetRequestSchema,
+  WorkspaceSnoozeSetRequestSchema,
   WorkspaceLabelListRequestSchema,
   WorkspaceLabelAssignmentSetRequestSchema,
   WorkspaceLabelUpdateRequestSchema,
@@ -4145,6 +4180,8 @@ export const ServerInfoStatusPayloadSchema = z
         pluginNotifications: z.boolean().optional(),
         // COMPAT(workspaceBackgroundSet): FSH-only, added after v0.13.0, remove gate after 2027-05-05.
         workspaceBackgroundSet: z.boolean().optional(),
+        // COMPAT(workspaceSnooze): FSH-only, added after v0.13.0, remove gate after 2027-05-09.
+        workspaceSnooze: z.boolean().optional(),
         // COMPAT(skillManagement): added in v0.4.0, remove gate after 2027-08-16.
         skillManagement: z.boolean().optional(),
         // COMPAT(idleRuntimeCleanupSetting): added in v0.13.0, remove gate after 2027-04-26.
@@ -4611,6 +4648,10 @@ export const WorkspaceDescriptorPayloadSchema = z
     title: z.string().nullable().optional(),
     // COMPAT(workspacePinning): added in v0.1.107, remove optional after 2027-01-12.
     pinnedAt: z.string().nullable().optional(),
+    // COMPAT(workspaceSnooze): FSH-only, added after v0.13.0, remove optional after 2027-05-09.
+    // Set while snoozed; `snoozedUntil` null means until the user wakes it.
+    snoozedAt: z.string().nullable().optional(),
+    snoozedUntil: z.string().nullable().optional(),
     // COMPAT(workspaceLabels): added in v0.5.0, remove optional after 2027-08-14.
     labels: z.array(z.string()).optional(),
     metadata: EntityMetadataSchema.optional(),
@@ -7941,6 +7982,7 @@ export const SessionOutboundMessageSchema = z.discriminatedUnion("type", [
   WorkspacePinSetResponseSchema,
   WorkspaceBaseBranchSetResponseSchema,
   WorkspaceBackgroundSetResponseSchema,
+  WorkspaceSnoozeSetResponseSchema,
   WorkspaceRecoveryInspectResponseSchema,
   WorkspaceRecoveryRestoreResponseSchema,
   WorkspaceArchiveUndoResponseSchema,
@@ -8163,6 +8205,10 @@ export type WorkspaceTitleSetResponsePayload = z.infer<
 export type WorkspacePinSetResponse = z.infer<typeof WorkspacePinSetResponseSchema>;
 export type WorkspacePinSetResponsePayload = z.infer<typeof WorkspacePinSetResponsePayloadSchema>;
 export type WorkspaceBackgroundSetResponse = z.infer<typeof WorkspaceBackgroundSetResponseSchema>;
+export type WorkspaceSnoozeSetResponse = z.infer<typeof WorkspaceSnoozeSetResponseSchema>;
+export type WorkspaceSnoozeSetResponsePayload = z.infer<
+  typeof WorkspaceSnoozeSetResponsePayloadSchema
+>;
 export type WorkspaceRecoveryState = z.infer<typeof WorkspaceRecoveryStateSchema>;
 export type WorkspaceRecoveryInspectResponse = z.infer<
   typeof WorkspaceRecoveryInspectResponseSchema
@@ -8353,6 +8399,7 @@ export type AgentMetadataUpdateResponse = z.infer<typeof AgentMetadataUpdateResp
 export type WorkspaceMetadataUpdateResponse = z.infer<typeof WorkspaceMetadataUpdateResponseSchema>;
 export type WorkspaceBaseBranchSetRequest = z.infer<typeof WorkspaceBaseBranchSetRequestSchema>;
 export type WorkspaceBackgroundSetRequest = z.infer<typeof WorkspaceBackgroundSetRequestSchema>;
+export type WorkspaceSnoozeSetRequest = z.infer<typeof WorkspaceSnoozeSetRequestSchema>;
 export type WorkspaceRecoveryInspectRequest = z.infer<typeof WorkspaceRecoveryInspectRequestSchema>;
 export type WorkspaceRecoveryRestoreRequest = z.infer<typeof WorkspaceRecoveryRestoreRequestSchema>;
 export type WorkspaceArchiveUndoRequest = z.infer<typeof WorkspaceArchiveUndoRequestSchema>;

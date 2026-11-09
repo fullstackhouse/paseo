@@ -102,6 +102,11 @@ import type { WorkspaceScriptRuntimeStore } from "./workspace-script-runtime-sto
 import type { SpeechReadinessSnapshot, SpeechService } from "./speech/speech-runtime.js";
 import type { VoiceCallerContext, VoiceSpeakHandler } from "./voice-types.js";
 import {
+  isWorkspaceSnoozed,
+  resolveSnoozedAttention,
+  wakeWorkspace,
+} from "./workspace-snooze/index.js";
+import {
   computeNotificationPlan,
   isPushEligibleAttentionReason,
   type ClientPresenceState,
@@ -2168,6 +2173,8 @@ export class VoiceAssistantWebSocketServer {
         pluginNotifications: true,
         // COMPAT(workspaceBackgroundSet): FSH-only, added after v0.13.0, remove gate after 2027-05-05.
         workspaceBackgroundSet: true,
+        // COMPAT(workspaceSnooze): FSH-only, added after v0.13.0, remove gate after 2027-05-09.
+        workspaceSnooze: true,
         // COMPAT(skillManagement): added in v0.4.0, remove gate after 2027-08-16.
         skillManagement: true,
         // COMPAT(idleRuntimeCleanupSetting): added in v0.13.0, remove gate after 2027-04-26.
@@ -2979,6 +2986,19 @@ export class VoiceAssistantWebSocketServer {
     if (!agent?.workspaceId) {
       return;
     }
+    const snoozedAttention = resolveSnoozedAttention({
+      workspace: await this.workspaceRegistry.get(agent.workspaceId),
+      reason: params.reason,
+      permissionBehavior: this.daemonConfigStore.get().snoozedPermission,
+      nowMs: Date.now(),
+    });
+    if (snoozedAttention === "wake") {
+      await wakeWorkspace({
+        registry: this.workspaceRegistry,
+        workspaceId: agent.workspaceId,
+        nowIso: new Date().toISOString(),
+      });
+    }
     const clientEntries: Array<{
       ws: WebSocketLike;
       state: ClientPresenceState;
@@ -3012,15 +3032,19 @@ export class VoiceAssistantWebSocketServer {
       permissionRequest: findLatestPermissionRequest(agent.pendingPermissions),
     });
 
-    const plan = this.planOncePerUnreadFinish(
-      params,
-      computeNotificationPlan({
-        allStates,
-        focusTarget: { kind: "agent", id: params.agentId },
-        pushEligible: isPushEligibleAttentionReason(params.reason),
-        nowMs,
-      }),
-    );
+    // A snoozed workspace still records attention for its rows, but nobody is notified.
+    const plan =
+      snoozedAttention === "quiet"
+        ? { inAppRecipientIndex: null, shouldPush: false }
+        : this.planOncePerUnreadFinish(
+            params,
+            computeNotificationPlan({
+              allStates,
+              focusTarget: { kind: "agent", id: params.agentId },
+              pushEligible: isPushEligibleAttentionReason(params.reason),
+              nowMs,
+            }),
+          );
 
     if (plan.shouldPush) {
       void this.pushNotificationSender.send(notification).catch((err) => {
@@ -3129,13 +3153,18 @@ export class VoiceAssistantWebSocketServer {
     const allStates = notificationEntries.map((e) => e.state);
     const nowMs = Date.now();
     const workspaceId = params.workspaceId;
+    const workspace = workspaceId ? await this.workspaceRegistry.get(workspaceId) : null;
 
-    const plan = computeNotificationPlan({
-      allStates,
-      focusTarget: { kind: "terminal", id: params.terminalId },
-      pushEligible: true,
-      nowMs,
-    });
+    // Terminal attention in a snoozed workspace stays quiet until the snooze ends.
+    const plan =
+      workspace && isWorkspaceSnoozed(workspace, nowMs)
+        ? { inAppRecipientIndex: null, shouldPush: false }
+        : computeNotificationPlan({
+            allStates,
+            focusTarget: { kind: "terminal", id: params.terminalId },
+            pushEligible: true,
+            nowMs,
+          });
 
     const title = terminalAttentionTitle(params.reason);
     const body = params.terminalName;

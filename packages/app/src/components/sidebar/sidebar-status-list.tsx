@@ -118,6 +118,8 @@ interface StatusWorkspaceListProps {
   onToggleWorkspacePin: ToggleSidebarWorkspacePin;
   onPinnedWorkspaceReorder: (workspaces: SidebarWorkspaceEntry[]) => void;
   listHeaderComponent?: ReactNode;
+  /** Below the groups, inside the scroll area; holds the Snoozed section. */
+  listFooterComponent?: ReactNode;
   /** Swaps the group list for the label filter's empty state. Never the header above it. */
   sidebarFilterEmpty?: boolean;
   parentGestureRef?: MutableRefObject<GestureType | undefined>;
@@ -136,6 +138,7 @@ export function SidebarStatusWorkspaceList({
   onToggleWorkspacePin,
   onPinnedWorkspaceReorder,
   listHeaderComponent,
+  listFooterComponent,
   sidebarFilterEmpty = false,
   parentGestureRef,
   dragGestureHostActive,
@@ -271,6 +274,7 @@ export function SidebarStatusWorkspaceList({
           onToggleWorkspacePin={onToggleWorkspacePin}
         />
       )}
+      {listFooterComponent}
       <SidebarToastClearance />
     </>
   );
@@ -433,7 +437,7 @@ interface StatusRowProjectPresentation {
   projectIconDataUri: string | null;
 }
 
-function buildStatusRowProjectPresentation({
+export function buildStatusRowProjectPresentation({
   workspace,
   projectIconByProjectViewKey,
   hostBadgeByServerId,
@@ -535,7 +539,7 @@ function StatusGroupIcon({ bucket }: { bucket: StatusBucket }) {
   }
 }
 
-const StatusWorkspaceRow = memo(function StatusWorkspaceRow({
+export const StatusWorkspaceRow = memo(function StatusWorkspaceRow({
   workspace,
   hostBadge,
   projectName,

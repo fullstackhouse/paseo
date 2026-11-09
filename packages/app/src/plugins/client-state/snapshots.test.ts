@@ -28,6 +28,8 @@ describe("plugin context snapshots", () => {
       status: "running",
       statusEnteredAt: "2026-08-16T10:00:00.000Z",
       archivingAt: null,
+      snoozedAt: "2026-08-16T09:00:00.000Z",
+      snoozedUntil: null,
       diffStat: { additions: 12, deletions: 3 },
     });
     expect(snapshot.diffStat).not.toBe(workspace.diffStat);
