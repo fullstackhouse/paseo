@@ -1229,6 +1229,7 @@ describe("WorkspaceReconciliationService", () => {
       pinnedAt: null,
       snoozedAt: null,
       snoozedUntil: null,
+      snoozeWakePrompt: null,
       branch: null,
       worktreeRoot: null,
       baseBranch: null,

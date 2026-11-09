@@ -1472,6 +1472,7 @@ export const es: TranslationResources = {
       },
       snooze: {
         title: "Posponer",
+        continueTitle: "Posponer y continuar a las…",
         wake: "Reactivar",
         tonight: "Hasta esta noche",
         tomorrow: "Hasta mañana por la mañana",

@@ -210,12 +210,13 @@ export interface PaseoWorkspaceHandle {
   setBackground(background: boolean, requestId?: string): Promise<{ background: boolean }>;
   /**
    * Snoozes the workspace until `until` (ISO), or indefinitely when `until` is null or omitted;
-   * `snoozed: false` wakes it. Needs `server_info.features.workspaceSnooze`.
+   * `snoozed: false` wakes it. Needs `server_info.features.workspaceSnooze`. `wakePrompt` is sent
+   * to the workspace's agent when a timed snooze ends (`features.workspaceSnoozeWakePrompt`).
    */
   setSnoozed(
     snoozed: boolean,
     until?: string | null,
-    requestId?: string,
+    options?: { wakePrompt?: string; requestId?: string },
   ): Promise<{ snoozedAt: string | null; snoozedUntil: string | null }>;
   /**
    * The prompt that asks an agent to open a pull request for this workspace's
@@ -1037,8 +1038,8 @@ function createWorkspaceHandleFactory(
         daemonClient.setWorkspaceBaseBranch({ ...options, workspaceId: id }),
       setBackground: (background, requestId) =>
         daemonClient.setWorkspaceBackground(id, background, requestId),
-      setSnoozed: (snoozed, until, requestId) =>
-        daemonClient.setWorkspaceSnoozed(id, snoozed, until ?? null, requestId),
+      setSnoozed: (snoozed, until, options) =>
+        daemonClient.setWorkspaceSnoozed(id, snoozed, until ?? null, options),
       pullRequestPrompt: async (options) => {
         // COMPAT(checkoutPrAgentPrompt): added in FSH v0.13.0-beta.1, remove gate after 2027-04-30.
         if (!daemonClient.getLastServerInfoMessage()?.features?.checkoutPrAgentPrompt) {

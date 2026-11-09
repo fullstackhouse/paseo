@@ -115,6 +115,12 @@ const PersistedWorkspaceRecordSchema = z.object({
     .nullable()
     .optional()
     .transform((value) => value ?? null),
+  // Sent to the workspace's agent when a timed snooze ends.
+  snoozeWakePrompt: z
+    .string()
+    .nullable()
+    .optional()
+    .transform((value) => value ?? null),
   labels: z.array(z.string()).optional(),
   // Plugin-owned data. Paseo stores it and never reads a key.
   metadata: z.record(z.string(), z.custom<JsonValue>()).default({}),
@@ -718,6 +724,7 @@ export function createPersistedWorkspaceRecord(input: {
   pinnedAt?: string | null;
   snoozedAt?: string | null;
   snoozedUntil?: string | null;
+  snoozeWakePrompt?: string | null;
   labels?: string[];
   metadata?: Record<string, JsonValue>;
   untrustedSource?: UntrustedWorkspaceSource;
@@ -739,6 +746,7 @@ export function createPersistedWorkspaceRecord(input: {
     pinnedAt: input.pinnedAt ?? null,
     snoozedAt: input.snoozedAt ?? null,
     snoozedUntil: input.snoozedUntil ?? null,
+    snoozeWakePrompt: input.snoozeWakePrompt ?? null,
   });
 }
 

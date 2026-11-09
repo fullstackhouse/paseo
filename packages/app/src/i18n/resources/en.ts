@@ -1446,6 +1446,7 @@ export const en = {
       },
       snooze: {
         title: "Snooze",
+        continueTitle: "Snooze and continue at…",
         wake: "Wake up",
         tonight: "Until tonight",
         tomorrow: "Until tomorrow morning",
