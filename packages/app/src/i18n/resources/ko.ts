@@ -1289,6 +1289,10 @@ export const ko: TranslationResources = {
     pinned: {
       title: "고정됨",
     },
+    snoozed: {
+      title: "다시 알림",
+      blocked: "응답 대기: {{count}}",
+    },
     host: {
       noHost: "호스트 없음",
       switchTitle: "호스트 전환",
@@ -1384,6 +1388,14 @@ export const ko: TranslationResources = {
         hideFromSidebar: "사이드바에서 숨기기",
         archiving: "보관하는 중...",
         hiding: "숨기는 중...",
+      },
+      snooze: {
+        title: "다시 알림",
+        wake: "깨우기",
+        tonight: "오늘 밤까지",
+        tomorrow: "내일 아침까지",
+        nextWeek: "다음 주까지",
+        indefinite: "직접 깨울 때까지",
       },
       confirmations: {
         hideTitle: "워크스페이스를 숨길까요?",
@@ -2852,6 +2864,16 @@ export const ko: TranslationResources = {
       },
       workspaces: {
         unavailable: "워크스페이스를 관리하려면 이 호스트에 연결하세요",
+        snoozedPermission: {
+          title: "다시 알림 워크스페이스와 권한 요청",
+          hint: "다시 알림 상태인 워크스페이스의 에이전트가 권한을 요청할 때의 동작입니다. 다시 알림 중에는 턴 완료 알림을 보내지 않습니다.",
+          updateFailed: "다시 알림 설정을 업데이트할 수 없습니다",
+          options: {
+            wake: "깨우고 알림",
+            badge: "다시 알림에 개수 표시",
+            silent: "표시 안 함",
+          },
+        },
       },
       terminalProfiles: {
         unavailable: "터미널 프로필을 관리하려면 이 호스트에 연결하세요",

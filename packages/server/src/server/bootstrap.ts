@@ -178,6 +178,8 @@ import {
   type ActiveWorkspaceRef,
 } from "./workspace-archive-service.js";
 import { setupAutoArchiveOnMerge } from "./auto-archive-on-merge/index.js";
+import { setupWorkspaceSnoozeWaker } from "./workspace-snooze/index.js";
+import type { SnoozedPermissionBehavior } from "@getpaseo/protocol/messages";
 import { wrapSessionMessage, type SessionOutboundMessage } from "./messages.js";
 import type { TerminalManager } from "../terminal/terminal-manager.js";
 import { createConfiguredTerminalManager } from "../terminal/terminal-manager-factory.js";
@@ -422,6 +424,7 @@ export interface PaseoDaemonConfig {
     maxProcessConcurrency: number;
   };
   autoArchiveAfterMerge?: boolean;
+  snoozedPermission?: SnoozedPermissionBehavior;
   enableTerminalAgentHooks?: boolean;
   appendSystemPrompt?: string;
   terminalProfiles?: TerminalProfile[];
@@ -590,6 +593,7 @@ function createInitialMutableDaemonConfig(config: ResolvedDaemonSettings): Mutab
       providers: config.metadataGeneration?.providers ?? [],
     },
     autoArchiveAfterMerge: config.autoArchiveAfterMerge ?? false,
+    snoozedPermission: config.snoozedPermission,
     enableTerminalAgentHooks: config.enableTerminalAgentHooks ?? false,
     idleRuntimeCleanup: config.idleRuntimeCleanup !== false,
     appendSystemPrompt: config.appendSystemPrompt ?? "",
@@ -1181,6 +1185,8 @@ export async function createPaseoDaemon(
     },
     logger,
   });
+
+  const workspaceSnoozeWaker = setupWorkspaceSnoozeWaker({ workspaceRegistry, logger });
 
   setupAutoArchiveOnMerge({
     paseoHome: config.paseoHome,
@@ -1955,6 +1961,7 @@ export async function createPaseoDaemon(
     scriptHealthMonitor.stop();
     unsubscribeIdleRuntimeCleanup();
     await idleRuntimeCleanup.close();
+    workspaceSnoozeWaker.close();
     // Freeze both ingress and registration before taking the agent closure snapshot.
     wsServer?.prepareForShutdown();
     await finishSubscriptions.close();

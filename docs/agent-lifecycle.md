@@ -181,6 +181,25 @@ those collections with its subset. Inclusive and default observations have disti
 scopes, so changing scope requires a fresh snapshot rather than reusing an incomplete cache.
 Clients gate creation and inclusive discovery on `features.backgroundWorkspaces`.
 
+## Snoozed workspaces
+
+Snooze is the user's "not now", and changes attention only. Background hides work from discovery;
+a snoozed workspace stays listed, in the sidebar's **Snoozed** section, and its agents keep
+running. `workspace.snooze.set` (FSH-only, `workspaces.ref(id).setSnoozed()`, gated on
+`features.workspaceSnooze`) stores `snoozedAt` and an optional `snoozedUntil`, and clears the pin.
+
+The daemon owns both halves so every client and plugin agrees:
+
+- `broadcastAgentAttention` never notifies for a finished or failed turn in a snoozed workspace.
+  A permission prompt follows the host's `snoozedPermission` setting (`wake` by default, `badge`,
+  `silent`). `wake` clears the snooze before notifying. `badge` and `silent` stay quiet; the app
+  counts blocked rows on the Snoozed header only for `badge`. Terminal attention is always quiet.
+- `setupWorkspaceSnoozeWaker` (`packages/server/src/server/workspace-snooze/`) clears timed snoozes
+  when they end, including any that ended while the daemon was down. A snooze past its end counts
+  as awake before the waker gets to it.
+
+Plugins read `snoozedAt` on `PluginWorkspaceSnapshot` and leave snoozed work out of their counters.
+
 ### Private daemon helpers
 
 Branch-name and commit-message generators still use private disposable internal runtimes.

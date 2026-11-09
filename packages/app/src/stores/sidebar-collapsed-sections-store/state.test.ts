@@ -6,6 +6,7 @@ import {
   setProjectCollapsed,
   togglePinnedCollapsed,
   toggleProjectCollapsed,
+  toggleSnoozedCollapsed,
   toggleWorkspaceGroupCollapsed,
 } from "@/stores/sidebar-collapsed-sections-store/state";
 
@@ -14,6 +15,7 @@ function emptyState(): CollapsedProjectsState {
     collapsedProjectKeys: new Set(),
     collapsedWorkspaceGroupKeys: new Set(),
     collapsedPinned: false,
+    collapsedSnoozed: true,
   };
 }
 
@@ -35,13 +37,22 @@ describe("sidebar collapsed projects transitions", () => {
       collapsedProjectKeys: new Set(["project-a", "project-b"]),
       collapsedWorkspaceGroupKeys: new Set(["running"]),
       collapsedPinned: true,
+      collapsedSnoozed: false,
     };
 
     expect(serializeCollapsedProjects(state)).toEqual({
       collapsedProjectKeys: ["project-a", "project-b"],
       collapsedWorkspaceGroupKeys: ["running"],
       collapsedPinned: true,
+      collapsedSnoozed: false,
     });
+  });
+
+  it("starts with Snoozed collapsed and restores a persisted expand", () => {
+    expect(emptyState().collapsedSnoozed).toBe(true);
+    expect(toggleSnoozedCollapsed(emptyState()).collapsedSnoozed).toBe(false);
+    const restored = mergePersistedCollapsedProjects({ collapsedSnoozed: false }, emptyState());
+    expect(restored.collapsedSnoozed).toBe(false);
   });
 
   it("toggles and restores the pinned section collapse flag", () => {

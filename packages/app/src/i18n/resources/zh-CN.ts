@@ -1274,6 +1274,10 @@ export const zhCN: TranslationResources = {
     pinned: {
       title: "已置顶",
     },
+    snoozed: {
+      title: "已暂缓",
+      blocked: "等待你处理：{{count}}",
+    },
     host: {
       noHost: "没有 Host",
       switchTitle: "切换 Host",
@@ -1367,6 +1371,14 @@ export const zhCN: TranslationResources = {
         hideFromSidebar: "从侧边栏隐藏",
         archiving: "正在归档...",
         hiding: "正在隐藏...",
+      },
+      snooze: {
+        title: "暂缓",
+        wake: "恢复",
+        tonight: "直到今晚",
+        tomorrow: "直到明天早上",
+        nextWeek: "直到下周",
+        indefinite: "直到我恢复",
       },
       confirmations: {
         hideTitle: "隐藏 workspace？",
@@ -2809,6 +2821,16 @@ export const zhCN: TranslationResources = {
       },
       workspaces: {
         unavailable: "连接到这个 Host 以管理 Workspace",
+        snoozedPermission: {
+          title: "已暂缓的工作区与权限请求",
+          hint: "已暂缓工作区中的智能体请求权限时会怎样。暂缓期间，回合结束不会发送通知。",
+          updateFailed: "无法更新暂缓设置",
+          options: {
+            wake: "恢复并通知",
+            badge: "在“已暂缓”中计数",
+            silent: "不提示",
+          },
+        },
       },
       terminalProfiles: {
         unavailable: "Connect to this host to manage terminal profiles",
