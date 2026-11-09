@@ -47,7 +47,22 @@ export interface PluginNavigableHostProps extends PluginHostProps {
       readonly workspaceId: string;
       readonly serverId?: string;
     }) => void;
+    /**
+     * Opens a screen another plugin added with `addScreen`. Throws when that plugin or screen is
+     * not on the host. Undefined on older hosts.
+     */
+    readonly openPluginScreen?: (input: PluginScreenTarget) => void;
+    /** Whether `openPluginScreen` would open that screen now. Undefined on older hosts. */
+    readonly hasPluginScreen?: (input: Omit<PluginScreenTarget, "params">) => boolean;
   };
+}
+
+/** A screen of any plugin on a host; `serverId` defaults to the rendering host. */
+export interface PluginScreenTarget {
+  readonly pluginId: string;
+  readonly screenId: string;
+  readonly params?: PluginScreenParams;
+  readonly serverId?: string;
 }
 
 /** String keys and values: params travel in the screen's URL. */
