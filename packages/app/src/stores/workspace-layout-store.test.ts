@@ -587,6 +587,7 @@ describe("workspace-layout-store version 2 migration", () => {
       expect(Object.keys(persisted.state).sort()).toEqual([
         "explorerPaneIdByWorkspace",
         "layoutByWorkspace",
+        "lineageTabAutoOpenedByWorkspace",
         "pinnedAgentIdsByWorkspace",
         "pullRequestTabAutoOpenedByWorkspace",
         "sidePaneIdByWorkspace",
@@ -3236,6 +3237,7 @@ describe("workspace-layout-store actions", () => {
       splitSizesByWorkspace: currentState.splitSizesByWorkspace,
       explorerPaneIdByWorkspace: {},
       pullRequestTabAutoOpenedByWorkspace: currentState.pullRequestTabAutoOpenedByWorkspace,
+      lineageTabAutoOpenedByWorkspace: currentState.lineageTabAutoOpenedByWorkspace,
       sidePaneIdByWorkspace: currentState.sidePaneIdByWorkspace,
     });
     expect(layout && collectAllTabs(layout.root).map((tab) => tab.target)).toEqual([
@@ -3465,6 +3467,7 @@ describe("workspace-layout-store actions", () => {
     expect(partialize).toBeTypeOf("function");
     expect(partialize?.(state)).toEqual({
       pullRequestTabAutoOpenedByWorkspace: {},
+      lineageTabAutoOpenedByWorkspace: {},
       layoutByWorkspace: {},
       pinnedAgentIdsByWorkspace: {},
       splitSizesByWorkspace: {},
