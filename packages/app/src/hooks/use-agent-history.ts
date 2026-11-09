@@ -218,6 +218,8 @@ export function useAgentHistory(options: {
   serverId?: string | null;
   enabled?: boolean;
   search?: string;
+  /** Fetch only when there is a query the hosts can search; never the unfiltered list. */
+  searchOnly?: boolean;
 }): AgentHistoryResult {
   const { t } = useTranslation();
   const daemons = useHosts();
@@ -294,7 +296,7 @@ export function useAgentHistory(options: {
     AgentHistoryCursorByServerId | null
   >({
     queryKey,
-    enabled: Boolean(enabled && targetHosts.length > 0),
+    enabled: Boolean(enabled && targetHosts.length > 0 && (!options.searchOnly || search)),
     staleTime: 30_000,
     initialPageParam: null,
     getNextPageParam: getNextAgentHistoryPageParam,

@@ -331,6 +331,13 @@ export interface TextFieldsOptions {
   subsequence?: boolean;
 }
 
+/**
+ * Options for searching things the user recalls by name rather than picks from a short list:
+ * History search on the daemon and the command center's workspace and agent rows. One constant,
+ * so both surfaces find the same sessions for the same query.
+ */
+export const RECALL_MATCH_OPTIONS: TextFieldsOptions = { typoTolerant: true };
+
 export function scoreTextFields(
   query: string,
   fields: string[],
