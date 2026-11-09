@@ -46,6 +46,7 @@ temporary by design: every patch is meant to go upstream and then drop out of `f
 - FSH-only (upstreamable): plugins can open another plugin's screen (`navigation.openPluginScreen`, checked with `navigation.hasPluginScreen`), so a paseo-prs row can open its review in paseo-inbox
 - FSH-only (upstreamable): a schedule's **View runs** menu item lists its runs newest first, each with its status, start time, how long it took and the error if it failed. Tapping a run opens the agent it started
 - FSH-only (upstreamable): **Collapse tool calls** is the default chat display. Upstream defaults new installs to Collapse turns and maps existing ones from the legacy tool call preference to Full or Collapse tool calls; a one-time settings migration moves every existing install to Collapse tool calls, and picking another display afterwards sticks
+- FSH-only (upstreamable): Cmd+K finds archived workspaces and agents through History search, labelled **Archived** and ranked after active rows that match as well. Workspace and agent rows match like History (typo-tolerant), and rank by how well every query word matched before recency, so a title matching each word beats letters scattered through a branch name
 
 Keep this list in sync with what's merged into `fsh`.
 
