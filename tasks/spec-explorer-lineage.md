@@ -1,6 +1,6 @@
 # Spec: Lineage tab in the Explorer sidebar
 
-Status: draft · 2026-11-09
+Status: phases 1–4 implemented · 2026-11-09 · detach follow-up open
 
 ## Problem
 
@@ -40,39 +40,37 @@ instead of dropping them. Skip: the relationship kinds, since Paseo has only `su
 The only source is the session store (`agents` + `agentDetails`) for the server. There are no new RPCs.
 
 - **Focus agent:** the agent of the workspace's focused agent tab. If no agent tab is focused, the workspace's
-  root agent (`isWorkspaceRootAgent`).
-- **Ancestors:** follow `parentAgentId` up to the root. Guard against cycles, and cap the walk at 10 levels.
-- **Children:** agents whose `parentAgentId` is the focus agent. Archived children appear only while the store still
-  holds them.
-- **Missing:** a parent id with no agent in the store becomes a `missing` row
-  ("Parent agent — not loaded"), as t3code does. Don't hide the chain.
+  most recently active root agent (`isWorkspaceRootAgent`).
+- **Ancestors:** follow the parent address labels (`paseo.parent-agent-id` + `paseo.parent-server-id`, so across
+  hosts too) up to the root. Guard against cycles, and cap the walk at 10 levels.
+- **Children:** live (unarchived) agents whose parent address is the focus agent.
+- **Missing:** a parent with no agent in the store becomes a `missing` row ("Not loaded"), as t3code does. The
+  chain stays visible.
 
-Put the derivation in one pure function,
-`deriveLineage(sessionSnapshot, focusAgentId) → { ancestors, children }`, next to
-`subagents/select.ts`. It is unit-tested like `select.test.ts`.
+The derivation is one pure function, `deriveLineage(sessionSnapshot, focusAddress) → { ancestors, children }`, in
+`subagents/lineage.ts`, with a memoized selector like `subagents/select.ts`.
 
 ### UI
 
-New panel kind `lineage` (`panels/panel-manifest.ts`). It is an Explorer singleton, uses `compactSheet` on
-compact layouts, and opens from the Explorer + menu.
+New panel kind `lineage` (`panels/panel-manifest.ts`). It is an Explorer-only singleton and opens from the
+Explorer + menu. It has no `compactSheet`: compact layouts already show Explorer as an overlay.
 
 ```
-Lineage
-  ↑ Spec production orders        helmet-mercato   ● done
-  ↑ Similarly as we wrote…        casteo           ● running   ← parent
-  ─ this agent ─
-  In this workspace     9 subagents  >      (opens existing subagents track)
-  In other workspaces
-    Impl: HR planner              casteo           ● needs you
-    feat/work-centers             casteo           ● done
+Started by
+  Spec production orders          helmet-mercato · casteo
+  Similarly as we wrote…          casteo · casteo
+[this agent]
+In other workspaces
+  Impl: HR planner                impl-hr · casteo
+In this workspace
+  Explore settings usage
 ```
 
 - Rows reuse `useAgentDescriptor` (icon, label, status bucket) and `navigateToAgent`, the same as
-  `useParentAgent`. Each row adds the workspace name.
-- Children in the focus agent's own workspace collapse into one row that opens the subagents track
-  we already have. Lineage only lists cross-workspace children, so nothing is listed twice.
-- Empty state: "No parent or child agents".
-- Follow `docs/design.md` and `docs/hover.md`.
+  `useParentAgent`. Rows in another workspace show the workspace and project, plus the host for another host.
+- Children in this workspace are listed too, under their own heading. The subagents track is a composer
+  popover that a panel can't open, so a single row pointing to it would lead nowhere.
+- Empty states: "No parent or child agents", or "Open an agent to see its lineage" when nothing is focused.
 
 ### Discoverability
 
@@ -82,9 +80,9 @@ stops it from coming back for that workspace (`open-supporting-view.ts` pattern)
 
 ## Open questions
 
-1. **Detach erases lineage.** Detach clears `paseo.parent-agent-id`, so a detached agent drops out of
-   Lineage. Should detach write a `paseo.detached-from` label so Lineage can show "started by X
-   (detached)"? Recommend yes, as a follow-up. It's a label, so it needs no protocol change.
+1. **Detach erases lineage.** Resolved: yes, as a follow-up. Detach clears `paseo.parent-agent-id`, so a detached
+   agent drops out of Lineage. Detach will also write `paseo.detached-from`, and Lineage will show "started by X
+   (detached)". It's a label, so the protocol doesn't change.
 2. **Archived parents.** A parent that has been archived may not be in the store. Fetch it on demand through the
    History lookup, or leave it as `missing`? Recommend `missing` for v1.
 3. **Sidebar hint.** Should a cross-workspace child's sidebar row also show "↳ from <workspace>"? Leave it out of
@@ -93,14 +91,17 @@ stops it from coming back for that workspace (`open-supporting-view.ts` pattern)
 ## Phases
 
 1. `deriveLineage` + unit tests (ancestors, cross/same-workspace children, missing parent, cycle).
-2. `lineage` panel kind + Explorer tab UI, with a browser test in the `tracks-panel.browser.test.tsx` style.
+2. `lineage` panel kind + Explorer tab UI, verified in a `paseo-run` window (no browser test: the panel needs the
+   full app's providers).
 3. Automatic reveal once per workspace, with the close opt-out.
 4. Update `docs/explorer-sidebar.md` (panel list, reveal rule) and `docs/agent-lifecycle.md`
    (Relationships → where lineage is shown). Add an FSH.md patch line.
+5. Follow-up: `paseo.detached-from` on detach, shown as "(detached)" in Lineage.
 
 ## Verification
 
-- Unit: `deriveLineage` cases above.
-- Manual (`paseo-run`): a parent agent creates a child via `create_agent` with a new workspace. The child
-  workspace's Lineage shows the parent, and the parent's Lineage lists the child under "In other workspaces".
-  Both rows navigate. Detaching removes the child from the list.
+- Unit: `subagents/lineage.test.ts` (ancestors, cross-host parent, missing, archived, cycle, depth cap, memoized
+  selector), and the store test for the once-per-workspace add.
+- Manual (`paseo-run`): a parent agent, one child in another workspace and one in its own. The tab is added in the
+  background in both workspaces. The parent's Lineage lists both children under their headings. Clicking the
+  other-workspace child opens it, and that workspace's Lineage shows the parent under "Started by".

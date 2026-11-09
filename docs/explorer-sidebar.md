@@ -142,6 +142,15 @@ layouts discover while Explorer is active. The rail requests summary status; sel
 content also requests timeline data. Inactive consumers read cached data without request demand.
 Discovery uses ordinary PR tabs and their existing once-per-workspace close opt-out.
 
+Lineage is an Explorer-only singleton tab that lists the focused agent's parents and the agents it
+started, with the workspace each one runs in (`packages/app/src/panels/lineage-panel.tsx`). The
+focused agent is the agent in the focused tab, else the workspace's most recently active root agent;
+selecting the Lineage tab doesn't change it, because Explorer tabs never take workspace focus. The
+sidebar shows nothing that links two workspaces, so the tab is added in the background, once per
+workspace, the first time a relative runs in a different workspace. It uses the same close opt-out
+as the PR tab (`lineageTabAutoOpenedByWorkspace`). Relatives come from parent labels already in
+the session store. A parent the client hasn't loaded stays in the chain as "Not loaded".
+
 ## Side pane
 
 `packages/app/src/workspace-tabs/open-beside.ts` owns content opened beside the user's work. The

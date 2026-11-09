@@ -4527,6 +4527,32 @@ it("persists the once-only PR add after closing, and clears it when purging the 
   expect(restored.getState().autoOpenPullRequestTab(workspaceKey, placement)).toBe("pull_request");
 });
 
+it("adds Lineage to Explorer once, keeps it closed across reloads, and forgets on purge", async () => {
+  await AsyncStorage.removeItem("workspace-layout-state");
+  const source = createWorkspaceLayoutStore(workspaceLayoutIds);
+  await source.persist.rehydrate();
+  const workspaceKey = "server-1:lineage-once";
+  source.getState().openTab({
+    workspaceKey,
+    target: { kind: "terminal", terminalId: "term-1" },
+    intent: "reveal",
+  });
+
+  const tabId = source.getState().autoOpenLineageTab(workspaceKey);
+  expect(tabId).toBe("lineage");
+  const layout = source.getState().layoutByWorkspace[workspaceKey];
+  expect(findPaneContainingTab(layout.root, "lineage")?.id).toBe("explorer");
+  // A background add never steals focus from the user's tab.
+  expect(findPaneContainingTab(layout.root, "lineage")?.focusedTabId).not.toBe("lineage");
+
+  source.getState().closeTab(workspaceKey, "lineage");
+  const restored = createWorkspaceLayoutStore(workspaceLayoutIds);
+  await restored.persist.rehydrate();
+  expect(restored.getState().autoOpenLineageTab(workspaceKey)).toBeNull();
+  restored.getState().purgeWorkspace(workspaceKey);
+  expect(restored.getState().lineageTabAutoOpenedByWorkspace[workspaceKey]).toBeUndefined();
+});
+
 describe("compact workspace sheet", () => {
   const workspaceKey = "server-1:sheet-ws";
   const fileTarget = { kind: "file" as const, path: "src/index.ts" };
