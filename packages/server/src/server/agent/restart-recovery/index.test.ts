@@ -103,3 +103,47 @@ test("opt-out consumes pending recovery and excludes archived, private, owned an
     await rm(root, { recursive: true, force: true });
   }
 });
+
+// FSH fork: interruptedAt feeds the app's Resume all callout, whether or not recovery is on.
+test("marks eligible running agents interrupted on shutdown and after a crash, with recovery off", async () => {
+  const root = await mkdtemp(join(tmpdir(), "restart-recovery-"));
+  try {
+    const storage = new AgentStorage(root, createTestLogger());
+    async function seed(extra: Record<string, unknown>) {
+      await storage.upsert(
+        parseStoredAgentRecord({
+          lastStatus: "running",
+          provider: "codex",
+          cwd: root,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          ...extra,
+        }),
+      );
+    }
+    await seed({ id: "stopped" });
+    await seed({ id: "idle", lastStatus: "idle" });
+    await seed({ id: "private", internal: true });
+    const recovery = createRestartRecovery({
+      storage,
+      settings: () => ({ enabled: false, prompt: "Resume working." }),
+      eligible: async () => true,
+      dispatch: async () => {},
+      report: () => {},
+    });
+    await recovery.captureRunningAgents();
+    expect((await storage.get("stopped"))?.interruptedAt).toEqual(expect.any(String));
+    expect((await storage.get("idle"))?.interruptedAt).toBeUndefined();
+    expect((await storage.get("private"))?.interruptedAt).toBeUndefined();
+
+    await seed({ id: "crashed" });
+    await seed({ id: "starting", lastStatus: "initializing" });
+    await recovery.prepareStartup();
+    expect((await storage.get("crashed"))?.interruptedAt).toEqual(expect.any(String));
+    expect((await storage.get("crashed"))?.lastStatus).toBe("closed");
+    expect((await storage.get("starting"))?.interruptedAt).toBeUndefined();
+    expect((await storage.list()).every((record) => !record.resumeOnStartup)).toBe(true);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
