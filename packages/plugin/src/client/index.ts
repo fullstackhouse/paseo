@@ -13,6 +13,7 @@ export type {
   PluginPopoverProps,
   PluginScreenParams,
   PluginOpenScreenInput,
+  PluginScreenTarget,
   PluginScreenLocation,
   PluginSidebarItemProps,
   PluginSidebarItemContribution,

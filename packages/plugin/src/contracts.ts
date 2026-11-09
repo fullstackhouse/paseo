@@ -16,6 +16,8 @@ export interface PluginTheme {
     readonly statusSuccess: string;
     readonly statusWarning: string;
     readonly statusDanger: string;
+    /** The sidebar's needs-input orange, for counts of things waiting on the human. Absent on older hosts. */
+    readonly attention?: string;
   };
 }
 
