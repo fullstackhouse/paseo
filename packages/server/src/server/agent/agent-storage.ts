@@ -421,18 +421,6 @@ export class AgentStorage {
     });
   }
 
-  /** Marks agents whose turn a daemon stop cut short, so clients can offer to resume them. */
-  async markInterrupted(agentIds: readonly string[], interruptedAt: string): Promise<void> {
-    await this.load();
-    await Promise.all(
-      agentIds.map(async (agentId) => {
-        await this.waitForPendingWrite(agentId);
-        const record = await this.get(agentId);
-        if (record) await this.upsert({ ...record, interruptedAt });
-      }),
-    );
-  }
-
   /** FSH: clears `background` on these agents' records; their workspace left the background. */
   async clearBackground(agentIds: readonly string[]): Promise<void> {
     await this.load();

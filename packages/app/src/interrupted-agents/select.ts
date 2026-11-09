@@ -1,9 +1,6 @@
 // FSH fork: agents whose turn a daemon restart cut short, offered for resume in one callout.
 import type { Agent } from "@/stores/session-store";
 
-export const RESUME_INTERRUPTED_PROMPT =
-  "Paseo restarted during your last turn, which interrupted it. Continue where you left off.";
-
 type InterruptedCandidate = Pick<Agent, "serverId" | "id" | "status" | "archivedAt"> & {
   interruptedAt?: Date | null;
 };

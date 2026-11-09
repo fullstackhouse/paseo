@@ -22,13 +22,17 @@ export function createRestartRecovery(deps: Dependencies) {
     /** Choose candidates before anything else reads or repairs persisted running status. */
     async prepareStartup() {
       // Startup recovery repairs persisted running status once before agents are restored.
+      const now = new Date().toISOString();
       for (const record of await deps.storage.listAll()) {
-        const pending =
-          deps.settings().enabled &&
+        const candidate =
           (record.resumeOnStartup === true || record.lastStatus === "running") &&
           (await eligible(record));
+        const pending = deps.settings().enabled && candidate;
+        // FSH fork: a record still "running" at startup means the daemon crashed mid-turn.
+        const crashed = candidate && record.lastStatus === "running";
         await deps.storage.upsert({
           ...record,
+          ...(crashed && !record.interruptedAt ? { interruptedAt: now } : {}),
           resumeOnStartup: pending,
           lastStatus:
             record.lastStatus === "running" || record.lastStatus === "initializing"
@@ -47,9 +51,15 @@ export function createRestartRecovery(deps: Dependencies) {
     async captureRunningAgents() {
       await deps.storage.flush();
       // Shutdown recovery captures running state once before the daemon exits.
+      const interruptedAt = new Date().toISOString();
       for (const record of await deps.storage.listAll()) {
+        // FSH fork: interruptedAt marks the agent for the app's Resume all callout.
         if (record.lastStatus === "running" && (await eligible(record)))
-          await deps.storage.upsert({ ...record, resumeOnStartup: deps.settings().enabled });
+          await deps.storage.upsert({
+            ...record,
+            resumeOnStartup: deps.settings().enabled,
+            interruptedAt,
+          });
       }
     },
     /** Resume every candidate in the background; a slow provider holds back only its agent. */

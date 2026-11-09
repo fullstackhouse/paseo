@@ -13,7 +13,7 @@ import { useHostFeature } from "@/runtime/host-features";
 import { useHostRuntimeIsConnected } from "@/runtime/host-runtime";
 import { settingsStyles } from "@/styles/settings";
 
-const DEFAULT_RESUME_PROMPT = "Resume working.";
+export const DEFAULT_RESUME_PROMPT = "Resume working.";
 
 // COMPAT(restartRecovery): added in v0.14.0, remove gate after 2027-04-28.
 export function RestartRecoveryCard({ serverId }: { serverId: string }) {
