@@ -169,7 +169,7 @@ export const DEFAULT_CLIENT_SETTINGS: AppSettings = {
   sidebarFooterItems: [],
   usage: DEFAULT_USAGE_PREFERENCES,
   autoExpandReasoning: false,
-  chatDisplay: "collapseTurns",
+  chatDisplay: "collapseToolCalls",
   chatOutlineEnabled: true,
   vimKeybindings: false,
   sendShortcut: "enter",
@@ -269,7 +269,7 @@ const StoredAppSettingsSchema = z
     sidebarFooterItems: z.array(z.object({ key: z.string(), visible: z.boolean() })).catch([]),
     usage: UsagePreferencesSchema,
     autoExpandReasoning: z.boolean().catch(false),
-    chatDisplay: z.enum(["full", "collapseToolCalls", "collapseTurns"]).optional().catch("full"),
+    chatDisplay: z.enum(["full", "collapseToolCalls", "collapseTurns"]).optional().catch(undefined),
     // COMPAT(toolCallDetailLevel): replaced by chatDisplay in v0.13, remove after 2027-04-24.
     toolCallDetailLevel: z
       .enum(["overview", "detailed"])
@@ -326,10 +326,7 @@ const StoredAppSettingsSchema = z
       (isChecksHiddenByLegacyRowItem(stored.sidebarRowItems)
         ? "none"
         : DEFAULT_SIDEBAR_CHECKS_DISPLAY);
-    const groupsToolCalls = stored.toolCallDetailLevel
-      ? stored.toolCallDetailLevel === "overview"
-      : stored.compactToolCalls === true;
-    const chatDisplay = stored.chatDisplay ?? (groupsToolCalls ? "collapseToolCalls" : "full");
+    const chatDisplay = stored.chatDisplay ?? DEFAULT_CLIENT_SETTINGS.chatDisplay;
     return {
       ...stored,
       openInSidePane,
@@ -399,8 +396,7 @@ export async function loadAppSettingsFromStorage(deps: SettingsDeps): Promise<Ap
     if (read.needsWrite) {
       await writeAppSettings(deps.storage, read.stored, read.settings);
     }
-    const { needsWrite: _needsWrite, ...stored } = read.stored;
-    return await migrateAppSettings(read.settings, deps.storage, stored, { native: isNative });
+    return await migrateAppSettings(read.settings, deps.storage, { native: isNative });
   } catch (error) {
     console.error("[AppSettings] Failed to load settings:", error);
     throw error;
