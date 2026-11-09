@@ -87,6 +87,7 @@ describe("toPluginTheme", () => {
         statusSuccess: lightTheme.colors.statusSuccess,
         statusWarning: lightTheme.colors.statusWarning,
         statusDanger: lightTheme.colors.statusDanger,
+        attention: lightTheme.colors.statusDotWarning,
       },
     });
   });
