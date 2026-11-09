@@ -14,8 +14,9 @@ const AppliedMigrationsSchema = z.strictObject({ applied: z.array(z.string()) })
 const STEER_DEFAULT_MIGRATION = "steer-default";
 
 /**
- * Existing installs carry whichever chat display v0.14 materialized for them (Full, or collapse
- * turns on new installs), which cannot be told apart from a deliberate pick. This moves every
+ * Existing installs carry whichever chat display v0.14 materialized for them (Full or collapse
+ * tool calls from the legacy tool call preference, collapse turns on new installs), which cannot
+ * be told apart from a deliberate pick. This moves every
  * existing install to collapse tool calls once; picking another display afterwards sticks.
  * Only installs that have run migrations before are moved: a fresh profile has nothing stale,
  * and keeps whatever its storage was seeded with.
