@@ -1,6 +1,9 @@
 import type { AgentAddress } from "./addresses.js";
 export const PARENT_SERVER_ID_LABEL = "paseo.parent-server-id";
 export const PARENT_AGENT_ID_LABEL = "paseo.parent-agent-id";
+/** Written by detach in place of the parent labels, so lineage survives a detach. */
+export const DETACHED_FROM_AGENT_ID_LABEL = "paseo.detached-from";
+export const DETACHED_FROM_SERVER_ID_LABEL = "paseo.detached-from-server-id";
 const OPEN_AGENT_TAB_LABEL_PREFIX = "paseo.open-agent-tab.";
 
 export function getOpenAgentTabLabel(clientId: string): string {
@@ -50,4 +53,19 @@ export function getParentAddressFromLabels(
 }
 export function parentAddressLabels(parent: AgentAddress): Record<string, string> {
   return { [PARENT_AGENT_ID_LABEL]: parent.agentId, [PARENT_SERVER_ID_LABEL]: parent.serverId };
+}
+
+function readLabel(labels: Record<string, unknown> | null | undefined, label: string) {
+  const value = labels?.[label];
+  return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
+}
+
+/** The agent a detached agent was started by. Absent host label means the same host. */
+export function getDetachedFromAddressFromLabels(
+  labels: Record<string, unknown> | null | undefined,
+  serverId: string,
+): AgentAddress | null {
+  const agentId = readLabel(labels, DETACHED_FROM_AGENT_ID_LABEL);
+  if (!agentId) return null;
+  return { serverId: readLabel(labels, DETACHED_FROM_SERVER_ID_LABEL) ?? serverId, agentId };
 }

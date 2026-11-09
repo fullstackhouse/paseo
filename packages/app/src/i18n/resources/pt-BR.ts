@@ -2197,6 +2197,7 @@ export const ptBR: TranslationResources = {
       noAgent: "Abra um agente para ver sua linhagem",
       notLoaded: "Não carregado",
       archived: "Arquivado",
+      detached: "Desvinculado",
       agent: "Agente",
     },
     diff: {

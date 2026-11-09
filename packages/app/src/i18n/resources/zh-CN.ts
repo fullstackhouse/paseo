@@ -2137,6 +2137,7 @@ export const zhCN: TranslationResources = {
       noAgent: "打开一个代理以查看其谱系",
       notLoaded: "未加载",
       archived: "已归档",
+      detached: "已分离",
       agent: "代理",
     },
     diff: {

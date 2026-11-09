@@ -1,6 +1,6 @@
 # Spec: Lineage tab in the Explorer sidebar
 
-Status: phases 1–4 implemented · 2026-11-09 · detach follow-up open
+Status: implemented · 2026-11-09
 
 ## Problem
 
@@ -96,7 +96,8 @@ stops it from coming back for that workspace (`open-supporting-view.ts` pattern)
 3. Automatic reveal once per workspace, with the close opt-out.
 4. Update `docs/explorer-sidebar.md` (panel list, reveal rule) and `docs/agent-lifecycle.md`
    (Relationships → where lineage is shown). Add an FSH.md patch line.
-5. Follow-up: `paseo.detached-from` on detach, shown as "(detached)" in Lineage.
+5. Detach writes `paseo.detached-from` (plus `paseo.detached-from-server-id` when the parent was on another
+   host), also when an archived parent detaches a child. Lineage follows it both ways and marks the row "Detached".
 
 ## Verification
 
