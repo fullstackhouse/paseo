@@ -78,3 +78,15 @@ export function computeNotificationPlan({
 export function isPushEligibleAttentionReason(reason: AgentAttentionReason): boolean {
   return reason !== "error";
 }
+
+/**
+ * A finished turn in a background workspace notifies nobody: the workspace is hidden, and the
+ * plugin that started it sends its own notification. Errors and permission prompts still notify,
+ * since nothing else would surface them.
+ */
+export function isQuietBackgroundAttention(
+  workspace: { background?: boolean } | null,
+  reason: AgentAttentionReason,
+): boolean {
+  return workspace?.background === true && reason === "finished";
+}
