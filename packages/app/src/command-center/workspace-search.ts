@@ -1,8 +1,8 @@
 import {
+  compareBuiltInRows,
   compareBuiltInScores,
-  compareByRecency,
   filterAndRankBuiltInResults,
-  scoreSearchFields,
+  scoreBuiltInFields,
   type CommandCenterScore,
   type CommandCenterWorkspaceResult,
 } from "./results";
@@ -42,7 +42,7 @@ function compareScoredWorkspaces(left: ScoredWorkspace, right: ScoredWorkspace):
     const scoreDelta = compareBuiltInScores(left.score, right.score);
     if (scoreDelta !== 0) return scoreDelta;
   }
-  return compareByRecency(left.workspace, right.workspace);
+  return compareBuiltInRows(left.workspace, right.workspace);
 }
 
 export function filterAndRankWorkspaces(
@@ -54,7 +54,7 @@ export function filterAndRankWorkspaces(
   const changeRequestNumber = parseChangeRequestQuery(query);
   const matches: ScoredWorkspace[] = [];
   for (const workspace of workspaces) {
-    const score = scoreSearchFields(query, searchFields(workspace));
+    const score = scoreBuiltInFields(query, searchFields(workspace));
     const changeRequestHit =
       changeRequestNumber !== null && workspace.changeRequestNumber === changeRequestNumber;
     if (score || changeRequestHit) matches.push({ workspace, score, changeRequestHit });

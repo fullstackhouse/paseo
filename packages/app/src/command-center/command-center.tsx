@@ -33,6 +33,7 @@ import type { SurfaceBackdrop } from "@/styles/surface-backdrop";
 import type { Theme } from "@/styles/theme";
 import { HighlightedText, type HighlightedTextProps } from "@/components/ui/highlighted-text";
 import { findHighlightRanges } from "@/components/ui/highlighted-text-segments";
+import { RECALL_MATCH_OPTIONS, type TextFieldsOptions } from "@getpaseo/protocol/search/text-match";
 import { MaterialFileIcon } from "@/components/material-file-icon";
 import { ProjectIconView } from "@/components/project-icon-view";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
@@ -47,7 +48,9 @@ import {
 } from "@/components/ui/isolated-bottom-sheet-modal";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { isNative, isWeb } from "@/constants/platform";
-import { useAggregatedAgents } from "@/hooks/use-aggregated-agents";
+import { type AggregatedAgent, useAggregatedAgents } from "@/hooks/use-aggregated-agents";
+import { useAgentHistory } from "@/hooks/use-agent-history";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { useProjects } from "@/hooks/use-projects";
 import { useTimeAgo } from "@/hooks/use-time-ago";
 import { createProjectIconTarget } from "@/projects/icon-target";
@@ -80,6 +83,7 @@ import {
 } from "./list-metrics";
 import { useCommandCenterContributions } from "./provider";
 import { filterAndRankWorkspaces } from "./workspace-search";
+import { agentSearchFields, buildArchivedSearchRows } from "./archived-search";
 import {
   buildContributionSections,
   filterAndRankBuiltInResults,
@@ -91,7 +95,6 @@ import {
   type CommandCenterListRow,
   type CommandCenterResult,
   type CommandCenterResultSection,
-  type CommandCenterSearchFields,
   type CommandCenterWorkspaceResult,
 } from "./results";
 import { createCommandCenterInteraction, type CommandCenterInteraction } from "./interaction";
@@ -114,11 +117,10 @@ const ThemedLoadingSpinner = withUnistyles(LoadingSpinner, (theme) => ({
 }));
 const COMMAND_CENTER_SNAP_POINTS = ["60%", "90%"];
 const KEYBOARD_SHOULD_PERSIST_TAPS = "always" as const;
+const EMPTY_AGENTS: readonly AggregatedAgent[] = [];
 
-/** `cwd` is not rendered, so a path match must never outrank a match on text the user can see. */
-function agentSearchFields(result: CommandCenterAgentResult): CommandCenterSearchFields {
-  return { visible: [result.title, result.subtitle], hidden: [result.agent.cwd] };
-}
+/** Same pause History search waits before asking the hosts. */
+const ARCHIVED_SEARCH_DEBOUNCE_MS = 200;
 
 function createWorkspaceResultAction(serverId: string, workspaceId: string) {
   return () => {
@@ -208,6 +210,7 @@ function useBuiltInRows(open: boolean): {
               project: workspaceProject,
               changeRequestNumber: workspace.changeRequestNumber,
               activityAt: workspace.statusEnteredAt,
+              archived: false,
               run: createWorkspaceResultAction(host.serverId, workspace.id),
             }),
           );
@@ -231,6 +234,7 @@ function useBuiltInRows(open: boolean): {
           workspaceTitle ?? shortenPath(agent.cwd),
         ]),
         activityAt: agent.lastActivityAt,
+        archived: false,
         run: createAgentResultAction(agent.serverId, agent.id),
       });
     });
@@ -239,9 +243,45 @@ function useBuiltInRows(open: boolean): {
   }, [agents, iconDataByProjectViewKey, open, projects, showHost, t]);
 }
 
-function useBuiltInSections(open: boolean, query: string): CommandCenterResultSection[] {
+/**
+ * Add what History search finds for the query to the live rows. The live lists hold only active
+ * workspaces and agents; History search is the daemon's own search over every session, archived
+ * included, so Cmd+K finds what the History screen finds.
+ */
+function useRowsWithArchivedMatches(
+  open: boolean,
+  query: string,
+): ReturnType<typeof useBuiltInRows> {
   const { t } = useTranslation();
   const rows = useBuiltInRows(open);
+  const showHost = useHosts().length > 1;
+  const search = useDebouncedValue(query, ARCHIVED_SEARCH_DEBOUNCE_MS).trim();
+  const history = useAgentHistory({ enabled: open, search, searchOnly: true });
+  const historyAgents = query.trim() ? history.agents : EMPTY_AGENTS;
+
+  return useMemo(() => {
+    if (historyAgents.length === 0) return rows;
+    const archived = buildArchivedSearchRows({
+      historyAgents,
+      listedWorkspaceKeys: new Set(
+        rows.workspaces.map((row) => `${row.serverId}:${row.workspaceId}`),
+      ),
+      listedAgentKeys: new Set(rows.agents.map((row) => `${row.agent.serverId}:${row.agent.id}`)),
+      showHost,
+      agentTitle: (agent) => resolveAgentLabel(agent.title) ?? t("workspace.tabs.loading"),
+      openWorkspace: createWorkspaceResultAction,
+      openAgent: createAgentResultAction,
+    });
+    return {
+      workspaces: [...rows.workspaces, ...archived.workspaces],
+      agents: [...rows.agents, ...archived.agents],
+    };
+  }, [historyAgents, rows, showHost, t]);
+}
+
+function useBuiltInSections(open: boolean, query: string): CommandCenterResultSection[] {
+  const { t } = useTranslation();
+  const rows = useRowsWithArchivedMatches(open, query);
 
   return useMemo(() => {
     if (!open) return [];
@@ -497,42 +537,54 @@ const ResultRow = memo(function ResultRow({
 function QueryHighlightedText({
   query,
   text,
+  matchOptions,
   ...props
-}: { query: string } & Omit<HighlightedTextProps, "ranges">) {
-  const ranges = useMemo(() => findHighlightRanges(query, text), [query, text]);
+}: { query: string; matchOptions?: TextFieldsOptions } & Omit<HighlightedTextProps, "ranges">) {
+  const ranges = useMemo(
+    () => findHighlightRanges(query, text, matchOptions),
+    [matchOptions, query, text],
+  );
   return <HighlightedText text={text} ranges={ranges} {...props} />;
 }
 
 /**
  * The subtitle line of a workspace or agent row. The timestamp is its own text so a long branch
  * truncates without pushing the time out of view, and so the time is never part of what the
- * query matches against. It keeps itself current while the command center stays open.
+ * query matches against. It keeps itself current while the command center stays open. An
+ * archived row says so after the time, where truncation cannot hide it.
  */
 function SubtitleWithTimestamp({
   query,
   subtitle,
   activityAt,
+  archived,
   testID,
 }: {
   query: string;
   subtitle: string;
   activityAt: Date | null;
+  archived: boolean;
   testID: string;
 }) {
+  const { t } = useTranslation();
   const timeAgo = useTimeAgo(activityAt);
+  const trailing = [timeAgo, archived ? t("agentList.badges.archived") : null]
+    .filter(Boolean)
+    .join(" · ");
   return (
     <View style={styles.subtitleLine}>
       <QueryHighlightedText
         query={query}
         text={subtitle}
+        matchOptions={RECALL_MATCH_OPTIONS}
         style={[styles.subtitle, styles.subtitleText]}
         numberOfLines={1}
         testID={testID}
       />
-      {timeAgo ? (
+      {trailing ? (
         <Text style={styles.subtitle} numberOfLines={1} testID="command-center-result-timestamp">
           {/* Non-breaking: web collapses a leading plain space in its own flex item. */}
-          {subtitle ? `\u00a0· ${timeAgo}` : timeAgo}
+          {subtitle ? `\u00a0· ${trailing}` : trailing}
         </Text>
       ) : null}
     </View>
@@ -573,6 +625,7 @@ function AgentResultContent({
           <QueryHighlightedText
             query={query}
             text={result.title}
+            matchOptions={RECALL_MATCH_OPTIONS}
             style={styles.title}
             numberOfLines={1}
           />
@@ -580,6 +633,7 @@ function AgentResultContent({
             query={query}
             subtitle={result.subtitle}
             activityAt={result.activityAt}
+            archived={result.archived}
             testID="command-center-agent-subtitle"
           />
         </View>
@@ -669,6 +723,7 @@ function ResultContent({
             <QueryHighlightedText
               query={query}
               text={result.title}
+              matchOptions={RECALL_MATCH_OPTIONS}
               style={styles.title}
               numberOfLines={1}
             />
@@ -676,6 +731,7 @@ function ResultContent({
               query={query}
               subtitle={result.subtitle}
               activityAt={result.activityAt}
+              archived={result.archived}
               testID="command-center-workspace-subtitle"
             />
           </View>
