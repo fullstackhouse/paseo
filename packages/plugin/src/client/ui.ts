@@ -192,9 +192,20 @@ export declare const Loading: ComponentType;
 /** Render a local document URL in an isolated frame. */
 export declare const DocumentFrame: ComponentType<{ url: string; testID?: string }>;
 
+export interface MarkdownBlockRange {
+  /** One-based source lines, including the gap before the next top-level block. */
+  startLine: number;
+  endLine: number;
+}
+
 export interface MarkdownProps {
   children: string;
+  compact?: boolean;
+  /** Insert review annotations after blocks. Return null to keep adjacent text together. */
+  afterBlock?: (block: MarkdownBlockRange) => ReactNode;
 }
 
 /** Renders Markdown using Paseo’s theme, selection, and link behavior. */
-export declare const Markdown: ComponentType<MarkdownProps>;
+export declare const Markdown: ComponentType<MarkdownProps> & {
+  readonly supportsBlockAnnotations: true;
+};
