@@ -369,7 +369,9 @@ function getPrimaryActionId(input: BuildGitActionsInput): GitActionId | null {
   if (!input.isOnBaseBranch && input.aheadCount > 0) {
     return "merge-branch";
   }
-  if (!input.isOnBaseBranch && canMergeFromBase(input)) {
+  // A Paseo worktree with no commits of its own has nothing to update: its work is done or went
+  // elsewhere, so Archive beats Update from base.
+  if (canMergeFromBase(input) && !input.isPaseoOwnedWorktree) {
     return "merge-from-base";
   }
   if (input.githubFeaturesEnabled && input.hasPullRequest && input.pullRequestUrl) {
