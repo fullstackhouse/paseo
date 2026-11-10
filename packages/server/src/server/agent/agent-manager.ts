@@ -1655,7 +1655,11 @@ export class AgentManager {
         initialTitle,
         publishWhenReady: true,
       });
-      for (const event of settleReplayedSubagents(imported.providerSubagentEvents ?? [])) {
+      const liveRunningIds = this.runningProviderSubagentIds(agent.id);
+      for (const event of settleReplayedSubagents(
+        imported.providerSubagentEvents ?? [],
+        liveRunningIds,
+      )) {
         const update = this.providerSubagents.apply(agent.id, event.provider, event.event);
         this.dispatch({ type: "provider_subagent", event: update });
       }
@@ -4481,12 +4485,7 @@ export class AgentManager {
     this.timelineStore.initialize(agent.id, { timestamp: new Date().toISOString() });
     agent.historyPrimed = true;
 
-    const liveRunningIds = new Set(
-      this.providerSubagents
-        .list(agent.id)
-        .filter((subagent) => subagent.status === "running")
-        .map((subagent) => subagent.id),
-    );
+    const liveRunningIds = this.runningProviderSubagentIds(agent.id);
     for (const event of this.providerSubagents.deleteParent(agent.id)) {
       if (broadcast) {
         this.dispatch({ type: "provider_subagent", event });
@@ -4558,7 +4557,8 @@ export class AgentManager {
       row: AgentTimelineRow;
     }> = [];
     const providerSubagentEvents: AgentManagerEvent[] = [];
-    for (const event of settleReplayedSubagents(historySubagentEvents)) {
+    const liveRunningIds = this.runningProviderSubagentIds(agent.id);
+    for (const event of settleReplayedSubagents(historySubagentEvents, liveRunningIds)) {
       const update = this.providerSubagents.apply(agent.id, event.provider, event.event);
       const managerEvent: AgentManagerEvent = { type: "provider_subagent", event: update };
       if (deferredBroadcast) {
@@ -5361,6 +5361,16 @@ export class AgentManager {
       this.broadcastAgentAttention(agent, "error");
       return;
     }
+  }
+
+  /** Children the live provider process has reported running, which a replay must not settle. */
+  private runningProviderSubagentIds(agentId: string): Set<string> {
+    return new Set(
+      this.providerSubagents
+        .list(agentId)
+        .filter((subagent) => subagent.status === "running")
+        .map((subagent) => subagent.id),
+    );
   }
 
   private hasRunningProviderSubagents(agentId: string): boolean {
