@@ -947,10 +947,16 @@ import { Markdown } from "@getpaseo/plugin/client/ui";
 <Markdown>{"## Review\n\nThe checks **passed**."}</Markdown>;
 ```
 
-`children` is the only prop and must be a string. Updating it renders the new content
+`children` must be a string. Updating it renders the new content
 immediately; an empty string renders nothing. The host supplies theme, text selection,
 code blocks, tables, diagrams, and link handling. Workspace file links and images use
 workspace context when the containing surface supplies it.
+
+Use `compact` for denser review cards. For inline review comments, pass
+`afterBlock={({ startLine, endLine }) => …}`. The range uses one-based inclusive
+source lines and includes the gap before the next top-level block. Return `null`
+when there is no annotation: adjacent text stays in one selectable view. Lists,
+tables and fenced diagrams stay whole; reference links retain document context.
 
 The component adds no page padding or scroll container. Use a surrounding layout or
 scroll view when needed. Fetching content and showing loading or error states belong
