@@ -99,8 +99,16 @@ function summaryRow(
   };
 }
 
+/**
+ * Plugin rows are widgets the reader may need to act on, such as an ask's buttons. A plugin row
+ * that renders an assistant message is that message, so it folds like one.
+ */
 function staysVisibleWhenCollapsed(item: StreamItem): boolean {
-  return isTurnTrigger(item) || item.kind === "compaction";
+  return (
+    isTurnTrigger(item) ||
+    item.kind === "compaction" ||
+    (item.kind === "plugin" && item.sourceKind !== "assistant_message")
+  );
 }
 
 function isAssistantReply(item: StreamItem): boolean {
@@ -130,7 +138,8 @@ function findLastReplyIndex(tail: StreamItem[], start: number, end: number): num
  * Folds each answered turn behind a summary row under its user message: everything the agent
  * did before its last message collapses into that row, and the last message stays in the chat.
  * A turn folds only once it is complete, its user message is loaded, and it sent messages or
- * called tools before its reply. Reasoning is revealed only when the turn opens.
+ * called tools before its reply. Plugin widgets stay in
+ * the chat. Reasoning is revealed only when the turn opens.
  */
 export function collapseTurns(input: CollapseTurnsInput): TurnCollapse {
   const { tail } = input;
