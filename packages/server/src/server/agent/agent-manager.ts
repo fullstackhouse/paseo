@@ -107,6 +107,7 @@ import { extractAttention } from "../persistence-hooks.js";
 
 const RELOAD_SESSION_CLOSE_TIMEOUT_MS = 3_000;
 const INTERRUPT_SESSION_TIMEOUT_MS = 2_000;
+const SUBAGENT_WAKE_GRACE_MS = 5_000;
 const IMPORTABLE_SESSION_LIST_TIMEOUT_MS = 90_000;
 const STORED_AGENT_CAPABILITIES: AgentCapabilityFlags = {
   supportsStreaming: false,
@@ -352,6 +353,8 @@ export interface AgentManagerOptions {
   resolvePlanApprovalModeId?: (provider: AgentProvider) => string | null | undefined;
   appendSystemPrompt?: string;
   agentStreamCoalesceWindowMs?: number;
+  /** How long a provider has to wake an agent after its last background subagent settles. */
+  subagentWakeGraceMs?: number;
   rescueTimeouts?: AgentManagerRescueTimeouts;
   beforeSteerUnavailableFallback?: (input: {
     agentId: string;
@@ -786,6 +789,9 @@ export class AgentManager {
   private readonly registry?: AgentStorage;
   private readonly durableTimelineStore?: AgentTimelineStore;
   private readonly previousStatuses = new Map<string, AgentLifecycleStatus>();
+  /** Finished turns held back while background subagents ran, with their wake grace timer. */
+  private readonly deferredFinishes = new Map<string, ReturnType<typeof setTimeout> | null>();
+  private readonly subagentWakeGraceMs: number | undefined;
   private readonly backgroundTasks = new Set<Promise<void>>();
   private readonly agentRegistrationTasks = new Set<Promise<void>>();
   private readonly inFlightAgentCloses = new Map<string, Promise<void>>();
@@ -839,6 +845,7 @@ export class AgentManager {
         options.rescueTimeouts?.interruptSessionMs ?? INTERRUPT_SESSION_TIMEOUT_MS,
     };
     this.beforeSteerUnavailableFallback = options.beforeSteerUnavailableFallback;
+    this.subagentWakeGraceMs = options.subagentWakeGraceMs;
     this.agentStreamCoalescer = new AgentStreamCoalescer({
       windowMs: options.agentStreamCoalesceWindowMs ?? AGENT_STREAM_COALESCE_DEFAULT_WINDOW_MS,
       timers: { setTimeout, clearTimeout },
@@ -4132,6 +4139,7 @@ export class AgentManager {
     this.agentStreamCoalescer.flushAndDiscard(agent.id);
     this.agents.delete(agent.id);
     this.previousStatuses.delete(agent.id);
+    this.cancelDeferredFinish(agent.id);
     if (agent.unsubscribeSession) {
       agent.unsubscribeSession();
       agent.unsubscribeSession = null;
@@ -4275,6 +4283,7 @@ export class AgentManager {
     if (event.type === "provider_subagent") {
       const update = this.providerSubagents.apply(agent.id, event.provider, event.event);
       this.dispatch({ type: "provider_subagent", event: update });
+      this.armDeferredFinish(agent.id);
       return;
     }
     if (event.type === "background_work") {
@@ -5299,6 +5308,9 @@ export class AgentManager {
 
     // Track the new status
     this.previousStatuses.set(agent.id, currentStatus);
+    if (currentStatus !== "idle") {
+      this.cancelDeferredFinish(agent.id);
+    }
 
     // Skip attention tracking for internal agents
     if (agent.internal) {
@@ -5310,7 +5322,18 @@ export class AgentManager {
       return;
     }
 
-    // Check if agent transitioned from running to idle (finished)
+    // A turn that ends while background subagents still run is an interim update. Claude wakes
+    // the agent with their results and that turn is the one worth announcing; armDeferredFinish
+    // covers providers that don't wake it.
+    if (
+      previousStatus === "running" &&
+      currentStatus === "idle" &&
+      this.hasRunningProviderSubagents(agent.id)
+    ) {
+      this.deferredFinishes.set(agent.id, null);
+      return;
+    }
+
     if (previousStatus === "running" && currentStatus === "idle") {
       agent.attention = {
         requiresAttention: true,
@@ -5331,6 +5354,51 @@ export class AgentManager {
       this.broadcastAgentAttention(agent, "error");
       return;
     }
+  }
+
+  private hasRunningProviderSubagents(agentId: string): boolean {
+    return this.providerSubagents.list(agentId).some((subagent) => subagent.status === "running");
+  }
+
+  /**
+   * Once the last background subagent of an agent with a held-back finish settles, give the
+   * provider a grace window to wake the agent. If it stays idle, announce the held-back finish.
+   */
+  private armDeferredFinish(agentId: string): void {
+    if (!this.deferredFinishes.has(agentId) || this.deferredFinishes.get(agentId)) {
+      return;
+    }
+    if (this.hasRunningProviderSubagents(agentId)) {
+      return;
+    }
+    const timer = setTimeout(() => {
+      this.deferredFinishes.set(agentId, null);
+      const agent = this.agents.get(agentId);
+      if (!agent || agent.lifecycle !== "idle" || this.hasRunningProviderSubagents(agentId)) {
+        return;
+      }
+      this.deferredFinishes.delete(agentId);
+      if (agent.attention.requiresAttention) {
+        return;
+      }
+      agent.attention = {
+        requiresAttention: true,
+        attentionReason: "finished",
+        attentionTimestamp: new Date(),
+      };
+      this.broadcastAgentAttention(agent, "finished");
+      this.emitState(agent);
+    }, this.subagentWakeGraceMs ?? SUBAGENT_WAKE_GRACE_MS);
+    timer.unref?.();
+    this.deferredFinishes.set(agentId, timer);
+  }
+
+  private cancelDeferredFinish(agentId: string): void {
+    const timer = this.deferredFinishes.get(agentId);
+    if (timer) {
+      clearTimeout(timer);
+    }
+    this.deferredFinishes.delete(agentId);
   }
 
   private enqueueBackgroundPersist(agent: ManagedAgent): void {
