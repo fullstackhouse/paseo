@@ -101,6 +101,7 @@ import {
   type ProviderSubagentDescriptor,
   type ProviderSubagentStoreEvent,
 } from "./provider-subagents/store.js";
+import { settleReplayedSubagents } from "./provider-subagents/settle-replayed.js";
 import { AgentBackgroundWorkStore, type AgentBackgroundWorkItem } from "./background-work/store.js";
 import { withTimeout } from "../../utils/promise-timeout.js";
 import { extractAttention } from "../persistence-hooks.js";
@@ -1654,7 +1655,7 @@ export class AgentManager {
         initialTitle,
         publishWhenReady: true,
       });
-      for (const event of imported.providerSubagentEvents ?? []) {
+      for (const event of settleReplayedSubagents(imported.providerSubagentEvents ?? [])) {
         const update = this.providerSubagents.apply(agent.id, event.provider, event.event);
         this.dispatch({ type: "provider_subagent", event: update });
       }
@@ -4480,12 +4481,18 @@ export class AgentManager {
     this.timelineStore.initialize(agent.id, { timestamp: new Date().toISOString() });
     agent.historyPrimed = true;
 
+    const liveRunningIds = new Set(
+      this.providerSubagents
+        .list(agent.id)
+        .filter((subagent) => subagent.status === "running")
+        .map((subagent) => subagent.id),
+    );
     for (const event of this.providerSubagents.deleteParent(agent.id)) {
       if (broadcast) {
         this.dispatch({ type: "provider_subagent", event });
       }
     }
-    for (const event of providerSubagentEvents) {
+    for (const event of settleReplayedSubagents(providerSubagentEvents, liveRunningIds)) {
       const update = this.providerSubagents.apply(agent.id, event.provider, event.event);
       if (broadcast) {
         this.dispatch({ type: "provider_subagent", event: update });
@@ -4551,7 +4558,7 @@ export class AgentManager {
       row: AgentTimelineRow;
     }> = [];
     const providerSubagentEvents: AgentManagerEvent[] = [];
-    for (const event of historySubagentEvents) {
+    for (const event of settleReplayedSubagents(historySubagentEvents)) {
       const update = this.providerSubagents.apply(agent.id, event.provider, event.event);
       const managerEvent: AgentManagerEvent = { type: "provider_subagent", event: update };
       if (deferredBroadcast) {
