@@ -74,6 +74,11 @@ export function shouldClearAgentAttention(input: ShouldClearAgentAttentionInput)
   if (input.attentionReason === "permission") {
     return false;
   }
+  // FSH: viewing a finished agent is not reviewing it. "Ready to review" stays until the
+  // next prompt or an explicit Mark as read (workspace menu).
+  if (input.attentionReason === "finished" && input.trigger && input.trigger !== "prompt-send") {
+    return false;
+  }
   if (input.trigger === "focus-entry" && input.hasDeferredFocusEntryClear === true) {
     return false;
   }
