@@ -5726,28 +5726,29 @@ test("runAgent persists finished attention and idle status without an external s
   expect(persisted?.attentionTimestamp).toEqual(expect.any(String));
 });
 
-test("a turn that ends with background subagents still running does not ask for attention", async () => {
+async function startAgentWithBackgroundSubagent(options: { subagentWakeGraceMs: number }) {
   const workdir = mkdtempSync(join(tmpdir(), "agent-manager-subagent-attention-"));
   const attentionEvents: string[] = [];
-  const storage = new AgentStorage(join(workdir, "agents"), logger);
-  let activeSession: TestAgentSession | null = null;
+  let session: TestAgentSession | null = null;
   class ProviderChildClient extends TestAgentClient {
     override async createSession(config: AgentSessionConfig): Promise<AgentSession> {
-      activeSession = new TestAgentSession(config);
-      return activeSession;
+      session = new TestAgentSession(config);
+      return session;
     }
   }
   const manager = new AgentManager({
     clients: { codex: new ProviderChildClient() },
-    registry: storage,
+    registry: new AgentStorage(join(workdir, "agents"), logger),
     logger,
-    idFactory: () => "00000000-0000-4000-8000-000000000135",
+    subagentWakeGraceMs: options.subagentWakeGraceMs,
     onAgentAttention: (event) => attentionEvents.push(event.reason),
   });
   const snapshot = await manager.createAgent({ provider: "codex", cwd: workdir }, undefined, {
     workspaceId: undefined,
   });
-  activeSession?.pushEvent({
+  const activeSession = session as TestAgentSession | null;
+  if (!activeSession) throw new Error("session was not created");
+  activeSession.pushEvent({
     type: "provider_subagent",
     provider: "codex",
     event: { type: "upsert", id: "research", title: "Research", status: "running" },
@@ -5756,11 +5757,10 @@ test("a turn that ends with background subagents still running does not ask for 
 
   await manager.runAgent(snapshot.id, "fan out");
   await manager.flush();
-
   expect(manager.getAgent(snapshot.id)?.attention.requiresAttention).toBe(false);
   expect(attentionEvents).toEqual([]);
 
-  activeSession?.pushEvent({
+  activeSession.pushEvent({
     type: "provider_subagent",
     provider: "codex",
     event: { type: "upsert", id: "research", status: "completed" },
@@ -5770,14 +5770,34 @@ test("a turn that ends with background subagents still running does not ask for 
       expect.objectContaining({ status: "completed" }),
     ]),
   );
+  return { manager, session: activeSession, agentId: snapshot.id, attentionEvents };
+}
 
-  await manager.runAgent(snapshot.id, "subagent finished");
-  await manager.flush();
+test("a turn that ends with background subagents running waits for the provider's wake turn", async () => {
+  const { manager, session, agentId, attentionEvents } = await startAgentWithBackgroundSubagent({
+    subagentWakeGraceMs: 60_000,
+  });
 
-  expect(manager.getAgent(snapshot.id)?.attention).toEqual(
+  session.pushEvent({ type: "turn_started", provider: "codex", turnId: "wake-turn" });
+  await vi.waitFor(() => expect(manager.getAgent(agentId)?.lifecycle).toBe("running"));
+  session.pushEvent({ type: "turn_completed", provider: "codex", turnId: "wake-turn" });
+  await vi.waitFor(() => expect(manager.getAgent(agentId)?.lifecycle).toBe("idle"));
+
+  expect(manager.getAgent(agentId)?.attention).toEqual(
     expect.objectContaining({ requiresAttention: true, attentionReason: "finished" }),
   );
   expect(attentionEvents).toEqual(["finished"]);
+});
+
+test("a held-back finish is announced when no wake turn follows the last subagent", async () => {
+  const { manager, agentId, attentionEvents } = await startAgentWithBackgroundSubagent({
+    subagentWakeGraceMs: 10,
+  });
+
+  await vi.waitFor(() => expect(attentionEvents).toEqual(["finished"]));
+  expect(manager.getAgent(agentId)?.attention).toEqual(
+    expect.objectContaining({ requiresAttention: true, attentionReason: "finished" }),
+  );
 });
 
 test("archiveSnapshot clears persisted attention and normalizes running status", async () => {
