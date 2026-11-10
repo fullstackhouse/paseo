@@ -848,3 +848,79 @@ it.each([false, true])(
     expect(markdownStyle.codeBlock?.fontSize).toBe(theme.fontSize.code);
   },
 );
+
+describe("Markdown block annotations", () => {
+  it("keeps unannotated source together and only splits after annotations", async () => {
+    const { annotateMarkdown } = await import("./annotations");
+    const source = "# Title\n\nFirst.\n\nSecond.";
+    expect(annotateMarkdown(source, () => null)).toEqual([{ source, startOffset: 0 }]);
+    expect(annotateMarkdown(source, () => false)).toEqual([{ source, startOffset: 0 }]);
+    const ranges: unknown[] = [];
+    expect(
+      annotateMarkdown(source, (range) => {
+        ranges.push(range);
+        return range.startLine === 3 ? "comment" : null;
+      }),
+    ).toEqual([
+      { source: "# Title\n\nFirst.\n\n", startOffset: 0, after: "comment" },
+      { source: "Second.", startOffset: 17 },
+    ]);
+    expect(ranges).toEqual([
+      { startLine: 1, endLine: 2 },
+      { startLine: 3, endLine: 4 },
+      { startLine: 5, endLine: 5 },
+    ]);
+  });
+
+  it("assigns gap lines to the preceding block without stripping the next block indentation", async () => {
+    const { annotateMarkdown } = await import("./annotations");
+    const source = "First.\r\n\r\n  ```mermaid\r\n  graph TD\r\n  A-->B\r\n  ```";
+    const parts = annotateMarkdown(source, ({ startLine, endLine }) =>
+      startLine <= 2 && endLine >= 2 ? "gap comment" : null,
+    );
+    expect(parts).toEqual([
+      { source: "First.\r\n\r\n", startOffset: 0, after: "gap comment" },
+      { source: "  ```mermaid\r\n  graph TD\r\n  A-->B\r\n  ```", startOffset: 10 },
+    ]);
+  });
+
+  it("includes leading definitions and definition-only documents in annotation ranges", async () => {
+    const { annotateMarkdown } = await import("./annotations");
+    for (const source of ["[link]: /first\n\nText", "[link]: /first\n"]) {
+      const ranges: unknown[] = [];
+      const parts = annotateMarkdown(source, (range) => {
+        ranges.push(range);
+        return "definition comment";
+      });
+      expect(ranges).toEqual([{ startLine: 1, endLine: source.split("\n").length }]);
+      expect(parts).toHaveLength(1);
+      expect(parts[0].after).toBe("definition comment");
+    }
+  });
+
+  it("keeps Mermaid fences, tables and nested lists whole", async () => {
+    const { annotateMarkdown } = await import("./annotations");
+    const blocks = [
+      "```mermaid\ngraph TD\nA-->B\n```",
+      "| a | b |\n|---|---|\n| x | y |",
+      "- one\n  - nested\n- two",
+    ];
+    const parts = annotateMarkdown(blocks.join("\n\n"), ({ startLine }) => startLine);
+    expect(parts.map((part) => part.source.trim())).toEqual(blocks);
+    expect(parts.map((part) => part.after)).toEqual([1, 6, 10]);
+  });
+
+  it("retains first reference definitions across annotated fragments", async () => {
+    const { annotateMarkdown } = await import("./annotations");
+    const source = '[before][link]\n\n[link]: /first "Title"\n\n[after][link]\n\n[link]: /second';
+    const parts = annotateMarkdown(source, ({ startLine }) => (startLine === 1 ? "comment" : null));
+    expect(parts).toHaveLength(2);
+    for (const part of parts) {
+      const tree = fromMarkdown(part.source);
+      expect(tree.children.find((node) => node.type === "definition")).toMatchObject({
+        url: "/first",
+        title: "Title",
+      });
+    }
+  });
+});
