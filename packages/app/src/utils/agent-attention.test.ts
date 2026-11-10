@@ -107,13 +107,51 @@ describe("shouldClearAgentAttention", () => {
     ).toBe(false);
   });
 
-  it("returns true for explicit follow-up entrypoints after deferred focus clear", () => {
+  it("keeps finished attention (Ready to review) until a prompt is sent", () => {
+    for (const trigger of ["focus-entry", "input-focus", "agent-blur"] as const) {
+      expect(
+        shouldClearAgentAttention({
+          agentId: "agent-1",
+          isConnected: true,
+          requiresAttention: true,
+          attentionReason: "finished",
+          trigger,
+        }),
+      ).toBe(false);
+    }
+
     expect(
       shouldClearAgentAttention({
         agentId: "agent-1",
         isConnected: true,
         requiresAttention: true,
         attentionReason: "finished",
+        trigger: "prompt-send",
+      }),
+    ).toBe(true);
+  });
+
+  it("clears error attention on view and blur", () => {
+    for (const trigger of ["focus-entry", "input-focus", "agent-blur", "prompt-send"] as const) {
+      expect(
+        shouldClearAgentAttention({
+          agentId: "agent-1",
+          isConnected: true,
+          requiresAttention: true,
+          attentionReason: "error",
+          trigger,
+        }),
+      ).toBe(true);
+    }
+  });
+
+  it("returns true for explicit follow-up entrypoints after deferred focus clear", () => {
+    expect(
+      shouldClearAgentAttention({
+        agentId: "agent-1",
+        isConnected: true,
+        requiresAttention: true,
+        attentionReason: "error",
         trigger: "input-focus",
         hasDeferredFocusEntryClear: true,
       }),
@@ -135,7 +173,7 @@ describe("shouldClearAgentAttention", () => {
         agentId: "agent-1",
         isConnected: true,
         requiresAttention: true,
-        attentionReason: "finished",
+        attentionReason: "error",
         trigger: "agent-blur",
         hasDeferredFocusEntryClear: true,
       }),
