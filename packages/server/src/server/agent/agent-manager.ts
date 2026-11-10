@@ -5310,8 +5310,13 @@ export class AgentManager {
       return;
     }
 
-    // Check if agent transitioned from running to idle (finished)
-    if (previousStatus === "running" && currentStatus === "idle") {
+    // A turn that ends while background subagents still run is an interim update: the provider
+    // wakes the agent with their results, and the turn after that is the one worth announcing.
+    if (
+      previousStatus === "running" &&
+      currentStatus === "idle" &&
+      !this.hasRunningProviderSubagents(agent.id)
+    ) {
       agent.attention = {
         requiresAttention: true,
         attentionReason: "finished",
@@ -5331,6 +5336,10 @@ export class AgentManager {
       this.broadcastAgentAttention(agent, "error");
       return;
     }
+  }
+
+  private hasRunningProviderSubagents(agentId: string): boolean {
+    return this.providerSubagents.list(agentId).some((subagent) => subagent.status === "running");
   }
 
   private enqueueBackgroundPersist(agent: ManagedAgent): void {

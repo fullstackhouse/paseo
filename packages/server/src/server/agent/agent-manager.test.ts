@@ -5726,6 +5726,60 @@ test("runAgent persists finished attention and idle status without an external s
   expect(persisted?.attentionTimestamp).toEqual(expect.any(String));
 });
 
+test("a turn that ends with background subagents still running does not ask for attention", async () => {
+  const workdir = mkdtempSync(join(tmpdir(), "agent-manager-subagent-attention-"));
+  const attentionEvents: string[] = [];
+  const storage = new AgentStorage(join(workdir, "agents"), logger);
+  let activeSession: TestAgentSession | null = null;
+  class ProviderChildClient extends TestAgentClient {
+    override async createSession(config: AgentSessionConfig): Promise<AgentSession> {
+      activeSession = new TestAgentSession(config);
+      return activeSession;
+    }
+  }
+  const manager = new AgentManager({
+    clients: { codex: new ProviderChildClient() },
+    registry: storage,
+    logger,
+    idFactory: () => "00000000-0000-4000-8000-000000000135",
+    onAgentAttention: (event) => attentionEvents.push(event.reason),
+  });
+  const snapshot = await manager.createAgent({ provider: "codex", cwd: workdir }, undefined, {
+    workspaceId: undefined,
+  });
+  activeSession?.pushEvent({
+    type: "provider_subagent",
+    provider: "codex",
+    event: { type: "upsert", id: "research", title: "Research", status: "running" },
+  });
+  await vi.waitFor(() => expect(manager.listProviderSubagents(snapshot.id)).toHaveLength(1));
+
+  await manager.runAgent(snapshot.id, "fan out");
+  await manager.flush();
+
+  expect(manager.getAgent(snapshot.id)?.attention.requiresAttention).toBe(false);
+  expect(attentionEvents).toEqual([]);
+
+  activeSession?.pushEvent({
+    type: "provider_subagent",
+    provider: "codex",
+    event: { type: "upsert", id: "research", status: "completed" },
+  });
+  await vi.waitFor(() =>
+    expect(manager.listProviderSubagents(snapshot.id)).toEqual([
+      expect.objectContaining({ status: "completed" }),
+    ]),
+  );
+
+  await manager.runAgent(snapshot.id, "subagent finished");
+  await manager.flush();
+
+  expect(manager.getAgent(snapshot.id)?.attention).toEqual(
+    expect.objectContaining({ requiresAttention: true, attentionReason: "finished" }),
+  );
+  expect(attentionEvents).toEqual(["finished"]);
+});
+
 test("archiveSnapshot clears persisted attention and normalizes running status", async () => {
   const workdir = mkdtempSync(join(tmpdir(), "agent-manager-archive-attention-"));
   const storagePath = join(workdir, "agents");
