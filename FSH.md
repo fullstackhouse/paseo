@@ -12,6 +12,7 @@ temporary by design: every patch is meant to go upstream and then drop out of `f
 - getpaseo/paseo#7645: plugins can add items to sidebar workspace rows
 - getpaseo/paseo#6220: clients and plugins can see an agent's background work
 - getpaseo/paseo#9307: `agent.turn.after` drops the always-empty `timeline` from the SDK type, so plugins reading it fail typecheck instead of silently seeing no reply; `latestTurn()` in `@getpaseo/plugin/server` reads the turn
+- FSH-only (upstreamable): a turn that ends while provider subagents still run doesn't notify or mark the agent unread; the wake turn after they report back does, or the held-back finish fires 5 s after the last subagent settles when no wake turn starts (#72)
 - FSH-only (not upstream yet): an idle agent's background work (a background shell, a `Monitor` watch) keeps its workspace in Working instead of Done
 - FSH-only (not upstream yet): host setting for the mode an agent switches to after plan approval, per provider (Claude, Codex), under host Settings → Agents. Applies to approvals from the app, MCP and CLI
 - FSH-only (upstreamable): approving a Claude plan from Bypass offers **Implement with Auto mode** as the highlighted action, next to **Implement with Bypass**, when the host can run Auto
