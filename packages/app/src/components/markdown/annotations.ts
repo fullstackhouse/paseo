@@ -17,14 +17,15 @@ export function annotateMarkdown<T>(
     extensions: [gfmTable()],
     mdastExtensions: [gfmTableFromMarkdown()],
   });
-  const blocks = tree.children.filter((node) => node.type !== "definition");
+  const renderedBlocks = tree.children.filter((node) => node.type !== "definition");
+  const blocks = renderedBlocks.length ? renderedBlocks : [tree];
   const parts: { source: string; startOffset: number; after?: T }[] = [];
   let cursor = 0;
   for (let index = 0; index < blocks.length; index++) {
     const block = blocks[index];
     const next = blocks[index + 1];
     const after = afterBlock({
-      startLine: block.position!.start.line,
+      startLine: index === 0 ? 1 : block.position!.start.line,
       endLine: next ? next.position!.start.line - 1 : tree.position!.end.line,
     });
     if (after == null || after === false) continue;

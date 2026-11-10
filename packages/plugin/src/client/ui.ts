@@ -206,4 +206,6 @@ export interface MarkdownProps {
 }
 
 /** Renders Markdown using Paseo’s theme, selection, and link behavior. */
-export declare const Markdown: ComponentType<MarkdownProps>;
+export declare const Markdown: ComponentType<MarkdownProps> & {
+  readonly supportsBlockAnnotations: true;
+};

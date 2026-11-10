@@ -884,6 +884,20 @@ describe("Markdown block annotations", () => {
     ]);
   });
 
+  it("includes leading definitions and definition-only documents in annotation ranges", async () => {
+    const { annotateMarkdown } = await import("./annotations");
+    for (const source of ["[link]: /first\n\nText", "[link]: /first\n"]) {
+      const ranges: unknown[] = [];
+      const parts = annotateMarkdown(source, (range) => {
+        ranges.push(range);
+        return "definition comment";
+      });
+      expect(ranges).toEqual([{ startLine: 1, endLine: source.split("\n").length }]);
+      expect(parts).toHaveLength(1);
+      expect(parts[0].after).toBe("definition comment");
+    }
+  });
+
   it("keeps Mermaid fences, tables and nested lists whole", async () => {
     const { annotateMarkdown } = await import("./annotations");
     const blocks = [
