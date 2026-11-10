@@ -91,6 +91,25 @@ describe("collapseTurns", () => {
     });
   });
 
+  it("keeps plugin widgets visible in a folded turn", () => {
+    const widget: StreamItem = {
+      kind: "plugin",
+      id: "asks/ask-1",
+      sourceId: "c2",
+      timestamp: at,
+      pluginId: "asks",
+      pluginItemId: "ask-1",
+      itemKind: "ask",
+      version: 1,
+      data: {},
+    };
+    const result = collapse([user("u1"), shell("c1"), widget, reply("final")]);
+
+    expect(ids(result.tail)).toEqual(["u1", "asks/ask-1", "final"]);
+    expect(result.hostIdByHiddenRowId.has("asks/ask-1")).toBe(false);
+    expect(result.turnsByHostId.has("u1")).toBe(true);
+  });
+
   it("folds a finished turn's work into its user message and keeps the reply", () => {
     const result = collapse([
       user("u1"),

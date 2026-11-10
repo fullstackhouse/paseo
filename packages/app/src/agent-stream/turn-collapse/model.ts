@@ -59,8 +59,9 @@ function hasWork(summary: TurnSummary): boolean {
   return Object.keys(paseoActions).length > 0 || Object.values(counts).some((count) => count > 0);
 }
 
+/** Plugin rows are widgets the reader may need to act on, such as an ask's buttons. */
 function staysVisibleWhenCollapsed(item: StreamItem): boolean {
-  return isTurnTrigger(item) || item.kind === "compaction";
+  return isTurnTrigger(item) || item.kind === "compaction" || item.kind === "plugin";
 }
 
 function findLastAssistantIndex(tail: StreamItem[], start: number, end: number): number {
@@ -74,7 +75,7 @@ function findLastAssistantIndex(tail: StreamItem[], start: number, end: number):
  * Folds each answered turn into its user message: everything the agent did before its last
  * message collapses into one summary line, and that message stays in the chat. A turn folds
  * only once it is complete, its user message is loaded, and it sent messages or called tools
- * before its reply. Reasoning is revealed only when the turn opens.
+ * before its reply. Plugin widgets stay in the chat. Reasoning is revealed only when the turn opens.
  */
 export function collapseTurns(input: CollapseTurnsInput): TurnCollapse {
   const { tail } = input;
