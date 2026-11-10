@@ -96,6 +96,7 @@ describe("plugin SDK import boundaries", () => {
     expect(Object.keys(server).sort()).toEqual([
       "defineAgentTool",
       "execCommand",
+      "latestTurn",
       "spawnProcess",
       "terminateProcess",
     ]);
@@ -283,8 +284,11 @@ describe("lifecycle hook SDK types", () => {
         server.addHook("workspace.create.before", async ({ request }) => ({ ...request, title: "Changed" }));
         server.addHook("workspace.create.before", async () => {});
         server.addHook("agent.open.before", async () => {});
-        server.addHook("agent.turn.after", async ({ agent, outcome, timeline }, { paseo, signal }) => {
+        server.addHook("agent.turn.after", async (event, { paseo, signal }) => {
+          const { agent, outcome } = event;
           const kind: "completed" | "failed" | "canceled" = outcome.kind;
+          // @ts-expect-error Turn payloads carry no history; read it with latestTurn().
+          event.timeline;
           // @ts-expect-error Notification payloads have no creation request.
           outcome.request;
         });
