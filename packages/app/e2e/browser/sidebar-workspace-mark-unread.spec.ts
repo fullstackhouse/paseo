@@ -74,10 +74,11 @@ async function expectStatus(page: Page, workspaceId: string, status: "done" | "a
 }
 
 async function markBackgroundWorkspaceAndReopen(page: Page, workspaceId: string) {
-  await test.step("background workspace gains green dot and clears when clicked", async () => {
+  await test.step("background workspace gains green dot and keeps it when clicked", async () => {
     await markAsUnread(page, workspaceId);
     await openWorkspace(page, workspaceId);
-    await expectStatus(page, workspaceId, "done");
+    await expectStatus(page, workspaceId, "attention");
+    await markAsRead(page, workspaceId);
   });
 }
 
@@ -91,22 +92,26 @@ async function leaveMarkedWorkspaceAndRead(page: Page, { subject, other }: Finis
 }
 
 async function leaveMarkedWorkspaceAndReopen(page: Page, { subject, other }: FinishedWorkspaces) {
-  await test.step("leaving preserves manual unread until reopening", async () => {
+  await test.step("reopening and leaving preserve manual unread", async () => {
     await markAsUnread(page, subject.workspaceId);
     await openWorkspace(page, other.workspaceId);
     await expectStatus(page, subject.workspaceId, "attention");
     await openWorkspace(page, subject.workspaceId);
-    await expectStatus(page, subject.workspaceId, "done");
+    await expectStatus(page, subject.workspaceId, "attention");
+    await openWorkspace(page, other.workspaceId);
+    await markAsRead(page, subject.workspaceId);
   });
 }
 
 async function completeTurnAndLeave(page: Page, { subject, other }: FinishedWorkspaces) {
-  await test.step("ordinary completion still clears on departure", async () => {
+  await test.step("ordinary completion stays ready to review through a visit", async () => {
     await subject.client.sendAgentMessage(subject.agentId, "Finish another turn.");
     await subject.client.waitForFinish(subject.agentId, 20_000);
     await expectStatus(page, subject.workspaceId, "attention");
+    await openWorkspace(page, subject.workspaceId);
     await openWorkspace(page, other.workspaceId);
-    await expectStatus(page, subject.workspaceId, "done");
+    await expectStatus(page, subject.workspaceId, "attention");
+    await markAsRead(page, subject.workspaceId);
   });
 }
 
@@ -131,24 +136,26 @@ async function leaveMarkedWorkspaceAndReopenOnCompact(
   page: Page,
   { subject, other }: FinishedWorkspaces,
 ) {
-  await test.step("leaving preserves manual unread until reopening", async () => {
+  await test.step("reopening and leaving preserve manual unread", async () => {
     await markAsUnread(page, subject.workspaceId);
     await openWorkspaceOnCompact(page, other.workspaceId);
     await expectStatus(page, subject.workspaceId, "attention");
     await openWorkspaceOnCompact(page, subject.workspaceId);
-    await expectStatus(page, subject.workspaceId, "done");
+    await expectStatus(page, subject.workspaceId, "attention");
+    await markAsRead(page, subject.workspaceId);
   });
 }
 
 async function completeTurnAndLeaveOnCompact(page: Page, { subject, other }: FinishedWorkspaces) {
-  await test.step("ordinary completion still clears on departure", async () => {
+  await test.step("ordinary completion stays ready to review after departure", async () => {
     await closeMobileAgentSidebar(page);
     await subject.client.sendAgentMessage(subject.agentId, "Finish another turn.");
     await subject.client.waitForFinish(subject.agentId, 20_000);
     await openMobileAgentSidebar(page);
     await expectStatus(page, subject.workspaceId, "attention");
     await openWorkspaceOnCompact(page, other.workspaceId);
-    await expectStatus(page, subject.workspaceId, "done");
+    await expectStatus(page, subject.workspaceId, "attention");
+    await markAsRead(page, subject.workspaceId);
   });
 }
 
@@ -185,16 +192,17 @@ async function openCompactWorkspace(page: Page, workspace: MockAgentWorkspace) {
 }
 
 async function markUnreadThenResumeChat(page: Page, workspaceId: string) {
-  await test.step("interacting with the visible chat clears manual unread", async () => {
+  await test.step("focusing the composer keeps manual unread", async () => {
     await markAsUnread(page, workspaceId);
     await closeMobileAgentSidebar(page);
     await page.getByRole("textbox", { name: "Message agent..." }).click();
     await openMobileAgentSidebar(page);
-    await expectStatus(page, workspaceId, "done");
+    await expectStatus(page, workspaceId, "attention");
+    await markAsRead(page, workspaceId);
   });
 }
 
-test("manual unread survives departure and clears on reopening without changing normal completions", async ({
+test("ready to review survives opening and leaving until Mark as read", async ({
   page,
   workspaces,
 }) => {
@@ -207,10 +215,7 @@ test("manual unread survives departure and clears on reopening without changing 
   await markBackgroundWorkspaceAndRead(page, workspaces.subject.workspaceId);
 });
 
-test("clicking a multi-agent workspace reveals and clears its marked agent", async ({
-  page,
-  workspaces,
-}) => {
+test("clicking a multi-agent workspace reveals its marked agent", async ({ page, workspaces }) => {
   await openAgentRoute(page, workspaces.subject);
   await expectSelectedAgent(page, workspaces.subject.agentId);
   await openWorkspace(page, workspaces.other.workspaceId);
