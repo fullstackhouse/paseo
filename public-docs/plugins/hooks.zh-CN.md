@@ -47,22 +47,22 @@ Paseo 只观察返回的 Promise，因此独立任务没有错误报告，也没
 
 ## 钩子一览 {#hooks}
 
-| 钩子                      | 等待 | 载荷                                   | 可修改                                    |
-| ------------------------- | ---- | -------------------------------------- | ----------------------------------------- |
-| `workspace.create.before` | 是   | `{ request }`                          | 整个创建请求                              |
-| `workspace.create.after`  | 否   | `{ workspace }`                        |                                           |
-| `workspace.archive.after` | 否   | `{ workspace }`                        |                                           |
-| `worktree.create.before`  | 是   | `{ request }`                          | 创建选项和目标路径                        |
-| `worktree.create.after`   | 是   | `{ worktree }`                         | worktree 中的文件；抛出错误中止创建       |
-| `agent.create.before`     | 是   | `{ request: { config, env? } }`        | 除 `cwd` 外的已保存配置；`env`            |
-| `agent.create.after`      | 否   | `{ agent }`                            |                                           |
-| `agent.open.before`       | 是   | `{ request }`                          | 仅用于启动的 `env`、`tools`、`mcpServers` |
-| `agent.close.after`       | 否   | `{ agent }`                            |                                           |
-| `agent.archive.after`     | 否   | `{ agent, archivedAt }`                |                                           |
-| `agent.turn.before`       | 否   | `{ agent, turnId }`                    |                                           |
-| `agent.turn.after`        | 否   | `{ agent, turnId, outcome, timeline }` |                                           |
-| `agent.permission.before` | 否   | `{ agent, request }`                   |                                           |
-| `agent.permission.after`  | 否   | `{ agent, requestId, resolution }`     |                                           |
+| 钩子                      | 等待 | 载荷                               | 可修改                                    |
+| ------------------------- | ---- | ---------------------------------- | ----------------------------------------- |
+| `workspace.create.before` | 是   | `{ request }`                      | 整个创建请求                              |
+| `workspace.create.after`  | 否   | `{ workspace }`                    |                                           |
+| `workspace.archive.after` | 否   | `{ workspace }`                    |                                           |
+| `worktree.create.before`  | 是   | `{ request }`                      | 创建选项和目标路径                        |
+| `worktree.create.after`   | 是   | `{ worktree }`                     | worktree 中的文件；抛出错误中止创建       |
+| `agent.create.before`     | 是   | `{ request: { config, env? } }`    | 除 `cwd` 外的已保存配置；`env`            |
+| `agent.create.after`      | 否   | `{ agent }`                        |                                           |
+| `agent.open.before`       | 是   | `{ request }`                      | 仅用于启动的 `env`、`tools`、`mcpServers` |
+| `agent.close.after`       | 否   | `{ agent }`                        |                                           |
+| `agent.archive.after`     | 否   | `{ agent, archivedAt }`            |                                           |
+| `agent.turn.before`       | 否   | `{ agent, turnId }`                |                                           |
+| `agent.turn.after`        | 否   | `{ agent, turnId, outcome }`       |                                           |
+| `agent.permission.before` | 否   | `{ agent, request }`               |                                           |
+| `agent.permission.after`  | 否   | `{ agent, requestId, resolution }` |                                           |
 
 ## 共享载荷 {#shared-payloads}
 
@@ -474,14 +474,14 @@ server.addHook("agent.turn.before", async ({ agent, turnId }) => {
 
 ## agent.turn.after {#agentturnafter}
 
-实时轮次完成、失败或取消后触发，收到 `{ agent, turnId, outcome, timeline }`。`outcome.kind` 为 `completed`、`failed` 或 `canceled`。`timeline` 已弃用且始终为空；请按下面的示例通过 SDK 获取历史。
+实时轮次完成、失败或取消后触发，收到 `{ agent, turnId, outcome }`。`outcome.kind` 为 `completed`、`failed` 或 `canceled`。载荷不含历史：请用 `@getpaseo/plugin/server` 的 `latestTurn()` 读取本轮，它返回最近一条用户消息及其之后的全部条目。仍读取 `event.timeline` 的旧插件只会拿到空数组，因此看不到任何回复。
 
 ### 在轮次结束时发送后续消息 {#send-a-follow-up-when-a-turn-ends}
 
 把 [server/inspect.ts](https://github.com/getpaseo/paseo/blob/main/plugin-examples/lifecycle-actions/server/inspect.ts) 复制到你的插件中。该辅助文件从 `@getpaseo/protocol/agent-types` 导入类型；请把与 daemon 版本相同的 `@getpaseo/protocol` 加入开发依赖，并在加载插件之前安装它们。`latestOutputText` 会拼接最近一条用户消息之后的文本片段。
 
 ```ts
-import type { PluginServerContext } from "@getpaseo/plugin/server";
+import { latestTurn, type PluginServerContext } from "@getpaseo/plugin/server";
 import { latestOutputText } from "./server/inspect";
 
 export default function contribute(server: PluginServerContext) {
@@ -491,8 +491,7 @@ export default function contribute(server: PluginServerContext) {
     }
 
     const agent = context.paseo.agents.ref(event.agent.id);
-    const page = await agent.timeline.refetch({ direction: "tail", limit: 20 });
-    const text = latestOutputText(page.entries.map(({ item }) => item));
+    const text = latestOutputText(await latestTurn(agent.timeline));
     if (/out of credits/i.test(text)) {
       await agent.send("Try again.");
     }
