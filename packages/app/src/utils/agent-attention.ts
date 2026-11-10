@@ -18,6 +18,9 @@ export function createAgentAttentionController(deps: {
     if (!pendingFocus || !state?.focused || !state.ready) return;
     pendingFocus = false;
     if (!state.requiresAttention || state.attentionReason === "permission" || inFlight) return;
+    // FSH: viewing a finished agent is not reviewing it. "Ready to review" stays until the next
+    // prompt or an explicit Mark as read (workspace menu).
+    if (state.attentionReason === "finished") return;
     inFlight = true;
     void deps.clear().then(
       () => {

@@ -507,7 +507,7 @@ test.describe("Sidebar workspace list", () => {
     }
   });
 
-  test("marks a finished workspace unread until it is opened again", async ({ page }) => {
+  test("marks a finished workspace unread until it is marked read", async ({ page }) => {
     const workspace = await seedMockAgentWorkspace({
       repoPrefix: "sidebar-mark-unread-",
       title: "Mark unread",
@@ -527,6 +527,7 @@ test.describe("Sidebar workspace list", () => {
 
       await page.keyboard.press("Escape");
       await openWorkspaceFromSidebar(page, workspace.workspaceId);
+      await (await openWorkspaceReadAction(page, workspace.workspaceId, "read")).click();
       await openWorkspaceReadAction(page, workspace.workspaceId, "unread");
     } finally {
       await workspace.cleanup();

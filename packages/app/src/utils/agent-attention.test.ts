@@ -15,7 +15,8 @@ describe("agent attention acknowledgement", () => {
       focused: true,
       ready: true,
       requiresAttention: false,
-      attentionReason: "finished" as const,
+      // FSH: finished attention is never cleared by viewing, so these cases use an error.
+      attentionReason: "error" as "finished" | "error" | "permission",
       focusRequest: null as object | null,
     };
     return { controller, state, calls, errors };
@@ -81,6 +82,14 @@ describe("agent attention acknowledgement", () => {
     expect(calls).toEqual([]);
   });
 
+  it("keeps finished attention (Ready to review) through entry and focus", () => {
+    const { controller, state, calls } = setup();
+    controller.update({ ...state, requiresAttention: true, attentionReason: "finished" });
+    controller.focus();
+    controller.update({ ...state, requiresAttention: true, attentionReason: "finished", focusRequest: {} });
+    expect(calls).toEqual([]);
+  });
+
   it("keeps permission attention and deduplicates an in-flight acknowledgement", () => {
     const { controller, state, calls } = setup();
     controller.update({ ...state, requiresAttention: true, attentionReason: "permission" });
@@ -106,7 +115,7 @@ describe("agent attention acknowledgement", () => {
       focused: true,
       ready: true,
       requiresAttention: true,
-      attentionReason: "finished",
+      attentionReason: "error",
       focusRequest: null,
     });
     await Promise.resolve();
