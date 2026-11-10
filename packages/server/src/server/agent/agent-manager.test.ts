@@ -4954,6 +4954,90 @@ test("reloadAgentSession terminalizes running provider children when preserving 
   ]);
 });
 
+test("hydrateTimelineFromProvider cancels replayed children with no outcome unless they are live", async () => {
+  const workdir = mkdtempSync(join(tmpdir(), "agent-manager-provider-child-settle-"));
+  let activeSession: TestAgentSession | null = null;
+  class ReplaySession extends TestAgentSession {
+    override async *streamHistory(): AsyncGenerator<AgentStreamEvent> {
+      for (const id of ["stale-child", "live-child"]) {
+        yield {
+          type: "provider_subagent",
+          provider: "codex",
+          event: { type: "upsert", id, title: id },
+        };
+      }
+    }
+  }
+  class ReplayClient extends TestAgentClient {
+    override async createSession(config: AgentSessionConfig): Promise<AgentSession> {
+      activeSession = new ReplaySession(config);
+      return activeSession;
+    }
+  }
+  const manager = new AgentManager({
+    clients: { codex: new ReplayClient() },
+    registry: new AgentStorage(join(workdir, "agents"), logger),
+    logger,
+  });
+  const snapshot = await manager.createAgent({ provider: "codex", cwd: workdir }, undefined, {
+    workspaceId: undefined,
+  });
+  activeSession?.pushEvent({
+    type: "provider_subagent",
+    provider: "codex",
+    event: { type: "upsert", id: "live-child", status: "running" },
+  });
+  await vi.waitFor(() => expect(manager.listProviderSubagents(snapshot.id)).toHaveLength(1));
+
+  await manager.hydrateTimelineFromProvider(snapshot.id, { force: true });
+
+  expect(
+    manager
+      .listProviderSubagents(snapshot.id)
+      .map(({ id, status }) => ({ id, status }))
+      .sort((left, right) => left.id.localeCompare(right.id)),
+  ).toEqual([
+    { id: "live-child", status: "running" },
+    { id: "stale-child", status: "canceled" },
+  ]);
+});
+
+test("rehydrating from disk cancels replayed children with no outcome", async () => {
+  const workdir = mkdtempSync(join(tmpdir(), "agent-manager-provider-child-restart-"));
+  class ReplaySession extends TestAgentSession {
+    override async *streamHistory(): AsyncGenerator<AgentStreamEvent> {
+      yield {
+        type: "provider_subagent",
+        provider: "codex",
+        event: { type: "upsert", id: "orphan", title: "Orphan" },
+      };
+    }
+  }
+  class ReplayClient extends TestAgentClient {
+    override async createSession(config: AgentSessionConfig): Promise<AgentSession> {
+      return new ReplaySession(config);
+    }
+
+    override async resumeSession(
+      _handle: AgentPersistenceHandle,
+      config?: Partial<AgentSessionConfig>,
+    ): Promise<AgentSession> {
+      return new ReplaySession({ provider: "codex", cwd: config?.cwd ?? workdir });
+    }
+  }
+  const manager = new AgentManager({ clients: { codex: new ReplayClient() }, logger });
+  const snapshot = await manager.createAgent({ provider: "codex", cwd: workdir }, undefined, {
+    workspaceId: undefined,
+  });
+
+  await manager.reloadAgentSession(snapshot.id, undefined, { rehydrateFromDisk: true });
+  await manager.hydrateTimelineFromProvider(snapshot.id);
+
+  expect(manager.listProviderSubagents(snapshot.id)).toEqual([
+    expect.objectContaining({ id: "orphan", status: "canceled" }),
+  ]);
+});
+
 test("hydrateTimelineFromProvider restores and broadcasts provider children from session history", async () => {
   const workdir = mkdtempSync(join(tmpdir(), "agent-manager-provider-child-history-"));
   const storage = new AgentStorage(join(workdir, "agents"), logger);
