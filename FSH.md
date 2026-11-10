@@ -55,6 +55,7 @@ temporary by design: every patch is meant to go upstream and then drop out of `f
 - FSH-only (not upstream yet): a finished turn in a background workspace notifies nobody (no push, no in-app alert); the plugin that started it notifies instead. Errors and permission prompts still notify
 - FSH-only (upstreamable): a **Lineage** tab in the Explorer sidebar lists the focused agent's parents and the agents it started, with the workspace each runs in; clicking one opens it. It's added once per workspace the first time a parent or child runs in another workspace, and stays closed once you close it. Also in the Explorer + menu. Detaching a subagent records its former parent (`paseo.detached-from`), so it stays in Lineage marked "Detached"
 - FSH-only (not upstream yet): **Ready to review** stays until you send the agent a prompt or choose **Mark as read**. Opening, focusing or leaving the chat no longer clears it. Errors still clear on view. Upstream declined a setting for this (getpaseo/paseo#9155; discussion getpaseo/paseo#4495); getpaseo/paseo#2892 did the same and was closed unmerged
+- FSH-only (upstreamable): a Paseo worktree with no commits of its own shows **Archive workspace** as its main git action, not **Update from <base>**. Its work is done or went to another repo, so there is nothing to update
 
 Keep this list in sync with what's merged into `fsh`.
 

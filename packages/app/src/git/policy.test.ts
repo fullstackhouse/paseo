@@ -528,6 +528,35 @@ describe("git-actions-policy", () => {
     expect(actions.primary).toMatchObject({ id: "archive-workspace" });
   });
 
+  it("promotes archive over update-from-base for a Paseo-owned worktree with no work of its own", () => {
+    const actions = buildGitActions(
+      createInput({
+        hasRemote: true,
+        isOnBaseBranch: false,
+        isPaseoOwnedWorktree: true,
+        behindBaseCount: 3,
+      }),
+    );
+
+    expect(actions.primary).toMatchObject({ id: "archive-workspace" });
+    expect(actions.secondary.some((action) => action.id === "merge-from-base")).toBe(true);
+  });
+
+  it("keeps update-from-base primary for a Paseo-owned worktree with commits of its own", () => {
+    const actions = buildGitActions(
+      createInput({
+        hasRemote: true,
+        isOnBaseBranch: false,
+        isPaseoOwnedWorktree: true,
+        aheadCount: 1,
+        behindBaseCount: 3,
+        shipDefault: "merge",
+      }),
+    );
+
+    expect(actions.primary?.id).not.toBe("archive-workspace");
+  });
+
   it("promotes squash-and-merge when an open PR is mergeable and the branch is in sync", () => {
     const actions = buildGitActions(
       createInput({
