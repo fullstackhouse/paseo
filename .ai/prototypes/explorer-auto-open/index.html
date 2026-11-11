@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en" data-prototype-id="explorer-auto-open">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Open Explorer when entering a workspace — storyboard</title>
+<link rel="stylesheet" href="tokens.css" />
+<link rel="stylesheet" href="components.css" />
+<link rel="stylesheet" href="screens.css" />
+<link rel="stylesheet" href="prototype.css" />
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs><symbol id="ic-chevron-right" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></symbol><symbol id="ic-chevron-down" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></symbol><symbol id="ic-more" viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="5" cy="12" r="1.75"/><circle cx="12" cy="12" r="1.75"/><circle cx="19" cy="12" r="1.75"/></symbol><symbol id="ic-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></symbol><symbol id="ic-info" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></symbol><symbol id="ic-warn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></symbol><symbol id="ic-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol><symbol id="ic-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="M2 12h2"/><path d="M20 12h2"/></symbol><symbol id="ic-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></symbol><symbol id="ic-branch" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" x2="6" y1="3" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></symbol><symbol id="ic-commit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><line x1="3" x2="9" y1="12" y2="12"/><line x1="15" x2="21" y1="12" y2="12"/></symbol><symbol id="ic-push" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></symbol><symbol id="ic-pr" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 0 1 2 2v7"/><line x1="6" x2="6" y1="9" y2="21"/></symbol><symbol id="ic-merge" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 21V9a9 9 0 0 0 9 9"/></symbol><symbol id="ic-archive" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="5" x="2" y="3" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/><path d="M10 12h4"/></symbol><symbol id="ic-play" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="6 3 20 12 6 21 6 3"/></symbol><symbol id="ic-stop" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="5" y="5" rx="2"/></symbol><symbol id="ic-code" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></symbol><symbol id="ic-bot" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></symbol><symbol id="ic-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></symbol><symbol id="ic-ask" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></symbol><symbol id="ic-dashboard" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></symbol><symbol id="ic-files" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></symbol><symbol id="ic-diff" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v14"/><path d="M5 10h14"/><path d="M5 21h14"/></symbol><symbol id="ic-lineage" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="2"/><circle cx="6" cy="19" r="2"/><circle cx="18" cy="19" r="2"/><path d="M12 7v4M12 11l-6 6M12 11l6 6"/></symbol><symbol id="ic-monitor" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/></symbol><symbol id="ic-panel" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M15 3v18"/></symbol><symbol id="ic-folder" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></symbol><symbol id="ic-terminal" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" x2="20" y1="19" y2="19"/></symbol><symbol id="ic-settings" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M1 12h3M20 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></symbol><symbol id="ic-send" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></symbol><symbol id="ic-refresh" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><path d="M3 21v-5h5"/></symbol></defs></svg>
+<div class="doc-toolbar">
+  <strong style="font-size:0.875rem">Open Explorer when entering a workspace — storyboard</strong>
+  <nav class="screen-nav" aria-label="Screens"><a href="#s1">1 Enter with asks</a><a href="#s2">2 Setting</a><a href="#s3">3 Hidden</a></nav>
+  <button class="btn btn-outline btn-sm" id="theme-toggle" type="button"><svg aria-hidden="true"><use href="#ic-sun"/></svg> Theme</button>
+</div>
+<div class="doc">
+<header class="doc-head">
+  <h1>Open Explorer when entering a workspace — every state</h1>
+  <p class="muted" style="max-width:70ch;margin:0">Storyboard for <code class="t-mono">tasks/spec-explorer-auto-open.md</code>. Each section is one state, rendered at desktop width from one fixture set (compact layouts are out of scope and keep their sheets). All data is fictional. Read top to bottom; nothing needs clicking.</p>
+</header>
+
+<section class="screen" id="s1">
+  <div class="screen-meta">
+    <h2>1. Entering a workspace with open asks — opens on Asks</h2>
+    <p>With the setting on When something needs you or Always, entering lands on the Asks tab.</p>
+    <div class="screen-refs"><span class="ref">US-1</span><span class="ref">Auto-show table</span></div>
+  </div>
+  <div class="sb-pair"><div class="frame sb-frame-desktop">
+    <div class="frame-bar"><div class="frame-dots"><i></i><i></i><i></i></div><span class="frame-url">paseo · larkspur-api / Checkout retry backoff</span><span class="sb-frame-label">desktop · 1280</span></div>
+    <div class="px-window "><aside class="px-nav">
+    <div class="px-nav-head"><span class="px-logo">Paseo</span><span class="px-icon-btn"><svg aria-hidden="true"><use href="#ic-plus"/></svg></span></div>
+    <div class="px-nav-label">Workspaces</div>
+    <div class="px-ws is-active"><span class="px-dot px-dot-running"></span><div class="px-ws-text"><span class="px-ws-title">Checkout retry backoff</span><span class="px-ws-meta">larkspur-api</span></div></div><div class="px-ws "><span class="px-dot px-dot-needs_input"></span><div class="px-ws-text"><span class="px-ws-title">Invoice PDF footer</span><span class="px-ws-meta">larkspur-web</span></div></div><div class="px-ws "><span class="px-dot px-dot-attention"></span><div class="px-ws-text"><span class="px-ws-title">Rate limiter metrics</span><span class="px-ws-meta">larkspur-api</span></div></div><div class="px-ws "><span class="px-dot px-dot-done"></span><div class="px-ws-text"><span class="px-ws-title">Onboarding copy pass</span><span class="px-ws-meta">larkspur-web</span></div></div><div class="px-ws "><span class="px-dot px-dot-failed"></span><div class="px-ws-text"><span class="px-ws-title">Migrate cron to queue</span><span class="px-ws-meta">larkspur-api</span></div></div>
+  </aside><main class="px-main">
+    <header class="px-head">
+      <div class="px-crumbs"><span class="px-muted">larkspur-api</span><span class="px-muted">/</span><span>Checkout retry backoff</span></div>
+      <div class="px-head-actions"><span class="px-icon-btn"><svg aria-hidden="true"><use href="#ic-play"/></svg></span><span class="px-icon-btn"><svg aria-hidden="true"><use href="#ic-code"/></svg></span><span class="px-split"><svg aria-hidden="true"><use href="#ic-commit"/></svg> Git <svg aria-hidden="true"><use href="#ic-chevron-down"/></svg></span><span class="px-icon-btn is-on"><svg aria-hidden="true"><use href="#ic-panel"/></svg></span></div>
+    </header>
+    <div class="px-transcript">
+      <div class="px-msg px-msg-user">Add jittered exponential backoff to the checkout retry path and cover it with tests.</div>
+      <div class="px-msg">Done. <code>retry.ts</code> now waits 200ms × 2ⁿ with ±20% jitter, capped at 5 attempts. Added 6 unit tests and one e2e case for the 503 path. All tests pass locally.</div>
+      <div class="px-tool"><svg aria-hidden="true"><use href="#ic-terminal"/></svg> npm test -- retry · 6 passed</div>
+    </div>
+    <div class="px-composer-wrap">
+      <div class="px-pills"><span class="px-pill"><svg aria-hidden="true"><use href="#ic-diff"/></svg> <span class="px-add">+210</span> <span class="px-del">−38</span></span><span class="px-pill"><svg aria-hidden="true"><use href="#ic-ask"/></svg> 2</span></div>
+      <div class="px-composer"><span class="px-muted">Ask anything…</span><span class="px-send"><svg aria-hidden="true"><use href="#ic-send"/></svg></span></div>
+    </div>
+  </main><aside class="px-explorer">
+    <div class="px-tabs"><span class="px-tab is-active"><svg aria-hidden="true"><use href="#ic-ask"/></svg> Asks <b class="px-badge">2</b></span><span class="px-tab "><svg aria-hidden="true"><use href="#ic-diff"/></svg> Changes</span><span class="px-tab "><svg aria-hidden="true"><use href="#ic-files"/></svg> Files</span><span class="px-tab px-tab-plus"><svg aria-hidden="true"><use href="#ic-plus"/></svg></span></div>
+    <div class="px-explorer-body"><div class="px-overview">
+    <div class="px-ask"><b>Cap retries at 5 or 8 attempts?</b><span class="px-row-meta">5 keeps p99 checkout under 4s; 8 recovers more 503s during deploys.</span><div class="px-ask-actions"><span class="px-btn-secondary">5 (recommended)</span><span class="px-btn-ghost">8</span></div></div>
+    <div class="px-ask"><b>Merge PR #417 (metrics) first?</b><span class="px-row-meta">This branch reads the counter it adds.</span><div class="px-ask-actions"><span class="px-btn-secondary">Merge #417</span><span class="px-btn-ghost">Wait</span></div></div>
+  </div></div>
+  </aside></div>
+  </div></div>
+  <div class="notes"><div class="note"><b>1</b><span>The Asks tab is the plugin’s existing side-panel tab; the host picks it because the plugin badge has needsYou.</span></div><div class="note"><b>2</b><span>A permission or failed item opens Explorer and focuses the agent tab in the main pane instead.</span></div><div class="note"><b>3</b><span>Auto-show runs on entering a workspace only, never while you are in it.</span></div></div>
+</section>
+
+<section class="screen" id="s2">
+  <div class="screen-meta">
+    <h2>2. Settings — Open Explorer when entering a workspace</h2>
+    <p>You choose the auto-show rule once, for this device.</p>
+    <div class="screen-refs"><span class="ref">US-3</span><span class="ref">Open question 1</span></div>
+  </div>
+  <div class="sb-pair"><div class="frame sb-frame-desktop">
+    <div class="frame-bar"><div class="frame-dots"><i></i><i></i><i></i></div><span class="frame-url">paseo · Settings / General</span><span class="sb-frame-label">desktop · 1280</span></div>
+    <div class="px-window px-settings">
+      <aside class="px-nav"><div class="px-nav-head"><span class="px-logo">Settings</span></div>
+        <div class="px-ws is-active"><div class="px-ws-text"><span class="px-ws-title">General</span></div></div><div class="px-ws "><div class="px-ws-text"><span class="px-ws-title">Appearance</span></div></div><div class="px-ws "><div class="px-ws-text"><span class="px-ws-title">Chat</span></div></div><div class="px-ws "><div class="px-ws-text"><span class="px-ws-title">Sidebar</span></div></div><div class="px-ws "><div class="px-ws-text"><span class="px-ws-title">Terminal</span></div></div><div class="px-ws "><div class="px-ws-text"><span class="px-ws-title">Hosts</span></div></div><div class="px-ws "><div class="px-ws-text"><span class="px-ws-title">Plugins</span></div></div>
+      </aside>
+      <main class="px-settings-main"><div class="px-settings-col">
+        <div class="px-section"><div class="px-section-label">Open location</div><div class="px-card">
+          <div class="px-row"><div class="px-row-text"><span>Pull requests</span><span class="px-row-meta">Where a detected PR opens</span></div><span class="px-select">Explorer sidebar <svg aria-hidden="true"><use href="#ic-chevron-down"/></svg></span></div>
+          <div class="px-row px-row-anchor"><div class="px-row-text"><span>Open Explorer when entering a workspace</span><span class="px-row-meta">Hiding it keeps it hidden in that workspace until something new needs you</span></div><span class="px-select is-open">Always <svg aria-hidden="true"><use href="#ic-chevron-down"/></svg></span>
+            <div class="px-menu"><div class="px-menu-item "><span class="px-menu-check"></span><div class="px-row-text"><span>Never</span><span class="px-row-meta">Only when you open it</span></div></div><div class="px-menu-item "><span class="px-menu-check"></span><div class="px-row-text"><span>When something needs you</span><span class="px-row-meta">Permission, asks, failures, PR status</span></div></div><div class="px-menu-item is-on"><span class="px-menu-check"><svg aria-hidden="true"><use href="#ic-check"/></svg></span><div class="px-row-text"><span>Always</span><span class="px-row-meta">On the tab that needs you, otherwise where you left it</span></div></div></div>
+          </div>
+          <div class="px-row"><div class="px-row-text"><span>Diffs</span><span class="px-row-meta">Where a diff opens</span></div><span class="px-select">Main panel <svg aria-hidden="true"><use href="#ic-chevron-down"/></svg></span></div>
+        </div></div>
+      </div></main>
+    </div>
+  </div></div>
+  <div class="notes"><div class="note"><b>1</b><span>Desktop only; the row is absent on compact layouts.</span></div><div class="note"><b>2</b><span>Never is exactly today’s behavior. Default is Open question 1 (recommend Always on FSH).</span></div></div>
+</section>
+
+<section class="screen" id="s3">
+  <div class="screen-meta">
+    <h2>3. Hidden with Cmd+E — stays hidden until something new</h2>
+    <p>You hid Explorer here; re-entering keeps it hidden, a new ask brings it back.</p>
+    <div class="screen-refs"><span class="ref">US-2</span><span class="ref">Hide memory</span></div>
+  </div>
+  <div class="sb-pair"><div class="frame sb-frame-desktop">
+    <div class="frame-bar"><div class="frame-dots"><i></i><i></i><i></i></div><span class="frame-url">Before · re-entering after Cmd+E — stays hidden</span><span class="sb-frame-label">desktop · 1280</span></div>
+    <div class="px-window is-hidden"><aside class="px-nav">
+    <div class="px-nav-head"><span class="px-logo">Paseo</span><span class="px-icon-btn"><svg aria-hidden="true"><use href="#ic-plus"/></svg></span></div>
+    <div class="px-nav-label">Workspaces</div>
+    <div class="px-ws is-active"><span class="px-dot px-dot-running"></span><div class="px-ws-text"><span class="px-ws-title">Checkout retry backoff</span><span class="px-ws-meta">larkspur-api</span></div></div><div class="px-ws "><span class="px-dot px-dot-needs_input"></span><div class="px-ws-text"><span class="px-ws-title">Invoice PDF footer</span><span class="px-ws-meta">larkspur-web</span></div></div><div class="px-ws "><span class="px-dot px-dot-attention"></span><div class="px-ws-text"><span class="px-ws-title">Rate limiter metrics</span><span class="px-ws-meta">larkspur-api</span></div></div><div class="px-ws "><span class="px-dot px-dot-done"></span><div class="px-ws-text"><span class="px-ws-title">Onboarding copy pass</span><span class="px-ws-meta">larkspur-web</span></div></div><div class="px-ws "><span class="px-dot px-dot-failed"></span><div class="px-ws-text"><span class="px-ws-title">Migrate cron to queue</span><span class="px-ws-meta">larkspur-api</span></div></div>
+  </aside><main class="px-main">
+    <header class="px-head">
+      <div class="px-crumbs"><span class="px-muted">larkspur-api</span><span class="px-muted">/</span><span>Checkout retry backoff</span></div>
+      <div class="px-head-actions"><span class="px-icon-btn"><svg aria-hidden="true"><use href="#ic-play"/></svg></span><span class="px-icon-btn"><svg aria-hidden="true"><use href="#ic-code"/></svg></span><span class="px-split"><svg aria-hidden="true"><use href="#ic-commit"/></svg> Git <svg aria-hidden="true"><use href="#ic-chevron-down"/></svg></span><span class="px-icon-btn "><svg aria-hidden="true"><use href="#ic-panel"/></svg></span></div>
+    </header>
+    <div class="px-transcript">
+      <div class="px-msg px-msg-user">Add jittered exponential backoff to the checkout retry path and cover it with tests.</div>
+      <div class="px-msg">Done. <code>retry.ts</code> now waits 200ms × 2ⁿ with ±20% jitter, capped at 5 attempts. Added 6 unit tests and one e2e case for the 503 path. All tests pass locally.</div>
+      <div class="px-tool"><svg aria-hidden="true"><use href="#ic-terminal"/></svg> npm test -- retry · 6 passed</div>
+    </div>
+    <div class="px-composer-wrap">
+      <div class="px-pills"><span class="px-pill"><svg aria-hidden="true"><use href="#ic-diff"/></svg> <span class="px-add">+210</span> <span class="px-del">−38</span></span></div>
+      <div class="px-composer"><span class="px-muted">Ask anything…</span><span class="px-send"><svg aria-hidden="true"><use href="#ic-send"/></svg></span></div>
+    </div>
+  </main></div>
+  </div><div class="frame sb-frame-desktop">
+    <div class="frame-bar"><div class="frame-dots"><i></i><i></i><i></i></div><span class="frame-url">After · a new ask arrived — next entry opens on Asks</span><span class="sb-frame-label">desktop · 1280</span></div>
+    <div class="px-window "><aside class="px-nav">
+    <div class="px-nav-head"><span class="px-logo">Paseo</span><span class="px-icon-btn"><svg aria-hidden="true"><use href="#ic-plus"/></svg></span></div>
+    <div class="px-nav-label">Workspaces</div>
+    <div class="px-ws is-active"><span class="px-dot px-dot-running"></span><div class="px-ws-text"><span class="px-ws-title">Checkout retry backoff</span><span class="px-ws-meta">larkspur-api</span></div></div><div class="px-ws "><span class="px-dot px-dot-needs_input"></span><div class="px-ws-text"><span class="px-ws-title">Invoice PDF footer</span><span class="px-ws-meta">larkspur-web</span></div></div><div class="px-ws "><span class="px-dot px-dot-attention"></span><div class="px-ws-text"><span class="px-ws-title">Rate limiter metrics</span><span class="px-ws-meta">larkspur-api</span></div></div><div class="px-ws "><span class="px-dot px-dot-done"></span><div class="px-ws-text"><span class="px-ws-title">Onboarding copy pass</span><span class="px-ws-meta">larkspur-web</span></div></div><div class="px-ws "><span class="px-dot px-dot-failed"></span><div class="px-ws-text"><span class="px-ws-title">Migrate cron to queue</span><span class="px-ws-meta">larkspur-api</span></div></div>
+  </aside><main class="px-main">
+    <header class="px-head">
+      <div class="px-crumbs"><span class="px-muted">larkspur-api</span><span class="px-muted">/</span><span>Checkout retry backoff</span></div>
+      <div class="px-head-actions"><span class="px-icon-btn"><svg aria-hidden="true"><use href="#ic-play"/></svg></span><span class="px-icon-btn"><svg aria-hidden="true"><use href="#ic-code"/></svg></span><span class="px-split"><svg aria-hidden="true"><use href="#ic-commit"/></svg> Git <svg aria-hidden="true"><use href="#ic-chevron-down"/></svg></span><span class="px-icon-btn is-on"><svg aria-hidden="true"><use href="#ic-panel"/></svg></span></div>
+    </header>
+    <div class="px-transcript">
+      <div class="px-msg px-msg-user">Add jittered exponential backoff to the checkout retry path and cover it with tests.</div>
+      <div class="px-msg">Done. <code>retry.ts</code> now waits 200ms × 2ⁿ with ±20% jitter, capped at 5 attempts. Added 6 unit tests and one e2e case for the 503 path. All tests pass locally.</div>
+      <div class="px-tool"><svg aria-hidden="true"><use href="#ic-terminal"/></svg> npm test -- retry · 6 passed</div>
+    </div>
+    <div class="px-composer-wrap">
+      <div class="px-pills"><span class="px-pill"><svg aria-hidden="true"><use href="#ic-diff"/></svg> <span class="px-add">+210</span> <span class="px-del">−38</span></span><span class="px-pill"><svg aria-hidden="true"><use href="#ic-ask"/></svg> 2</span></div>
+      <div class="px-composer"><span class="px-muted">Ask anything…</span><span class="px-send"><svg aria-hidden="true"><use href="#ic-send"/></svg></span></div>
+    </div>
+  </main><aside class="px-explorer">
+    <div class="px-tabs"><span class="px-tab is-active"><svg aria-hidden="true"><use href="#ic-ask"/></svg> Asks <b class="px-badge">2</b></span><span class="px-tab "><svg aria-hidden="true"><use href="#ic-diff"/></svg> Changes</span><span class="px-tab "><svg aria-hidden="true"><use href="#ic-files"/></svg> Files</span><span class="px-tab px-tab-plus"><svg aria-hidden="true"><use href="#ic-plus"/></svg></span></div>
+    <div class="px-explorer-body"><div class="px-overview">
+    <div class="px-ask"><b>Cap retries at 5 or 8 attempts?</b><span class="px-row-meta">5 keeps p99 checkout under 4s; 8 recovers more 503s during deploys.</span><div class="px-ask-actions"><span class="px-btn-secondary">5 (recommended)</span><span class="px-btn-ghost">8</span></div></div>
+    <div class="px-ask"><b>Merge PR #417 (metrics) first?</b><span class="px-row-meta">This branch reads the counter it adds.</span><div class="px-ask-actions"><span class="px-btn-secondary">Merge #417</span><span class="px-btn-ghost">Wait</span></div></div>
+  </div></div>
+  </aside></div>
+  </div></div>
+  <div class="notes"><div class="note"><b>1</b><span>Hiding records the attention keys present at that moment. Only keys not in that set count on the next entry.</span></div><div class="note"><b>2</b><span>Showing Explorer by hand clears the record.</span></div></div>
+</section>
+</div>
+<script>
+(function () { var btn = document.getElementById('theme-toggle'); btn.addEventListener('click', function () { document.documentElement.classList.toggle('dark'); }); })();
+</script>
+<script src="comments.js"></script>
+<script src="prototype.js"></script>
+</body>
+</html>
