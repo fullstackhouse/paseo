@@ -37,14 +37,14 @@ Acceptance criteria per state are in the storyboard (s1–s3), each with notes.
 
 "Something needs you" is a workspace-level list of **attention items**, each with a stable key:
 
-| Key                                | Source                               | Tab it opens     |
-| ---------------------------------- | ------------------------------------ | ---------------- |
-| `permission:<agentId>:<requestId>` | session store `pendingPermissions`   | that agent's tab |
-| `plugin:<pluginId>:<badgeKey>`     | plugin badge with `needsYou` (below) | the plugin's tab |
-| `failed:<agentId>`                 | agent status `error`                 | that agent's tab |
-| `pr-checks-failed:<number>:<sha>`  | `useCheckoutPrStatusQuery`           | PR tab           |
-| `pr-ready:<number>:<sha>`          | checks pass, mergeable, review ok    | PR tab           |
-| `pr-merged:<number>`               | PR status                            | PR tab           |
+| Key                                | Source                                         | Tab it opens       |
+| ---------------------------------- | ---------------------------------------------- | ------------------ |
+| `permission:<agentId>:<requestId>` | session store `pendingPermissions`             | that agent's tab   |
+| `plugin:<pluginId>:<itemId>:<key>` | workspace summary item with `needsYou` (below) | the plugin's panel |
+| `failed:<agentId>`                 | agent status `error`                           | that agent's tab   |
+| `pr-checks-failed:<number>:<sha>`  | `useCheckoutPrStatusQuery`                     | PR tab             |
+| `pr-ready:<number>:<sha>`          | checks pass, mergeable, review ok              | PR tab             |
+| `pr-merged:<number>`               | PR status                                      | PR tab             |
 
 The table order is the priority order. `useWorkspaceAttention(workspaceKey) → AttentionItem[]` lives in
 `workspace-attention/attention.ts`, with a pure `deriveAttentionItems(input)` for tests. "Ready to review"
@@ -55,14 +55,37 @@ PR items depend on PR status, which today is requested only while discovery runs
 (`panels/pull-request/activity.ts`). On entering a workspace, read the cached status, and request one refresh
 if there is no cached status yet. Don't add polling.
 
-### Plugin badge
+### Workspace summary items
 
-The Asks plugin only sets its pill label to a count, so the host can't tell that anything waits on you. Add an
-optional `badge?: { count: number; needsYou: boolean; key: string }` to composer buttons
-(`plugins/buttons/model.ts`, validated in `validation.ts`, exposed through `pill.update`). `key` changes with
-each new item (for example the newest ask id), so a new ask after a hide counts as new. The host aggregates
-badges per workspace across that workspace's agents. It's an additive, optional field with no protocol change.
-It is FSH-only, like the side-panel opt-in. The Asks plugin (`paseo-asks`, a separate repo) sets it.
+The Asks plugin only sets its pill label to a count, so the host can't tell that anything waits on you. Add a
+plugin client contribution, `addWorkspaceSummaryItem`, next to `addWorkspaceRowItem`
+(`packages/plugin/src/client/contracts.ts`). It's data, not a component, because the host needs the facts
+to decide what to open:
+
+```ts
+const asks = paseo.addWorkspaceSummaryItem({
+  id: "asks",
+  title: "Asks",
+  icon: "message-circle-question",
+});
+asks.set(workspaceId, {
+  label: "2 waiting on you",
+  count: 2,
+  needsYou: true,
+  key: newestAskId,
+  panelId: "asks",
+});
+asks.clear(workspaceId);
+```
+
+- One value per workspace, so the plugin aggregates across that workspace's agents. Registration returns a
+  cleanup, as other contributions do.
+- `key` changes with each new item (for example the newest ask id), so a new ask after a hide counts as new.
+- `panelId` names the plugin panel to open in Explorer (`navigation.openWorkspacePanel(..., "explorer")`).
+  Asks moves its side-panel tab to a workspace panel.
+- The host keeps values in a client store keyed by `(serverId, workspaceId)`. It needs no protocol change. It
+  is FSH-only, like the side-panel opt-in. The Overview's Plugins section renders these rows (companion spec).
+- The Asks plugin (`paseo-asks`, a separate repo) registers the item and keeps its pill.
 
 ### Setting
 
@@ -75,7 +98,7 @@ workspace**. Options and hints:
 - **When something needs you**: permission prompts, asks, failures, PR status
 - **Always**: on the tab that needs you, otherwise where you left it
 
-Default: Open question 1.
+Default: **When something needs you**.
 
 ### Auto-show
 
@@ -102,19 +125,18 @@ unseen.
 
 Auto-show never opens Explorer while you are in the workspace. Changes there only update tab badges.
 
-## Open questions
+## Decisions
 
-1. **Default value.** Recommend **Always** on the FSH build. The hide memory keeps it from nagging, and the
-   right column becomes the place to look. **Never** stays available.
-2. **Badge shape.** `badge` on composer buttons (recommended) versus a new per-workspace contribution. The
-   pill already opens the side-panel tab, so one registration supplies both the item and its tab.
+1. **Default value:** **When something needs you**. **Always** and **Never** stay available.
+2. **How the host learns about asks:** a new `addWorkspaceSummaryItem` contribution, not a field on composer
+   buttons and not a hard-coded Asks plugin.
 
 ## Phases
 
 1. `deriveAttentionItems` and `useWorkspaceAttention`, with unit tests for every key and the priority order.
-2. Plugin badge field: model, validation, client runtime and aggregation. Then update the Asks plugin.
+2. `addWorkspaceSummaryItem`: contract, client runtime, host store, and an `explorer` panel open. Then update the Asks plugin.
 3. Setting, `useExplorerAutoShow` and hide memory, with store and persistence tests.
-4. Docs: `docs/explorer-sidebar.md` (auto-show rule, hide memory), `docs/plugins.md` (badge), FSH.md patch
+4. Docs: `docs/explorer-sidebar.md` (auto-show rule, hide memory), `docs/plugins.md` (workspace summary items), FSH.md patch
    line.
 
 ## Verification

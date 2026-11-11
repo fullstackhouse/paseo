@@ -348,8 +348,8 @@ function settingsFrame() {
       <main class="px-settings-main"><div class="px-settings-col">
         <div class="px-section"><div class="px-section-label">Open location</div><div class="px-card">
           ${row('', 'Pull requests', 'Where a detected PR opens', `<span class="px-select">Explorer sidebar ${ic('chevron-down')}</span>`)}
-          <div class="px-row px-row-anchor">${''}<div class="px-row-text"><span>Open Explorer when entering a workspace</span><span class="px-row-meta">Hiding it keeps it hidden in that workspace until something new needs you</span></div><span class="px-select is-open">Always ${ic('chevron-down')}</span>
-            <div class="px-menu">${opt('Never', 'Only when you open it', false)}${opt('When something needs you', 'Permission, asks, failures, PR status', false)}${opt('Always', 'On the tab that needs you, otherwise where you left it', true)}</div>
+          <div class="px-row px-row-anchor">${''}<div class="px-row-text"><span>Open Explorer when entering a workspace</span><span class="px-row-meta">Hiding it keeps it hidden in that workspace until something new needs you</span></div><span class="px-select is-open">When something needs you ${ic('chevron-down')}</span>
+            <div class="px-menu">${opt('Never', 'Only when you open it', false)}${opt('When something needs you', 'Permission, asks, failures, PR status', true)}${opt('Always', 'On the tab that needs you, otherwise where you left it', false)}</div>
           </div>
           ${row('', 'Diffs', 'Where a diff opens', `<span class="px-select">Main panel ${ic('chevron-down')}</span>`)}
         </div></div>
@@ -364,13 +364,13 @@ const screens = [
     id: 's1', nav: 'Enter with asks', title: 'Entering a workspace with open asks — opens on Asks',
     task: 'With the setting on When something needs you or Always, entering lands on the Asks tab.',
     refs: ['US-1', 'Auto-show table'], html: one(windowFrame(fx.asksTab)),
-    notes: ['The Asks tab is the plugin’s existing side-panel tab; the host picks it because the plugin badge has needsYou.', 'A permission or failed item opens Explorer and focuses the agent tab in the main pane instead.', 'Auto-show runs on entering a workspace only, never while you are in it.'],
+    notes: ['The Asks tab is the plugin’s existing side-panel tab; the host picks it because the plugin’s workspace summary item has needsYou.', 'A permission or failed item opens Explorer and focuses the agent tab in the main pane instead.', 'Auto-show runs on entering a workspace only, never while you are in it.'],
   },
   {
     id: 's2', nav: 'Setting', title: 'Settings — Open Explorer when entering a workspace',
     task: 'You choose the auto-show rule once, for this device.',
-    refs: ['US-3', 'Open question 1'], html: one(settingsFrame()),
-    notes: ['Desktop only; the row is absent on compact layouts.', 'Never is exactly today’s behavior. Default is Open question 1 (recommend Always on FSH).'],
+    refs: ['US-3', 'Decision 1'], html: one(settingsFrame()),
+    notes: ['Desktop only; the row is absent on compact layouts.', 'Default is When something needs you. Never is exactly today’s behavior.'],
   },
   {
     id: 's3', nav: 'Hidden', title: 'Hidden with Cmd+E — stays hidden until something new',
