@@ -86,6 +86,7 @@ const BUILT_IN_SELECTIONS = {
   browser: { kind: "browser" },
   pullRequest: { kind: "target", target: { kind: "pull_request" } },
   lineage: { kind: "target", target: { kind: "lineage" } },
+  overview: { kind: "target", target: { kind: "overview" } },
 } satisfies Record<BuiltInLaunchItemId, NewTabSelection>;
 
 function getLaunchPresentation(kind: WorkspaceTabTarget["kind"]): PanelPresentation {
@@ -126,6 +127,7 @@ export function useWorkspaceTabLaunchCatalog(input: {
     const filesPresentation = getLaunchPresentation("files");
     const pullRequestPresentation = getLaunchPresentation("pull_request");
     const lineagePresentation = getLaunchPresentation("lineage");
+    const overviewPresentation = getLaunchPresentation("overview");
     const builtIns: Record<BuiltInLaunchItemId, WorkspaceTabLaunchItem & { hidden?: boolean }> = {
       agent: {
         id: "agent",
@@ -200,6 +202,14 @@ export function useWorkspaceTabLaunchCatalog(input: {
         disabled: false,
         panelKind: "lineage",
         launch: launchSelection(BUILT_IN_SELECTIONS.lineage),
+      },
+      overview: {
+        id: "overview",
+        label: overviewPresentation.label(t),
+        Icon: overviewPresentation.icon,
+        disabled: false,
+        panelKind: "overview",
+        launch: launchSelection(BUILT_IN_SELECTIONS.overview),
       },
     };
     const tabItems = getBuiltInLaunchOrder(purpose).flatMap((id) => {

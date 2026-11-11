@@ -67,6 +67,7 @@ function normalizeSimpleWorkspaceTabTarget(value: WorkspaceTabTarget): Workspace
     case "files":
     case "pull_request":
     case "lineage":
+    case "overview":
       return { kind: value.kind };
     case "setup": {
       const workspaceId = trimNonEmpty(value.workspaceId);
@@ -142,6 +143,7 @@ const SINGLETON_TARGET_KINDS: ReadonlySet<WorkspaceTabTarget["kind"]> = new Set(
   "changes_tree",
   "pull_request",
   "lineage",
+  "overview",
 ]);
 
 function secondaryWorkspaceTabTargetsEqual(
@@ -237,7 +239,8 @@ export function buildDeterministicWorkspaceTabId(target: WorkspaceTabTarget): st
     target.kind === "changes_tree" ||
     target.kind === "files" ||
     target.kind === "pull_request" ||
-    target.kind === "lineage"
+    target.kind === "lineage" ||
+    target.kind === "overview"
   ) {
     return target.kind;
   }

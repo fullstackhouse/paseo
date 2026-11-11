@@ -160,6 +160,8 @@ interface WorkspaceLayoutStore {
   pullRequestTabAutoOpenedByWorkspace: Record<string, true>;
   /** Workspaces where a cross-workspace lineage already added its tab once; a closed tab never returns. */
   lineageTabAutoOpenedByWorkspace: Record<string, true>;
+  /** Workspaces where Explorer already got its Overview tab once; a closed tab never returns. */
+  overviewTabAutoOpenedByWorkspace: Record<string, true>;
   /**
    * Per workspace: whether the user hid Explorer, and the attention keys already surfaced or present
    * when they hid it. Entering the workspace opens Explorer only for a key not in `seenKeys`.
@@ -183,6 +185,8 @@ interface WorkspaceLayoutStore {
   ) => string | null;
   /** Adds the Lineage tab to Explorer in the background, once per workspace. */
   autoOpenLineageTab: (workspaceKey: string) => string | null;
+  /** Adds the Overview tab to the front of Explorer in the background, once per workspace. */
+  autoOpenOverviewTab: (workspaceKey: string) => string | null;
   /** Reveals the Explorer sidebar without selecting a view. Returns its pane id. */
   ensureExplorerSidebar: (workspaceKey: string) => string | null;
   showExplorerSidebar: (workspaceKey: string) => string | null;
@@ -1015,6 +1019,7 @@ const PERSISTED_SLICES = [
   "sidePaneIdByWorkspace",
   "pullRequestTabAutoOpenedByWorkspace",
   "lineageTabAutoOpenedByWorkspace",
+  "overviewTabAutoOpenedByWorkspace",
   "explorerAttentionByWorkspace",
 ] as const;
 
@@ -1053,6 +1058,7 @@ function createPersistedStateProjection() {
       sidePaneIdByWorkspace: source.sidePaneIdByWorkspace,
       pullRequestTabAutoOpenedByWorkspace: source.pullRequestTabAutoOpenedByWorkspace,
       lineageTabAutoOpenedByWorkspace: source.lineageTabAutoOpenedByWorkspace,
+      overviewTabAutoOpenedByWorkspace: source.overviewTabAutoOpenedByWorkspace,
       explorerAttentionByWorkspace: source.explorerAttentionByWorkspace,
     };
     previous = { source, state };
@@ -1127,6 +1133,37 @@ export function createWorkspaceLayoutStore(
           }
           return tabId;
         },
+        autoOpenOverviewTab: (workspaceKey) => {
+          const key = trimNonEmpty(workspaceKey);
+          if (!key || get().overviewTabAutoOpenedByWorkspace[key]) return null;
+          const paneId = resolveExplorerSidebarPaneId(
+            getWorkspaceLayout(get().layoutByWorkspace, key),
+            get().explorerSidebarPaneIdByWorkspace[key],
+          );
+          const tabId = get().openTab({
+            workspaceKey: key,
+            target: { kind: "overview" },
+            intent: "background",
+            placement: paneId ? { mode: "prefer", paneId } : undefined,
+          });
+          if (!tabId) return null;
+          set((state) => ({
+            overviewTabAutoOpenedByWorkspace: {
+              ...state.overviewTabAutoOpenedByWorkspace,
+              [key]: true,
+            },
+          }));
+          // First in the rail: it's the summary the other Explorer tabs detail.
+          const layout = getWorkspaceLayout(get().layoutByWorkspace, key);
+          const pane = findPaneContainingTab(layout.root, tabId);
+          if (pane && pane.tabIds[0] !== tabId) {
+            get().reorderTabsInPane(key, pane.id, [
+              tabId,
+              ...pane.tabIds.filter((id) => id !== tabId),
+            ]);
+          }
+          return tabId;
+        },
         panelRevisionByWorkspace: {},
         pendingOpenByWorkspace: {},
         deferOpenTab: (input) => {
@@ -1161,6 +1198,7 @@ export function createWorkspaceLayoutStore(
         sidePaneIdByWorkspace: {},
         pullRequestTabAutoOpenedByWorkspace: {},
         lineageTabAutoOpenedByWorkspace: {},
+        overviewTabAutoOpenedByWorkspace: {},
         explorerAttentionByWorkspace: {},
         openTab: (input) => {
           const normalizedWorkspaceKey = trimNonEmpty(input.workspaceKey);
@@ -2332,6 +2370,7 @@ export function createWorkspaceLayoutStore(
               normalizedWorkspaceKey in state.sidePaneIdByWorkspace ||
               normalizedWorkspaceKey in state.pullRequestTabAutoOpenedByWorkspace ||
               normalizedWorkspaceKey in state.lineageTabAutoOpenedByWorkspace ||
+              normalizedWorkspaceKey in state.overviewTabAutoOpenedByWorkspace ||
               normalizedWorkspaceKey in state.explorerAttentionByWorkspace ||
               normalizedWorkspaceKey in state.sheetsByWorkspace;
             if (!hasAny) {
@@ -2347,6 +2386,10 @@ export function createWorkspaceLayoutStore(
               [normalizedWorkspaceKey]: _lineageAutoOpened,
               ...lineageTabAutoOpenedByWorkspace
             } = state.lineageTabAutoOpenedByWorkspace;
+            const {
+              [normalizedWorkspaceKey]: _overviewAutoOpened,
+              ...overviewTabAutoOpenedByWorkspace
+            } = state.overviewTabAutoOpenedByWorkspace;
             const {
               [normalizedWorkspaceKey]: _explorerAttention,
               ...explorerAttentionByWorkspace
@@ -2373,6 +2416,7 @@ export function createWorkspaceLayoutStore(
               pullRequestTabAutoOpenedByWorkspace,
               lineageTabAutoOpenedByWorkspace,
               layoutByWorkspace,
+              overviewTabAutoOpenedByWorkspace,
               explorerAttentionByWorkspace,
               splitSizesByWorkspace,
               pinnedAgentIdsByWorkspace,
@@ -2440,6 +2484,7 @@ export function createWorkspaceLayoutStore(
             pullRequestTabAutoOpenedByWorkspace:
               result.data.pullRequestTabAutoOpenedByWorkspace ?? {},
             lineageTabAutoOpenedByWorkspace: result.data.lineageTabAutoOpenedByWorkspace ?? {},
+            overviewTabAutoOpenedByWorkspace: result.data.overviewTabAutoOpenedByWorkspace ?? {},
             explorerAttentionByWorkspace: result.data.explorerAttentionByWorkspace ?? {},
           };
         },

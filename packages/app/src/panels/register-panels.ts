@@ -14,6 +14,7 @@ import { terminalPanelRegistration } from "@/panels/terminal-panel";
 import { providerSubagentPanelRegistration } from "@/panels/provider-subagent-panel";
 import { pullRequestPanelRegistration } from "@/panels/pull-request-panel";
 import { lineagePanelRegistration } from "@/panels/lineage-panel";
+import { overviewPanelRegistration } from "@/panels/overview-panel";
 import { pluginButtonPanelRegistration } from "@/plugins/buttons/panel";
 import { pluginPanelRegistration } from "@/plugins/workspace-panels/panel";
 import { newTabPanelRegistration } from "@/panels/new-tab-panel";
@@ -35,6 +36,7 @@ export function ensurePanelsRegistered(): void {
   registerPanel(filesPanelRegistration);
   registerPanel(pullRequestPanelRegistration);
   registerPanel(lineagePanelRegistration);
+  registerPanel(overviewPanelRegistration);
   registerPanel(commitDiffPanelRegistration);
   registerPanel(workingDiffPanelRegistration);
   registerPanel(changesTreePanelRegistration);

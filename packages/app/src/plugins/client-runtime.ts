@@ -36,7 +36,11 @@ export function createPluginClientRuntime(
     },
     addWorkspaceSummaryItem(contribution) {
       return workspaceSummaryStore.add(
-        { serverId: installation.serverId, pluginId: installation.id },
+        {
+          serverId: installation.serverId,
+          pluginId: installation.id,
+          resolveText: (text) => installation.i18n.resolve(text, installation.locale),
+        },
         contribution,
       );
     },

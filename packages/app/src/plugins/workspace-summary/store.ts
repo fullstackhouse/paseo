@@ -13,12 +13,14 @@ export interface WorkspaceSummaryItem extends PluginWorkspaceSummaryItemState {
   pluginId: string;
   itemId: string;
   workspaceId: string;
-  title: PluginText;
+  /** Resolved for the current locale when the item is added. */
+  title: string;
 }
 
 export interface WorkspaceSummaryOwner {
   serverId: string;
   pluginId: string;
+  resolveText(text: PluginText): string;
 }
 
 const EMPTY: readonly WorkspaceSummaryItem[] = [];
@@ -71,7 +73,8 @@ export class WorkspaceSummaryStore {
   ): PluginWorkspaceSummaryItemRegistration {
     const itemId = requireText(contribution.id, "id");
     const workspaceId = requireText(contribution.workspaceId, "workspace id");
-    if (!contribution.title) throw new Error(`Workspace summary item ${itemId} needs a title`);
+    const title = contribution.title ? owner.resolveText(contribution.title).trim() : "";
+    if (!title) throw new Error(`Workspace summary item ${itemId} needs a title`);
     const duplicate = this.entries.some(
       (entry) =>
         entry.serverId === owner.serverId &&
@@ -88,7 +91,7 @@ export class WorkspaceSummaryStore {
       pluginId: owner.pluginId,
       itemId,
       workspaceId,
-      title: contribution.title,
+      title,
     });
     let current = cleanState(contribution);
     this.replace([...this.entries, build(current)]);
