@@ -770,6 +770,7 @@ function ChatAgentContent({
     isConnected,
     requiresAttention: agentState.requiresAttention,
     attentionReason: agentState.attentionReason,
+    isRunning: agentState.status === "running",
     isScreenFocused: isPaneFocused,
   });
   useEffect(() => {

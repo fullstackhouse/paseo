@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { AppState } from "react-native";
 import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
 import {
+  isWatchedTurnFinish,
   shouldClearAgentAttention,
   type AgentAttentionClearTrigger,
 } from "@/utils/agent-attention";
@@ -16,6 +17,7 @@ interface UseAgentAttentionClearParams {
   isConnected: boolean;
   requiresAttention: boolean | null | undefined;
   attentionReason: AttentionReason;
+  isRunning: boolean;
   isScreenFocused: boolean;
 }
 
@@ -31,6 +33,7 @@ export function useAgentAttentionClear({
   isConnected,
   requiresAttention,
   attentionReason,
+  isRunning,
   isScreenFocused,
 }: UseAgentAttentionClearParams): AgentAttentionClearController {
   const [isAppVisible, setIsAppVisible] = useState<boolean>(() => getIsAppActivelyVisible());
@@ -39,6 +42,9 @@ export function useAgentAttentionClear({
   const prevActivelyViewedRef = useRef(isScreenFocused && getIsAppActivelyVisible());
   const prevScreenFocusedRef = useRef(false);
   const prevAppVisibleRef = useRef(getIsAppActivelyVisible());
+  // The agent that has run since its last attention, so a watched finish can be told apart from
+  // Mark as unread, which flags an idle agent.
+  const ranSinceLastAttentionRef = useRef<string | null>(null);
 
   const clearAttention = useCallback(
     (trigger: AgentAttentionClearTrigger) => {
@@ -96,18 +102,37 @@ export function useAgentAttentionClear({
   }, [requiresAttention]);
 
   useEffect(() => {
-    const isActivelyViewed = isScreenFocused && isAppVisible;
-    if (
-      !prevRequiresAttentionRef.current &&
-      Boolean(requiresAttention) &&
-      prevActivelyViewedRef.current &&
-      isActivelyViewed
-    ) {
-      deferredFocusEntryClearRef.current = true;
+    if (agentId && isRunning && !requiresAttention) {
+      ranSinceLastAttentionRef.current = agentId;
     }
+  }, [agentId, isRunning, requiresAttention]);
+
+  useEffect(() => {
+    const isActivelyViewed = isScreenFocused && isAppVisible;
+    const hadAttention = prevRequiresAttentionRef.current;
+    const wasActivelyViewed = prevActivelyViewedRef.current;
     prevRequiresAttentionRef.current = Boolean(requiresAttention);
     prevActivelyViewedRef.current = isActivelyViewed;
-  }, [isAppVisible, isScreenFocused, requiresAttention]);
+    if (hadAttention || !requiresAttention) {
+      return;
+    }
+    const watchedFinish = isWatchedTurnFinish({
+      hadAttention,
+      requiresAttention: true,
+      attentionReason,
+      wasActivelyViewed,
+      isActivelyViewed,
+      ranSinceLastAttention: Boolean(agentId) && ranSinceLastAttentionRef.current === agentId,
+    });
+    ranSinceLastAttentionRef.current = null;
+    if (watchedFinish) {
+      clearAttention("watched-finish");
+      return;
+    }
+    if (wasActivelyViewed && isActivelyViewed) {
+      deferredFocusEntryClearRef.current = true;
+    }
+  }, [agentId, attentionReason, clearAttention, isAppVisible, isScreenFocused, requiresAttention]);
 
   useEffect(() => {
     const enteredScreenFocus = !prevScreenFocusedRef.current && isScreenFocused && isAppVisible;

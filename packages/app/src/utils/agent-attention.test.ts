@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { Agent } from "@/stores/session-store";
-import { pickAttentionAgent, shouldClearAgentAttention } from "@/utils/agent-attention";
+import {
+  isWatchedTurnFinish,
+  pickAttentionAgent,
+  shouldClearAgentAttention,
+} from "@/utils/agent-attention";
 
 function createAgent(input: Partial<Agent> & Pick<Agent, "id">): Agent {
   const { id, ...rest } = input;
@@ -131,6 +135,19 @@ describe("shouldClearAgentAttention", () => {
     ).toBe(true);
   });
 
+  it("clears finished attention for a turn the user watched finish", () => {
+    expect(
+      shouldClearAgentAttention({
+        agentId: "agent-1",
+        isConnected: true,
+        requiresAttention: true,
+        attentionReason: "finished",
+        trigger: "watched-finish",
+        hasDeferredFocusEntryClear: false,
+      }),
+    ).toBe(true);
+  });
+
   it("clears error attention on view and blur", () => {
     for (const trigger of ["focus-entry", "input-focus", "agent-blur", "prompt-send"] as const) {
       expect(
@@ -178,6 +195,39 @@ describe("shouldClearAgentAttention", () => {
         hasDeferredFocusEntryClear: true,
       }),
     ).toBe(true);
+  });
+});
+
+describe("isWatchedTurnFinish", () => {
+  const watchedFinish = {
+    hadAttention: false,
+    requiresAttention: true,
+    attentionReason: "finished",
+    wasActivelyViewed: true,
+    isActivelyViewed: true,
+    ranSinceLastAttention: true,
+  } as const;
+
+  it("is true when a turn finishes while the user is viewing the agent", () => {
+    expect(isWatchedTurnFinish(watchedFinish)).toBe(true);
+  });
+
+  it("is false for a turn that finished in the background, then was opened", () => {
+    expect(isWatchedTurnFinish({ ...watchedFinish, wasActivelyViewed: false })).toBe(false);
+    expect(isWatchedTurnFinish({ ...watchedFinish, isActivelyViewed: false })).toBe(false);
+  });
+
+  it("is false when attention was already there, as on opening a finished workspace", () => {
+    expect(isWatchedTurnFinish({ ...watchedFinish, hadAttention: true })).toBe(false);
+  });
+
+  it("is false for Mark as unread, which flags an agent that has not run since", () => {
+    expect(isWatchedTurnFinish({ ...watchedFinish, ranSinceLastAttention: false })).toBe(false);
+  });
+
+  it("is false for errors and permission prompts", () => {
+    expect(isWatchedTurnFinish({ ...watchedFinish, attentionReason: "error" })).toBe(false);
+    expect(isWatchedTurnFinish({ ...watchedFinish, attentionReason: "permission" })).toBe(false);
   });
 });
 

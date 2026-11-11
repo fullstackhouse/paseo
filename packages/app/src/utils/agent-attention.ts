@@ -13,7 +13,8 @@ export type AgentAttentionClearTrigger =
   | "focus-entry"
   | "input-focus"
   | "prompt-send"
-  | "agent-blur";
+  | "agent-blur"
+  | "watched-finish";
 
 const ATTENTION_REASON_PRIORITY = {
   permission: 0,
@@ -75,12 +76,42 @@ export function shouldClearAgentAttention(input: ShouldClearAgentAttentionInput)
     return false;
   }
   // FSH: viewing a finished agent is not reviewing it. "Ready to review" stays until the
-  // next prompt or an explicit Mark as read (workspace menu).
-  if (input.attentionReason === "finished" && input.trigger && input.trigger !== "prompt-send") {
+  // next prompt, an explicit Mark as read (workspace menu), or a turn the user watched finish.
+  if (
+    input.attentionReason === "finished" &&
+    input.trigger &&
+    input.trigger !== "prompt-send" &&
+    input.trigger !== "watched-finish"
+  ) {
     return false;
   }
   if (input.trigger === "focus-entry" && input.hasDeferredFocusEntryClear === true) {
     return false;
   }
   return true;
+}
+
+interface WatchedTurnFinishInput {
+  hadAttention: boolean;
+  requiresAttention: boolean;
+  attentionReason: "finished" | "error" | "permission" | null | undefined;
+  wasActivelyViewed: boolean;
+  isActivelyViewed: boolean;
+  ranSinceLastAttention: boolean;
+}
+
+/**
+ * Whether "Ready to review" just arrived for a turn the user watched finish. Mark as unread
+ * sets the same finished attention on an idle agent, so the agent must have run since the last
+ * attention; a turn that finished in the background has no watched arrival at all.
+ */
+export function isWatchedTurnFinish(input: WatchedTurnFinishInput): boolean {
+  return (
+    !input.hadAttention &&
+    input.requiresAttention &&
+    input.attentionReason === "finished" &&
+    input.wasActivelyViewed &&
+    input.isActivelyViewed &&
+    input.ranSinceLastAttention
+  );
 }

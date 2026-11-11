@@ -115,6 +115,21 @@ async function completeTurnAndLeave(page: Page, { subject, other }: FinishedWork
   });
 }
 
+async function watchTurnFinish(page: Page, { subject, other }: FinishedWorkspaces) {
+  await test.step("a turn that finishes while you watch it goes to Done", async () => {
+    await openWorkspace(page, subject.workspaceId);
+    await subject.client.sendAgentMessage(subject.agentId, "Finish a watched turn.");
+    await subject.client.waitForFinish(subject.agentId, 20_000);
+    await expectStatus(page, subject.workspaceId, "done");
+  });
+  await test.step("Mark as unread on the open chat still sticks after a watched turn", async () => {
+    await markAsUnread(page, subject.workspaceId);
+    await openWorkspace(page, other.workspaceId);
+    await expectStatus(page, subject.workspaceId, "attention");
+    await markAsRead(page, subject.workspaceId);
+  });
+}
+
 async function openWorkspaceOnCompact(page: Page, workspaceId: string) {
   await openWorkspace(page, workspaceId);
   await openMobileAgentSidebar(page);
@@ -146,14 +161,21 @@ async function leaveMarkedWorkspaceAndReopenOnCompact(
   });
 }
 
-async function completeTurnAndLeaveOnCompact(page: Page, { subject, other }: FinishedWorkspaces) {
-  await test.step("ordinary completion stays ready to review after departure", async () => {
+async function completeWatchedTurnOnCompact(page: Page, { subject }: FinishedWorkspaces) {
+  await test.step("a turn that finishes while you watch it goes to Done", async () => {
     await closeMobileAgentSidebar(page);
     await subject.client.sendAgentMessage(subject.agentId, "Finish another turn.");
     await subject.client.waitForFinish(subject.agentId, 20_000);
     await openMobileAgentSidebar(page);
-    await expectStatus(page, subject.workspaceId, "attention");
+    await expectStatus(page, subject.workspaceId, "done");
+  });
+}
+
+async function completeBackgroundTurnOnCompact(page: Page, { subject, other }: FinishedWorkspaces) {
+  await test.step("a turn that finishes in another workspace stays ready to review", async () => {
     await openWorkspaceOnCompact(page, other.workspaceId);
+    await subject.client.sendAgentMessage(subject.agentId, "Finish a turn out of view.");
+    await subject.client.waitForFinish(subject.agentId, 20_000);
     await expectStatus(page, subject.workspaceId, "attention");
     await markAsRead(page, subject.workspaceId);
   });
@@ -212,6 +234,7 @@ test("ready to review survives opening and leaving until Mark as read", async ({
   await leaveMarkedWorkspaceAndRead(page, workspaces);
   await leaveMarkedWorkspaceAndReopen(page, workspaces);
   await completeTurnAndLeave(page, workspaces);
+  await watchTurnFinish(page, workspaces);
   await markBackgroundWorkspaceAndRead(page, workspaces.subject.workspaceId);
 });
 
@@ -232,7 +255,8 @@ test("manual unread survives leaving the current workspace on compact layout", a
   await leaveMarkedWorkspaceAndReadOnCompact(page, workspaces);
   await leaveMarkedWorkspaceAndReopenOnCompact(page, workspaces);
   await markUnreadThenResumeChat(page, workspaces.subject.workspaceId);
-  await completeTurnAndLeaveOnCompact(page, workspaces);
+  await completeWatchedTurnOnCompact(page, workspaces);
+  await completeBackgroundTurnOnCompact(page, workspaces);
 });
 
 async function reopenMarkedWorkspaceAfterBackgroundTurn(page: Page, workspace: MockAgentWorkspace) {
