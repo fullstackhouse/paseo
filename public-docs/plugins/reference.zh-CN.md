@@ -739,7 +739,7 @@ client.addWorkspaceRowItem({ id: "review", title: "Review", icon: "Eye", Compone
 
 早于此 API 的主机没有 `addWorkspaceRowItem`；调用前先检查它是否存在。
 
-### 工作区摘要项
+### 工作区摘要项 {#workspace-summary-items}
 
 `addWorkspaceSummaryItem({ id, workspaceId, title, label, count, needsYou, key, panelId })` 告诉主机插件对某个工作区掌握的信息。每个工作区注册一个，并用 `update(patch)` 保持最新；`remove()` 将其移除，插件停止时会移除全部。
 
