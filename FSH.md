@@ -61,6 +61,8 @@ temporary by design: every patch is meant to go upstream and then drop out of `f
 - FSH-only (upstreamable): a Paseo worktree with no commits of its own shows **Archive workspace** as its main git action, not **Update from <base>**. Its work is done or went to another repo, so there is nothing to update
 - FSH-only (upstreamable): after a squash or rebase merge, the Changes panel and the diff badge stop counting the branch's merged commits and show only work that isn't in base yet. Before, a merged branch kept its full diff until it was archived
 
+- FSH-only (not upstream yet): desktop can show the Explorer sidebar when you enter a workspace. Settings → Open location → **Entering a workspace opens the Explorer sidebar**: Never, When something needs you (default), Always. Something needs you means a permission prompt, a failed agent, failing PR checks, a PR ready to merge or merged, or a plugin's workspace summary item (`addWorkspaceSummaryItem`, used by Asks). Explorer opens on that tab; hiding it keeps it hidden in that workspace until something new needs you
+
 Keep this list in sync with what's merged into `fsh`.
 
 ## Install the desktop app and plugins (macOS, Fedora)

@@ -44,6 +44,7 @@ function registry(version: string) {
         subscribe: () => {
           throw new Error("Subscriptions are not used here");
         },
+        addWorkspaceSummaryItem: () => ({ update() {}, remove() {} }),
       };
     },
   });

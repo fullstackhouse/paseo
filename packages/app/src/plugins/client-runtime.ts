@@ -11,6 +11,7 @@ import { createPluginClientStateSource } from "./client-state/source";
 import type { PluginClientRuntime } from "./evaluate";
 import { createPluginNavigation } from "./navigation";
 import { pluginButtonStore } from "./buttons";
+import { workspaceSummaryStore } from "./workspace-summary/store";
 import type { InstalledPlugin } from "./types";
 
 export function createPluginClientRuntime(
@@ -32,6 +33,12 @@ export function createPluginClientRuntime(
     },
     addHeaderButton(contribution) {
       return pluginButtonStore.addHeaderButton(installation, contribution);
+    },
+    addWorkspaceSummaryItem(contribution) {
+      return workspaceSummaryStore.add(
+        { serverId: installation.serverId, pluginId: installation.id },
+        contribution,
+      );
     },
     openPanel(panelId, options) {
       openClientPanel({ installation, state, panelId, options });

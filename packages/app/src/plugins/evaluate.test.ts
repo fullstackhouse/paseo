@@ -78,6 +78,32 @@ describe("evaluatePluginClientBundle", () => {
     ).toThrow("Duplicate sidebar view");
   });
 
+  it("removes workspace summary items when the plugin stops", async () => {
+    const active = new Set<string>();
+    const plugin = runPluginClientBundle(
+      "summary-items",
+      bundle(`
+      plugin.addWorkspaceSummaryItem({ id: "asks", workspaceId: "w1", title: "Asks", needsYou: true });
+      plugin.addWorkspaceSummaryItem({ id: "asks", workspaceId: "w2", title: "Asks" });
+    `),
+      {
+        ...runtime,
+        addWorkspaceSummaryItem(contribution) {
+          active.add(contribution.workspaceId);
+          return {
+            update() {},
+            remove() {
+              active.delete(contribution.workspaceId);
+            },
+          };
+        },
+      },
+    );
+    expect([...active]).toEqual(["w1", "w2"]);
+    await plugin.cleanup();
+    expect(active.size).toBe(0);
+  });
+
   it("accepts memoized settings screens", () => {
     const plugin = evaluatePluginClientBundle(
       "settings",
