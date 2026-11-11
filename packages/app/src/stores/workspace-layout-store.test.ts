@@ -585,6 +585,7 @@ describe("workspace-layout-store version 2 migration", () => {
       const persisted = JSON.parse((await AsyncStorage.getItem("workspace-layout-state")) ?? "{}");
       expect(persisted.version).toBe(2);
       expect(Object.keys(persisted.state).sort()).toEqual([
+        "explorerAttentionByWorkspace",
         "explorerPaneIdByWorkspace",
         "layoutByWorkspace",
         "lineageTabAutoOpenedByWorkspace",
@@ -3238,6 +3239,7 @@ describe("workspace-layout-store actions", () => {
       explorerPaneIdByWorkspace: {},
       pullRequestTabAutoOpenedByWorkspace: currentState.pullRequestTabAutoOpenedByWorkspace,
       lineageTabAutoOpenedByWorkspace: currentState.lineageTabAutoOpenedByWorkspace,
+      explorerAttentionByWorkspace: currentState.explorerAttentionByWorkspace,
       sidePaneIdByWorkspace: currentState.sidePaneIdByWorkspace,
     });
     expect(layout && collectAllTabs(layout.root).map((tab) => tab.target)).toEqual([
@@ -3468,6 +3470,7 @@ describe("workspace-layout-store actions", () => {
     expect(partialize?.(state)).toEqual({
       pullRequestTabAutoOpenedByWorkspace: {},
       lineageTabAutoOpenedByWorkspace: {},
+      explorerAttentionByWorkspace: {},
       layoutByWorkspace: {},
       pinnedAgentIdsByWorkspace: {},
       splitSizesByWorkspace: {},
@@ -4554,6 +4557,23 @@ it("adds Lineage to Explorer once, keeps it closed across reloads, and forgets o
   expect(restored.getState().autoOpenLineageTab(workspaceKey)).toBeNull();
   restored.getState().purgeWorkspace(workspaceKey);
   expect(restored.getState().lineageTabAutoOpenedByWorkspace[workspaceKey]).toBeUndefined();
+});
+
+it("remembers a hidden Explorer and its seen attention across reloads, and forgets on purge", async () => {
+  await AsyncStorage.removeItem("workspace-layout-state");
+  const source = createWorkspaceLayoutStore(workspaceLayoutIds);
+  await source.persist.rehydrate();
+  const workspaceKey = "server-1:explorer-attention";
+  source.getState().setExplorerAttention(workspaceKey, { hidden: true, seenKeys: ["pr-merged:7"] });
+
+  const restored = createWorkspaceLayoutStore(workspaceLayoutIds);
+  await restored.persist.rehydrate();
+  expect(restored.getState().explorerAttentionByWorkspace[workspaceKey]).toEqual({
+    hidden: true,
+    seenKeys: ["pr-merged:7"],
+  });
+  restored.getState().purgeWorkspace(workspaceKey);
+  expect(restored.getState().explorerAttentionByWorkspace[workspaceKey]).toBeUndefined();
 });
 
 describe("compact workspace sheet", () => {

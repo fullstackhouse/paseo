@@ -1,6 +1,6 @@
 # Spec: Open Explorer when entering a workspace
 
-Status: draft · 2026-11-11 · storyboard: [`.ai/prototypes/explorer-auto-open/`](../.ai/prototypes/explorer-auto-open/index.html)
+Status: implemented · 2026-11-11
 
 Companion: [Overview tab](spec-explorer-overview.md) is a separate PR. Either can land first.
 
@@ -29,8 +29,6 @@ workspace, the Overview tab itself (companion spec).
 | US-2 | If I hide Explorer with Cmd+E, it stays hidden in that workspace until something new needs me.                                                                    |
 | US-3 | I choose the rule in Settings, and **Never** keeps today's behavior exactly.                                                                                      |
 
-Acceptance criteria per state are in the storyboard (s1–s3), each with notes.
-
 ## Design
 
 ### Attention items
@@ -47,7 +45,7 @@ Acceptance criteria per state are in the storyboard (s1–s3), each with notes.
 | `pr-merged:<number>`               | PR status                                      | PR tab             |
 
 The table order is the priority order. `useWorkspaceAttention(workspaceKey) → AttentionItem[]` lives in
-`workspace-attention/attention.ts`, with a pure `deriveAttentionItems(input)` for tests. "Ready to review"
+`workspace-attention/attention.ts`, with the pure `deriveAttentionItems(input)` in `workspace-attention/model.ts`. "Ready to review"
 (an agent finished) is deliberately not an item: it would fire on every turn. The sidebar keeps showing it.
 The Overview companion reuses this list for its first next-step rules.
 
@@ -63,26 +61,21 @@ plugin client contribution, `addWorkspaceSummaryItem`, next to `addWorkspaceRowI
 to decide what to open:
 
 ```ts
-const asks = paseo.addWorkspaceSummaryItem({
-  id: "asks",
-  title: "Asks",
-  icon: "message-circle-question",
-});
-asks.set(workspaceId, {
+const item = paseo.addWorkspaceSummaryItem({ id: "asks", workspaceId, title: "Asks" });
+item.update({
   label: "2 waiting on you",
   count: 2,
   needsYou: true,
   key: newestAskId,
   panelId: "asks",
 });
-asks.clear(workspaceId);
+item.remove();
 ```
 
-- One value per workspace, so the plugin aggregates across that workspace's agents. Registration returns a
-  cleanup, as other contributions do.
+- One registration per workspace, so the plugin aggregates across that workspace's agents. It returns
+  `update`/`remove`, like composer pills, and stopping the plugin removes it.
 - `key` changes with each new item (for example the newest ask id), so a new ask after a hide counts as new.
-- `panelId` names the plugin panel to open in Explorer (`navigation.openWorkspacePanel(..., "explorer")`).
-  Asks moves its side-panel tab to a workspace panel.
+- `panelId` names the plugin's workspace panel to open in Explorer. Asks already has one (`asks`).
 - The host keeps values in a client store keyed by `(serverId, workspaceId)`. It needs no protocol change. It
   is FSH-only, like the side-panel opt-in. The Overview's Plugins section renders these rows (companion spec).
 - The Asks plugin (`paseo-asks`, a separate repo) registers the item and keeps its pill.
@@ -117,11 +110,12 @@ not compact). It runs once per entry, on the transition from inactive to active:
 Agent tabs live in the main pane, not Explorer. For a permission or failed item, show Explorer and focus the
 agent tab as `navigateToWorkspace` does for attention today. Explorer's selected tab doesn't change.
 
-**Hide memory.** When you hide Explorer in a workspace (Cmd+E, toggle, close gesture), store
-`explorerHiddenByWorkspace[key] = { attentionKeys }`: the keys present at that moment. Persist it next to
+**Hide memory.** When you toggle Explorer in a workspace (Cmd+E or the header button), store
+`explorerAttentionByWorkspace[key] = { hidden, seenKeys }`, with the keys present at that moment. An entry that
+opens Explorer for an item also stores the current keys as seen, so a lingering item doesn't reselect its tab on
+every entry. Persist it next to
 `lineageTabAutoOpenedByWorkspace` (`stores/workspace-layout-storage.ts`). **Unseen** items are those whose key
-isn't in that set. Showing Explorer by hand clears the record. A workspace with no record treats every item as
-unseen.
+isn't in `seenKeys`. A workspace with no record treats every item as unseen.
 
 Auto-show never opens Explorer while you are in the workspace. Changes there only update tab badges.
 
@@ -138,6 +132,11 @@ Auto-show never opens Explorer while you are in the workspace. Changes there onl
 3. Setting, `useExplorerAutoShow` and hide memory, with store and persistence tests.
 4. Docs: `docs/explorer-sidebar.md` (auto-show rule, hide memory), `docs/plugins.md` (workspace summary items), FSH.md patch
    line.
+
+## Follow-ups
+
+- `paseo-asks` registers its workspace summary item (separate repo).
+- The Overview tab (companion spec) renders summary items as rows.
 
 ## Verification
 

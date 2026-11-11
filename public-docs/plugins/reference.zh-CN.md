@@ -739,6 +739,23 @@ client.addWorkspaceRowItem({ id: "review", title: "Review", icon: "Eye", Compone
 
 早于此 API 的主机没有 `addWorkspaceRowItem`；调用前先检查它是否存在。
 
+### 工作区摘要项
+
+`addWorkspaceSummaryItem({ id, workspaceId, title, label, count, needsYou, key, panelId })` 告诉主机插件对某个工作区掌握的信息。每个工作区注册一个，并用 `update(patch)` 保持最新；`remove()` 将其移除，插件停止时会移除全部。
+
+| 字段       | 含义                                                               |
+| ---------- | ------------------------------------------------------------------ |
+| `title`    | 项的名称，例如 "Asks"。                                            |
+| `label`    | 可选的简短文字，例如 "2 waiting on you"。                          |
+| `count`    | 可选的数字。                                                       |
+| `needsYou` | 工作区中有事项等待用户处理时为 true。                              |
+| `key`      | 标识正在等待的事项，例如最新一项的 id。有新事项到来时更改它。      |
+| `panelId`  | 可选。插件的某个工作区面板，注册时 `locations` 需包含 `explorer`。 |
+
+在桌面端，当 **Open Explorer when entering a workspace** 设置允许时，进入工作区会为带有 `needsYou` 且用户在该工作区尚未看过其 `key` 的项打开 Explorer，并显示 `panelId`。用户隐藏 Explorer 时已存在的 `key` 不会再次打开它；新的 `key` 会。
+
+早于此 API 的主机没有 `addWorkspaceSummaryItem`；调用前先检查它是否存在。
+
 ## 宿主 UI {#host-ui}
 
 在客户端代码中从 `@getpaseo/plugin/client/ui` 导入由 Paseo 提供的 UI。下面的示例会打开一个受控的弹窗、渲染一个宿主图标，并用 toast 确认操作：

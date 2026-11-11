@@ -122,6 +122,16 @@ workspace tabs, launcher, and panel host. Below 600 points the shell is the swip
 overlay; at 600 points and above it reserves width beside the workspace. Native docking keeps its
 touch resize handle. Full workspace splits remain a separate web-only capability.
 
+Desktop can also show Explorer when you enter a workspace: Settings → Open location → **Entering a
+workspace opens the Explorer sidebar** (Never / When something needs you, the default / Always).
+`packages/app/src/workspace-attention/` owns it. Attention items are pending permissions, plugin
+workspace summary items with `needsYou`, failed agents, and the PR's failed checks, readiness to
+merge, or merge. Each item has a key, and the first unseen one picks the tab: the plugin's panel, the PR
+tab, or the current tab for agent items, whose tab lives in the main pane. The decision runs once per
+entry, never while you stay. Hiding Explorer with the toggle records the keys present then
+(`explorerAttentionByWorkspace`), so it stays hidden until a new key appears; under Always it otherwise
+reopens on every entry.
+
 The dock reserves at least 240 points and the workspace 360. App navigation yields when it cannot
 share the remaining width with both. This keeps a portrait tablet from rendering three unusably
 narrow columns; widening restores navigation without changing its saved open state.

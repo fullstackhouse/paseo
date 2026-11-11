@@ -119,6 +119,9 @@ export const WorkspaceLayoutPersistedStateSchema = z.strictObject({
   sidePaneIdByWorkspace: z.record(z.string(), z.string().nullable()).optional(),
   pullRequestTabAutoOpenedByWorkspace: z.record(z.string(), z.literal(true)).optional(),
   lineageTabAutoOpenedByWorkspace: z.record(z.string(), z.literal(true)).optional(),
+  explorerAttentionByWorkspace: z
+    .record(z.string(), z.object({ hidden: z.boolean(), seenKeys: z.array(z.string()) }))
+    .optional(),
   // COMPAT(pullRequestAutoAdd): PR detection stopped opening a tab in v0.5; accepted
   // and ignored so upgrading does not discard the layout. Remove after 2027-08-20.
   acknowledgedPullRequestByWorkspace: z.record(z.string(), z.string()).optional(),

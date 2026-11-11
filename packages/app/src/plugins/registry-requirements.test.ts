@@ -39,6 +39,7 @@ function registry(version: string) {
         openPanel() {},
         addComposerPill: () => ({ update() {}, remove() {} }),
         addHeaderButton: () => ({ update() {}, remove() {} }),
+        addWorkspaceSummaryItem: () => ({ update() {}, remove() {} }),
       };
     },
   });
