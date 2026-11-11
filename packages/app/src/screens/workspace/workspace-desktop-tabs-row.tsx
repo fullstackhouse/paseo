@@ -1,4 +1,5 @@
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
+import { inlineUnistylesStyle } from "@/styles/unistyles-inline-style";
 import React, {
   Fragment,
   useCallback,
@@ -803,11 +804,13 @@ function TabChip({
       styles.tab,
       isFilled && styles.tabFill(chipBackdrop),
       isWeb && isDragging && ({ cursor: "grabbing" } as object),
-      {
+      // Measured width changes while Explorer resizes; keep it out of the CSS registry
+      // (docs/unistyles.md, Dynamic Pixel Styles On Web).
+      inlineUnistylesStyle({
         minWidth: resolvedTabWidth,
         width: resolvedTabWidth,
         maxWidth: resolvedTabWidth,
-      },
+      }),
     ],
     [chipBackdrop, isDragging, isFilled, resolvedTabWidth],
   );
