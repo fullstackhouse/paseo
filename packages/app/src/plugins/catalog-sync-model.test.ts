@@ -153,6 +153,7 @@ function harness() {
         openPanel() {},
         addComposerPill: () => ({ update() {}, remove() {} }),
         addHeaderButton: () => ({ update() {}, remove() {} }),
+        addWorkspaceSummaryItem: () => ({ update() {}, remove() {} }),
       };
     },
   });

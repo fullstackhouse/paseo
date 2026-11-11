@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { SettingsSection, SettingsCard, SettingsSelect } from "@/components/settings";
 import {
   useAppSettings,
+  type ExplorerOnWorkspaceEnter,
   type OpenInSidePanePreferences,
   type PullRequestOpenLocation,
   type ServiceUrlBehavior,
@@ -83,6 +84,36 @@ function ServiceUrlRow() {
   );
 }
 
+const EXPLORER_ON_ENTER_VALUES: readonly ExplorerOnWorkspaceEnter[] = ["never", "needed", "always"];
+
+function ExplorerOnWorkspaceEnterRow() {
+  const { t } = useTranslation();
+  const { settings, updateSettings } = useAppSettings();
+  const options = useMemo(
+    () =>
+      EXPLORER_ON_ENTER_VALUES.map((value) => ({
+        value,
+        label: t(
+          `settings.layout.openInSidePane.sources.explorerOnWorkspaceEnter.options.${value}`,
+        ),
+      })),
+    [t],
+  );
+  const change = useCallback(
+    (explorerOnWorkspaceEnter: ExplorerOnWorkspaceEnter) =>
+      void updateSettings({ explorerOnWorkspaceEnter }),
+    [updateSettings],
+  );
+  return (
+    <SettingsSelect
+      label={t("settings.layout.openInSidePane.sources.explorerOnWorkspaceEnter.label")}
+      value={settings.explorerOnWorkspaceEnter}
+      options={options}
+      onValueChange={change}
+    />
+  );
+}
+
 /** Where things open: files, diffs, subagents, pull requests, and script URLs. Desktop only. */
 export function OpenLocationSection() {
   const { t } = useTranslation();
@@ -117,6 +148,7 @@ export function OpenLocationSection() {
           onDestinationChange={handleDestinationChange}
         />
         <ServiceUrlRow />
+        <ExplorerOnWorkspaceEnterRow />
       </SettingsCard>
     </SettingsSection>
   );

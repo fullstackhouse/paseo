@@ -890,6 +890,47 @@ client.addWorkspaceRowItem({ id: "review", title: "Review", icon: "Eye", Compone
 
 Hosts older than this API have no `addWorkspaceRowItem`; check for it before calling.
 
+### Workspace summary items
+
+`addWorkspaceSummaryItem({ id, workspaceId, title, label, count, needsYou, key, panelId })` tells the
+host what the plugin knows about one workspace. Register one per workspace and keep it current with
+`update(patch)`; `remove()` drops it, and stopping the plugin removes all of them.
+
+| Field      | Meaning                                                                                       |
+| ---------- | --------------------------------------------------------------------------------------------- |
+| `title`    | The item's name, such as "Asks".                                                              |
+| `label`    | Optional short text, such as "2 waiting on you".                                              |
+| `count`    | Optional number.                                                                              |
+| `needsYou` | True while something in the workspace waits on the human.                                     |
+| `key`      | Identifies what waits, such as the newest item's id. Change it when something new arrives.    |
+| `panelId`  | Optional. A workspace panel of this plugin, registered with `locations` including `explorer`. |
+
+On desktop, entering a workspace opens Explorer for an item with `needsYou` whose `key` the user
+hasn't seen there, on `panelId`, when **Open Explorer when entering a workspace** allows it. A `key`
+that was present when the user hid Explorer doesn't open it again; a new `key` does.
+
+```ts
+const items = new Map<string, PluginWorkspaceSummaryItemRegistration>();
+function setAsks(workspaceId: string, open: { id: string }[]) {
+  const state = {
+    label: `${open.length} waiting on you`,
+    count: open.length,
+    needsYou: open.length > 0,
+    key: open[0]?.id,
+    panelId: "asks",
+  };
+  const item = items.get(workspaceId);
+  if (item) item.update(state);
+  else
+    items.set(
+      workspaceId,
+      client.addWorkspaceSummaryItem({ id: "asks", workspaceId, title: "Asks", ...state }),
+    );
+}
+```
+
+Hosts older than this API have no `addWorkspaceSummaryItem`; check for it before calling.
+
 ## Host UI
 
 Import Paseo-owned UI from `@getpaseo/plugin/client/ui` in client code. This example

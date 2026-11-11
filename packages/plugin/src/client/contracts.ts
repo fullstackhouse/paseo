@@ -121,6 +121,39 @@ export interface PluginWorkspaceRowItemContribution<Text extends PluginText = st
   Component: ComponentType<PluginWorkspaceRowItemProps>;
 }
 
+/** What a plugin knows about one workspace, for the host's workspace summary and attention. */
+export interface PluginWorkspaceSummaryItemState {
+  /** Short text such as "2 waiting on you"; the item's title is shown when omitted. */
+  label?: string;
+  count?: number;
+  /** True while something in this workspace waits on the human. */
+  needsYou?: boolean;
+  /**
+   * Identifies what currently needs the human, such as the newest ask's id. Change it when a new
+   * thing arrives: the host treats an unseen key as new attention.
+   */
+  key?: string;
+  /** A workspace panel of this plugin to open in Explorer when the item needs the human. */
+  panelId?: string;
+}
+
+/**
+ * One fact about a workspace, set per workspace. The host uses `needsYou` to decide whether entering
+ * the workspace opens Explorer, and on which panel.
+ */
+export interface PluginWorkspaceSummaryItemContribution<
+  Text extends PluginText = string,
+> extends PluginWorkspaceSummaryItemState {
+  id: string;
+  workspaceId: string;
+  title: Text;
+}
+
+export interface PluginWorkspaceSummaryItemRegistration {
+  update(patch: PluginWorkspaceSummaryItemState): void;
+  remove(): void;
+}
+
 /**
  * A Lucide icon name, inline SVG markup, or a component. Components receive the surface's size
  * and color; buttons widen the props with their host and target context.
@@ -214,6 +247,10 @@ export interface PluginClientContext extends PluginCommandCapabilities, PluginCl
   addSidebarFooterItem(contribution: PluginSidebarItemContribution<PluginText>): PluginCleanup;
   addAgentPanel(contribution: PluginAgentPanelContribution<PluginText>): PluginCleanup;
   addWorkspaceRowItem(contribution: PluginWorkspaceRowItemContribution<PluginText>): PluginCleanup;
+  /** Set what this plugin knows about one workspace; see `PluginWorkspaceSummaryItemContribution`. */
+  addWorkspaceSummaryItem(
+    contribution: PluginWorkspaceSummaryItemContribution<PluginText>,
+  ): PluginWorkspaceSummaryItemRegistration;
   addWorkspacePanel(contribution: PluginWorkspacePanelContribution<PluginText>): PluginCleanup;
   addCommandCenterItem(
     contribution: PluginCommandCenterItemContribution<PluginText>,

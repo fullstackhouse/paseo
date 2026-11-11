@@ -228,6 +228,7 @@ import { RenderProfile } from "@/utils/render-profiler";
 import { useWorkspaceCheckoutStatus } from "@/screens/workspace/use-workspace-checkout-status";
 import { useWorkspacePullRequestDiscovery } from "@/panels/pull-request";
 import { useLineageAutoOpen } from "@/subagents/lineage-discovery";
+import { useExplorerAutoShow } from "@/workspace-attention/auto-show";
 
 const NO_SHEETS: readonly SheetTab[] = [];
 const WORKSPACE_FLOATING_PANEL_PORTAL_HOST_PREFIX = "workspace-floating-panels";
@@ -1315,6 +1316,13 @@ function WorkspaceScreenContent({
     workspaceKey: persistenceKey,
     workspaceActive: isRouteFocused,
   });
+  const { onExplorerToggled } = useExplorerAutoShow({
+    serverId: normalizedServerId,
+    workspaceId: normalizedWorkspaceId,
+    workspaceKey: persistenceKey,
+    workspaceActive: isRouteFocused,
+    isCompact: isMobile,
+  });
 
   const explorerSidebarToggleAccessibilityState = useMemo(
     () => ({ expanded: isExplorerSidebarShowing }),
@@ -1399,11 +1407,11 @@ function WorkspaceScreenContent({
   const moveWorkspaceTabToPane = useWorkspaceLayoutStore((state) => state.moveTabToPane);
   const closeWorkspacePane = useWorkspaceLayoutStore((state) => state.closePane);
   const handleToggleExplorerSidebar = useCallback(() => {
-    toggleExplorerSidebar({
-      isCompact: isMobile,
-      workspaceKey: persistenceKey,
-    });
-  }, [isMobile, persistenceKey]);
+    const query = { isCompact: isMobile, workspaceKey: persistenceKey };
+    const wasOpen = isExplorerSidebarOpen(query);
+    toggleExplorerSidebar(query);
+    onExplorerToggled(!wasOpen);
+  }, [isMobile, onExplorerToggled, persistenceKey]);
   const paneFocusSuppressedRef = useRef(false);
   const resizeWorkspaceSplit = useWorkspaceLayoutStore((state) => state.resizeSplit);
   const reorderWorkspaceTabsInPane = useWorkspaceLayoutStore((state) => state.reorderTabsInPane);

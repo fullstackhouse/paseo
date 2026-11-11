@@ -24,7 +24,6 @@ import {
   type PluginSurfaceProps,
   type PluginTimelineRendererContribution,
   type PluginTimelineTransformerContribution,
-  type PluginButtonRegistration,
 } from "@getpaseo/plugin/client";
 import type {
   EvaluatedPlugin,
@@ -114,6 +113,7 @@ export type PluginClientRuntime = Pick<
   | "openPanel"
   | "addComposerPill"
   | "addHeaderButton"
+  | "addWorkspaceSummaryItem"
 > & { hosts: ReturnType<typeof createPluginHosts> };
 
 // COMPAT(pluginReactNativeEntrypoint): added in v0.13.0, remove after 2027-04-20
@@ -159,9 +159,11 @@ export function runPluginClientBundle(
   const removals = new Set<PluginCleanup>();
   let setupComplete = false;
   let stopped = false;
-  function trackButton(
-    registration: PluginButtonRegistration<PluginText>,
-  ): PluginButtonRegistration<PluginText> {
+  /** Wraps a button or summary item so plugin teardown removes it and a stopped plugin can't update it. */
+  function trackButton<Patch>(registration: { update(patch: Patch): void; remove(): void }): {
+    update(patch: Patch): void;
+    remove(): void;
+  } {
     let active = true;
     const remove = () => {
       if (!active) return;
@@ -524,6 +526,10 @@ export function runPluginClientBundle(
     addHeaderButton(contribution) {
       if (stopped) throw new Error("Plugin has stopped");
       return trackButton(runtime.addHeaderButton(contribution));
+    },
+    addWorkspaceSummaryItem(contribution) {
+      if (stopped) throw new Error("Plugin has stopped");
+      return trackButton(runtime.addWorkspaceSummaryItem(contribution));
     },
   };
   const runtimeRequire = (name: string): unknown => {

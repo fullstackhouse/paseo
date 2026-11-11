@@ -2428,6 +2428,14 @@ export const en = {
           serviceUrls: {
             label: "Clicking a script's service URL",
           },
+          explorerOnWorkspaceEnter: {
+            label: "Entering a workspace opens the Explorer sidebar",
+            options: {
+              never: "Never",
+              needed: "When something needs you",
+              always: "Always",
+            },
+          },
         },
       },
     },
