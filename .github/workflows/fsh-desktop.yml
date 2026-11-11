@@ -1,14 +1,15 @@
-# FSH fork: on every push to `fsh`, build an unsigned (ad-hoc signed) macOS arm64 DMG and a Linux
-# x86_64 RPM of the `fsh` branch and attach both to one GitHub Release on fullstackhouse/paseo.
+# FSH fork: on every push to `fsh`, build a macOS arm64 DMG (signed with the self-signed FSH
+# certificate, not notarized) and a Linux x86_64 RPM of the `fsh` branch and attach both to one
+# GitHub Release on fullstackhouse/paseo.
 #
-# No latest-mac.yml is published: an ad-hoc signed app can't run electron-updater. The build
+# No latest-mac.yml is published: an app without a Developer ID can't run electron-updater. The build
 # stamps `fshBuild` (the release tag minus `fsh-`) into the app's package.json, and the app
 # updates itself by running scripts/install-fsh.sh instead
 # (packages/desktop/src/features/fsh-updater.ts).
 #
 # hardenedRuntime must be off. Upstream enables it (packages/desktop/electron-builder.yml)
 # because upstream signs with a real Developer ID, so every nested binary shares one Team
-# ID and library validation passes. Ad-hoc signatures carry no Team ID, so on macOS 26 the
+# ID and library validation passes. Ad-hoc and self-signed signatures carry no Team ID, so on macOS 26 the
 # main binary is refused its own Electron Framework ("different Team IDs") and the app dies
 # at launch in dyld. The runner below is macOS 15, which does not enforce this, so the
 # packaged-app smoke test cannot catch it — keep the flag rather than relying on the gate.
@@ -104,9 +105,38 @@ jobs:
             fs.writeFileSync(file, yaml.dump(config, { lineWidth: -1 }));
           '
 
+      # Sign with the FSH certificate (self-signed "Paseo FSH", public half in
+      # .github/fsh-macos-signing.pem) instead of ad hoc. macOS keeps an app's privacy answers
+      # (Documents, Downloads, network volumes...) per designated requirement: for an ad-hoc build
+      # that is the build's own hash, so every update asks again; for a certificate it is the
+      # certificate, so the answers survive updates. Installs never need to trust it.
+      # electron-builder only signs with trusted identities (`find-identity -v`), so the runner
+      # trusts it. Without the secrets (PRs from forks) the build stays ad hoc.
+      - name: Trust the FSH signing certificate
+        id: signing
+        env:
+          P12_BASE64: ${{ secrets.PASEO_MACOS_SIGNING_P12_BASE64 }}
+          P12_PASSWORD: ${{ secrets.PASEO_MACOS_SIGNING_P12_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$P12_BASE64" ]]; then
+            echo "::warning::No signing secrets; building ad hoc"
+            echo "identity=-" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          printf '%s' "$P12_BASE64" | base64 --decode > "$RUNNER_TEMP/fsh-signing.p12"
+          sudo security add-trusted-cert -d -r trustRoot -p codeSign \
+            -k /Library/Keychains/System.keychain .github/fsh-macos-signing.pem
+          {
+            echo "CSC_LINK=$RUNNER_TEMP/fsh-signing.p12"
+            echo "CSC_KEY_PASSWORD=$P12_PASSWORD"
+          } >> "$GITHUB_ENV"
+          echo "identity=Paseo FSH" >> "$GITHUB_OUTPUT"
+
       - name: Build desktop app
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
+          FSH_SIGNING_IDENTITY: ${{ steps.signing.outputs.identity }}
           # Upstream's packaged-app smoke test (scripts/after-sign.js) gates the release.
           PASEO_DESKTOP_SMOKE: "1"
           PASEO_DESKTOP_SMOKE_ARTIFACT_DIR: ${{ runner.temp }}/desktop-smoke
@@ -114,7 +144,7 @@ jobs:
         run: |
           npm run build:desktop -- --publish never --mac dmg --arm64 \
             "-c.extraMetadata.fshBuild=${FSH_VERSION}-${FSH_SHA}" \
-            -c.mac.identity=- \
+            "-c.mac.identity=${FSH_SIGNING_IDENTITY}" \
             -c.mac.notarize=false \
             -c.mac.hardenedRuntime=false \
             -c.publish.owner=fullstackhouse \
@@ -262,7 +292,7 @@ jobs:
           version="$FSH_VERSION"
           tag="$FSH_TAG"
           files=(release-assets/*.dmg release-assets/*.rpm)
-          unsigned="Unsigned: after copying to Applications, run \`xattr -cr /Applications/Paseo.app\` once."
+          unsigned="Not notarized: after copying to Applications, run \`xattr -cr /Applications/Paseo.app\` once."
           rpm="\`sudo dnf install ./Paseo-*.rpm\`"
           if [[ "$FSH_PRERELEASE" == "true" ]]; then
             # Rebuilding the same commit (relabel, re-run) replaces its prerelease.

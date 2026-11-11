@@ -23,6 +23,7 @@ temporary by design: every patch is meant to go upstream and then drop out of `f
 - FSH-only (not upstream yet): docs and a `paseo-run` skill for running a branch, or testing a plugin, next to the Paseo you work in
 - FSH-only (not upstream yet): new workspaces branch off the repo's default branch, not whatever branch the source checkout is on. The daemon picks the ref: the default branch's upstream (any remote), then origin's copy, then local
 - FSH-only (not upstream yet): remove a project from its settings page (Settings → Projects → project → Danger zone), not just from the sidebar menu
+- FSH-only: macOS builds are signed with a self-signed FSH certificate instead of ad hoc, so folder-access answers survive updates (see Install below)
 - FSH-only: the desktop app's update callout installs new FSH builds through `scripts/install-fsh.sh`, on macOS (DMG) and Fedora (RPM) (see Install below)
 - FSH-only: Settings → About has no **Release channel** picker. FSH builds update from GitHub's latest release, which has no beta channel
 - FSH-only (upstreamable): the desktop update callout offers **Install when idle**: the update installs once no workspace on the local host has been running or waiting on a permission prompt for 15 seconds. Settings → About → **Install updates when idle** does this for every update
@@ -76,6 +77,12 @@ When a newer build is out, the script quits Paseo and stops the daemon before sw
 is mid-turn. It asks first; `--yes` skips the question. Every FSH build reports the same `0.13.0-beta.1`, so neither
 the app nor the daemon notices a swap underneath it — that's why the script stops both. It records the installed
 release tag in `~/.paseo/fsh-release` and does nothing when that matches the latest (`--force` reinstalls).
+
+macOS builds are signed with the self-signed FSH certificate "Paseo FSH" (not notarized, not a Developer ID), so macOS
+remembers your answers to its folder-access prompts (Documents, Downloads, network volumes) across updates. Ad-hoc
+builds asked again after every update. You don't need to trust the certificate. Its public half is
+`.github/fsh-macos-signing.pem`; the `.p12` is in GCP Secret Manager (`paseo-macos-signing-p12{,-password}`) and in the
+fork secrets `PASEO_MACOS_SIGNING_P12_{BASE64,PASSWORD}`. Rotating it makes every Mac ask once more.
 
 To see which build you're running, open Paseo → About Paseo: it shows the commit (`Version 0.13.0-beta.1 (fsh.<sha>)`),
 the build time, and links to the release and the commit.
