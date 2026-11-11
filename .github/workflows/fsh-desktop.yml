@@ -130,6 +130,8 @@ jobs:
           {
             echo "CSC_LINK=$RUNNER_TEMP/fsh-signing.p12"
             echo "CSC_KEY_PASSWORD=$P12_PASSWORD"
+            # electron-builder skips signing on PR builds otherwise. Fork PRs never see the secrets.
+            echo "CSC_FOR_PULL_REQUEST=true"
           } >> "$GITHUB_ENV"
           echo "identity=Paseo FSH" >> "$GITHUB_OUTPUT"
 
