@@ -125,6 +125,7 @@ export const ptBR: TranslationResources = {
       groupByProject: "Agrupar por projeto",
       groupByStatus: "Agrupar por status",
       copyBrowserHostName: "Copiar o nome do host do navegador",
+      updatePaseo: "Atualizar Paseo",
       modelGroupLabel: "Modelo",
       modelSearchKeywords: "trocar modelo mudar modelo definir modelo selecionar modelo",
       thinkingGroupLabel: "Raciocínio",

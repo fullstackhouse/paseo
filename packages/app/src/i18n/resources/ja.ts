@@ -125,6 +125,7 @@ export const ja: TranslationResources = {
       groupByProject: "プロジェクトでグループ化",
       groupByStatus: "ステータスでグループ化",
       copyBrowserHostName: "ブラウザホスト名をコピー",
+      updatePaseo: "Paseo をアップデート",
       modelGroupLabel: "モデル",
       modelSearchKeywords: "モデルを切り替え モデルを変更 モデルを設定 モデルを選択",
       thinkingGroupLabel: "思考",

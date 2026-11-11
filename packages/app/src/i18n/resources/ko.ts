@@ -124,6 +124,7 @@ export const ko: TranslationResources = {
       groupByProject: "프로젝트별 그룹화",
       groupByStatus: "상태별 그룹화",
       copyBrowserHostName: "브라우저 호스트 이름 복사",
+      updatePaseo: "Paseo 업데이트",
       modelGroupLabel: "모델",
       modelSearchKeywords: "모델 전환 모델 변경 모델 설정 모델 선택",
       thinkingGroupLabel: "추론",

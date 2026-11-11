@@ -122,6 +122,7 @@ export const en = {
       groupByProject: "Group by project",
       groupByStatus: "Group by status",
       copyBrowserHostName: "Copy browser host name",
+      updatePaseo: "Update Paseo",
       modelGroupLabel: "Model",
       modelSearchKeywords: "switch model change model set model select model",
       thinkingGroupLabel: "Thinking",

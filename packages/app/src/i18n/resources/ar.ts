@@ -124,6 +124,7 @@ export const ar: TranslationResources = {
       groupByProject: "تجميع حسب المشروع",
       groupByStatus: "تجميع حسب الحالة",
       copyBrowserHostName: "نسخ اسم مضيف المتصفح",
+      updatePaseo: "تحديث Paseo",
       modelGroupLabel: "النموذج",
       modelSearchKeywords: "تبديل النموذج تغيير النموذج تعيين النموذج اختيار النموذج",
       thinkingGroupLabel: "التفكير",

@@ -125,6 +125,7 @@ export const ru: TranslationResources = {
       groupByProject: "Группировать по проекту",
       groupByStatus: "Группировать по статусу",
       copyBrowserHostName: "Скопировать имя хоста браузера",
+      updatePaseo: "Обновить Paseo",
       modelGroupLabel: "Модель",
       modelSearchKeywords: "Сменить, изменить, выбрать или установить модель",
       thinkingGroupLabel: "Мышление",
