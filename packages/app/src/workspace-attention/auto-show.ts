@@ -4,11 +4,13 @@ import {
   useWorkspaceLayoutStore,
   useWorkspaceLayoutStoreHydrated,
 } from "@/stores/workspace-layout-store";
+import { collectAllTabs } from "@/stores/workspace-layout-actions";
 import { openExplorerSidebarView, showExplorerSidebar } from "@/workspace-tabs/explorer-sidebar";
 import { useWorkspaceAttention } from "./attention";
 import { decideExplorerAutoShow, type AttentionItem } from "./model";
 
-function showForItem(workspaceKey: string, item: AttentionItem): void {
+/** Shows Explorer on the tab that belongs to an attention item. */
+export function showExplorerForAttention(workspaceKey: string, item: AttentionItem): void {
   switch (item.kind) {
     case "plugin": {
       const paneId = showExplorerSidebar({ isCompact: false, workspaceKey });
@@ -34,6 +36,22 @@ function showForItem(workspaceKey: string, item: AttentionItem): void {
       showExplorerSidebar({ isCompact: false, workspaceKey });
       return;
   }
+}
+
+/** Shows Explorer on its Overview tab when the workspace still has one; closing it is respected. */
+function showExplorerOnOverview(workspaceKey: string): void {
+  const paneId = showExplorerSidebar({ isCompact: false, workspaceKey });
+  const store = useWorkspaceLayoutStore.getState();
+  const layout = store.layoutByWorkspace[workspaceKey];
+  const hasOverview =
+    layout && collectAllTabs(layout.root).some((tab) => tab.target.kind === "overview");
+  if (!paneId || !hasOverview) return;
+  store.openTab({
+    workspaceKey,
+    target: { kind: "overview" },
+    intent: "reveal",
+    placement: { mode: "pane", paneId },
+  });
 }
 
 /**
@@ -63,15 +81,16 @@ export function useExplorerAutoShow(input: {
     if (!hydrated || isCompact || !workspaceKey || decidedForRef.current === workspaceKey) return;
     decidedForRef.current = workspaceKey;
     const store = useWorkspaceLayoutStore.getState();
+    store.autoOpenOverviewTab(workspaceKey);
     const decision = decideExplorerAutoShow({
       setting,
       items: itemsRef.current,
       record: store.explorerAttentionByWorkspace[workspaceKey] ?? null,
     });
     if (decision.kind === "show") {
-      showExplorerSidebar({ isCompact: false, workspaceKey });
+      showExplorerOnOverview(workspaceKey);
     } else if (decision.kind === "item") {
-      showForItem(workspaceKey, decision.item);
+      showExplorerForAttention(workspaceKey, decision.item);
       store.setExplorerAttention(workspaceKey, {
         hidden: false,
         seenKeys: itemsRef.current.map((item) => item.key),

@@ -589,6 +589,7 @@ describe("workspace-layout-store version 2 migration", () => {
         "explorerPaneIdByWorkspace",
         "layoutByWorkspace",
         "lineageTabAutoOpenedByWorkspace",
+        "overviewTabAutoOpenedByWorkspace",
         "pinnedAgentIdsByWorkspace",
         "pullRequestTabAutoOpenedByWorkspace",
         "sidePaneIdByWorkspace",
@@ -3239,6 +3240,7 @@ describe("workspace-layout-store actions", () => {
       explorerPaneIdByWorkspace: {},
       pullRequestTabAutoOpenedByWorkspace: currentState.pullRequestTabAutoOpenedByWorkspace,
       lineageTabAutoOpenedByWorkspace: currentState.lineageTabAutoOpenedByWorkspace,
+      overviewTabAutoOpenedByWorkspace: currentState.overviewTabAutoOpenedByWorkspace,
       explorerAttentionByWorkspace: currentState.explorerAttentionByWorkspace,
       sidePaneIdByWorkspace: currentState.sidePaneIdByWorkspace,
     });
@@ -3470,6 +3472,7 @@ describe("workspace-layout-store actions", () => {
     expect(partialize?.(state)).toEqual({
       pullRequestTabAutoOpenedByWorkspace: {},
       lineageTabAutoOpenedByWorkspace: {},
+      overviewTabAutoOpenedByWorkspace: {},
       explorerAttentionByWorkspace: {},
       layoutByWorkspace: {},
       pinnedAgentIdsByWorkspace: {},
@@ -4557,6 +4560,33 @@ it("adds Lineage to Explorer once, keeps it closed across reloads, and forgets o
   expect(restored.getState().autoOpenLineageTab(workspaceKey)).toBeNull();
   restored.getState().purgeWorkspace(workspaceKey);
   expect(restored.getState().lineageTabAutoOpenedByWorkspace[workspaceKey]).toBeUndefined();
+});
+
+it("adds Overview to the front of Explorer once, keeps it closed across reloads, and forgets on purge", async () => {
+  await AsyncStorage.removeItem("workspace-layout-state");
+  const source = createWorkspaceLayoutStore(workspaceLayoutIds);
+  await source.persist.rehydrate();
+  const workspaceKey = "server-1:overview-once";
+  source.getState().openTab({
+    workspaceKey,
+    target: { kind: "terminal", terminalId: "term-1" },
+    intent: "reveal",
+  });
+
+  const tabId = source.getState().autoOpenOverviewTab(workspaceKey);
+  expect(tabId).toBe("overview");
+  const layout = source.getState().layoutByWorkspace[workspaceKey];
+  const pane = findPaneContainingTab(layout.root, "overview");
+  expect(pane?.id).toBe("explorer");
+  expect(pane?.tabIds[0]).toBe("overview");
+  expect(pane?.focusedTabId).not.toBe("overview");
+
+  source.getState().closeTab(workspaceKey, "overview");
+  const restored = createWorkspaceLayoutStore(workspaceLayoutIds);
+  await restored.persist.rehydrate();
+  expect(restored.getState().autoOpenOverviewTab(workspaceKey)).toBeNull();
+  restored.getState().purgeWorkspace(workspaceKey);
+  expect(restored.getState().overviewTabAutoOpenedByWorkspace[workspaceKey]).toBeUndefined();
 });
 
 it("remembers a hidden Explorer and its seen attention across reloads, and forgets on purge", async () => {

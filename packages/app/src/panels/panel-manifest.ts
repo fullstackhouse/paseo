@@ -122,6 +122,14 @@ const manifests = {
     compactSheet: null,
     resourceKey: () => "lineage",
   },
+  overview: {
+    kind: "overview",
+    supportedHosts: ["explorer"],
+    showCloseButton: true,
+    singleton: true,
+    compactSheet: null,
+    resourceKey: () => "overview",
+  },
   file: {
     kind: "file",
     supportedHosts: ["main", "explorer"],
