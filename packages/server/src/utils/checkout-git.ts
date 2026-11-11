@@ -634,6 +634,44 @@ async function tryResolveMergeBase(cwd: string, baseRef: string): Promise<string
   }
 }
 
+/**
+ * The commit a branch's changes are diffed from. Normally the merge-base with `baseRef`. When the
+ * branch's commits already landed in base under different SHAs (a squash or rebase merge), merging
+ * HEAD into base changes nothing, so only uncommitted work remains and HEAD is the diff base.
+ * Throws when git cannot compute the merge-base.
+ */
+async function resolveBranchDiffBase(input: {
+  cwd: string;
+  baseRef: string;
+  runGit: RunGitCommand;
+}): Promise<string | null> {
+  const { cwd, baseRef, runGit } = input;
+  const options = { cwd, envOverlay: READ_ONLY_GIT_ENV };
+  const mergeBase = (await runGit(["merge-base", baseRef, "HEAD"], options)).stdout.trim();
+  if (!mergeBase) {
+    return null;
+  }
+  try {
+    const { stdout: revs } = await runGit(
+      ["rev-parse", "HEAD", `${baseRef}^{commit}`, `${baseRef}^{tree}`],
+      options,
+    );
+    const [head, baseCommit, baseTree] = revs.trim().split("\n");
+    // Base contains HEAD, or HEAD contains base: plain ancestry, the merge-base is exact.
+    if (mergeBase === head || mergeBase === baseCommit) {
+      return mergeBase;
+    }
+    // Exits non-zero on conflicts, which means the branch still differs from base.
+    const { stdout: mergedTree } = await runGit(
+      ["merge-tree", "--write-tree", "--name-only", baseRef, "HEAD"],
+      options,
+    );
+    return mergedTree.split("\n")[0]?.trim() === baseTree ? "HEAD" : mergeBase;
+  } catch {
+    return mergeBase;
+  }
+}
+
 type FileStat = { additions: number; deletions: number; isBinary: boolean } | null;
 
 function normalizeNumstatPath(pathField: string): string {
@@ -3106,14 +3144,11 @@ async function getCheckoutShortstatUncached(
   }
 
   try {
-    const { stdout: mergeBaseOut } = await getRunGitCommand(context)(
-      ["merge-base", "HEAD", comparisonRef],
-      {
-        cwd,
-        envOverlay: READ_ONLY_GIT_ENV,
-      },
-    );
-    const mergeBase = mergeBaseOut.trim();
+    const mergeBase = await resolveBranchDiffBase({
+      cwd,
+      baseRef: comparisonRef,
+      runGit: getRunGitCommand(context),
+    });
     if (!mergeBase) {
       return null;
     }
@@ -3714,7 +3749,10 @@ async function resolveCheckoutDiffRefs(
   }
   const bestBaseRef = await resolveBestComparisonBaseRef(cwd, baseRef);
   return {
-    baseRef: (await tryResolveMergeBase(cwd, bestBaseRef)) ?? bestBaseRef,
+    baseRef:
+      (await resolveBranchDiffBase({ cwd, baseRef: bestBaseRef, runGit: runGitCommand }).catch(
+        () => null,
+      )) ?? bestBaseRef,
     targetRef: compare.mode === "base" ? "HEAD" : undefined,
     includeUntracked: compare.mode === "all",
   };

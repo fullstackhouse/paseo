@@ -1166,6 +1166,57 @@ const x = 1;
     expect(shortstat).toEqual({ additions: 2, deletions: 1 });
   });
 
+  describe("after the branch was squash-merged into base", () => {
+    function squashMergeFeatureIntoMain(): void {
+      execFileSync("git", ["checkout", "-b", "feature"], { cwd: repoDir });
+      commitFile(repoDir, "feature.txt", "one\n", "feature one");
+      commitFile(repoDir, "feature.txt", "one\ntwo\n", "feature two");
+      execFileSync("git", ["checkout", "main"], { cwd: repoDir });
+      commitFile(repoDir, "other.txt", "other\n", "unrelated main work");
+      execFileSync("git", ["merge", "--squash", "feature"], { cwd: repoDir });
+      execFileSync("git", ["-c", "commit.gpgsign=false", "commit", "-m", "feature (#1)"], {
+        cwd: repoDir,
+      });
+      execFileSync("git", ["checkout", "feature"], { cwd: repoDir });
+    }
+
+    it("reports no shortstat for the merged commits", async () => {
+      squashMergeFeatureIntoMain();
+
+      expect(await getCheckoutShortstat(repoDir)).toBeNull();
+    });
+
+    it("still reports uncommitted edits", async () => {
+      squashMergeFeatureIntoMain();
+      writeFileSync(join(repoDir, "feature.txt"), "one\ntwo\nthree\n");
+
+      expect(await getCheckoutShortstat(repoDir)).toEqual({ additions: 1, deletions: 0 });
+      const diff = await getCheckoutDiff(repoDir, {
+        mode: "all",
+        baseRef: "main",
+        includeStructured: true,
+      });
+      expect(diff.structured).toEqual([
+        expect.objectContaining({ path: "feature.txt", additions: 1, deletions: 0 }),
+      ]);
+    });
+
+    it("lists no committed changes against base", async () => {
+      squashMergeFeatureIntoMain();
+
+      const diff = await getCheckoutDiff(repoDir, { mode: "base", baseRef: "main" });
+
+      expect(diff.diff).toBe("");
+    });
+
+    it("keeps reporting commits made after the squash merge", async () => {
+      squashMergeFeatureIntoMain();
+      commitFile(repoDir, "feature.txt", "one\ntwo\nfollow-up\n", "follow-up");
+
+      expect(await getCheckoutShortstat(repoDir)).toEqual({ additions: 3, deletions: 0 });
+    });
+  });
+
   it("uses the merge-base for shortstat when the base branch diverged from its remote", async () => {
     const { cloneDir } = setupRemoteTrackingMain(repoDir, tempDir);
     commitFile(cloneDir, "file.txt", "remote one\nremote two\n", "remote update");
