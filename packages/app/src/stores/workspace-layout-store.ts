@@ -155,6 +155,11 @@ interface WorkspaceLayoutStore {
   /** Workspaces where a cross-workspace lineage already added its tab once; a closed tab never returns. */
   lineageTabAutoOpenedByWorkspace: Record<string, true>;
   /**
+   * Per workspace: whether the user hid Explorer, and the attention keys already surfaced or present
+   * when they hid it. Entering the workspace opens Explorer only for a key not in `seenKeys`.
+   */
+  explorerAttentionByWorkspace: Record<string, ExplorerAttentionRecord>;
+  /**
    * The one entry point for showing a target. On compact layouts a target whose panel declares
    * `compactSheet` opens in a sheet; the returned tab id is the sheet tab's id.
    */
@@ -176,6 +181,7 @@ interface WorkspaceLayoutStore {
   ensureExplorerSidebar: (workspaceKey: string) => string | null;
   showExplorerSidebar: (workspaceKey: string) => string | null;
   hideExplorerSidebar: (workspaceKey: string) => void;
+  setExplorerAttention: (workspaceKey: string, record: ExplorerAttentionRecord) => void;
   /** Returns the ordinary right-side workspace pane, creating it when absent. */
   ensureSidePane: (workspaceKey: string, options?: { focus: boolean }) => string | null;
   closeTab: (workspaceKey: string, tabId: string) => void;
@@ -238,6 +244,11 @@ const MAX_TREE_DEPTH = 5;
 
 const LEGACY_EXPLORER_SIDEBAR_REFERENCE_WIDTH = 1440;
 const WORKSPACE_LAYOUT_PERSIST_VERSION = 2;
+export interface ExplorerAttentionRecord {
+  hidden: boolean;
+  seenKeys: string[];
+}
+
 type WorkspaceLayoutPersistedState = z.infer<typeof WorkspaceLayoutPersistedStateSchema>;
 
 // COMPAT(explorerSidebarWidthPerWorkspace): builds through v0.14.x saved a width per workspace;
@@ -985,6 +996,7 @@ const PERSISTED_SLICES = [
   "sidePaneIdByWorkspace",
   "pullRequestTabAutoOpenedByWorkspace",
   "lineageTabAutoOpenedByWorkspace",
+  "explorerAttentionByWorkspace",
 ] as const;
 
 // Zustand persist re-runs partialize after every set, including ones that return the state
@@ -1022,6 +1034,7 @@ function createPersistedStateProjection() {
       sidePaneIdByWorkspace: source.sidePaneIdByWorkspace,
       pullRequestTabAutoOpenedByWorkspace: source.pullRequestTabAutoOpenedByWorkspace,
       lineageTabAutoOpenedByWorkspace: source.lineageTabAutoOpenedByWorkspace,
+      explorerAttentionByWorkspace: source.explorerAttentionByWorkspace,
     };
     previous = { source, state };
     return state;
@@ -1127,6 +1140,7 @@ export function createWorkspaceLayoutStore(
           sidePaneIdByWorkspace: {},
           pullRequestTabAutoOpenedByWorkspace: {},
           lineageTabAutoOpenedByWorkspace: {},
+          explorerAttentionByWorkspace: {},
           openTab: (input) => {
             const normalizedWorkspaceKey = trimNonEmpty(input.workspaceKey);
             const normalizedTarget = normalizeWorkspaceTabTarget(input.target);
@@ -1345,6 +1359,16 @@ export function createWorkspaceLayoutStore(
                 : state;
             });
             return paneId;
+          },
+          setExplorerAttention: (workspaceKey, record) => {
+            const key = trimNonEmpty(workspaceKey);
+            if (!key) return;
+            set((state) => ({
+              explorerAttentionByWorkspace: {
+                ...state.explorerAttentionByWorkspace,
+                [key]: { hidden: record.hidden, seenKeys: [...record.seenKeys] },
+              },
+            }));
           },
           hideExplorerSidebar: (workspaceKey) => {
             const normalizedWorkspaceKey = trimNonEmpty(workspaceKey);
@@ -2291,6 +2315,7 @@ export function createWorkspaceLayoutStore(
                 normalizedWorkspaceKey in state.sidePaneIdByWorkspace ||
                 normalizedWorkspaceKey in state.pullRequestTabAutoOpenedByWorkspace ||
                 normalizedWorkspaceKey in state.lineageTabAutoOpenedByWorkspace ||
+                normalizedWorkspaceKey in state.explorerAttentionByWorkspace ||
                 normalizedWorkspaceKey in state.sheetsByWorkspace;
               if (!hasAny) {
                 return state;
@@ -2305,6 +2330,10 @@ export function createWorkspaceLayoutStore(
                 [normalizedWorkspaceKey]: _lineageAutoOpened,
                 ...lineageTabAutoOpenedByWorkspace
               } = state.lineageTabAutoOpenedByWorkspace;
+              const {
+                [normalizedWorkspaceKey]: _explorerAttention,
+                ...explorerAttentionByWorkspace
+              } = state.explorerAttentionByWorkspace;
               const { [normalizedWorkspaceKey]: _layout, ...layoutByWorkspace } =
                 state.layoutByWorkspace;
               const { [normalizedWorkspaceKey]: _splits, ...splitSizesByWorkspace } =
@@ -2326,6 +2355,7 @@ export function createWorkspaceLayoutStore(
                 pendingOpenByWorkspace,
                 pullRequestTabAutoOpenedByWorkspace,
                 lineageTabAutoOpenedByWorkspace,
+                explorerAttentionByWorkspace,
                 layoutByWorkspace,
                 splitSizesByWorkspace,
                 pinnedAgentIdsByWorkspace,
@@ -2394,6 +2424,7 @@ export function createWorkspaceLayoutStore(
             pullRequestTabAutoOpenedByWorkspace:
               result.data.pullRequestTabAutoOpenedByWorkspace ?? {},
             lineageTabAutoOpenedByWorkspace: result.data.lineageTabAutoOpenedByWorkspace ?? {},
+            explorerAttentionByWorkspace: result.data.explorerAttentionByWorkspace ?? {},
           };
         },
       },
