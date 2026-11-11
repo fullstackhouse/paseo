@@ -23,6 +23,8 @@ export interface ScheduleUpdateOptions extends ScheduleCommandOptions {
   model?: string;
   mode?: string;
   cwd?: string;
+  isolation?: string;
+  archiveOnFinish?: boolean;
   maxRuns?: string | false;
   expiresIn?: string | false;
 }
@@ -43,6 +45,8 @@ export async function runUpdateCommand(
     model: options.model,
     mode: options.mode,
     cwd: options.cwd,
+    isolation: options.isolation,
+    archiveOnFinish: options.archiveOnFinish,
     maxRuns: options.maxRuns === false ? undefined : options.maxRuns,
     expiresIn: options.expiresIn === false ? undefined : options.expiresIn,
     clearMaxRuns: options.maxRuns === false,
