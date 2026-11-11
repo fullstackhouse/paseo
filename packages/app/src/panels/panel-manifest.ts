@@ -125,7 +125,7 @@ const manifests = {
   overview: {
     kind: "overview",
     supportedHosts: ["explorer"],
-    showCloseButton: true,
+    showCloseButton: false,
     singleton: true,
     compactSheet: null,
     resourceKey: () => "overview",
