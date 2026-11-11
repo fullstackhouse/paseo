@@ -136,6 +136,7 @@ test("one comparison refresh updates a shared base and upstream ref", async () =
     "ls-files",
     "merge-base",
     "rev-list",
+    "rev-parse",
   ]);
 });
 
