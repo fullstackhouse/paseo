@@ -1,4 +1,5 @@
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
+import { inlineUnistylesStyle } from "@/styles/unistyles-inline-style";
 import React, {
   Fragment,
   useCallback,
@@ -613,6 +614,7 @@ function getFallbackTabLabel(
     files: string;
     pullRequest: string;
     lineage: string;
+    overview: string;
   },
 ): string {
   if (tab.target.kind === "new_tab") {
@@ -641,6 +643,9 @@ function getFallbackTabLabel(
   }
   if (tab.target.kind === "lineage") {
     return labels.lineage;
+  }
+  if (tab.target.kind === "overview") {
+    return labels.overview;
   }
   return labels.agent;
 }
@@ -799,11 +804,13 @@ function TabChip({
       styles.tab,
       isFilled && styles.tabFill(chipBackdrop),
       isWeb && isDragging && ({ cursor: "grabbing" } as object),
-      {
+      // Measured width changes while Explorer resizes; keep it out of the CSS registry
+      // (docs/unistyles.md, Dynamic Pixel Styles On Web).
+      inlineUnistylesStyle({
         minWidth: resolvedTabWidth,
         width: resolvedTabWidth,
         maxWidth: resolvedTabWidth,
-      },
+      }),
     ],
     [chipBackdrop, isDragging, isFilled, resolvedTabWidth],
   );
@@ -1111,6 +1118,7 @@ function ResolvedWorkspaceDesktopTabsRow({
       files: t("panels.files.label"),
       pullRequest: t("panels.pullRequest.label"),
       lineage: t("panels.lineage.label"),
+      overview: t("panels.overview.label"),
     }),
     [t],
   );

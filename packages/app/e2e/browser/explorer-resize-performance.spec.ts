@@ -100,6 +100,10 @@ test("Explorer drag previews without rerendering panes or rewriting the shared s
   await runWorkspaceActionFromCommandCenter(page, "Split pane right");
   await page.getByTestId("workspace-explorer-toggle").first().click();
   await expect(page.getByTestId("workspace-explorer-sidebar")).toBeVisible();
+  // Measure the drag, not Explorer's first load: let Changes finish rendering its content.
+  await expect(
+    page.getByTestId("workspace-explorer-sidebar").getByText("No changes to display"),
+  ).toBeVisible();
   // Verify that direct pane renders are being counted before resetting them.
   expect(
     await page.evaluate(() =>

@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { WorkspaceSummaryStore } from "./store";
 
-const owner = { serverId: "s", pluginId: "paseo-asks" };
+const owner = {
+  serverId: "s",
+  pluginId: "paseo-asks",
+  resolveText: (text: unknown) => String(text),
+};
 
 describe("WorkspaceSummaryStore", () => {
   it("groups items per workspace and keeps the array stable between unrelated changes", () => {

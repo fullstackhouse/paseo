@@ -35,6 +35,7 @@ function getFallbackTabOptionLabel(
     files: string;
     pullRequest: string;
     lineage: string;
+    overview: string;
   },
 ): string {
   if (tab.target.kind === "new_tab") {
@@ -67,6 +68,9 @@ function getFallbackTabOptionLabel(
   if (tab.target.kind === "lineage") {
     return labels.lineage;
   }
+  if (tab.target.kind === "overview") {
+    return labels.overview;
+  }
   if (tab.target.kind === "commit_diff") {
     return tab.target.sha.slice(0, 7);
   }
@@ -86,6 +90,7 @@ function getFallbackTabOptionDescription(
     files: string;
     pullRequest: string;
     lineage: string;
+    overview: string;
   },
 ): string {
   if (tab.target.kind === "new_tab") {
@@ -123,6 +128,9 @@ function getFallbackTabOptionDescription(
   }
   if (tab.target.kind === "lineage") {
     return labels.lineage;
+  }
+  if (tab.target.kind === "overview") {
+    return labels.overview;
   }
   if (tab.target.kind === "plugin") {
     return tab.target.panelId;
@@ -242,6 +250,7 @@ function MobileWorkspaceTabOption({
       files: t("panels.files.label"),
       pullRequest: t("panels.pullRequest.label"),
       lineage: t("panels.lineage.label"),
+      overview: t("panels.overview.label"),
     }),
     [t],
   );
@@ -320,6 +329,7 @@ export const MobileWorkspaceTabSwitcher = memo(function MobileWorkspaceTabSwitch
       files: t("panels.files.label"),
       pullRequest: t("panels.pullRequest.label"),
       lineage: t("panels.lineage.label"),
+      overview: t("panels.overview.label"),
     }),
     [t],
   );

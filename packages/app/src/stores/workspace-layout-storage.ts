@@ -28,6 +28,7 @@ const WorkspaceTabTargetStorageSchema = z.discriminatedUnion("kind", [
   z.strictObject({ kind: z.literal("files") }),
   z.strictObject({ kind: z.literal("pull_request") }),
   z.strictObject({ kind: z.literal("lineage") }),
+  z.strictObject({ kind: z.literal("overview") }),
   z.strictObject({
     kind: z.literal("file"),
     path: z.string(),
@@ -119,6 +120,7 @@ export const WorkspaceLayoutPersistedStateSchema = z.strictObject({
   sidePaneIdByWorkspace: z.record(z.string(), z.string().nullable()).optional(),
   pullRequestTabAutoOpenedByWorkspace: z.record(z.string(), z.literal(true)).optional(),
   lineageTabAutoOpenedByWorkspace: z.record(z.string(), z.literal(true)).optional(),
+  overviewTabAutoOpenedByWorkspace: z.record(z.string(), z.literal(true)).optional(),
   explorerAttentionByWorkspace: z
     .record(z.string(), z.object({ hidden: z.boolean(), seenKeys: z.array(z.string()) }))
     .optional(),

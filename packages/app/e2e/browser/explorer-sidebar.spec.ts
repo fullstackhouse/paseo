@@ -117,7 +117,8 @@ async function closeOtherExplorerTabs(page: Parameters<typeof ensureExplorerSide
   });
   await files.click({ button: "right", position: { x: 12, y: 13 } });
   const confirmation = page.waitForEvent("dialog").then((dialog) => {
-    expect(dialog.message()).toContain("close 1 tab");
+    // Changes and Overview; Files stays.
+    expect(dialog.message()).toContain("close 2 tab");
     return dialog.accept();
   });
   await page.getByRole("menuitem", { name: "Close other tabs", exact: true }).click();
@@ -169,6 +170,7 @@ test("Explorer keeps Files and Changes close actions in the context menu", async
     await test.step("standard bulk-close menus affect only Explorer tabs", async () => {
       await closeOtherExplorerTabs(page);
       await expect(explorer.getByTestId("workspace-tab-changes_tree")).toHaveCount(0);
+      await expect(explorer.getByTestId("workspace-tab-overview")).toHaveCount(0);
       await expect(explorer.getByTestId("workspace-tab-files")).toBeVisible();
       await expect(main.getByTestId("workspace-tabs-row").getByRole("button")).toHaveCount(
         mainTabsBefore,

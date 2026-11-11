@@ -152,6 +152,14 @@ layouts discover while Explorer is active. The rail requests summary status; sel
 content also requests timeline data. Inactive consumers read cached data without request demand.
 Discovery uses ordinary PR tabs and their existing once-per-workspace close opt-out.
 
+Overview is an Explorer-only singleton tab that summarizes the workspace on desktop
+(`packages/app/src/panels/overview-panel.tsx`): a next step, the focused agent, plugin workspace summary
+items, the branch and its changes, and the pull request. The next step reuses the attention items above:
+permission, plugin and failed items come first, then a running agent shows no action, then failing checks.
+Otherwise it renders the header's `GitActionsSplitButton` with the same `useGitActions` result, so the two
+can't disagree. Entering a workspace adds the tab once, first in the rail. Like Files and Changes it
+has no inline close; closing it from the tab menu opts that workspace out, as with Lineage. **Always** shows Explorer on it when nothing needs you.
+
 Lineage is an Explorer-only singleton tab that lists the focused agent's parents and the agents it
 started, with the workspace each one runs in (`packages/app/src/panels/lineage-panel.tsx`). The
 focused agent is the agent in the focused tab, else the workspace's most recently active root agent;
