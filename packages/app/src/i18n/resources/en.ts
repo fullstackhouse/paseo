@@ -105,6 +105,7 @@ export const en = {
       home: "Home",
       groupByProject: "Group by project",
       groupByStatus: "Group by status",
+      updatePaseo: "Update Paseo",
       modelGroupLabel: "Model",
       modelSearchKeywords: "switch model change model set model select model",
       thinkingGroupLabel: "Thinking",
