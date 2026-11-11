@@ -106,7 +106,7 @@ jobs:
           '
 
       # Sign with the FSH certificate (self-signed "Paseo FSH", public half in
-      # .github/fsh-macos-signing.pem) instead of ad hoc. macOS keeps an app's privacy answers
+      # .github/fsh-macos-signing.crt) instead of ad hoc. macOS keeps an app's privacy answers
       # (Documents, Downloads, network volumes...) per designated requirement: for an ad-hoc build
       # that is the build's own hash, so every update asks again; for a certificate it is the
       # certificate, so the answers survive updates. Installs never need to trust it.
@@ -126,7 +126,7 @@ jobs:
           fi
           printf '%s' "$P12_BASE64" | base64 --decode > "$RUNNER_TEMP/fsh-signing.p12"
           sudo security add-trusted-cert -d -r trustRoot -p codeSign \
-            -k /Library/Keychains/System.keychain .github/fsh-macos-signing.pem
+            -k /Library/Keychains/System.keychain .github/fsh-macos-signing.crt
           {
             echo "CSC_LINK=$RUNNER_TEMP/fsh-signing.p12"
             echo "CSC_KEY_PASSWORD=$P12_PASSWORD"

@@ -81,7 +81,7 @@ release tag in `~/.paseo/fsh-release` and does nothing when that matches the lat
 macOS builds are signed with the self-signed FSH certificate "Paseo FSH" (not notarized, not a Developer ID), so macOS
 remembers your answers to its folder-access prompts (Documents, Downloads, network volumes) across updates. Ad-hoc
 builds asked again after every update. You don't need to trust the certificate. Its public half is
-`.github/fsh-macos-signing.pem`; the `.p12` is in GCP Secret Manager (`paseo-macos-signing-p12{,-password}`) and in the
+`.github/fsh-macos-signing.crt`; the `.p12` is in GCP Secret Manager (`paseo-macos-signing-p12{,-password}`) and in the
 fork secrets `PASEO_MACOS_SIGNING_P12_{BASE64,PASSWORD}`. Rotating it makes every Mac ask once more.
 
 To see which build you're running, open Paseo → About Paseo: it shows the commit (`Version 0.13.0-beta.1 (fsh.<sha>)`),
