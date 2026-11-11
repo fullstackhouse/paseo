@@ -8,7 +8,7 @@ nav: CLI
 
 `paseo schedule` 在终端中创建和管理新建 Agent 的[定时任务](/docs/schedules)，适用于无界面的机器和脚本。每次运行都会启动一个新的 Agent。
 
-默认情况下，每次运行结束时都会归档其工作区。传入 `--no-archive-on-finish` 可以把[每次运行的工作区保留](/docs/schedules#keep-run-workspaces)在侧边栏中，传入 `--isolation worktree` 可以让每次运行在各自的 worktree 中进行。
+默认情况下，每次运行结束时都会归档其工作区（**Archive on finish**）。传入 `--no-archive-on-finish` 可以把[每次运行的工作区保留](/docs/schedules#keep-run-workspaces)在侧边栏中，传入 `--isolation worktree` 可以让每次运行在各自的 worktree 中进行。
 
 ## 创建 {#create}
 
