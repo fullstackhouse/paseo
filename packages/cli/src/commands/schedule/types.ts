@@ -1,5 +1,7 @@
 export type ScheduleStatus = "active" | "paused" | "completed";
 
+export type ScheduleIsolation = "local" | "worktree";
+
 export type ScheduleCadence =
   | {
       type: "every";
@@ -28,6 +30,8 @@ export type ScheduleTarget =
         modeId?: string;
         model?: string;
         thinkingOptionId?: string;
+        isolation?: ScheduleIsolation;
+        archiveOnFinish?: boolean;
         title?: string | null;
         providerOptions?: Record<string, unknown>;
       };
@@ -138,6 +142,8 @@ export interface UpdateScheduleNewAgentConfig {
   provider?: string;
   model?: string | null;
   modeId?: string | null;
+  isolation?: ScheduleIsolation;
+  archiveOnFinish?: boolean;
   cwd?: string;
 }
 

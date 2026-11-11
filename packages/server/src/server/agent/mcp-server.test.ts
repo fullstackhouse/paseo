@@ -5098,6 +5098,41 @@ describe("create_schedule MCP tool", () => {
     });
   });
 
+  it("passes archiveOnFinish through create_schedule input", async () => {
+    const { agentManager, agentStorage } = createTestDeps();
+    const createOrReplace = vi.fn(async (input: CreateScheduleInput) =>
+      createStoredSchedule(input),
+    );
+    const server = await createAgentMcpServer({
+      agentManager,
+      agentStorage,
+      providerSnapshotManager: createOpenCodeManager().manager,
+      scheduleService: { createOrReplace } as unknown as ScheduleService,
+      logger,
+    });
+    const tool = registeredTool(server, "create_schedule");
+
+    await tool.handler({
+      prompt: "say hello",
+      cron: "*/5 * * * *",
+      provider: "codex",
+      archiveOnFinish: false,
+    });
+
+    expect(createOrReplace).toHaveBeenCalledWith(
+      expect.objectContaining({
+        target: {
+          type: "new-agent",
+          config: {
+            provider: "codex",
+            cwd: process.cwd(),
+            archiveOnFinish: false,
+          },
+        },
+      }),
+    );
+  });
+
   it("passes timezone through cron create_schedule input", async () => {
     const { agentManager, agentStorage } = createTestDeps();
     const createOrReplace = vi.fn(async (scheduleInput: CreateScheduleInput) =>
@@ -5632,6 +5667,34 @@ describe("update_schedule MCP tool", () => {
       newAgentConfig: {
         model: null,
         modeId: null,
+      },
+    });
+  });
+
+  it("patches archiveOnFinish and isolation for the next run", async () => {
+    const { agentManager, agentStorage } = createTestDeps();
+    const stored = makeStoredSchedule();
+    const update = vi.fn(async (_input: UpdateScheduleInput) => stored);
+    const server = await createAgentMcpServer({
+      agentManager,
+      agentStorage,
+      providerSnapshotManager: createOpenCodeManager().manager,
+      scheduleService: scheduleServiceWithUpdate(update, stored),
+      logger,
+    });
+    const tool = registeredTool(server, "update_schedule");
+
+    await tool.handler({
+      id: "schedule-1",
+      archiveOnFinish: false,
+      isolation: "worktree",
+    });
+
+    expect(update).toHaveBeenCalledWith({
+      id: "schedule-1",
+      newAgentConfig: {
+        archiveOnFinish: false,
+        isolation: "worktree",
       },
     });
   });
