@@ -394,6 +394,9 @@ function resolveScheduleUpdateProviderAndModel(params: {
   };
 }
 
+const ARCHIVE_ON_FINISH_DESCRIPTION =
+  "Archive each run's workspace when the run ends (default true). Set false to keep runs in the sidebar.";
+
 interface ScheduleUpdateToolInput {
   id: string;
   every?: string;
@@ -406,6 +409,8 @@ interface ScheduleUpdateToolInput {
   model?: string | null;
   mode?: string | null;
   cwd?: string;
+  archiveOnFinish?: boolean;
+  isolation?: "local" | "worktree";
   expiresIn?: string;
   clearExpires?: boolean;
 }
@@ -539,6 +544,8 @@ function buildScheduleUpdateInput(input: ScheduleUpdateToolInput): UpdateSchedul
     ...(providerModelPatch.model !== undefined ? { model: providerModelPatch.model } : {}),
     ...(input.mode !== undefined ? { modeId: input.mode } : {}),
     ...(input.cwd !== undefined ? { cwd: input.cwd } : {}),
+    ...(input.archiveOnFinish !== undefined ? { archiveOnFinish: input.archiveOnFinish } : {}),
+    ...(input.isolation !== undefined ? { isolation: input.isolation } : {}),
   };
 
   return {
@@ -998,6 +1005,7 @@ function createToolCatalog(
     provider?: string;
     cwd?: string;
     isolation?: "local" | "worktree";
+    archiveOnFinish?: boolean;
   }) => {
     const callerAgent = resolveCallerAgent();
     if (callerAgent) {
@@ -1006,6 +1014,9 @@ function createToolCatalog(
         config: {
           ...buildCallerAgentScheduleConfig(callerAgent, params),
           ...(params?.isolation ? { isolation: params.isolation } : {}),
+          ...(params?.archiveOnFinish !== undefined
+            ? { archiveOnFinish: params.archiveOnFinish }
+            : {}),
         },
       };
     }
@@ -1025,6 +1036,9 @@ function createToolCatalog(
         cwd: params?.cwd?.trim() ? expandUserPath(params.cwd) : process.cwd(),
         ...(resolvedProviderModel.model ? { model: resolvedProviderModel.model } : {}),
         ...(params?.isolation ? { isolation: params.isolation } : {}),
+        ...(params?.archiveOnFinish !== undefined
+          ? { archiveOnFinish: params.archiveOnFinish }
+          : {}),
       },
     };
   };
@@ -2701,13 +2715,25 @@ function createToolCatalog(
           ),
           cwd: z.string().optional(),
           isolation: z.enum(["local", "worktree"]).optional(),
+          archiveOnFinish: z.boolean().optional().describe(ARCHIVE_ON_FINISH_DESCRIPTION),
           maxRuns: z.number().int().positive().optional(),
           expiresIn: scheduleDurationInputSchema.optional(),
         })
         .superRefine(addScheduleCadenceIssue),
       outputSchema: ScheduleSummarySchema.shape,
     },
-    async ({ prompt, cron, timezone, name, provider, cwd, isolation, maxRuns, expiresIn }) => {
+    async ({
+      prompt,
+      cron,
+      timezone,
+      name,
+      provider,
+      cwd,
+      isolation,
+      archiveOnFinish,
+      maxRuns,
+      expiresIn,
+    }) => {
       if (!scheduleService) {
         throw new Error("Schedule service is not configured");
       }
@@ -2719,7 +2745,7 @@ function createToolCatalog(
           cron,
           ...(timezone !== undefined ? { timezone } : {}),
         }),
-        target: resolveNewAgentScheduleTarget({ provider, cwd, isolation }),
+        target: resolveNewAgentScheduleTarget({ provider, cwd, isolation, archiveOnFinish }),
         ...(name?.trim() ? { name: name.trim() } : {}),
         ...(maxRuns === undefined ? {} : { maxRuns }),
         ...(expiresAt === undefined ? {} : { expiresAt }),
@@ -3039,6 +3065,11 @@ function createToolCatalog(
             .optional()
             .describe("New mode for new-agent target (null to clear)."),
           cwd: z.string().trim().min(1).optional().describe("New cwd for new-agent target."),
+          isolation: z
+            .enum(["local", "worktree"])
+            .optional()
+            .describe("New workspace isolation for each run of a new-agent target."),
+          archiveOnFinish: z.boolean().optional().describe(ARCHIVE_ON_FINISH_DESCRIPTION),
           expiresIn: scheduleDurationInputSchema
             .optional()
             .describe("New relative expiry duration (for example: 1h, 2d)."),
