@@ -109,6 +109,7 @@ export const zhCN: TranslationResources = {
       home: "首页",
       groupByProject: "按项目分组",
       groupByStatus: "按状态分组",
+      updatePaseo: "更新 Paseo",
       modelGroupLabel: "模型",
       modelSearchKeywords: "切换模型 更改模型 设置模型 选择模型",
       thinkingGroupLabel: "思考",

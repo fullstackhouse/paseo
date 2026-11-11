@@ -1,7 +1,10 @@
-import { Gift } from "lucide-react-native";
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { Download, Gift } from "lucide-react-native";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useUnistyles } from "react-native-unistyles";
+import { useUnistyles, withUnistyles } from "react-native-unistyles";
+import type { CommandCenterIconProps } from "@/command-center/contributions";
+import { useCommandCenterActions } from "@/command-center/provider";
+import { buildUpdateContribution } from "@/command-center/root-contributions";
 import {
   type SidebarCalloutAction,
   SidebarCalloutDescriptionText,
@@ -17,8 +20,18 @@ import { useInstallWhenIdle, useLocalHostActivity } from "@/desktop/updates/use-
 import { useAppSettings } from "@/hooks/use-settings";
 import { useStableEvent } from "@/hooks/use-stable-event";
 import { openChangelog } from "@/changelog";
+import { confirmDialog } from "@/utils/confirm-dialog";
+import { clearCommandCenterFocusRestoreElement } from "@/utils/command-center-focus-restore";
 
 const CHECK_INTERVAL_MS = 30 * 60 * 1000;
+
+const ThemedDownload = withUnistyles(Download, (theme) => ({
+  color: theme.colors.foregroundMuted,
+}));
+
+function UpdateIcon({ size }: CommandCenterIconProps) {
+  return <ThemedDownload size={size} strokeWidth={2.2} />;
+}
 
 function renderBody(body: UpdateCalloutBody, t: ReturnType<typeof useTranslation>["t"]): ReactNode {
   if (body.kind === "installing") return t("desktop.updates.callout.installingDescription");
@@ -78,6 +91,43 @@ export function UpdateCalloutSource() {
   });
   const cancelWaiting = useStableEvent(() => {
     setIdleChoice({ version: latestVersion, wait: false });
+  });
+  // The palette shows no restart warning, so confirm before stopping agents.
+  const confirmAndInstall = useStableEvent(() => {
+    clearCommandCenterFocusRestoreElement();
+    void confirmDialog({
+      title: t("settings.about.updates.installTitle"),
+      message: t("settings.about.updates.installMessage"),
+      confirmLabel: t("settings.about.updates.installConfirm"),
+      cancelLabel: t("common.actions.cancel"),
+    })
+      .then((confirmed) => {
+        if (confirmed) install();
+        return;
+      })
+      .catch((error) => {
+        console.error("[Updates] Failed to open app update confirmation", error);
+      });
+  });
+  const commandCenterActions = useMemo(() => {
+    const contribution = buildUpdateContribution({
+      isDesktopApp,
+      status,
+      isInstalling,
+      versionLabel: latestVersion ? `v${latestVersion.replace(/^v/i, "")}` : null,
+      labels: {
+        section: t("shell.commandCenter.actions"),
+        title: t("shell.commandCenter.updatePaseo"),
+      },
+      icon: UpdateIcon,
+      install: confirmAndInstall,
+    });
+    return contribution ? [contribution] : [];
+  }, [confirmAndInstall, isDesktopApp, isInstalling, latestVersion, status, t]);
+  useCommandCenterActions({
+    sourceId: "desktop-update",
+    enabled: commandCenterActions.length > 0,
+    actions: commandCenterActions,
   });
   const localHostActivity = useLocalHostActivity();
   useInstallWhenIdle({ activity: localHostActivity, enabled: waitingForIdle, onIdle: install });

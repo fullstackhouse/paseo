@@ -110,6 +110,7 @@ export const ja: TranslationResources = {
       home: "ホーム",
       groupByProject: "プロジェクトでグループ化",
       groupByStatus: "ステータスでグループ化",
+      updatePaseo: "Paseo をアップデート",
       modelGroupLabel: "モデル",
       modelSearchKeywords: "モデルを切り替え モデルを変更 モデルを設定 モデルを選択",
       thinkingGroupLabel: "思考",

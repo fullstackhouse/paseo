@@ -110,6 +110,7 @@ export const fr: TranslationResources = {
       home: "Accueil",
       groupByProject: "Grouper par projet",
       groupByStatus: "Grouper par statut",
+      updatePaseo: "Mettre à jour Paseo",
       modelGroupLabel: "Modèle",
       modelSearchKeywords:
         "changer de modèle modifier le modèle définir le modèle sélectionner le modèle model",

@@ -1,4 +1,5 @@
 import type { SidebarGroupMode } from "@/stores/sidebar-view-store";
+import type { DesktopAppUpdateStatus } from "@/desktop/updates/desktop-app-updater";
 import type { CommandCenterContribution, CommandCenterIcon } from "./contributions";
 
 export interface GroupingCommandCenterSource {
@@ -34,6 +35,41 @@ export function buildGroupingContribution(
       title: target === "status" ? source.labels.groupByStatus : source.labels.groupByProject,
       sectionTitle: source.labels.section,
       icon: target === "status" ? source.icons.status : source.icons.project,
+    },
+  };
+}
+
+export interface UpdateCommandCenterSource {
+  isDesktopApp: boolean;
+  status: DesktopAppUpdateStatus;
+  isInstalling: boolean;
+  versionLabel: string | null;
+  labels: { section: string; title: string };
+  icon?: CommandCenterIcon;
+  install(): void;
+}
+
+// Listed only while an update is ready, so the entry never reads as a no-op.
+export function buildUpdateContribution(
+  source: UpdateCommandCenterSource,
+): CommandCenterContribution | null {
+  if (!source.isDesktopApp || source.status !== "available" || source.isInstalling) {
+    return null;
+  }
+  return {
+    id: "update-paseo",
+    group: "actions",
+    groupRank: 0,
+    rank: 9,
+    keywords: ["update", "upgrade", "install", "restart", "version", "paseo"],
+    visibility: "query",
+    run: source.install,
+    presentation: {
+      kind: "action",
+      title: source.labels.title,
+      subtitle: source.versionLabel ?? undefined,
+      sectionTitle: source.labels.section,
+      icon: source.icon,
     },
   };
 }
