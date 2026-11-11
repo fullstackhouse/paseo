@@ -5,6 +5,7 @@ import type {
   CreateScheduleInput,
   ScheduleCadence,
   ScheduleDaemonClient,
+  ScheduleIsolation,
   ScheduleListItem,
   ScheduleRecord,
   ScheduleTarget,
@@ -116,7 +117,8 @@ function resolveScheduleTarget(args: {
   if (hasExplicitNewAgentOption) {
     throw {
       code: "INVALID_TARGET",
-      message: "--provider/--mode/--thinking can only be used with a new-agent target",
+      message:
+        "--provider/--mode/--thinking/--isolation/--archive-on-finish can only be used with a new-agent target",
       details: "Use --target new-agent or omit --target to create a new agent schedule",
     } satisfies CommandError;
   }
@@ -148,6 +150,8 @@ export function parseScheduleCreateInput(options: {
   mode?: string;
   thinking?: string;
   cwd?: string;
+  isolation?: string;
+  archiveOnFinish?: boolean;
   host?: string;
   daemonTarget: import("../../utils/daemon-target.js").DaemonTarget;
   maxRuns?: string;
@@ -190,8 +194,12 @@ export function parseScheduleCreateInput(options: {
       message: "--thinking cannot be empty",
     } satisfies CommandError;
   }
+  const runWorkspaceConfig = parseRunWorkspaceConfig(options);
   const hasExplicitNewAgentOption =
-    options.provider !== undefined || options.mode !== undefined || options.thinking !== undefined;
+    options.provider !== undefined ||
+    options.mode !== undefined ||
+    options.thinking !== undefined ||
+    Object.keys(runWorkspaceConfig).length > 0;
   const createNewAgentTarget = (): ScheduleTarget => {
     const resolvedProviderModel = resolveProviderAndModel({
       provider: options.provider,
@@ -204,6 +212,7 @@ export function parseScheduleCreateInput(options: {
         ...(resolvedProviderModel.model ? { model: resolvedProviderModel.model } : {}),
         ...(modeId ? { modeId } : {}),
         ...(thinkingOptionId ? { thinkingOptionId } : {}),
+        ...runWorkspaceConfig,
       },
     };
   };
@@ -249,6 +258,8 @@ export interface ScheduleUpdateOptionsInput {
   model?: string;
   mode?: string;
   cwd?: string;
+  isolation?: string;
+  archiveOnFinish?: boolean;
   maxRuns?: string;
   expiresIn?: string;
   clearMaxRuns?: boolean;
@@ -412,7 +423,7 @@ function parseUpdatePrompt(options: ScheduleUpdateOptionsInput): string | undefi
 function buildNewAgentConfigPatch(
   options: ScheduleUpdateOptionsInput,
 ): UpdateScheduleNewAgentConfig | undefined {
-  const patch: UpdateScheduleNewAgentConfig = {};
+  const patch: UpdateScheduleNewAgentConfig = parseRunWorkspaceConfig(options);
   if (options.provider !== undefined || options.model !== undefined) {
     const resolved = resolveProviderAndModel({
       provider: options.provider,
@@ -438,6 +449,33 @@ function buildNewAgentConfigPatch(
     patch.cwd = trimmed;
   }
   return Object.keys(patch).length > 0 ? patch : undefined;
+}
+
+type RunWorkspaceConfig = Pick<UpdateScheduleNewAgentConfig, "isolation" | "archiveOnFinish">;
+
+function parseRunWorkspaceConfig(options: {
+  isolation?: string;
+  archiveOnFinish?: boolean;
+}): RunWorkspaceConfig {
+  const isolation = parseIsolationFlag(options.isolation);
+  return {
+    ...(isolation !== undefined ? { isolation } : {}),
+    ...(options.archiveOnFinish !== undefined ? { archiveOnFinish: options.archiveOnFinish } : {}),
+  };
+}
+
+function parseIsolationFlag(value: string | undefined): ScheduleIsolation | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  const trimmed = value.trim();
+  if (trimmed === "local" || trimmed === "worktree") {
+    return trimmed;
+  }
+  throw {
+    code: "INVALID_ISOLATION",
+    message: "--isolation must be local or worktree",
+  } satisfies CommandError;
 }
 
 function parsePositiveInt(value: string, flag: string): number {

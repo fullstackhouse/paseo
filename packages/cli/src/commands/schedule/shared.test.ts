@@ -159,6 +159,44 @@ describe("parseScheduleCreateInput thinking", () => {
   });
 });
 
+describe("parseScheduleCreateInput run workspace lifecycle", () => {
+  test("sets isolation and keeps runs when archiving is turned off", () => {
+    const input = parseScheduleCreateInput({
+      ...baseOptions,
+      cwd: "/project",
+      isolation: "worktree",
+      archiveOnFinish: false,
+    });
+
+    expect(input.target).toEqual({
+      type: "new-agent",
+      config: {
+        provider: "claude",
+        cwd: "/project",
+        isolation: "worktree",
+        archiveOnFinish: false,
+      },
+    });
+  });
+
+  test("rejects an unknown isolation", () => {
+    expect(() => parseScheduleCreateInput({ ...baseOptions, isolation: "docker" })).toThrow(
+      expect.objectContaining({ code: "INVALID_ISOLATION" }),
+    );
+  });
+
+  test("rejects lifecycle flags on an existing-agent target", () => {
+    expect(() =>
+      parseScheduleCreateInput({
+        ...baseOptions,
+        provider: undefined,
+        target: "00000000-0000-4000-8000-000000000001",
+        archiveOnFinish: false,
+      }),
+    ).toThrow(expect.objectContaining({ code: "INVALID_TARGET" }));
+  });
+});
+
 describe("parseScheduleUpdateInput", () => {
   test("rejects calls with no fields to update", () => {
     expect(() => parseScheduleUpdateInput({ id: "abc" })).toThrow(
@@ -252,6 +290,21 @@ describe("parseScheduleUpdateInput", () => {
       id: "abc",
       newAgentConfig: { modeId: null },
     });
+  });
+
+  test("--no-archive-on-finish and --isolation patch the new-agent config", () => {
+    expect(
+      parseScheduleUpdateInput({ id: "abc", archiveOnFinish: false, isolation: " local " }),
+    ).toEqual({
+      id: "abc",
+      newAgentConfig: { archiveOnFinish: false, isolation: "local" },
+    });
+  });
+
+  test("rejects an unknown --isolation", () => {
+    expect(() => parseScheduleUpdateInput({ id: "abc", isolation: "docker" })).toThrow(
+      expect.objectContaining({ code: "INVALID_ISOLATION" }),
+    );
   });
 
   test("rejects empty --cwd", () => {

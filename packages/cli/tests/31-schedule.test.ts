@@ -250,6 +250,47 @@ try {
     assert.strictEqual(JSON.parse(deleted.stdout).id, createdJson.id);
     console.log("compatibility agent-target schedules remain deletable\n");
   }
+  {
+    console.log("Test 1f: schedule create/update set run isolation and archive behavior");
+    const created = await ctx.paseo([
+      "schedule",
+      "create",
+      "Keep my runs",
+      "--cron",
+      "0 0 1 1 *",
+      "--provider",
+      "claude",
+      "--cwd",
+      ctx.workDir,
+      "--isolation",
+      "local",
+      "--no-archive-on-finish",
+      "--json",
+    ]);
+    assert.strictEqual(created.exitCode, 0, created.stderr);
+    const { id } = JSON.parse(created.stdout);
+
+    const inspectConfig = async () => {
+      const result = await ctx.paseo(["schedule", "inspect", id, "--json"]);
+      assert.strictEqual(result.exitCode, 0, result.stderr);
+      return JSON.parse(result.stdout).target.config;
+    };
+    const initial = await inspectConfig();
+    assert.strictEqual(initial.isolation, "local");
+    assert.strictEqual(initial.archiveOnFinish, false);
+
+    const renamed = await ctx.paseo(["schedule", "update", id, "--name", "kept", "--json"]);
+    assert.strictEqual(renamed.exitCode, 0, renamed.stderr);
+    assert.strictEqual((await inspectConfig()).archiveOnFinish, false);
+
+    const archived = await ctx.paseo(["schedule", "update", id, "--archive-on-finish", "--json"]);
+    assert.strictEqual(archived.exitCode, 0, archived.stderr);
+    assert.strictEqual((await inspectConfig()).archiveOnFinish, true);
+
+    const deleted = await ctx.paseo(["schedule", "delete", id, "--json"]);
+    assert.strictEqual(deleted.exitCode, 0, deleted.stderr);
+    console.log("schedule create/update set run isolation and archive behavior\n");
+  }
 } finally {
   await ctx.stop();
   await rm(ctx.paseoHome, { recursive: true, force: true });
