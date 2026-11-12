@@ -40,6 +40,9 @@ export interface SidebarDisplayPreferences {
   /** A one-click Archive button beside the row's menu while the row is hovered. */
   archiveButton: boolean;
   toggleArchiveButton: () => void;
+  /** Experimental: idle workspaces are grouped by what their agents reported. */
+  agentReportedStatus: boolean;
+  toggleAgentReportedStatus: () => void;
   checksDisplay: SidebarChecksDisplay;
   setChecksDisplay: (display: SidebarChecksDisplay) => void;
   trailing: SidebarWorkspaceTrailing;
@@ -90,6 +93,7 @@ export function useSidebarDisplayPreferences(): SidebarDisplayPreferences {
       sidebarChecksDisplay,
       sidebarPluginRowItems,
       sidebarArchiveButton,
+      sidebarAgentReportedStatus,
     },
     updateSettings,
   } = useAppSettings();
@@ -133,6 +137,9 @@ export function useSidebarDisplayPreferences(): SidebarDisplayPreferences {
   const toggleArchiveButton = useCallback(() => {
     void updateSettings({ sidebarArchiveButton: !sidebarArchiveButton });
   }, [updateSettings, sidebarArchiveButton]);
+  const toggleAgentReportedStatus = useCallback(() => {
+    void updateSettings({ sidebarAgentReportedStatus: !sidebarAgentReportedStatus });
+  }, [updateSettings, sidebarAgentReportedStatus]);
 
   const setChecksDisplay = useCallback(
     (display: SidebarChecksDisplay) => {
@@ -167,6 +174,8 @@ export function useSidebarDisplayPreferences(): SidebarDisplayPreferences {
       togglePluginRowItem,
       archiveButton: sidebarArchiveButton,
       toggleArchiveButton,
+      agentReportedStatus: sidebarAgentReportedStatus,
+      toggleAgentReportedStatus,
       checksDisplay: sidebarChecksDisplay,
       setChecksDisplay,
       trailing: sidebarWorkspaceTrailing,
@@ -197,6 +206,8 @@ export function useSidebarDisplayPreferences(): SidebarDisplayPreferences {
       togglePluginRowItem,
       sidebarArchiveButton,
       toggleArchiveButton,
+      sidebarAgentReportedStatus,
+      toggleAgentReportedStatus,
       sidebarChecksDisplay,
       setChecksDisplay,
       sidebarWorkspaceTrailing,

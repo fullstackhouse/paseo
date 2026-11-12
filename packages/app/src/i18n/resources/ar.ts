@@ -1227,6 +1227,7 @@ export const ar: TranslationResources = {
         project: "المشروع",
         status: "الحالة",
         labels: "التسميات",
+        agentReportedStatus: "الحالة التي يبلغ عنها الوكيل (تجريبي)",
       },
       titleSource: {
         label: "العنوان",

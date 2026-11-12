@@ -1244,6 +1244,7 @@ export const ru: TranslationResources = {
         project: "Проект",
         status: "Статус",
         labels: "Метки",
+        agentReportedStatus: "Статус от агента (бета)",
       },
       titleSource: {
         label: "Заголовок",

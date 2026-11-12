@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo } from "react";
 import { useStoreWithEqualityFn } from "zustand/traditional";
 import { useCreateFlowStore } from "@/stores/create-flow-store";
 import { useSessionStore } from "@/stores/session-store";
+import { useReportedWorkLookup } from "@/workspace-status/reported-work";
 import { useWorkspaceDirectoryServerIds } from "@/stores/session-store-hooks";
 import { workspaceEqualityFns } from "@/stores/session-store-hooks/selectors";
 import { useWorkspaceStructure } from "@/stores/session-store-hooks";
@@ -65,6 +66,8 @@ export function useSidebarProjectStatusBucket(input: {
     workspaceEqualityFns.deep,
   );
 
+  const reportedWork = useReportedWorkLookup();
+
   const selector = useCallback(
     (state: { sessions: Record<string, ProjectStatusSession | undefined> }) => {
       if (!enabled) return null;
@@ -72,9 +75,10 @@ export function useSidebarProjectStatusBucket(input: {
         workspaces,
         sessions: state.sessions,
         pendingCreateAttempts,
+        reportedWork,
       });
     },
-    [enabled, pendingCreateAttempts, workspaces],
+    [enabled, pendingCreateAttempts, reportedWork, workspaces],
   );
 
   return useStoreWithEqualityFn(useSessionStore, selector, Object.is);

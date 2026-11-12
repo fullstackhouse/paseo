@@ -1240,6 +1240,7 @@ export const ja: TranslationResources = {
         project: "プロジェクト",
         status: "ステータス",
         labels: "ラベル",
+        agentReportedStatus: "エージェントが報告した状態（ベータ）",
       },
       titleSource: {
         label: "タイトル",

@@ -2,6 +2,7 @@ import { useMemo, useRef } from "react";
 import { useStoreWithEqualityFn } from "zustand/traditional";
 import { useCreateFlowStore } from "@/stores/create-flow-store";
 import { useSessionStore } from "@/stores/session-store";
+import { useReportedWorkLookup } from "@/workspace-status/reported-work";
 import {
   areSidebarWorkspaceSessionsEqual,
   buildSidebarWorkspaceEntries,
@@ -32,6 +33,7 @@ export function useSidebarWorkspaceEntries(
   const pendingCreateAttempts = useCreateFlowStore((state) =>
     enabled ? state.pendingByDraftId : EMPTY_PENDING_CREATE_ATTEMPTS,
   );
+  const reportedWork = useReportedWorkLookup();
   const previousEntriesRef = useRef<ReadonlyMap<string, SidebarWorkspaceEntry>>(EMPTY_ENTRIES);
 
   // Collection ownership is intentional: retained sidebars have one cheap
@@ -49,9 +51,10 @@ export function useSidebarWorkspaceEntries(
       placements,
       sessions,
       pendingCreateAttempts,
+      reportedWork,
       previousEntries: previousEntriesRef.current,
     });
     previousEntriesRef.current = entries;
     return entries;
-  }, [enabled, pendingCreateAttempts, placements, sessions]);
+  }, [enabled, pendingCreateAttempts, placements, reportedWork, sessions]);
 }

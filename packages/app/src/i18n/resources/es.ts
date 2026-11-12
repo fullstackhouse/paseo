@@ -1263,6 +1263,7 @@ export const es: TranslationResources = {
         project: "Proyecto",
         status: "Estado",
         labels: "Etiquetas",
+        agentReportedStatus: "Estado informado por el agente (beta)",
       },
       titleSource: {
         label: "Título",
