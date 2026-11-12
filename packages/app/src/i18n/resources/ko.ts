@@ -1424,6 +1424,7 @@ export const ko: TranslationResources = {
   },
   newWorkspace: {
     title: "새 워크스페이스",
+    recentProjects: "최근 프로젝트",
     create: "생성",
     isolation: {
       local: "로컬",

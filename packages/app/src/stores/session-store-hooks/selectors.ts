@@ -7,7 +7,7 @@ import {
 } from "@/projects/workspace-structure";
 import type { DesktopBadgeWorkspaceStatus } from "@/utils/desktop-badge-state";
 import { resolveWorkspaceMapKeyByIdentity } from "@/utils/workspace-identity";
-import type { ProjectDescriptor, WorkspaceDescriptor } from "../session-store";
+import type { Agent, ProjectDescriptor, WorkspaceDescriptor } from "../session-store";
 
 export type { DesktopBadgeWorkspaceStatus } from "@/utils/desktop-badge-state";
 export type { WorkspaceStructure, WorkspaceStructureProject } from "@/projects/workspace-structure";
@@ -20,6 +20,7 @@ export interface SessionsSnapshot {
       hasWorkspaceDirectorySnapshot?: boolean;
       workspaces: Map<string, WorkspaceDescriptor>;
       projects?: Map<string, ProjectDescriptor>;
+      agents?: Map<string, Agent>;
     }
   >;
 }
@@ -305,6 +306,93 @@ export function selectRecommendedProjectPaths(
   return Array.from(workspaces.values())
     .map((workspace) => workspace.projectRootPath)
     .filter((path) => path.length > 0);
+}
+
+/** The composer settings of a project's latest agent, shaped like an applied agent profile. */
+export interface RecentAgentSetup {
+  provider: string;
+  modelId: string;
+  modeId: string;
+  thinkingOptionId: string;
+  featureValues: Record<string, unknown>;
+}
+
+export interface RecentProjectActivity {
+  projectId: string;
+  /** Epoch ms of the project's latest prompt, or its newest workspace when nothing was prompted. */
+  lastUsedAt: number;
+  /** The setup of the project's most recently prompted top-level agent; null without one. */
+  agentSetup: RecentAgentSetup | null;
+}
+
+const EMPTY_RECENT_PROJECTS: RecentProjectActivity[] = [];
+
+function activityTime(item: { lastUserMessageAt: Date | null; createdAt: Date | null }): number {
+  return (item.lastUserMessageAt ?? item.createdAt)?.getTime() ?? 0;
+}
+
+function agentSetup(agent: Agent): RecentAgentSetup {
+  const featureValues: Record<string, unknown> = {};
+  for (const feature of agent.features ?? []) {
+    featureValues[feature.id] = feature.value;
+  }
+  return {
+    provider: agent.provider,
+    modelId: agent.model ?? "",
+    modeId: agent.currentModeId ?? "",
+    thinkingOptionId: agent.thinkingOptionId ?? "",
+    featureValues,
+  };
+}
+
+/** The host's projects, most recently used first, each with its latest agent's setup. */
+export function selectRecentProjects(
+  state: SessionsSnapshot,
+  serverId: string | null,
+): RecentProjectActivity[] {
+  const session = serverId ? state.sessions[serverId] : undefined;
+  if (!session || session.workspaces.size === 0) {
+    return EMPTY_RECENT_PROJECTS;
+  }
+  const byProjectId = new Map<string, RecentProjectActivity & { agentTime: number }>();
+  const projectIdByWorkspaceId = new Map<string, string>();
+  for (const workspace of session.workspaces.values()) {
+    projectIdByWorkspaceId.set(workspace.id, workspace.projectId);
+    const time = activityTime(workspace);
+    const entry = byProjectId.get(workspace.projectId);
+    if (!entry) {
+      byProjectId.set(workspace.projectId, {
+        projectId: workspace.projectId,
+        lastUsedAt: time,
+        agentSetup: null,
+        agentTime: -1,
+      });
+    } else if (time > entry.lastUsedAt) {
+      entry.lastUsedAt = time;
+    }
+  }
+  for (const agent of session.agents?.values() ?? []) {
+    if (agent.parentAgentId) continue;
+    const projectId = agent.workspaceId ? projectIdByWorkspaceId.get(agent.workspaceId) : undefined;
+    const entry = projectId ? byProjectId.get(projectId) : undefined;
+    if (!entry) continue;
+    const time = activityTime(agent);
+    if (time > entry.agentTime) {
+      entry.agentTime = time;
+      entry.agentSetup = agentSetup(agent);
+    }
+    if (time > entry.lastUsedAt) entry.lastUsedAt = time;
+  }
+  return Array.from(byProjectId.values())
+    .sort(
+      (left, right) =>
+        right.lastUsedAt - left.lastUsedAt || left.projectId.localeCompare(right.projectId),
+    )
+    .map(({ projectId, lastUsedAt, agentSetup: setup }) => ({
+      projectId,
+      lastUsedAt,
+      agentSetup: setup,
+    }));
 }
 
 export function selectProjectRootPaths(state: SessionsSnapshot, serverId: string | null): string[] {

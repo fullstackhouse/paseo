@@ -9,6 +9,7 @@ import {
   selectHydratedWorkspaceServerIds,
   selectWorkspaceDirectoryServerIds,
   selectProjectOrder,
+  selectRecentProjects,
   selectRecommendedProjectPaths,
   selectWorkspace,
   selectWorkspaceDirectory,
@@ -21,6 +22,7 @@ import {
 } from "./selectors";
 import {
   useSessionStore,
+  type Agent,
   type ProjectDescriptor,
   type WorkspaceDescriptor,
 } from "../session-store";
@@ -566,6 +568,123 @@ describe("selectRecommendedProjectPaths", () => {
     expect(tracked.current).toBe(before);
 
     tracked.stop();
+  });
+});
+
+describe("selectRecentProjects", () => {
+  const at = (iso: string) => new Date(iso);
+
+  function agent(input: Partial<Agent> & Pick<Agent, "id">): Agent {
+    return {
+      serverId: SERVER_ID,
+      provider: "claude",
+      status: "idle",
+      turn: { phase: "idle", cancellationRequestId: null },
+      createdAt: at("2026-01-01"),
+      updatedAt: at("2026-01-01"),
+      lastUserMessageAt: null,
+      lastActivityAt: at("2026-01-01"),
+      capabilities: {
+        supportsStreaming: true,
+        supportsSessionPersistence: true,
+        supportsDynamicModes: true,
+        supportsMcpServers: true,
+        supportsReasoningStream: true,
+        supportsToolInvocations: true,
+      },
+      currentModeId: null,
+      availableModes: [],
+      pendingPermissions: [],
+      persistence: null,
+      title: null,
+      cwd: "/repo",
+      model: null,
+      parentAgentId: null,
+      labels: {},
+      ...input,
+    };
+  }
+
+  function setAgents(agents: Agent[]): void {
+    useSessionStore.getState().setAgents(SERVER_ID, new Map(agents.map((item) => [item.id, item])));
+  }
+
+  it("orders projects by their latest prompt, falling back to workspace creation", () => {
+    initializeWorkspaces([
+      {
+        ...createWorkspace({ id: "old-prompt", projectId: "alpha" }),
+        createdAt: at("2026-01-01"),
+        lastUserMessageAt: at("2026-01-02"),
+      },
+      {
+        ...createWorkspace({ id: "new-prompt", projectId: "alpha" }),
+        createdAt: at("2026-01-01"),
+        lastUserMessageAt: at("2026-01-05"),
+      },
+      {
+        ...createWorkspace({ id: "never-prompted", projectId: "beta" }),
+        createdAt: at("2026-01-04"),
+      },
+      {
+        ...createWorkspace({ id: "newest-prompt", projectId: "gamma" }),
+        createdAt: at("2026-01-01"),
+        lastUserMessageAt: at("2026-01-06"),
+      },
+    ]);
+
+    const recent = selectRecentProjects(useSessionStore.getState(), SERVER_ID);
+    expect(recent.map((item) => item.projectId)).toEqual(["gamma", "alpha", "beta"]);
+    expect(recent[0]?.lastUsedAt).toBe(at("2026-01-06").getTime());
+    expect(recent.every((item) => item.agentSetup === null)).toBe(true);
+  });
+
+  it("carries the setup of the project's most recently prompted top-level agent", () => {
+    initializeWorkspaces([
+      { ...createWorkspace({ id: "ws-a", projectId: "alpha" }), createdAt: at("2026-01-01") },
+    ]);
+    setAgents([
+      agent({
+        id: "older",
+        workspaceId: "ws-a",
+        provider: "codex",
+        model: "gpt-5",
+        lastUserMessageAt: at("2026-01-02"),
+      }),
+      agent({
+        id: "newer",
+        workspaceId: "ws-a",
+        model: "opus",
+        currentModeId: "auto",
+        thinkingOptionId: "high",
+        features: [{ type: "toggle", id: "fast", label: "Fast", value: true }],
+        lastUserMessageAt: at("2026-01-03"),
+      }),
+      agent({
+        id: "subagent",
+        workspaceId: "ws-a",
+        parentAgentId: "newer",
+        model: "haiku",
+        lastUserMessageAt: at("2026-01-09"),
+      }),
+    ]);
+
+    expect(selectRecentProjects(useSessionStore.getState(), SERVER_ID)).toEqual([
+      {
+        projectId: "alpha",
+        lastUsedAt: at("2026-01-03").getTime(),
+        agentSetup: {
+          provider: "claude",
+          modelId: "opus",
+          modeId: "auto",
+          thinkingOptionId: "high",
+          featureValues: { fast: true },
+        },
+      },
+    ]);
+  });
+
+  it("is empty without a host", () => {
+    expect(selectRecentProjects(useSessionStore.getState(), null)).toEqual([]);
   });
 });
 
