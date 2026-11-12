@@ -3,6 +3,7 @@ import type { ComboboxOption as ComboboxOptionType } from "@/components/ui/combo
 import { isWorkspaceArchivePending } from "@/contexts/session-workspace-upserts";
 import {
   filterWorkspaceProjectsForHost,
+  getHostProjectId,
   getHostProjectSourceDirectory,
   resolveInitialWorkspaceProject,
   type HostProjectListItem,
@@ -17,8 +18,10 @@ import {
   type ProjectSelection,
   type ProjectSelectionContext,
 } from "./project-selection";
+import { useRecentProjectIds } from "@/stores/session-store-hooks";
 
 const PROJECT_OPTION_PREFIX = "project:";
+const RECENT_PROJECT_LIMIT = 5;
 
 interface NewWorkspaceProjectPickerInput {
   selectedServerId: string;
@@ -34,6 +37,7 @@ interface NewWorkspaceProjectPickerState {
   selectedSourceDirectory: string | null;
   projectPickerOptions: ComboboxOptionType[];
   projectByOptionId: Map<string, HostProjectListItem>;
+  recentProjectOptionIds: string[];
   selectedProjectOptionId: string;
   projectTriggerLabel: string;
   handleSelectProjectOption: (id: string) => void;
@@ -51,6 +55,32 @@ function computeProjectOptionData(projects: readonly HostProjectListItem[]) {
     return { id, label: project.projectName };
   });
   return { options, projectByOptionId };
+}
+
+/**
+ * Option ids of the host's most recently used projects, newest first. Only projects the picker
+ * offers count, and the list is left empty when it would offer no choice beyond the picker.
+ */
+export function resolveRecentProjectOptionIds(input: {
+  projects: readonly HostProjectListItem[];
+  recentProjectIds: readonly string[];
+  serverId: string;
+  limit?: number;
+}): string[] {
+  const projectByHostProjectId = new Map<string, HostProjectListItem>();
+  for (const project of input.projects) {
+    const hostProjectId = getHostProjectId(project, input.serverId);
+    if (hostProjectId) projectByHostProjectId.set(hostProjectId, project);
+  }
+  const optionIds: string[] = [];
+  for (const projectId of input.recentProjectIds) {
+    const project = projectByHostProjectId.get(projectId);
+    if (!project) continue;
+    const optionId = projectOptionId(project.viewKey);
+    if (!optionIds.includes(optionId)) optionIds.push(optionId);
+    if (optionIds.length === (input.limit ?? RECENT_PROJECT_LIMIT)) break;
+  }
+  return optionIds.length > 1 ? optionIds : [];
 }
 
 function resolveWorkspaceIdFromProjectWorkspaceKey(input: {
@@ -163,6 +193,16 @@ export function useNewWorkspaceProjectPicker({
     () => computeProjectOptionData(selectableProjects),
     [selectableProjects],
   );
+  const recentProjectIds = useRecentProjectIds(selectedServerId);
+  const recentProjectOptionIds = useMemo(
+    () =>
+      resolveRecentProjectOptionIds({
+        projects: selectableProjects,
+        recentProjectIds,
+        serverId: selectedServerId,
+      }),
+    [recentProjectIds, selectableProjects, selectedServerId],
+  );
   const handleSelectProjectOption = useCallback(
     (id: string) => {
       const project = projectByOptionId.get(id);
@@ -189,6 +229,7 @@ export function useNewWorkspaceProjectPicker({
       : null,
     projectPickerOptions,
     projectByOptionId,
+    recentProjectOptionIds,
     selectedProjectOptionId: selectedProject ? projectOptionId(selectedProject.viewKey) : "",
     projectTriggerLabel: selectedProject?.projectName ?? "Choose project",
     handleSelectProjectOption,

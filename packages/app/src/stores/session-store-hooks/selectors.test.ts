@@ -9,6 +9,7 @@ import {
   selectHydratedWorkspaceServerIds,
   selectWorkspaceDirectoryServerIds,
   selectProjectOrder,
+  selectRecentProjectIds,
   selectRecommendedProjectPaths,
   selectWorkspace,
   selectWorkspaceDirectory,
@@ -566,6 +567,43 @@ describe("selectRecommendedProjectPaths", () => {
     expect(tracked.current).toBe(before);
 
     tracked.stop();
+  });
+});
+
+describe("selectRecentProjectIds", () => {
+  it("orders projects by their latest prompt, falling back to workspace creation", () => {
+    const at = (iso: string) => new Date(iso);
+    initializeWorkspaces([
+      {
+        ...createWorkspace({ id: "old-prompt", projectId: "alpha" }),
+        createdAt: at("2026-01-01"),
+        lastUserMessageAt: at("2026-01-02"),
+      },
+      {
+        ...createWorkspace({ id: "new-prompt", projectId: "alpha" }),
+        createdAt: at("2026-01-01"),
+        lastUserMessageAt: at("2026-01-05"),
+      },
+      {
+        ...createWorkspace({ id: "never-prompted", projectId: "beta" }),
+        createdAt: at("2026-01-04"),
+      },
+      {
+        ...createWorkspace({ id: "newest-prompt", projectId: "gamma" }),
+        createdAt: at("2026-01-01"),
+        lastUserMessageAt: at("2026-01-06"),
+      },
+    ]);
+
+    expect(selectRecentProjectIds(useSessionStore.getState(), SERVER_ID)).toEqual([
+      "gamma",
+      "alpha",
+      "beta",
+    ]);
+  });
+
+  it("is empty without a host", () => {
+    expect(selectRecentProjectIds(useSessionStore.getState(), null)).toEqual([]);
   });
 });
 

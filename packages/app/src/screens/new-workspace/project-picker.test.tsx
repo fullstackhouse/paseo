@@ -3,7 +3,7 @@
 import { act, renderHook } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import type { HostProjectListItem } from "@/projects/host-projects";
-import { useNewWorkspaceProjectPicker } from "./project-picker";
+import { resolveRecentProjectOptionIds, useNewWorkspaceProjectPicker } from "./project-picker";
 
 function project(input: {
   viewKey: string;
@@ -78,5 +78,57 @@ describe("useNewWorkspaceProjectPicker", () => {
     });
 
     expect(result.current.selectedProject).toEqual(manualProject);
+  });
+});
+
+describe("resolveRecentProjectOptionIds", () => {
+  const alpha = project({
+    viewKey: "alpha",
+    projectKey: "alpha",
+    projectId: "p-alpha",
+    projectName: "Alpha",
+  });
+  const beta = project({
+    viewKey: "beta",
+    projectKey: "beta",
+    projectId: "p-beta",
+    projectName: "Beta",
+  });
+  const gamma = project({
+    viewKey: "gamma",
+    projectKey: "gamma",
+    projectId: "p-gamma",
+    projectName: "Gamma",
+  });
+
+  it("keeps recency order, skips projects the picker doesn't offer, and caps the list", () => {
+    expect(
+      resolveRecentProjectOptionIds({
+        projects: [alpha, beta, gamma],
+        recentProjectIds: ["p-gamma", "p-hidden", "p-alpha", "p-beta"],
+        serverId: "host",
+        limit: 2,
+      }),
+    ).toEqual(["project:gamma", "project:alpha"]);
+  });
+
+  it("offers nothing when only one project is recent", () => {
+    expect(
+      resolveRecentProjectOptionIds({
+        projects: [alpha, beta],
+        recentProjectIds: ["p-alpha"],
+        serverId: "host",
+      }),
+    ).toEqual([]);
+  });
+
+  it("ignores projects that live on another host", () => {
+    expect(
+      resolveRecentProjectOptionIds({
+        projects: [alpha, beta],
+        recentProjectIds: ["p-alpha", "p-beta"],
+        serverId: "other-host",
+      }),
+    ).toEqual([]);
   });
 });

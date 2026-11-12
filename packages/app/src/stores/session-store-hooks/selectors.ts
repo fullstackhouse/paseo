@@ -307,6 +307,25 @@ export function selectRecommendedProjectPaths(
     .filter((path) => path.length > 0);
 }
 
+/** The host's project ids, most recently used first: by each project's latest prompt, or its newest workspace. */
+export function selectRecentProjectIds(state: SessionsSnapshot, serverId: string | null): string[] {
+  const workspaces = serverId ? state.sessions[serverId]?.workspaces : undefined;
+  if (!workspaces || workspaces.size === 0) {
+    return EMPTY_WORKSPACE_KEYS;
+  }
+  const latestByProjectId = new Map<string, number>();
+  for (const workspace of workspaces.values()) {
+    const time = (workspace.lastUserMessageAt ?? workspace.createdAt)?.getTime() ?? 0;
+    const latest = latestByProjectId.get(workspace.projectId);
+    if (latest === undefined || time > latest) {
+      latestByProjectId.set(workspace.projectId, time);
+    }
+  }
+  return Array.from(latestByProjectId)
+    .sort(([leftId, left], [rightId, right]) => right - left || leftId.localeCompare(rightId))
+    .map(([projectId]) => projectId);
+}
+
 export function selectProjectRootPaths(state: SessionsSnapshot, serverId: string | null): string[] {
   const projects = serverId ? state.sessions[serverId]?.projects : undefined;
   if (!projects || projects.size === 0) {
