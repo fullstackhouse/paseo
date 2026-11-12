@@ -266,3 +266,66 @@ export declare const Toggle: ComponentType<ToggleProps>;
 export declare function Select<Value extends string>(props: SelectProps<Value>): ReactNode;
 export declare const Action: ComponentType<ActionProps>;
 export declare function Combobox<Item extends ComboboxItem>(props: ComboboxProps<Item>): ReactNode;
+
+export interface PullRequestPanelCheck {
+  name: string;
+  status: "success" | "failure" | "pending" | "skipped" | "cancelled";
+  url: string;
+  workflow?: string;
+  timing?: string;
+}
+
+export interface PullRequestPanelActivity {
+  /** Unique across this pull request's reviews and comments. */
+  id: string;
+  kind: "review" | "comment";
+  author: string;
+  authorUrl?: string | null;
+  avatarUrl?: string | null;
+  body: string;
+  url: string;
+  /** ISO timestamp; the host orders activity and formats its age. */
+  createdAt: string;
+  reviewState?: "approved" | "changes_requested" | "commented";
+  /** Matches the parent review's activity id to nest this comment's thread. */
+  reviewId?: string;
+  threadId?: string;
+  threadIsResolved?: boolean;
+  location?: {
+    path: string;
+    line?: number;
+    startLine?: number;
+    threadId?: string;
+    isResolved?: boolean;
+    isOutdated?: boolean;
+  };
+}
+
+export interface PullRequestPanelData {
+  /** Forge id, such as "github" or "gitlab". Unknown ids use neutral labels. */
+  forge: string;
+  number: number;
+  title: string;
+  url: string;
+  state: "open" | "draft" | "merged" | "closed";
+  repoOwner?: string;
+  repoName?: string;
+  checks: PullRequestPanelCheck[];
+  activity: PullRequestPanelActivity[];
+}
+
+export interface PullRequestPanelProps {
+  data: PullRequestPanelData;
+  activityLoading?: boolean;
+  onRefresh?: () => void;
+  isRefreshing?: boolean;
+  /** Default true. Set false inside a parent scroll view. */
+  scrollable?: boolean;
+  /** Default true. Hide when the parent already names the pull request. */
+  showHeader?: boolean;
+  /** Optional freshness or commit label beside the shared toolbar actions. */
+  toolbarMeta?: ReactNode;
+}
+
+/** The Explorer's checks and activity UI with plugin-supplied data; no workspace or writes. */
+export declare const PullRequestPanel: ComponentType<PullRequestPanelProps>;

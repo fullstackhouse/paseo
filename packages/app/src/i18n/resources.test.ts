@@ -99,7 +99,7 @@ const untranslatedLocalFallbacks = [
 ] as const;
 
 const pullRequestPanelSources = [
-  "git/pull-request-panel/pane.tsx",
+  "git/pull-request-panel/view.tsx",
   "git/pull-request-panel/data.ts",
   "git/pull-request-panel/checks-section.tsx",
   "components/sidebar/sidebar-status-list.tsx",
