@@ -3,6 +3,7 @@ import type { ComboboxOption as ComboboxOptionType } from "@/components/ui/combo
 import { isWorkspaceArchivePending } from "@/contexts/session-workspace-upserts";
 import {
   filterWorkspaceProjectsForHost,
+  getHostProjectId,
   getHostProjectSourceDirectory,
   resolveInitialWorkspaceProject,
   type HostProjectListItem,
@@ -17,8 +18,14 @@ import {
   type ProjectSelection,
   type ProjectSelectionContext,
 } from "./project-selection";
+import {
+  useRecentProjects,
+  type RecentAgentSetup,
+  type RecentProjectActivity,
+} from "@/stores/session-store-hooks";
 
 const PROJECT_OPTION_PREFIX = "project:";
+const RECENT_PROJECT_LIMIT = 6;
 
 interface NewWorkspaceProjectPickerInput {
   selectedServerId: string;
@@ -34,6 +41,7 @@ interface NewWorkspaceProjectPickerState {
   selectedSourceDirectory: string | null;
   projectPickerOptions: ComboboxOptionType[];
   projectByOptionId: Map<string, HostProjectListItem>;
+  recentProjectChoices: RecentProjectChoice[];
   selectedProjectOptionId: string;
   projectTriggerLabel: string;
   handleSelectProjectOption: (id: string) => void;
@@ -51,6 +59,46 @@ function computeProjectOptionData(projects: readonly HostProjectListItem[]) {
     return { id, label: project.projectName };
   });
   return { options, projectByOptionId };
+}
+
+export interface RecentProjectChoice {
+  optionId: string;
+  project: HostProjectListItem;
+  lastUsedAt: number;
+  agentSetup: RecentAgentSetup | null;
+}
+
+/**
+ * The host's most recently used projects, newest first, each with the setup its latest agent ran
+ * with. Only projects the picker offers count, and the list is left empty when it would offer no
+ * choice beyond the picker.
+ */
+export function resolveRecentProjectChoices(input: {
+  projects: readonly HostProjectListItem[];
+  recentProjects: readonly RecentProjectActivity[];
+  serverId: string;
+  limit?: number;
+}): RecentProjectChoice[] {
+  const projectByHostProjectId = new Map<string, HostProjectListItem>();
+  for (const project of input.projects) {
+    const hostProjectId = getHostProjectId(project, input.serverId);
+    if (hostProjectId) projectByHostProjectId.set(hostProjectId, project);
+  }
+  const choices: RecentProjectChoice[] = [];
+  for (const recent of input.recentProjects) {
+    const project = projectByHostProjectId.get(recent.projectId);
+    if (!project) continue;
+    const optionId = projectOptionId(project.viewKey);
+    if (choices.some((choice) => choice.optionId === optionId)) continue;
+    choices.push({
+      optionId,
+      project,
+      lastUsedAt: recent.lastUsedAt,
+      agentSetup: recent.agentSetup,
+    });
+    if (choices.length === (input.limit ?? RECENT_PROJECT_LIMIT)) break;
+  }
+  return choices.length > 1 ? choices : [];
 }
 
 function resolveWorkspaceIdFromProjectWorkspaceKey(input: {
@@ -163,6 +211,16 @@ export function useNewWorkspaceProjectPicker({
     () => computeProjectOptionData(selectableProjects),
     [selectableProjects],
   );
+  const recentProjects = useRecentProjects(selectedServerId);
+  const recentProjectChoices = useMemo(
+    () =>
+      resolveRecentProjectChoices({
+        projects: selectableProjects,
+        recentProjects,
+        serverId: selectedServerId,
+      }),
+    [recentProjects, selectableProjects, selectedServerId],
+  );
   const handleSelectProjectOption = useCallback(
     (id: string) => {
       const project = projectByOptionId.get(id);
@@ -189,6 +247,7 @@ export function useNewWorkspaceProjectPicker({
       : null,
     projectPickerOptions,
     projectByOptionId,
+    recentProjectChoices,
     selectedProjectOptionId: selectedProject ? projectOptionId(selectedProject.viewKey) : "",
     projectTriggerLabel: selectedProject?.projectName ?? "Choose project",
     handleSelectProjectOption,

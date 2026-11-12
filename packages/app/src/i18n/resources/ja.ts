@@ -1431,6 +1431,7 @@ export const ja: TranslationResources = {
   },
   newWorkspace: {
     title: "新しいワークスペース",
+    recentProjects: "最近のプロジェクト",
     create: "作成",
     isolation: {
       local: "ローカル",
