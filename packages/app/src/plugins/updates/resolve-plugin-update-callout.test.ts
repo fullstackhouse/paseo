@@ -63,35 +63,31 @@ describe("resolvePluginUpdateCallout", () => {
     ).toBeNull();
   });
 
-  it("offers only the plugins with updates", () => {
-    const descriptor = resolvePluginUpdateCallout(input());
-    expect(descriptor).toMatchObject({
-      id: "plugin-updates:srv-1",
-      title: "Plugin updates available",
-      description: "paseo-asks can be updated.",
-      variant: "default",
-      actionLabel: "Update",
-      actionDisabled: false,
-    });
+  it("does not prompt before or during automatic updates", () => {
+    expect(resolvePluginUpdateCallout(input())).toBeNull();
+    expect(resolvePluginUpdateCallout(input({ isApplying: true }))).toBeNull();
+  });
+
+  it("identifies the host and retries only plugins with available updates", () => {
+    const descriptor = resolvePluginUpdateCallout(
+      input({ hostLabel: "MacBook", applyError: "build failed" }),
+    );
+    expect(descriptor?.description).toBe("MacBook: build failed");
     expect(descriptor?.proposals.map((proposal) => proposal.id)).toEqual(["paseo-asks"]);
   });
 
-  it("names the host when several are configured", () => {
-    expect(resolvePluginUpdateCallout(input({ hostLabel: "MacBook" }))?.description).toBe(
-      "paseo-asks on MacBook can be updated.",
-    );
-  });
-
   it("keys dismissal on the target, so a newer commit shows the callout again", () => {
-    const first = resolvePluginUpdateCallout(input());
+    const first = resolvePluginUpdateCallout(input({ applyError: "failed" }));
     const newer = resolvePluginUpdateCallout(
-      input({ previews: [gitPreview("paseo-asks", "c".repeat(40))] }),
+      input({ previews: [gitPreview("paseo-asks", "c".repeat(40))], applyError: "failed" }),
     );
     expect(first?.dismissalKey).not.toBe(newer?.dismissalKey);
   });
 
   it("disables the action while applying and offers retry after a failure", () => {
-    expect(resolvePluginUpdateCallout(input({ isApplying: true }))).toMatchObject({
+    expect(
+      resolvePluginUpdateCallout(input({ isApplying: true, applyError: "failed" })),
+    ).toMatchObject({
       actionLabel: "Updating...",
       actionDisabled: true,
     });
