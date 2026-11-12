@@ -3,7 +3,7 @@
 import { act, renderHook } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import type { HostProjectListItem } from "@/projects/host-projects";
-import { resolveRecentProjectOptionIds, useNewWorkspaceProjectPicker } from "./project-picker";
+import { resolveRecentProjectChoices, useNewWorkspaceProjectPicker } from "./project-picker";
 
 function project(input: {
   viewKey: string;
@@ -81,7 +81,7 @@ describe("useNewWorkspaceProjectPicker", () => {
   });
 });
 
-describe("resolveRecentProjectOptionIds", () => {
+describe("resolveRecentProjectChoices", () => {
   const alpha = project({
     viewKey: "alpha",
     projectKey: "alpha",
@@ -100,23 +100,43 @@ describe("resolveRecentProjectOptionIds", () => {
     projectId: "p-gamma",
     projectName: "Gamma",
   });
+  const setup = {
+    provider: "claude",
+    modelId: "opus",
+    modeId: "auto",
+    thinkingOptionId: "high",
+    featureValues: {},
+  };
+  const recent = (projectId: string, lastUsedAt = 1, agentSetup: typeof setup | null = null) => ({
+    projectId,
+    lastUsedAt,
+    agentSetup,
+  });
 
-  it("keeps recency order, skips projects the picker doesn't offer, and caps the list", () => {
+  it("keeps recency order and each project's setup, skips projects the picker doesn't offer, and caps the list", () => {
     expect(
-      resolveRecentProjectOptionIds({
+      resolveRecentProjectChoices({
         projects: [alpha, beta, gamma],
-        recentProjectIds: ["p-gamma", "p-hidden", "p-alpha", "p-beta"],
+        recentProjects: [
+          recent("p-gamma", 3, setup),
+          recent("p-hidden"),
+          recent("p-alpha", 2),
+          recent("p-beta"),
+        ],
         serverId: "host",
         limit: 2,
       }),
-    ).toEqual(["project:gamma", "project:alpha"]);
+    ).toEqual([
+      { optionId: "project:gamma", project: gamma, lastUsedAt: 3, agentSetup: setup },
+      { optionId: "project:alpha", project: alpha, lastUsedAt: 2, agentSetup: null },
+    ]);
   });
 
   it("offers nothing when only one project is recent", () => {
     expect(
-      resolveRecentProjectOptionIds({
+      resolveRecentProjectChoices({
         projects: [alpha, beta],
-        recentProjectIds: ["p-alpha"],
+        recentProjects: [recent("p-alpha")],
         serverId: "host",
       }),
     ).toEqual([]);
@@ -124,9 +144,9 @@ describe("resolveRecentProjectOptionIds", () => {
 
   it("ignores projects that live on another host", () => {
     expect(
-      resolveRecentProjectOptionIds({
+      resolveRecentProjectChoices({
         projects: [alpha, beta],
-        recentProjectIds: ["p-alpha", "p-beta"],
+        recentProjects: [recent("p-alpha"), recent("p-beta")],
         serverId: "other-host",
       }),
     ).toEqual([]);

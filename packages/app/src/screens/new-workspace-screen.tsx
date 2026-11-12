@@ -110,7 +110,8 @@ import { buildNewWorkspaceProjectIconTargets } from "./new-workspace/project-ico
 import { useNewWorkspaceProjectPicker } from "./new-workspace/project-picker";
 import { useNewWorkspaceForm } from "./new-workspace/form";
 import { ImportSessionButton } from "./new-workspace/import-session-button";
-import { RecentProjects } from "./new-workspace/form/recent-projects";
+import { RecentProjectCards } from "./new-workspace/recent-project-cards";
+import type { RecentProjectChoice } from "./new-workspace/project-picker";
 import { useImportSession } from "@/hooks/use-import-session";
 import {
   buildTerminalsQueryKey,
@@ -965,7 +966,7 @@ export function NewWorkspaceScreen({
     selectedSourceDirectory,
     projectPickerOptions,
     projectByOptionId,
-    recentProjectOptionIds,
+    recentProjectChoices,
     selectedProjectOptionId,
     projectTriggerLabel,
     handleSelectProjectOption: selectProjectOption,
@@ -1522,26 +1523,36 @@ export function NewWorkspaceScreen({
     },
   });
 
+  const chatComposerState = chatDraft.composerState;
+  // A card picks its project and the setup its last agent ran with, which the card shows.
+  const handleSelectRecentProject = useCallback(
+    (choice: RecentProjectChoice) => {
+      handleSelectProjectOption(choice.optionId);
+      if (choice.agentSetup) chatComposerState?.applyAgentSetup(choice.agentSetup);
+    },
+    [chatComposerState, handleSelectProjectOption],
+  );
   const recentProjects = useMemo(
     () => (
-      <RecentProjects
-        optionIds={recentProjectOptionIds}
-        projectByOptionId={projectByOptionId}
+      <RecentProjectCards
+        layout={isCompact ? "scroll" : "grid"}
+        serverId={selectedServerId}
+        choices={recentProjectChoices}
         iconDataByProjectViewKey={projectIconDataByProjectViewKey}
         selectedOptionId={selectedProjectOptionId}
         disabled={isPending}
-        onSelect={handleSelectProjectOption}
-        style={isCompact ? styles.compactRecentProjects : undefined}
+        onSelect={handleSelectRecentProject}
+        style={isCompact ? styles.compactRecentProjects : styles.wideRecentProjects}
       />
     ),
     [
-      handleSelectProjectOption,
+      handleSelectRecentProject,
       isCompact,
       isPending,
-      projectByOptionId,
       projectIconDataByProjectViewKey,
-      recentProjectOptionIds,
+      recentProjectChoices,
       selectedProjectOptionId,
+      selectedServerId,
     ],
   );
 
@@ -1660,7 +1671,7 @@ function NewWorkspaceLayout({
   /** The composer covers the screen; the header leaves and the dock fills the content. */
   fullscreen: boolean;
   title: string;
-  /** Quick picks for the project, under the title; renders nothing when there are none. */
+  /** Recent project cards: under the composer when wide, above the fields when compact. */
   recentProjects: ReactNode;
   formStack: ReactNode;
   onImportSession: () => void;
@@ -1678,11 +1689,8 @@ function NewWorkspaceLayout({
     </>
   ) : (
     <>
-      <View style={styles.composerHeader}>
-        <View style={styles.composerTitleContainer} pointerEvents="none">
-          <Text style={styles.composerTitle}>{title}</Text>
-        </View>
-        {recentProjects}
+      <View style={styles.composerTitleContainer} pointerEvents="none">
+        <Text style={styles.composerTitle}>{title}</Text>
       </View>
       {formStack}
     </>
@@ -1699,6 +1707,7 @@ function NewWorkspaceLayout({
           <>
             {children}
             {isCompact || fullscreen ? null : importSessionButton}
+            {isCompact || fullscreen ? null : recentProjects}
           </>
         </ComposerDock>
       </View>
@@ -1719,19 +1728,20 @@ const styles = StyleSheet.create((theme) => ({
   compactSetupSpace: {
     flex: 1,
   },
-  // Title and recent projects form one header; its bottom gap leaves the field badges' tooltips
-  // room to open upward without covering the recent projects.
-  composerHeader: {
-    marginBottom: theme.spacing[8],
-    gap: theme.spacing[3],
-  },
   composerTitleContainer: {
+    marginBottom: theme.spacing[8],
     paddingLeft: theme.spacing[6],
     paddingRight: theme.spacing[4],
   },
-  // Replaces the row's focus-ring bleed; with its inner inset, the gap to the fields is spacing[3].
+  // On the composer's inset, like the Import session pill above it.
+  wideRecentProjects: {
+    marginTop: theme.spacing[8],
+    paddingHorizontal: theme.spacing[4],
+  },
+  // On the compact fields' inset; the cards' row bleeds back out to the screen edges.
   compactRecentProjects: {
-    marginBottom: theme.spacing[2],
+    marginBottom: theme.spacing[4],
+    paddingHorizontal: theme.spacing[4],
   },
   composerTitle: {
     fontSize: theme.fontSize["2xl"],

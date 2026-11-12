@@ -11,7 +11,7 @@ import {
   selectHasWorkspaces,
   selectProjectOrder,
   selectProjectRootPaths,
-  selectRecentProjectIds,
+  selectRecentProjects,
   selectRecommendedProjectPaths,
   selectWorkspace,
   selectWorkspaceDirectory,
@@ -20,6 +20,7 @@ import {
   selectWorkspaceKeys,
   selectWorkspaceStatusesForBadges,
   workspaceEqualityFns,
+  type RecentProjectActivity,
   type WorkspaceStructure,
 } from "./selectors";
 import { useSessionStore, type WorkspaceDescriptor } from "../session-store";
@@ -31,6 +32,8 @@ import type { DesktopBadgeWorkspaceStatus } from "@/utils/desktop-badge-state";
 
 export type {
   DesktopBadgeWorkspaceStatus,
+  RecentAgentSetup,
+  RecentProjectActivity,
   WorkspaceStructure,
   WorkspaceStructureProject,
 } from "./selectors";
@@ -157,10 +160,10 @@ export function useProjectRootPaths(serverId: string | null): string[] {
   );
 }
 
-export function useRecentProjectIds(serverId: string | null): string[] {
+export function useRecentProjects(serverId: string | null): RecentProjectActivity[] {
   return useStoreWithEqualityFn(
     useSessionStore,
-    (state) => selectRecentProjectIds(state, serverId),
+    (state) => selectRecentProjects(state, serverId),
     workspaceEqualityFns.deep,
   );
 }

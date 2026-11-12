@@ -18,10 +18,14 @@ import {
   type ProjectSelection,
   type ProjectSelectionContext,
 } from "./project-selection";
-import { useRecentProjectIds } from "@/stores/session-store-hooks";
+import {
+  useRecentProjects,
+  type RecentAgentSetup,
+  type RecentProjectActivity,
+} from "@/stores/session-store-hooks";
 
 const PROJECT_OPTION_PREFIX = "project:";
-const RECENT_PROJECT_LIMIT = 5;
+const RECENT_PROJECT_LIMIT = 6;
 
 interface NewWorkspaceProjectPickerInput {
   selectedServerId: string;
@@ -37,7 +41,7 @@ interface NewWorkspaceProjectPickerState {
   selectedSourceDirectory: string | null;
   projectPickerOptions: ComboboxOptionType[];
   projectByOptionId: Map<string, HostProjectListItem>;
-  recentProjectOptionIds: string[];
+  recentProjectChoices: RecentProjectChoice[];
   selectedProjectOptionId: string;
   projectTriggerLabel: string;
   handleSelectProjectOption: (id: string) => void;
@@ -57,30 +61,44 @@ function computeProjectOptionData(projects: readonly HostProjectListItem[]) {
   return { options, projectByOptionId };
 }
 
+export interface RecentProjectChoice {
+  optionId: string;
+  project: HostProjectListItem;
+  lastUsedAt: number;
+  agentSetup: RecentAgentSetup | null;
+}
+
 /**
- * Option ids of the host's most recently used projects, newest first. Only projects the picker
- * offers count, and the list is left empty when it would offer no choice beyond the picker.
+ * The host's most recently used projects, newest first, each with the setup its latest agent ran
+ * with. Only projects the picker offers count, and the list is left empty when it would offer no
+ * choice beyond the picker.
  */
-export function resolveRecentProjectOptionIds(input: {
+export function resolveRecentProjectChoices(input: {
   projects: readonly HostProjectListItem[];
-  recentProjectIds: readonly string[];
+  recentProjects: readonly RecentProjectActivity[];
   serverId: string;
   limit?: number;
-}): string[] {
+}): RecentProjectChoice[] {
   const projectByHostProjectId = new Map<string, HostProjectListItem>();
   for (const project of input.projects) {
     const hostProjectId = getHostProjectId(project, input.serverId);
     if (hostProjectId) projectByHostProjectId.set(hostProjectId, project);
   }
-  const optionIds: string[] = [];
-  for (const projectId of input.recentProjectIds) {
-    const project = projectByHostProjectId.get(projectId);
+  const choices: RecentProjectChoice[] = [];
+  for (const recent of input.recentProjects) {
+    const project = projectByHostProjectId.get(recent.projectId);
     if (!project) continue;
     const optionId = projectOptionId(project.viewKey);
-    if (!optionIds.includes(optionId)) optionIds.push(optionId);
-    if (optionIds.length === (input.limit ?? RECENT_PROJECT_LIMIT)) break;
+    if (choices.some((choice) => choice.optionId === optionId)) continue;
+    choices.push({
+      optionId,
+      project,
+      lastUsedAt: recent.lastUsedAt,
+      agentSetup: recent.agentSetup,
+    });
+    if (choices.length === (input.limit ?? RECENT_PROJECT_LIMIT)) break;
   }
-  return optionIds.length > 1 ? optionIds : [];
+  return choices.length > 1 ? choices : [];
 }
 
 function resolveWorkspaceIdFromProjectWorkspaceKey(input: {
@@ -193,15 +211,15 @@ export function useNewWorkspaceProjectPicker({
     () => computeProjectOptionData(selectableProjects),
     [selectableProjects],
   );
-  const recentProjectIds = useRecentProjectIds(selectedServerId);
-  const recentProjectOptionIds = useMemo(
+  const recentProjects = useRecentProjects(selectedServerId);
+  const recentProjectChoices = useMemo(
     () =>
-      resolveRecentProjectOptionIds({
+      resolveRecentProjectChoices({
         projects: selectableProjects,
-        recentProjectIds,
+        recentProjects,
         serverId: selectedServerId,
       }),
-    [recentProjectIds, selectableProjects, selectedServerId],
+    [recentProjects, selectableProjects, selectedServerId],
   );
   const handleSelectProjectOption = useCallback(
     (id: string) => {
@@ -229,7 +247,7 @@ export function useNewWorkspaceProjectPicker({
       : null,
     projectPickerOptions,
     projectByOptionId,
-    recentProjectOptionIds,
+    recentProjectChoices,
     selectedProjectOptionId: selectedProject ? projectOptionId(selectedProject.viewKey) : "",
     projectTriggerLabel: selectedProject?.projectName ?? "Choose project",
     handleSelectProjectOption,
