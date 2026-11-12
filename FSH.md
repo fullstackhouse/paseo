@@ -6,6 +6,8 @@ temporary by design: every patch is meant to go upstream and then drop out of `f
 
 ## Patches on `fsh`
 
+- FSH-only: don't automatically show the worktree scripts setup callout; configure scripts in project settings.
+
 - FSH-only (not upstream yet): plugin Markdown supports inline review annotations with source line ranges and advertises `supportsBlockAnnotations`. Inbox and Asks use the shared renderer, including Mermaid diagrams; older hosts show update guidance for annotated documents.
 
 - getpaseo/paseo#7692: Cmd+Shift+[ / ] for previous/next tab on macOS desktop
