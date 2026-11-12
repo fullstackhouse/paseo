@@ -153,8 +153,9 @@ content also requests timeline data. Inactive consumers read cached data without
 Discovery uses ordinary PR tabs and their existing once-per-workspace close opt-out.
 
 Overview is an Explorer-only singleton tab that summarizes the workspace on desktop
-(`packages/app/src/panels/overview-panel.tsx`): a next step, the focused agent, plugin workspace summary
-items, the branch and its changes, and the pull request. The next step reuses the attention items above:
+(`packages/app/src/panels/overview-panel.tsx`): a next step, the focused agent and its lineage, plugin workspace summary
+items, the branch and its changes, and the pull request. Inline lineage reuses the Lineage tab’s
+relative rows and navigation without repeating the focused agent or nesting a scroll view. The next step reuses the attention items above:
 permission, plugin and failed items come first, then a running agent shows no action, then failing checks.
 Otherwise it renders the header's `GitActionsSplitButton` with the same `useGitActions` result, so the two
 can't disagree. Entering a workspace adds the tab once, first in the rail. Like Files and Changes it
