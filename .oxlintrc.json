@@ -608,7 +608,7 @@
         "packages/app/src/git/diff-pane.tsx",
         "packages/app/src/git/forges/gitlab.view.tsx",
         "packages/app/src/git/pull-request-panel/checks-section.tsx",
-        "packages/app/src/git/pull-request-panel/pane.tsx",
+        "packages/app/src/git/pull-request-panel/view.tsx",
         "packages/app/src/git/pull-request-panel/section-kit.tsx",
         "packages/app/src/hosts/host-chooser.tsx",
         "packages/app/src/mobile-panels/presentation.tsx",
