@@ -18,7 +18,7 @@ export type ReportedWorkLookup =
 export function foldReportedWork(items: readonly WorkspaceSummaryItem[]): ReportedWork | null {
   let result: ReportedWork | null = null;
   for (const item of items) {
-    if (item.needsYou) return "needs_you";
+    if (item.needsYou || item.workState === "waiting") return "needs_you";
     if (item.workState === "working") result = "working";
     else if (item.workState === "done" && result === null) result = "done";
   }

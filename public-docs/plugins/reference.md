@@ -896,23 +896,23 @@ Hosts older than this API have no `addWorkspaceRowItem`; check for it before cal
 host what the plugin knows about one workspace. Register one per workspace and keep it current with
 `update(patch)`; `remove()` drops it, and stopping the plugin removes all of them.
 
-| Field       | Meaning                                                                                                                         |
-| ----------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| `title`     | The item's name, such as "Asks".                                                                                                |
-| `label`     | Optional short text, such as "2 waiting on you".                                                                                |
-| `count`     | Optional number.                                                                                                                |
-| `needsYou`  | True while something in the workspace waits on the human.                                                                       |
-| `key`       | Identifies what waits, such as the newest item's id. Change it when something new arrives.                                      |
-| `panelId`   | Optional. A workspace panel of this plugin, registered with `locations` including `explorer`.                                   |
-| `workState` | Optional, experimental. `"working"` or `"done"`: where the workspace's work stands, as its agent reported it. `null` clears it. |
+| Field       | Meaning                                                                                                                                      |
+| ----------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `title`     | The item's name, such as "Asks".                                                                                                             |
+| `label`     | Optional short text, such as "2 waiting on you".                                                                                             |
+| `count`     | Optional number.                                                                                                                             |
+| `needsYou`  | True while something in the workspace waits on the human.                                                                                    |
+| `key`       | Identifies what waits, such as the newest item's id. Change it when something new arrives.                                                   |
+| `panelId`   | Optional. A workspace panel of this plugin, registered with `locations` including `explorer`.                                                |
+| `workState` | Optional, experimental. `"waiting"`, `"working"` or `"done"`: where the workspace's work stands, as its agent reported it. `null` clears it. |
 
 On desktop, entering a workspace opens Explorer for an item with `needsYou` whose `key` the user
 hasn't seen there, on `panelId`, when **Open Explorer when entering a workspace** allows it. A `key`
 that was present when the user hid Explorer doesn't open it again; a new `key` does.
 
 With **Grouping > Agent-reported status (beta)** on in the sidebar's display menu, an idle workspace
-is grouped by its summary items instead of by whether its last turn was read: any `needsYou` puts it
-in Ready to review, otherwise any `workState: "working"` in Working, otherwise `"done"` in Done. A
+is grouped by its summary items instead of by whether its last turn was read: any `needsYou`
+or `workState: "waiting"` puts it in Ready to review, otherwise any `workState: "working"` in Working, otherwise `"done"` in Done. A
 running agent, a failure or a permission prompt still wins. Workspaces with no `needsYou` and no
 `workState` keep the usual grouping.
 

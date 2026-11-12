@@ -45,7 +45,9 @@ function cleanState(patch: PluginWorkspaceSummaryItemState): PluginWorkspaceSumm
   if (patch.panelId !== undefined) state.panelId = patch.panelId.trim() || undefined;
   if (patch.workState !== undefined) {
     state.workState =
-      patch.workState === "working" || patch.workState === "done" ? patch.workState : undefined;
+      patch.workState === "waiting" || patch.workState === "working" || patch.workState === "done"
+        ? patch.workState
+        : undefined;
   }
   return state;
 }

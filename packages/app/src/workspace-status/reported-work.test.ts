@@ -22,6 +22,9 @@ describe("foldReportedWork", () => {
     expect(foldReportedWork([])).toBeNull();
     expect(foldReportedWork([item({ count: 1 })])).toBeNull();
     expect(foldReportedWork([item({ workState: "done" })])).toBe("done");
+    expect(foldReportedWork([item({ workState: "working" }), item({ workState: "waiting" })])).toBe(
+      "needs_you",
+    );
     expect(foldReportedWork([item({ workState: "done" }), item({ workState: "working" })])).toBe(
       "working",
     );

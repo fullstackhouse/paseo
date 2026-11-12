@@ -143,7 +143,7 @@ export interface PluginWorkspaceSummaryItemState {
   workState?: PluginWorkspaceWorkState | null;
 }
 
-export type PluginWorkspaceWorkState = "working" | "done";
+export type PluginWorkspaceWorkState = "waiting" | "working" | "done";
 
 /**
  * One fact about a workspace, set per workspace. The host uses `needsYou` to decide whether entering
