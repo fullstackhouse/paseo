@@ -192,7 +192,7 @@ paseo plugin install github:owner/repository --ref main
 
 Append `:relative/path` for a plugin below the repository root. `--ref` chooses the initial
 branch, tag, or commit once. Updates of explicit Git sources resolve the remote's default HEAD
-and ask for approval. `ls` reports the installed commit without contacting the remote.
+automatically while the app is connected. `ls` reports the installed commit without contacting the remote.
 
 ## Managed source ownership
 
@@ -220,6 +220,10 @@ returns update-client guidance. Basic management remains independently available
 Preview returns exact targets and expected installed identity/root/revision. Apply validates those
 values, acquires the displayed artifact or commit, then rechecks state before activation. No review
 session is stored in the daemon. PluginService owns activation/recovery and independent bulk results.
+
+The app checks managed plugin sources on connection, every 30 minutes, and after catalog changes.
+Updates apply without confirmation; directory sources stay untouched. Failed updates show a retry
+callout. Each proposal is attempted once per app session to avoid retry loops after failures.
 
 ### Declare Git preparation
 

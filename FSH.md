@@ -8,6 +8,8 @@ temporary by design: every patch is meant to go upstream and then drop out of `f
 
 - FSH-only (upstreamable): plugins can render the Explorer pull-request panel through `PullRequestPanel`, using their own checks and activity data without a workspace checkout. Inbox uses it for its read-only GitHub tab.
 
+- FSH-only: don't automatically show the worktree scripts setup callout; configure scripts in project settings.
+
 - FSH-only (not upstream yet): plugin Markdown supports inline review annotations with source line ranges and advertises `supportsBlockAnnotations`. Inbox and Asks use the shared renderer, including Mermaid diagrams; older hosts show update guidance for annotated documents.
 
 - getpaseo/paseo#7692: Cmd+Shift+[ / ] for previous/next tab on macOS desktop
@@ -34,7 +36,7 @@ temporary by design: every patch is meant to go upstream and then drop out of `f
 - FSH-only (upstreamable): workspace diffs show unpushed and behind counts (`↑1 ↓327`) in the composer pill and the Changes header, opening a sync card (upstream, uncommitted files, unpushed commits, commits to pull, next step); a branch both ahead and behind its remote offers Pull and push as the primary action
 - FSH-only (upstreamable): WebSocket upgrades through the service proxy reach the workspace service instead of getting a 400 from the daemon's own `/ws` server, so worktree web apps opened by proxy URL stop reload-looping
 - FSH-only (not upstream yet): `app-main` worktree service runs the branch's web app against your main daemon, to review UI changes with real workspaces and no restart
-- FSH-only (upstreamable): a sidebar callout offers plugin updates per host and applies them in place, using the daemon's reviewed update preview/apply. Directory-installed plugins never show up there
+- FSH-only (upstreamable): the app automatically applies plugin updates per connected host using the daemon's validated preview/apply. Only failures show a sidebar retry callout; directory-installed plugins stay untouched
 - FSH-only (upstreamable): plugin timeline items and button popovers get `navigation` (`openAgent`, `openWorkspace`, `openBrowser`), like screens and panels, so a plugin card in the chat can open the agent it just created
 
 - FSH-only (upstreamable): agents whose turn a daemon restart or crash cut short are marked interrupted; the sidebar then offers **Resume all**. It is the manual side of upstream's restart recovery: the same agents, and the same prompt (Host settings → Agents, default `Resume working.`), which upstream sends by itself only when you turn recovery on
