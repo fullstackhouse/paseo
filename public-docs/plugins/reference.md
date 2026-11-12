@@ -977,6 +977,38 @@ export function IssueActions({ theme }: PluginSurfaceProps) {
 }
 ```
 
+### Pull request checks and activity
+
+Import `PullRequestPanel` from `@getpaseo/plugin/client/ui` to render the same checks,
+reviews and discussion threads as the Explorer PR tab. Supply `PullRequestPanelData`
+from your plugin RPC; the component does not fetch data or require a workspace.
+It has no posting, resolving or chat-attachment actions.
+
+```tsx
+<PullRequestPanel
+  data={pullRequest}
+  onRefresh={refresh}
+  isRefreshing={refreshing}
+  scrollable={false}
+  showHeader={false}
+/>
+```
+
+Use `scrollable={false}` inside your screen's scroll view. Hide the header when the
+screen already names the PR; the toolbar's external link remains visible. You can
+place a freshness or commit label in `toolbarMeta`. Keep initial loading and fetch
+errors in your screen, and pass `activityLoading` when only activity is pending.
+
+Supply activity timestamps as ISO strings in `createdAt`; the host sorts entries and
+formats their age. Use unique activity IDs. A comment's `reviewId` must match its
+parent review's activity ID to nest its thread under that review. Share a `threadId`
+among replies and provide `location.isResolved` / `location.isOutdated` for file
+threads (or `threadIsResolved` for discussions without a file). The host owns their
+collapse state, Markdown, avatars and status styling.
+
+The export requires a host build with `PullRequestPanel`. On older hosts, show update
+guidance when the export is absent; do not substitute a separate renderer.
+
 ### Markdown
 
 Import `Markdown` from `@getpaseo/plugin/client/ui` to render a string with Paseo's

@@ -10,6 +10,8 @@ import {
   mapPipelineStatus,
 } from "@/git/forges/gitlab";
 import { i18n } from "@/i18n/i18next";
+import { mapPluginPullRequest } from "@/plugins/react-native/pull-request-data";
+import { buildPrTimeline } from "./timeline";
 import { IDENTITY_COLOR_NAMES, identityColor } from "@/styles/identity-colors";
 import {
   deriveAvatarColor,
@@ -814,5 +816,68 @@ describe("getActivityVerbKey", () => {
   ] as const)("labels %o as %s, and %s in French", (item, englishVerb, frenchVerb) => {
     expect(english(getActivityVerbKey(item))).toBe(englishVerb);
     expect(french(getActivityVerbKey(item))).toBe(frenchVerb);
+  });
+});
+
+describe("plugin pull request data", () => {
+  it("orders replies and nests threads beneath their review without plugin presentation fields", () => {
+    const comment = {
+      kind: "comment" as const,
+      author: "alex",
+      body: "Check this",
+      url: "https://github.com/acme/repo/pull/42#discussion",
+      reviewId: "review:1",
+      threadId: "thread:1",
+      location: { path: "src/file.ts", line: 12, isResolved: true, isOutdated: false },
+    };
+    const data = mapPluginPullRequest(
+      {
+        forge: "github",
+        number: 42,
+        title: "Plugin review",
+        url: "https://github.com/acme/repo/pull/42",
+        state: "open",
+        checks: [
+          { name: "build", status: "failure", url: "https://github.com/acme/repo/actions/1" },
+        ],
+        activity: [
+          { ...comment, id: "reply", createdAt: "2026-11-12T10:02:00Z" },
+          { ...comment, id: "root", createdAt: "2026-11-12T10:01:00Z" },
+          {
+            id: "review:1",
+            kind: "review",
+            author: "alex",
+            body: "",
+            url: "https://github.com/acme/repo/pull/42#review",
+            reviewState: "approved",
+            createdAt: "2026-11-12T10:00:00Z",
+          },
+        ],
+      },
+      Date.parse("2026-11-12T10:03:00Z"),
+    );
+    expect(data.activity.map(({ id, age }) => ({ id, age }))).toEqual([
+      { id: "review:1", age: "3m ago" },
+      { id: "root", age: "2m ago" },
+      { id: "reply", age: "1m ago" },
+    ]);
+    expect(data.activity[0].avatarColor).toBe(deriveAvatarColor("alex"));
+    expect(data.checks[0].provider).toBe("github");
+    expect(buildPrTimeline(data.activity)).toEqual([
+      {
+        kind: "review",
+        id: "review:1",
+        review: data.activity[0],
+        threads: [
+          {
+            kind: "thread",
+            id: "thread:thread:1",
+            location: comment.location,
+            isResolved: true,
+            comments: [data.activity[1], data.activity[2]],
+          },
+        ],
+      },
+    ]);
   });
 });

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useState, type ReactNode } from "react";
 import { Image, Pressable, ScrollView, Text, View, type ViewStyle } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import {
@@ -199,11 +199,6 @@ export function PullRequestPane({
   workspaceAttachmentScopeKey?: string;
 }) {
   const { t } = useTranslation();
-  const isCompact = useIsCompactFormFactor();
-  const toolbarRefreshButtonStyle = useCallback(
-    (state: PressableStateCallbackType) => refreshButtonStyle(state, isCompact),
-    [isCompact],
-  );
   const toast = useToast();
   const daemonClient = useHostRuntimeClient(serverId);
   // COMPAT(githubCheckDetailsRpc): recognize the legacy capability on daemons
@@ -221,14 +216,7 @@ export function PullRequestPane({
   const addWorkspaceAttachment = useWorkspaceAttachmentsStore(
     (state) => state.addWorkspaceAttachment,
   );
-  const [checksOpen, setChecksOpen] = useState(true);
-  const [activityOpen, setActivityOpen] = useState(true);
-  const [activityState, setActivityState] = useState(getActivityState);
   const [loadingCheckKeys, setLoadingCheckKeys] = useState<ReadonlySet<string>>(() => new Set());
-
-  const handleOpenPrUrl = useCallback(() => {
-    void openExternalUrl(data.url);
-  }, [data.url]);
 
   const refreshSupported = useSessionStore(
     (state) => state.sessions[serverId]?.serverInfo?.features?.checkoutRefresh === true,
@@ -247,40 +235,6 @@ export function PullRequestPane({
       toast.error(error instanceof Error ? error.message : t("workspace.git.diff.failedRefresh"));
     });
   }, [cwd, isRefreshing, runRefresh, serverId, t, toast]);
-
-  const handleToggleChecks = useCallback(() => {
-    setChecksOpen((open) => !open);
-  }, []);
-
-  const handleToggleActivity = useCallback(() => {
-    setActivityOpen((open) => !open);
-  }, []);
-
-  const approvals = data.activity.filter(
-    (item) => item.kind === "review" && item.reviewState === "approved",
-  ).length;
-  const changesRequested = data.activity.filter(
-    (item) => item.kind === "review" && item.reviewState === "changes_requested",
-  ).length;
-  const commentCount = data.activity.filter(
-    (item) =>
-      item.kind === "comment" || (item.kind === "review" && item.reviewState === "commented"),
-  ).length;
-
-  const timelineEntries = useMemo(() => buildPrTimeline(data.activity), [data.activity]);
-  const visibleEntries = useMemo(
-    () =>
-      getVisibleEntries(activityState, {
-        prNumber: data.number,
-        entries: timelineEntries,
-      }),
-    [activityState, data.number, timelineEntries],
-  );
-  const collapsedEntryIds = useMemo(
-    () => getCollapsedEntryIds(activityState, { prNumber: data.number, entries: timelineEntries }),
-    [activityState, data.number, timelineEntries],
-  );
-  const attachEnabled = workspaceAttachmentScopeKey !== undefined;
 
   const handleAddActivityToChat = useCallback(
     (activity: PrPaneActivity) => {
@@ -345,25 +299,6 @@ export function PullRequestPane({
       workspaceAttachmentScopeKey,
     ],
   );
-
-  const handleAddAllToChat = useCallback(() => {
-    for (const { entry } of visibleEntries) {
-      if (entry.kind === "single") {
-        handleAddActivityToChat(entry.activity);
-        continue;
-      }
-      if (entry.kind === "review") {
-        handleAddActivityToChat(entry.review);
-      }
-      const threads = entry.kind === "thread" ? [entry] : entry.threads;
-      for (const thread of threads) {
-        if (thread.isResolved === true) {
-          continue;
-        }
-        handleAddThreadToChat(thread);
-      }
-    }
-  }, [handleAddActivityToChat, handleAddThreadToChat, visibleEntries]);
 
   const handleAddCheckLogsToChat = useCallback(
     async (check: PrPaneCheck) => {
@@ -442,6 +377,171 @@ export function PullRequestPane({
     ],
   );
 
+  // Native forge surfaces (e.g. GitLab approvals/pipeline) come from a registry
+  // keyed by the facts-family, so the central render has no per-forge branch.
+  const nativeContribution = resolvePaneContribution(data.forgeSpecific);
+  const nativeHeaderMeta = data.forgeSpecific
+    ? nativeContribution?.renderHeaderMeta(data.forgeSpecific)
+    : null;
+  const renderNativeChecks = useCallback(
+    (state: { open: boolean; onToggle(): void }) =>
+      data.forgeSpecific
+        ? nativeContribution?.renderChecksSection(data.forgeSpecific, {
+            serverId,
+            cwd,
+            changeRequestNumber: data.number,
+            ...state,
+            enabled: forgeProvidersEnabled,
+            canFetchCheckDetails: canFetchForgeCheckDetails,
+          })
+        : null,
+    [
+      data.forgeSpecific,
+      data.number,
+      nativeContribution,
+      serverId,
+      cwd,
+      forgeProvidersEnabled,
+      canFetchForgeCheckDetails,
+    ],
+  );
+  const attachments = useMemo(
+    () =>
+      workspaceAttachmentScopeKey
+        ? {
+            loadingCheckKeys,
+            addActivity: handleAddActivityToChat,
+            addThread: handleAddThreadToChat,
+            addCheck: handleAddCheckLogsToChat,
+          }
+        : undefined,
+    [
+      workspaceAttachmentScopeKey,
+      loadingCheckKeys,
+      handleAddActivityToChat,
+      handleAddThreadToChat,
+      handleAddCheckLogsToChat,
+    ],
+  );
+
+  return (
+    <PullRequestPaneView
+      data={data}
+      activityLoading={activityLoading}
+      onRefresh={refreshSupported ? handleRefresh : undefined}
+      isRefreshing={isRefreshing}
+      nativeHeaderMeta={nativeHeaderMeta}
+      renderNativeChecks={renderNativeChecks}
+      attachments={attachments}
+    />
+  );
+}
+
+export interface PullRequestPaneViewProps {
+  data: PrPaneData;
+  activityLoading?: boolean;
+  onRefresh?: () => void;
+  isRefreshing?: boolean;
+  scrollable?: boolean;
+  showHeader?: boolean;
+  toolbarMeta?: ReactNode;
+  nativeHeaderMeta?: ReactNode;
+  renderNativeChecks?: (state: { open: boolean; onToggle(): void }) => ReactNode;
+  attachments?: {
+    loadingCheckKeys: ReadonlySet<string>;
+    addActivity(activity: PrPaneActivity): void;
+    addThread(thread: PrThreadEntry): void;
+    addCheck(check: PrPaneCheck): void;
+  };
+}
+
+const EMPTY_ATTACHMENTS: NonNullable<PullRequestPaneViewProps["attachments"]> = {
+  loadingCheckKeys: new Set(),
+  addActivity() {},
+  addThread() {},
+  addCheck() {},
+};
+
+/** Shared PR presentation; checkout operations stay in the Explorer wrapper. */
+export function PullRequestPaneView({
+  data,
+  activityLoading = false,
+  onRefresh,
+  isRefreshing = false,
+  scrollable = true,
+  showHeader = true,
+  toolbarMeta,
+  nativeHeaderMeta,
+  renderNativeChecks,
+  attachments,
+}: PullRequestPaneViewProps) {
+  const { t } = useTranslation();
+  const [checksOpen, setChecksOpen] = useState(true);
+  const [activityOpen, setActivityOpen] = useState(true);
+  const [activityState, setActivityState] = useState(getActivityState);
+  const handleOpenPrUrl = useCallback(() => {
+    void openExternalUrl(data.url);
+  }, [data.url]);
+
+  const handleToggleChecks = useCallback(() => {
+    setChecksOpen((open) => !open);
+  }, []);
+
+  const handleToggleActivity = useCallback(() => {
+    setActivityOpen((open) => !open);
+  }, []);
+
+  const approvals = data.activity.filter(
+    (item) => item.kind === "review" && item.reviewState === "approved",
+  ).length;
+  const changesRequested = data.activity.filter(
+    (item) => item.kind === "review" && item.reviewState === "changes_requested",
+  ).length;
+  const commentCount = data.activity.filter(
+    (item) =>
+      item.kind === "comment" || (item.kind === "review" && item.reviewState === "commented"),
+  ).length;
+
+  const timelineEntries = useMemo(() => buildPrTimeline(data.activity), [data.activity]);
+  const visibleEntries = useMemo(
+    () =>
+      getVisibleEntries(activityState, {
+        prNumber: data.number,
+        entries: timelineEntries,
+      }),
+    [activityState, data.number, timelineEntries],
+  );
+  const collapsedEntryIds = useMemo(
+    () => getCollapsedEntryIds(activityState, { prNumber: data.number, entries: timelineEntries }),
+    [activityState, data.number, timelineEntries],
+  );
+
+  const attachEnabled = attachments !== undefined;
+  const {
+    addActivity: handleAddActivityToChat,
+    addThread: handleAddThreadToChat,
+    addCheck: handleAddCheckLogsToChat,
+    loadingCheckKeys,
+  } = attachments ?? EMPTY_ATTACHMENTS;
+  const handleAddAllToChat = useCallback(() => {
+    for (const { entry } of visibleEntries) {
+      if (entry.kind === "single") {
+        handleAddActivityToChat(entry.activity);
+        continue;
+      }
+      if (entry.kind === "review") {
+        handleAddActivityToChat(entry.review);
+      }
+      const threads = entry.kind === "thread" ? [entry] : entry.threads;
+      for (const thread of threads) {
+        if (thread.isResolved === true) {
+          continue;
+        }
+        handleAddThreadToChat(thread);
+      }
+    }
+  }, [handleAddActivityToChat, handleAddThreadToChat, visibleEntries]);
+
   const handleToggleEntryCollapsed = useCallback(
     (entryId: string, collapsed: boolean) => {
       setActivityState((current) => {
@@ -452,6 +552,185 @@ export function PullRequestPane({
     [data.number],
   );
 
+  const forgePresentation = getForgePresentation(data.forge);
+
+  const nativeChecksSection = renderNativeChecks?.({
+    open: checksOpen,
+    onToggle: handleToggleChecks,
+  });
+
+  const content = (
+    <>
+      <PullRequestToolbar
+        onOpen={handleOpenPrUrl}
+        onRefresh={onRefresh}
+        isRefreshing={isRefreshing}
+        brandLabel={forgePresentation.brandLabel}
+        meta={toolbarMeta}
+      />
+
+      {showHeader ? (
+        <PullRequestHeader
+          data={data}
+          onOpen={handleOpenPrUrl}
+          nativeHeaderMeta={nativeHeaderMeta}
+        />
+      ) : null}
+
+      {nativeChecksSection ?? (
+        <ChecksSection
+          checks={data.checks}
+          open={checksOpen}
+          onToggle={handleToggleChecks}
+          attachEnabled={attachEnabled}
+          loadingCheckKeys={loadingCheckKeys}
+          onAddLogsToChat={handleAddCheckLogsToChat}
+        />
+      )}
+
+      <View style={styles.divider} />
+
+      <Section
+        title={t("workspace.git.pr.sections.activity")}
+        open={activityOpen}
+        onToggle={handleToggleActivity}
+        summary={
+          <>
+            <SummaryPill count={approvals} icon={SUMMARY_APPROVAL_ICON} variant="success" />
+            <SummaryPill
+              count={changesRequested}
+              icon={SUMMARY_CHANGES_REQUESTED_ICON}
+              variant="danger"
+            />
+            <SummaryPill count={commentCount} icon={SUMMARY_COMMENT_ICON} variant="muted" />
+          </>
+        }
+      >
+        {timelineEntries.length > 0 && attachEnabled && visibleEntries.length > 0 ? (
+          <View style={styles.activityToolbar}>
+            <Button
+              variant="ghost"
+              size="sm"
+              leftIcon={MessageSquarePlus}
+              onPress={handleAddAllToChat}
+              disabled={activityLoading}
+            >
+              {t("workspace.git.pr.actions.addAllToChat")}
+            </Button>
+          </View>
+        ) : null}
+        {activityLoading ? <PrActivitySkeleton /> : null}
+        {!activityLoading && visibleEntries.length === 0 ? (
+          <Text style={sectionKitStyles.emptyText}>{t("workspace.git.pr.empty.noActivity")}</Text>
+        ) : null}
+        {!activityLoading
+          ? visibleEntries.map(({ entry, collapsed }) => (
+              <TimelineEntryCard
+                key={entry.id}
+                entry={entry}
+                collapsed={collapsed}
+                collapsedEntryIds={collapsedEntryIds}
+                attachEnabled={attachEnabled}
+                brandLabel={forgePresentation.brandLabel}
+                onAddToChat={handleAddActivityToChat}
+                onAddThreadToChat={handleAddThreadToChat}
+                onToggleCollapsed={handleToggleEntryCollapsed}
+              />
+            ))
+          : null}
+      </Section>
+    </>
+  );
+  return (
+    <View style={scrollable ? styles.root : styles.embedded} testID="pr-pane">
+      {scrollable ? (
+        <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
+          {content}
+        </ScrollView>
+      ) : (
+        content
+      )}
+    </View>
+  );
+}
+
+function PullRequestToolbar({
+  onOpen,
+  onRefresh,
+  isRefreshing,
+  brandLabel,
+  meta,
+}: {
+  onOpen(): void;
+  onRefresh?: () => void;
+  isRefreshing: boolean;
+  brandLabel: string;
+  meta?: ReactNode;
+}) {
+  const { t } = useTranslation();
+  const isCompact = useIsCompactFormFactor();
+  const toolbarRefreshButtonStyle = useCallback(
+    (state: PressableStateCallbackType) => refreshButtonStyle(state, isCompact),
+    [isCompact],
+  );
+  return (
+    <PaneContentToolbar style={styles.toolbar} testID="pr-pane-toolbar">
+      <View style={styles.toolbarActions}>
+        <Button
+          variant="ghost"
+          size="sm"
+          leftIcon={ExternalLink}
+          onPress={onOpen}
+          style={styles.viewButton}
+          testID="pr-pane-view-pr"
+        >
+          {t("workspace.git.pr.actions.viewPullRequest")}
+        </Button>
+      </View>
+      {meta ? <View style={styles.toolbarMeta}>{meta}</View> : null}
+      {onRefresh ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={
+            isRefreshing
+              ? t("workspace.git.diff.refreshing")
+              : t("workspace.git.diff.refreshState", { brand: brandLabel })
+          }
+          testID="pr-pane-refresh"
+          style={toolbarRefreshButtonStyle}
+          hitSlop={8}
+          onPress={onRefresh}
+          disabled={isRefreshing}
+        >
+          <View style={styles.refreshIcon}>
+            {isRefreshing ? (
+              <ThemedLoadingSpinner
+                size={paneContentToolbarIconSize(isCompact)}
+                uniProps={foregroundMutedColorMapping}
+              />
+            ) : (
+              <ThemedRotateCw
+                size={paneContentToolbarIconSize(isCompact)}
+                uniProps={foregroundMutedColorMapping}
+              />
+            )}
+          </View>
+        </Pressable>
+      ) : null}
+    </PaneContentToolbar>
+  );
+}
+
+function PullRequestHeader({
+  data,
+  onOpen,
+  nativeHeaderMeta,
+}: {
+  data: PrPaneData;
+  onOpen(): void;
+  nativeHeaderMeta?: ReactNode;
+}) {
+  const { t } = useTranslation();
   const statePresentation = PR_STATE_PRESENTATION[data.state];
   const StateIcon = statePresentation.Icon;
   const forgePresentation = getForgePresentation(data.forge);
@@ -459,165 +738,36 @@ export function PullRequestPane({
     data.projectPath ??
     (data.repoOwner && data.repoName ? `${data.repoOwner}/${data.repoName}` : null);
 
-  // Native forge surfaces (e.g. GitLab approvals/pipeline) come from a registry
-  // keyed by the facts-family, so the central render has no per-forge branch.
-  const nativeContribution = resolvePaneContribution(data.forgeSpecific);
-  const nativeHeaderMeta = data.forgeSpecific
-    ? nativeContribution?.renderHeaderMeta(data.forgeSpecific)
-    : null;
-  const nativeChecksSection = data.forgeSpecific
-    ? nativeContribution?.renderChecksSection(data.forgeSpecific, {
-        serverId,
-        cwd,
-        changeRequestNumber: data.number,
-        open: checksOpen,
-        onToggle: handleToggleChecks,
-        enabled: forgeProvidersEnabled,
-        canFetchCheckDetails: canFetchForgeCheckDetails,
-      })
-    : null;
-
   return (
-    <View style={styles.root} testID="pr-pane">
-      <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
-        <PaneContentToolbar style={styles.toolbar} testID="pr-pane-toolbar">
-          <View style={styles.toolbarActions}>
-            <Button
-              variant="ghost"
-              size="sm"
-              leftIcon={ExternalLink}
-              onPress={handleOpenPrUrl}
-              style={styles.viewButton}
-              testID="pr-pane-view-pr"
-            >
-              {t("workspace.git.pr.actions.viewPullRequest")}
-            </Button>
-          </View>
-          {refreshSupported ? (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={
-                isRefreshing
-                  ? t("workspace.git.diff.refreshing")
-                  : t("workspace.git.diff.refreshState", { brand: forgePresentation.brandLabel })
-              }
-              testID="pr-pane-refresh"
-              style={toolbarRefreshButtonStyle}
-              hitSlop={8}
-              onPress={handleRefresh}
-              disabled={isRefreshing}
-            >
-              <View style={styles.refreshIcon}>
-                {isRefreshing ? (
-                  <ThemedLoadingSpinner
-                    size={paneContentToolbarIconSize(isCompact)}
-                    uniProps={foregroundMutedColorMapping}
-                  />
-                ) : (
-                  <ThemedRotateCw
-                    size={paneContentToolbarIconSize(isCompact)}
-                    uniProps={foregroundMutedColorMapping}
-                  />
-                )}
-              </View>
-            </Pressable>
-          ) : null}
-        </PaneContentToolbar>
-
-        <Pressable onPress={handleOpenPrUrl} style={styles.header}>
-          {({ hovered }) => (
-            <>
-              <Text style={styles.title} testID="pr-pane-title">
-                {data.title}
-                <Text style={styles.titleNumber}>
-                  {" "}
-                  {forgePresentation.numberPrefix}
-                  {data.number}
-                </Text>
+    <Pressable onPress={onOpen} style={styles.header}>
+      {({ hovered }) => (
+        <>
+          <Text style={styles.title} testID="pr-pane-title">
+            {data.title}
+            <Text style={styles.titleNumber}>
+              {" "}
+              {forgePresentation.numberPrefix}
+              {data.number}
+            </Text>
+          </Text>
+          <View style={styles.metaLine}>
+            <StateIcon size={14} uniProps={statePresentation.iconColor} />
+            <Text style={stateLabelStyle(data.state)} testID="pr-pane-state">
+              {t(getStateLabelKey(data.state))}
+            </Text>
+            {nativeHeaderMeta}
+            {repoIdentity ? (
+              <Text style={styles.repoRef} numberOfLines={1}>
+                {repoIdentity}
               </Text>
-              <View style={styles.metaLine}>
-                <StateIcon size={14} uniProps={statePresentation.iconColor} />
-                <Text style={stateLabelStyle(data.state)} testID="pr-pane-state">
-                  {t(getStateLabelKey(data.state))}
-                </Text>
-                {nativeHeaderMeta}
-                {repoIdentity ? (
-                  <Text style={styles.repoRef} numberOfLines={1}>
-                    {repoIdentity}
-                  </Text>
-                ) : null}
-                <View style={hovered ? styles.headerLinkIcon : styles.headerLinkIconHidden}>
-                  <ThemedExternalLink size={12} uniProps={foregroundMutedColorMapping} />
-                </View>
-              </View>
-            </>
-          )}
-        </Pressable>
-
-        {nativeChecksSection ?? (
-          <ChecksSection
-            checks={data.checks}
-            open={checksOpen}
-            onToggle={handleToggleChecks}
-            attachEnabled={attachEnabled}
-            loadingCheckKeys={loadingCheckKeys}
-            onAddLogsToChat={handleAddCheckLogsToChat}
-          />
-        )}
-
-        <View style={styles.divider} />
-
-        <Section
-          title={t("workspace.git.pr.sections.activity")}
-          open={activityOpen}
-          onToggle={handleToggleActivity}
-          summary={
-            <>
-              <SummaryPill count={approvals} icon={SUMMARY_APPROVAL_ICON} variant="success" />
-              <SummaryPill
-                count={changesRequested}
-                icon={SUMMARY_CHANGES_REQUESTED_ICON}
-                variant="danger"
-              />
-              <SummaryPill count={commentCount} icon={SUMMARY_COMMENT_ICON} variant="muted" />
-            </>
-          }
-        >
-          {timelineEntries.length > 0 && attachEnabled && visibleEntries.length > 0 ? (
-            <View style={styles.activityToolbar}>
-              <Button
-                variant="ghost"
-                size="sm"
-                leftIcon={MessageSquarePlus}
-                onPress={handleAddAllToChat}
-                disabled={activityLoading}
-              >
-                {t("workspace.git.pr.actions.addAllToChat")}
-              </Button>
+            ) : null}
+            <View style={hovered ? styles.headerLinkIcon : styles.headerLinkIconHidden}>
+              <ThemedExternalLink size={12} uniProps={foregroundMutedColorMapping} />
             </View>
-          ) : null}
-          {activityLoading ? <PrActivitySkeleton /> : null}
-          {!activityLoading && visibleEntries.length === 0 ? (
-            <Text style={sectionKitStyles.emptyText}>{t("workspace.git.pr.empty.noActivity")}</Text>
-          ) : null}
-          {!activityLoading
-            ? visibleEntries.map(({ entry, collapsed }) => (
-                <TimelineEntryCard
-                  key={entry.id}
-                  entry={entry}
-                  collapsed={collapsed}
-                  collapsedEntryIds={collapsedEntryIds}
-                  attachEnabled={attachEnabled}
-                  brandLabel={forgePresentation.brandLabel}
-                  onAddToChat={handleAddActivityToChat}
-                  onAddThreadToChat={handleAddThreadToChat}
-                  onToggleCollapsed={handleToggleEntryCollapsed}
-                />
-              ))
-            : null}
-        </Section>
-      </ScrollView>
-    </View>
+          </View>
+        </>
+      )}
+    </Pressable>
   );
 }
 
@@ -1197,6 +1347,9 @@ const styles = StyleSheet.create((theme) => ({
     minHeight: 0,
     backgroundColor: theme.colors.surfaceSidebar,
   },
+  embedded: {
+    backgroundColor: theme.colors.surfaceSidebar,
+  },
   scroll: {
     flex: 1,
     minHeight: 0,
@@ -1271,6 +1424,11 @@ const styles = StyleSheet.create((theme) => ({
     justifyContent: "space-between",
     paddingRight: theme.spacing[3],
     paddingLeft: theme.spacing[3],
+  },
+  toolbarMeta: {
+    flex: 1,
+    minWidth: 0,
+    alignItems: "flex-end",
   },
   toolbarActions: {
     flexDirection: "row",

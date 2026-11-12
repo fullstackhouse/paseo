@@ -1,8 +1,8 @@
 /** @vitest-environment jsdom */
 import { ToastApiProvider } from "@/contexts/toast-api-context";
-import { act, useCallback, type ReactNode } from "react";
+import { act, createElement, useCallback, type ComponentType, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
-import { waitFor } from "@testing-library/dom";
+import { fireEvent, waitFor } from "@testing-library/dom";
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 const noop = () => {};
 const toastApi = { show: () => noop, error: noop, copied: noop };
@@ -24,7 +24,26 @@ function cleanup() {
 }
 
 import { QueryClient, QueryClientProvider, onlineManager } from "@tanstack/react-query";
-import { afterEach, beforeEach, expect, it } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { PullRequestPanel } from "@/plugins/react-native/pull-request";
+import { PullRequestPaneView } from "@/git/pull-request-panel/pane";
+import { mapPluginPullRequest } from "@/plugins/react-native/pull-request-data";
+import type { PullRequestPanelData } from "@getpaseo/plugin/client/ui";
+// The shared test adapter normally drops uniProps. Apply them here so the real
+// checks ring receives its theme palette while exercising the actual panel UI.
+vi.mock("react-native-unistyles", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("react-native-unistyles")>();
+  return {
+    ...actual,
+    withUnistyles: <Props extends object>(Component: ComponentType<Props>) => {
+      return function Themed(props: Props & { uniProps?: (theme: unknown) => Partial<Props> }) {
+        const { uniProps, ...rest } = props;
+        const { theme } = actual.useUnistyles();
+        return createElement(Component, { ...rest, ...uniProps?.(theme) } as Props);
+      };
+    },
+  };
+});
 import { RetainedPanelActivity } from "@/components/retained-panel";
 import {
   PullRequestConnectionProvider,
@@ -249,3 +268,91 @@ it("runs real PR descriptor/content/discovery hooks through hidden invalidation,
   view.unmount();
   queryClient.clear();
 });
+
+const suppliedPullRequest: PullRequestPanelData = {
+  forge: "github",
+  number: 7,
+  title: "Read-only review",
+  state: "open",
+  url: "https://github.com/acme/repo/pull/7",
+  checks: [
+    { name: "build", status: "failure", url: "https://github.com/acme/repo/actions/runs/1" },
+  ],
+  activity: [
+    {
+      id: "review:1",
+      kind: "review",
+      author: "alex",
+      body: "",
+      reviewState: "approved",
+      url: "https://github.com/acme/repo/pull/7#review",
+      createdAt: "2026-11-12T10:00:00Z",
+    },
+  ],
+};
+
+it("renders plugin checks and reviews without a host connection or chat actions", () => {
+  const onRefresh = vi.fn();
+  const view = render(
+    <PullRequestPanel
+      data={suppliedPullRequest}
+      scrollable={false}
+      showHeader={false}
+      onRefresh={onRefresh}
+    />,
+  );
+  expect(document.querySelector('[data-testid="pr-pane-check-failed"]')?.textContent).toBe(
+    "1 failing",
+  );
+  expect(document.querySelector('[data-testid="pr-pane-checks"]')?.textContent).toContain("build");
+  expect(document.querySelector('[data-testid="pr-pane-activity-row"]')?.textContent).toContain(
+    "alex",
+  );
+  expect(document.querySelector('[data-testid="pr-pane-title"]')).toBeNull();
+  expect(document.querySelector('[data-testid="pr-pane-view-pr"]')).not.toBeNull();
+  expect(document.body.textContent).not.toContain("Add to chat");
+  expect(document.body.textContent).not.toContain("Add all to chat");
+  const refresh = document.querySelector('[data-testid="pr-pane-refresh"]');
+  expect(refresh).not.toBeNull();
+  act(() => fireEvent.click(refresh!));
+  expect(onRefresh).toHaveBeenCalledTimes(1);
+  view.rerender(
+    <PullRequestPanel
+      data={suppliedPullRequest}
+      scrollable={false}
+      showHeader={false}
+      onRefresh={onRefresh}
+      isRefreshing
+    />,
+  );
+  act(() => fireEvent.click(document.querySelector('[data-testid="pr-pane-refresh"]')!));
+  expect(onRefresh).toHaveBeenCalledTimes(1);
+});
+
+it("keeps the Explorer attachment callbacks in the shared presentation", () => {
+  const added: string[] = [];
+  const attachments = attachmentCallbacks(added);
+  render(
+    <PullRequestPaneView
+      data={mapPluginPullRequest(suppliedPullRequest)}
+      attachments={attachments}
+    />,
+  );
+  const addAll = Array.from(document.querySelectorAll('[role="button"]')).find((button) =>
+    button.textContent?.includes("Add all to chat"),
+  );
+  expect(addAll).not.toBeUndefined();
+  act(() => fireEvent.click(addAll!));
+  expect(added).toEqual(["review:1"]);
+});
+
+function attachmentCallbacks(added: string[]) {
+  return {
+    loadingCheckKeys: new Set<string>(),
+    addActivity(activity: { id: string }) {
+      added.push(activity.id);
+    },
+    addThread() {},
+    addCheck() {},
+  };
+}
