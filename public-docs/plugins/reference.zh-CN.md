@@ -801,6 +801,26 @@ export function IssueActions({ theme }: PluginSurfaceProps) {
 }
 ```
 
+### PR 检查与活动 {#pull-request-checks-and-activity}
+
+从 `@getpaseo/plugin/client/ui` 导入 `PullRequestPanel`，即可渲染与 Explorer PR 标签页相同的检查、审查和讨论线程。通过插件 RPC 提供 `PullRequestPanelData`；组件不获取数据，也不需要工作区。它不提供发表评论、解决线程或添加聊天附件的操作。
+
+```tsx
+<PullRequestPanel
+  data={pullRequest}
+  onRefresh={refresh}
+  isRefreshing={refreshing}
+  scrollable={false}
+  showHeader={false}
+/>
+```
+
+在页面的滚动视图内使用时，设置 `scrollable={false}`。如果页面已经显示 PR 名称，隐藏组件标题；工具栏的外部链接仍会显示。可以通过 `toolbarMeta` 放置更新时间或提交标签。首次加载和获取失败的状态由页面处理；仅活动数据仍在加载时，传入 `activityLoading`。
+
+使用 `createdAt` 提供 ISO 格式的活动时间；主机会排序并格式化相对时间。活动 ID 必须唯一。评论的 `reviewId` 必须与所属审查的活动 ID 一致，才能将线程嵌套在该审查下。回复使用相同的 `threadId`；文件线程提供 `location.isResolved` / `location.isOutdated`，没有文件位置的讨论则使用 `threadIsResolved`。主机负责折叠状态、Markdown、头像和状态样式。
+
+该导出需要包含 `PullRequestPanel` 的主机构建版本。在旧版主机上，如果导出不存在，显示更新提示，不要替换为独立的渲染器。
+
 ### Markdown {#markdown}
 
 从 `@getpaseo/plugin/client/ui` 导入 `Markdown`，即可在网页、iOS 和 Android 上
