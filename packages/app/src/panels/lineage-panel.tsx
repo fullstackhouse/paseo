@@ -2,7 +2,7 @@ import type { AgentAddress } from "@getpaseo/protocol/addresses";
 import { useCallback, useMemo, useState, type ReactElement } from "react";
 import { Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
-import { GitFork } from "lucide-react-native";
+import { ChevronRight, GitFork } from "lucide-react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import invariant from "tiny-invariant";
 import { useAgentDescriptor } from "@/agent-presentation";
@@ -20,6 +20,8 @@ import { useLineageFocus } from "@/subagents/lineage-focus";
 import { navigateToAgent } from "@/utils/navigate-to-agent";
 
 const ThemedGitFork = withUnistyles(GitFork);
+const ThemedChevronRight = withUnistyles(ChevronRight);
+const mutedColorMapping = (theme: Theme) => ({ color: theme.colors.foregroundMuted });
 const ICON_SIZE = 16;
 const foregroundColorMapping = (theme: Theme) => ({ color: theme.colors.foreground });
 
@@ -31,64 +33,90 @@ export const lineagePanelPresentation = {
 } satisfies PanelPresentation;
 
 function LineagePanel(): ReactElement {
-  const { t } = useTranslation();
   const { serverId, workspaceId, target } = usePaneContext();
   invariant(target.kind === "lineage", "LineagePanel requires lineage target");
+  return <LineageContent serverId={serverId} workspaceId={workspaceId} />;
+}
+
+/** Inline relatives for Overview; its agent section already identifies the focused agent. */
+export function LineageSummary({
+  serverId,
+  workspaceId,
+}: {
+  serverId: string;
+  workspaceId: string;
+}): ReactElement {
+  return <LineageContent serverId={serverId} workspaceId={workspaceId} inline />;
+}
+
+function LineageContent({
+  serverId,
+  workspaceId,
+  inline = false,
+}: {
+  serverId: string;
+  workspaceId: string;
+  inline?: boolean;
+}): ReactElement {
+  const { t } = useTranslation();
   const focus = useLineageFocus(serverId, workspaceId);
   const selectLineage = useMemo(() => createLineageSelector(focus), [focus]);
   const lineage = useSessionStore(selectLineage);
   const workspace = useMemo(() => ({ serverId, workspaceId }), [serverId, workspaceId]);
 
   if (!focus) {
-    return <EmptyState text={t("panels.lineage.noAgent")} />;
+    return <EmptyState text={t("panels.lineage.noAgent")} inline={inline} />;
   }
   if (lineage.ancestors.length === 0 && lineage.children.length === 0) {
-    return <EmptyState text={t("panels.lineage.empty")} />;
+    return <EmptyState text={t("panels.lineage.empty")} inline={inline} />;
   }
 
   // Children elsewhere come first: they are the ones the sidebar doesn't tie to this workspace.
   const elsewhere = lineage.children.filter((node) => !isInWorkspace(node, workspace));
   const here = lineage.children.filter((node) => isInWorkspace(node, workspace));
 
-  return (
-    // Themed insets sit on a View: contentContainerStyle drops them on web (docs/unistyles.md).
-    <ScrollView testID="lineage-panel">
-      <View style={styles.body}>
-        {lineage.ancestors.length > 0 ? (
-          <Section title={t("panels.lineage.startedBy")}>
-            {lineage.ancestors.map((node) => (
-              <LineageRow key={nodeKey(node)} node={node} workspace={workspace} />
-            ))}
-          </Section>
-        ) : null}
-        <FocusRow address={focus} />
-        {elsewhere.length > 0 ? (
-          <Section title={t("panels.lineage.inOtherWorkspaces")}>
-            {elsewhere.map((node) => (
-              <LineageRow key={nodeKey(node)} node={node} workspace={workspace} />
-            ))}
-          </Section>
-        ) : null}
-        {here.length > 0 ? (
-          <Section title={t("panels.lineage.inThisWorkspace")}>
-            {here.map((node) => (
-              <LineageRow key={nodeKey(node)} node={node} workspace={workspace} />
-            ))}
-          </Section>
-        ) : null}
-      </View>
-    </ScrollView>
+  const content = (
+    <View
+      style={inline ? styles.summary : styles.body}
+      testID={inline ? "lineage-summary" : undefined}
+    >
+      {lineage.ancestors.length > 0 ? (
+        <Section title={t("panels.lineage.startedBy")}>
+          {lineage.ancestors.map((node) => (
+            <LineageRow key={nodeKey(node)} node={node} workspace={workspace} />
+          ))}
+        </Section>
+      ) : null}
+      {!inline ? <FocusRow address={focus} /> : null}
+      {elsewhere.length > 0 ? (
+        <Section title={t("panels.lineage.inOtherWorkspaces")}>
+          {elsewhere.map((node) => (
+            <LineageRow key={nodeKey(node)} node={node} workspace={workspace} />
+          ))}
+        </Section>
+      ) : null}
+      {here.length > 0 ? (
+        <Section title={t("panels.lineage.inThisWorkspace")}>
+          {here.map((node) => (
+            <LineageRow key={nodeKey(node)} node={node} workspace={workspace} />
+          ))}
+        </Section>
+      ) : null}
+    </View>
   );
+  if (inline) return content;
+  // Themed insets sit on a View: contentContainerStyle drops them on web (docs/unistyles.md).
+  return <ScrollView testID="lineage-panel">{content}</ScrollView>;
 }
 
 function nodeKey(node: LineageNode): string {
   return `${node.address.serverId}:${node.address.agentId}`;
 }
 
-function EmptyState({ text }: { text: string }): ReactElement {
+function EmptyState({ text, inline = false }: { text: string; inline?: boolean }): ReactElement {
   return (
-    <View style={styles.centerState} testID="lineage-panel-empty">
-      <Text style={styles.emptyText}>{text}</Text>
+    <View style={inline ? styles.inlineState : styles.centerState} testID="lineage-panel-empty">
+      <Text style={inline ? styles.rowFacts : styles.emptyText}>{text}</Text>
     </View>
   );
 }
@@ -113,7 +141,7 @@ function FocusRow({ address }: { address: AgentAddress }): ReactElement {
     <View style={styles.section}>
       <View style={styles.rowFocus} testID="lineage-focus-row">
         <RowIcon descriptor={descriptor} />
-        <Text style={styles.rowTitle} numberOfLines={1}>
+        <Text style={styles.rowTitle} numberOfLines={2}>
           {descriptor.label || t("panels.lineage.agent")}
         </Text>
       </View>
@@ -199,15 +227,16 @@ function LineageRow({
     >
       <RowIcon descriptor={descriptor} />
       <View style={styles.rowText}>
-        <Text style={styles.rowTitle} numberOfLines={1}>
+        <Text style={styles.rowTitle} numberOfLines={2}>
           {label}
         </Text>
         {facts ? (
-          <Text style={styles.rowFacts} numberOfLines={1}>
+          <Text style={styles.rowFacts} numberOfLines={2}>
             {facts}
           </Text>
         ) : null}
       </View>
+      {!node.missing ? <ThemedChevronRight size={ICON_SIZE} uniProps={mutedColorMapping} /> : null}
     </PressHighlight>
   );
 }
@@ -222,7 +251,7 @@ const styles = StyleSheet.create((theme) => {
     flexDirection: "row",
     alignItems: "center",
     gap: theme.spacing[2],
-    minHeight: 32,
+    minHeight: 44,
     paddingHorizontal: theme.spacing[2],
     paddingVertical: theme.spacing[1],
     borderRadius: theme.borderRadius.md,
@@ -231,6 +260,13 @@ const styles = StyleSheet.create((theme) => {
     body: {
       padding: theme.spacing[2],
       gap: theme.spacing[3],
+    },
+    summary: {
+      gap: theme.spacing[3],
+    },
+    inlineState: {
+      paddingHorizontal: theme.spacing[2],
+      paddingVertical: theme.spacing[1],
     },
     section: {
       gap: theme.spacing[0.5],
@@ -243,13 +279,11 @@ const styles = StyleSheet.create((theme) => {
       color: theme.colors.foregroundMuted,
     },
     row,
-    rowActive: { ...row, backgroundColor: theme.colors.surface2 },
-    rowPressed: { backgroundColor: theme.colors.surface2 },
+    rowActive: { ...row, backgroundColor: theme.colors.interactionHighlight },
+    rowPressed: { backgroundColor: theme.colors.interactionHighlight },
     rowFocus: { ...row, backgroundColor: theme.colors.surface1 },
     rowText: {
-      flexGrow: 1,
-      flexShrink: 1,
-      flexBasis: "auto",
+      flex: 1,
       minWidth: 0,
     },
     rowTitle: {

@@ -1,11 +1,19 @@
 import { useCallback, useMemo, useState, type ReactElement, type ReactNode } from "react";
 import { Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
-import { LayoutDashboard } from "lucide-react-native";
+import {
+  ChevronRight,
+  FileDiff,
+  GitBranch,
+  GitPullRequest,
+  LayoutDashboard,
+} from "lucide-react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import invariant from "tiny-invariant";
 import { useShallow } from "zustand/shallow";
 import { useAgentDescriptor } from "@/agent-presentation";
+import { SettingsSection } from "@/components/settings/headings/settings-section";
+import { LineageSummary } from "./lineage-panel";
 import { StatusIcon } from "@/components/status-icon";
 import { Button } from "@/components/ui/button";
 import { PressHighlight } from "@/components/ui/press-highlight";
@@ -32,6 +40,11 @@ import { buildWorkspaceTabPersistenceKey } from "@/workspace-tabs/model";
 import { deriveOverviewNextStep } from "./overview/next-step";
 
 const ThemedLayoutDashboard = withUnistyles(LayoutDashboard);
+const ThemedChevronRight = withUnistyles(ChevronRight);
+const ThemedFileDiff = withUnistyles(FileDiff);
+const ThemedGitBranch = withUnistyles(GitBranch);
+const ThemedGitPullRequest = withUnistyles(GitPullRequest);
+const mutedColorMapping = (theme: Theme) => ({ color: theme.colors.foregroundMuted });
 const ICON_SIZE = 16;
 const foregroundColorMapping = (theme: Theme) => ({ color: theme.colors.foreground });
 
@@ -81,6 +94,9 @@ function OverviewPanel(): ReactElement {
         <Section title={t("panels.overview.agent")}>
           <AgentRow serverId={serverId} workspaceId={workspaceId} />
         </Section>
+        <Section title={t("panels.lineage.label")}>
+          <LineageSummary serverId={serverId} workspaceId={workspaceId} />
+        </Section>
         {summaryItems.length > 0 && workspaceKey ? (
           <Section title={t("panels.overview.plugins")}>
             {summaryItems.map((item) => (
@@ -127,7 +143,7 @@ function NextStepSection({
     icons: GIT_ACTION_ICONS,
   });
   const nextStep = deriveOverviewNextStep({ items, agentRunning });
-  let content: ReactElement | null = null;
+  let content: ReactElement = <Text style={styles.muted}>{t("workspace.tabs.loading")}</Text>;
   if (nextStep.kind === "working") {
     content = <Text style={styles.muted}>{t("panels.overview.working")}</Text>;
   } else if (nextStep.kind === "attention" && workspaceKey) {
@@ -140,11 +156,13 @@ function NextStepSection({
     content = <GitActionsSplitButton gitActions={gitActions} />;
   }
   return (
-    <Section title={t("panels.overview.nextStep")}>
-      <View style={styles.nextStep} testID="overview-next-step">
-        {content}
-      </View>
-    </Section>
+    <View style={styles.nextStepSurface}>
+      <Section title={t("panels.overview.nextStep")}>
+        <View style={styles.nextStep} testID="overview-next-step">
+          {content}
+        </View>
+      </Section>
+    </View>
   );
 }
 
@@ -189,11 +207,13 @@ function GitSections({
     <>
       <Section title={t("panels.overview.changes")}>
         <Row
+          icon={ThemedGitBranch}
           title={facts.branch ?? t("panels.overview.noBranch")}
           facts={syncFacts(facts.ahead, facts.behind, t("panels.overview.inSync"))}
           testID="overview-branch"
         />
         <Row
+          icon={ThemedFileDiff}
           title={diffFacts(facts.diffStat) || t("panels.overview.noChanges")}
           facts={facts.isDirty ? t("panels.overview.uncommitted") : undefined}
           onPress={openChanges}
@@ -203,8 +223,13 @@ function GitSections({
       <Section title={t("panels.overview.pullRequest")}>
         {facts.pullRequest ? (
           <Row
+            icon={ThemedGitPullRequest}
             title={pullRequestTitle(facts.pullRequest)}
             facts={pullRequestFacts(facts.pullRequest, t)}
+            warning={
+              facts.pullRequest.checksStatus === "failure" ||
+              facts.pullRequest.reviewDecision === "changes_requested"
+            }
             onPress={openPullRequest}
             testID="overview-pull-request"
           />
@@ -280,12 +305,12 @@ function AttentionStep({
   }, [item, t]);
   return (
     <>
+      {reason ? <Text style={styles.stepReason}>{reason}</Text> : null}
       <View style={styles.stepButton}>
         <Button variant="default" onPress={press} testID="overview-next-step-button">
           {label}
         </Button>
       </View>
-      {reason ? <Text style={styles.muted}>{reason}</Text> : null}
     </>
   );
 }
@@ -367,21 +392,24 @@ const ThemedIcon = withUnistyles(AgentIcon);
 
 function Section({ title, children }: { title: string; children: ReactNode }): ReactElement {
   return (
-    <View style={styles.section}>
-      <Text style={styles.sectionLabel}>{title}</Text>
-      {children}
-    </View>
+    <SettingsSection title={title} flush>
+      <View style={styles.sectionRows}>{children}</View>
+    </SettingsSection>
   );
 }
 
 function Row({
   agentDescriptor,
+  icon: Icon,
+  warning = false,
   title,
   facts,
   onPress,
   testID,
 }: {
   agentDescriptor?: PanelDescriptor;
+  icon?: typeof ThemedGitBranch;
+  warning?: boolean;
   title: string;
   facts?: string;
   onPress?: () => void;
@@ -393,16 +421,18 @@ function Row({
   const content = (
     <>
       {agentDescriptor ? <AgentStatusIcon descriptor={agentDescriptor} /> : null}
+      {!agentDescriptor && Icon ? <Icon size={ICON_SIZE} uniProps={mutedColorMapping} /> : null}
       <View style={styles.rowText}>
-        <Text style={styles.rowTitle} numberOfLines={1}>
+        <Text style={styles.rowTitle} numberOfLines={2}>
           {title}
         </Text>
         {facts ? (
-          <Text style={styles.rowFacts} numberOfLines={1}>
+          <Text style={warning ? styles.rowWarning : styles.rowFacts} numberOfLines={2}>
             {facts}
           </Text>
         ) : null}
       </View>
+      {onPress ? <ThemedChevronRight size={ICON_SIZE} uniProps={mutedColorMapping} /> : null}
     </>
   );
   if (!onPress) {
@@ -438,30 +468,32 @@ const styles = StyleSheet.create((theme) => {
     flexDirection: "row",
     alignItems: "center",
     gap: theme.spacing[2],
-    minHeight: 32,
+    minHeight: 44,
     paddingHorizontal: theme.spacing[2],
-    paddingVertical: theme.spacing[1],
+    paddingVertical: theme.spacing[2],
     borderRadius: theme.borderRadius.md,
   } as const;
   return {
     body: {
-      padding: theme.spacing[2],
-      gap: theme.spacing[3],
+      padding: theme.spacing[4],
+      gap: theme.spacing[6],
     },
-    section: {
-      gap: theme.spacing[0.5],
+    sectionRows: {
+      gap: theme.spacing[1],
     },
-    sectionLabel: {
-      paddingHorizontal: theme.spacing[2],
-      paddingBottom: theme.spacing[1],
-      fontSize: theme.fontSize.sm,
-      fontWeight: theme.fontWeight.medium,
-      color: theme.colors.foregroundMuted,
+    nextStepSurface: {
+      padding: theme.spacing[3],
+      backgroundColor: theme.colors.surface1,
+      borderRadius: theme.borderRadius.lg,
+    },
+    stepReason: {
+      fontSize: theme.fontSize.base,
+      color: theme.colors.foreground,
     },
     nextStep: {
       gap: theme.spacing[2],
       paddingHorizontal: theme.spacing[2],
-      paddingVertical: theme.spacing[1],
+      paddingVertical: theme.spacing[2],
       alignItems: "flex-start",
     },
     stepButton: {
@@ -472,18 +504,21 @@ const styles = StyleSheet.create((theme) => {
       color: theme.colors.foregroundMuted,
     },
     row,
-    rowActive: { ...row, backgroundColor: theme.colors.surface2 },
-    rowPressed: { backgroundColor: theme.colors.surface2 },
+    rowActive: { ...row, backgroundColor: theme.colors.interactionHighlight },
+    rowPressed: { backgroundColor: theme.colors.interactionHighlight },
     rowText: {
-      flexGrow: 1,
-      flexShrink: 1,
-      flexBasis: "auto",
+      gap: theme.spacing[1],
+      flex: 1,
       minWidth: 0,
     },
     rowTitle: {
       flexShrink: 1,
       fontSize: theme.fontSize.base,
       color: theme.colors.foreground,
+    },
+    rowWarning: {
+      fontSize: theme.fontSize.sm,
+      color: theme.colors.destructive,
     },
     rowFacts: {
       fontSize: theme.fontSize.sm,
