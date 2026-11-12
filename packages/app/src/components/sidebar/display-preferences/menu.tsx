@@ -18,6 +18,7 @@ import {
   Diff,
   EyeOff,
   Folder,
+  Gauge,
   GitBranch,
   GitPullRequest,
   Globe,
@@ -67,6 +68,7 @@ const ThemedSettings2 = withUnistyles(Settings2);
 /** CI's mark: the subject of the checks row, and the shape the icon-only option leaves behind. */
 const ThemedCircleCheck = withUnistyles(CircleCheck);
 const ThemedCircle = withUnistyles(Circle);
+const ThemedGauge = withUnistyles(Gauge);
 const ThemedPluginIconView = withUnistyles(PluginIconView);
 
 /** Fits the item's 16pt leading slot with a hair of room, matching the trailing check. */
@@ -198,14 +200,18 @@ export function SidebarDisplayPreferencesMenu(): ReactElement {
         id: "grouping",
         title: t("sidebar.display.grouping.label"),
         content: (
-          <OptionList
-            values={GROUPING_MODES}
-            icons={GROUPING_ICONS}
-            labelKeys={GROUPING_LABEL_KEYS}
-            selectedValue={preferences.grouping}
-            onSelect={preferences.setGrouping}
-            testIDPrefix="sidebar-grouping"
-          />
+          <>
+            <OptionList
+              values={GROUPING_MODES}
+              icons={GROUPING_ICONS}
+              labelKeys={GROUPING_LABEL_KEYS}
+              selectedValue={preferences.grouping}
+              onSelect={preferences.setGrouping}
+              testIDPrefix="sidebar-grouping"
+            />
+            <MenuSeparator />
+            <AgentReportedStatusOption preferences={preferences} />
+          </>
         ),
       },
       {
@@ -655,6 +661,26 @@ function ShowPage({ preferences }: { preferences: Preferences }): ReactElement {
         />
       ))}
     </>
+  );
+}
+
+/** Experimental: idle workspaces are grouped by their agents' reports, via plugin summary items. */
+function AgentReportedStatusOption({ preferences }: { preferences: Preferences }): ReactElement {
+  const { t } = useTranslation();
+  const leading = useMemo(
+    () => <ThemedGauge size={OPTION_ICON_SIZE} uniProps={mutedIconMapping} />,
+    [],
+  );
+  return (
+    <MenuItem
+      selected={preferences.agentReportedStatus}
+      leading={leading}
+      closeOnSelect={false}
+      onSelect={preferences.toggleAgentReportedStatus}
+      testID="sidebar-grouping-agent-reported-status"
+    >
+      {t("sidebar.display.grouping.agentReportedStatus")}
+    </MenuItem>
   );
 }
 

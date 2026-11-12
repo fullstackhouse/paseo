@@ -3,6 +3,7 @@ import { useCreateFlowStore, type PendingCreateAttempt } from "@/stores/create-f
 import { useSessionStore, type WorkspaceDescriptor } from "@/stores/session-store";
 import type { WorkspaceAgentActivity } from "@/utils/workspace-agent-activity";
 import { resolveWorkspaceMapKeyByIdentity } from "@/utils/workspace-identity";
+import { applyReportedWork, useReportedWorkLookup, type ReportedWorkLookup } from "./reported-work";
 
 interface EffectiveWorkspaceStatus {
   status: WorkspaceDescriptor["status"];
@@ -10,6 +11,20 @@ interface EffectiveWorkspaceStatus {
 }
 
 export function deriveEffectiveWorkspaceStatus(input: {
+  serverId: string;
+  workspace: WorkspaceDescriptor;
+  pendingCreateAttempts?: Record<string, PendingCreateAttempt>;
+  workspaceAgentActivity?: ReadonlyMap<string, WorkspaceAgentActivity>;
+  /** Experimental: plugin-reported work regroups idle workspaces. */
+  reportedWork?: ReportedWorkLookup;
+}): EffectiveWorkspaceStatus {
+  return applyReportedWork(
+    deriveTurnWorkspaceStatus(input),
+    input.reportedWork?.(input.serverId, input.workspace.id),
+  );
+}
+
+function deriveTurnWorkspaceStatus(input: {
   serverId: string;
   workspace: WorkspaceDescriptor;
   pendingCreateAttempts?: Record<string, PendingCreateAttempt>;
@@ -56,6 +71,7 @@ function getPendingInitialAgentCreateStartedAt(input: {
 
 export function useWorkspaceStatus(serverId: string, workspaceId: string) {
   const pendingCreateAttempts = useCreateFlowStore((state) => state.pendingByDraftId);
+  const reportedWork = useReportedWorkLookup();
   return useSessionStore(
     useShallow((state) => {
       const session = state.sessions[serverId];
@@ -68,6 +84,7 @@ export function useWorkspaceStatus(serverId: string, workspaceId: string) {
         workspace,
         pendingCreateAttempts,
         workspaceAgentActivity: session.workspaceAgentActivity,
+        reportedWork,
       }).status;
     }),
   );

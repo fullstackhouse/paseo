@@ -101,6 +101,8 @@ export interface AppSettings {
   sidebarChecksDisplay: SidebarChecksDisplay;
   /** Plugin workspace row badge items by `<pluginId>/<itemId>`; a missing key shows. */
   sidebarPluginRowBadgeItems: Record<string, boolean>;
+  /** FSH, experimental: group idle workspaces by what their agents reported, not by unread turns. */
+  sidebarAgentReportedStatus: boolean;
   /** FSH: install a desktop update once the local host's agents have gone idle. */
   autoInstallUpdatesWhenIdle: boolean;
   /** Top-level sidebar rows in display order; empty means the default order, all visible. */
@@ -168,6 +170,7 @@ export const DEFAULT_CLIENT_SETTINGS: AppSettings = {
   sidebarRowItems: DEFAULT_SIDEBAR_ROW_ITEMS,
   sidebarChecksDisplay: DEFAULT_SIDEBAR_CHECKS_DISPLAY,
   sidebarPluginRowBadgeItems: {},
+  sidebarAgentReportedStatus: false,
   autoInstallUpdatesWhenIdle: false,
   sidebarNavItems: [],
   sidebarFooterItems: [],
@@ -270,6 +273,7 @@ const StoredAppSettingsSchema = z
       .optional()
       .catch(DEFAULT_SIDEBAR_CHECKS_DISPLAY),
     sidebarPluginRowBadgeItems: z.record(z.string(), z.boolean()).catch({}),
+    sidebarAgentReportedStatus: z.boolean().catch(false),
     autoInstallUpdatesWhenIdle: z.boolean().catch(false),
     sidebarNavItems: z.array(z.object({ key: z.string(), visible: z.boolean() })).catch([]),
     sidebarFooterItems: z.array(z.object({ key: z.string(), visible: z.boolean() })).catch([]),
