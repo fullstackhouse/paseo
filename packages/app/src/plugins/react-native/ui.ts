@@ -29,3 +29,4 @@ export { useToast } from "./toast";
 export { StreamedText } from "./streamed-text";
 
 export { Markdown } from "./markdown";
+export { PullRequestPanel } from "./pull-request";
