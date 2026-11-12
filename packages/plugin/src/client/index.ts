@@ -22,6 +22,7 @@ export type {
   PluginWorkspaceSummaryItemContribution,
   PluginWorkspaceSummaryItemRegistration,
   PluginWorkspaceSummaryItemState,
+  PluginWorkspaceWorkState,
   PluginIcon,
   PluginPanelLocation,
   PluginOpenPanelOptions,

@@ -43,6 +43,10 @@ function cleanState(patch: PluginWorkspaceSummaryItemState): PluginWorkspaceSumm
   if (patch.needsYou !== undefined) state.needsYou = patch.needsYou === true;
   if (patch.key !== undefined) state.key = String(patch.key);
   if (patch.panelId !== undefined) state.panelId = patch.panelId.trim() || undefined;
+  if (patch.workState !== undefined) {
+    state.workState =
+      patch.workState === "working" || patch.workState === "done" ? patch.workState : undefined;
+  }
   return state;
 }
 

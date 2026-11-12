@@ -100,6 +100,8 @@ export interface AppSettings {
   sidebarPluginRowItems: Record<string, boolean>;
   /** A one-click Archive button beside the workspace row's menu, on hover. */
   sidebarArchiveButton: boolean;
+  /** FSH, experimental: group idle workspaces by what their agents reported, not by unread turns. */
+  sidebarAgentReportedStatus: boolean;
   /** FSH: install a desktop update once the local host's agents have gone idle. */
   autoInstallUpdatesWhenIdle: boolean;
   /** Top-level sidebar rows in display order; empty means the default order, all visible. */
@@ -168,6 +170,7 @@ export const DEFAULT_CLIENT_SETTINGS: AppSettings = {
   sidebarChecksDisplay: DEFAULT_SIDEBAR_CHECKS_DISPLAY,
   sidebarPluginRowItems: {},
   sidebarArchiveButton: false,
+  sidebarAgentReportedStatus: false,
   autoInstallUpdatesWhenIdle: false,
   sidebarNavItems: [],
   sidebarFooterItems: [],
@@ -269,6 +272,7 @@ const StoredAppSettingsSchema = z
       .catch(DEFAULT_SIDEBAR_CHECKS_DISPLAY),
     sidebarPluginRowItems: z.record(z.string(), z.boolean()).catch({}),
     sidebarArchiveButton: z.boolean().catch(false),
+    sidebarAgentReportedStatus: z.boolean().catch(false),
     autoInstallUpdatesWhenIdle: z.boolean().catch(false),
     sidebarNavItems: z.array(z.object({ key: z.string(), visible: z.boolean() })).catch([]),
     sidebarFooterItems: z.array(z.object({ key: z.string(), visible: z.boolean() })).catch([]),

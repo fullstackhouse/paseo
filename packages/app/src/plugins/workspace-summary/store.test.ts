@@ -51,4 +51,18 @@ describe("WorkspaceSummaryStore", () => {
       /workspace id/,
     );
   });
+  it("keeps a valid work state and clears it on null", () => {
+    const store = new WorkspaceSummaryStore();
+    const item = store.add(owner, {
+      id: "status",
+      workspaceId: "w",
+      title: "Status",
+      workState: "working",
+    });
+    expect(store.forWorkspace("s", "w")[0]?.workState).toBe("working");
+    item.update({ workState: null });
+    expect(store.forWorkspace("s", "w")[0]?.workState).toBeUndefined();
+    item.update({ workState: "bogus" as never });
+    expect(store.forWorkspace("s", "w")[0]?.workState).toBeUndefined();
+  });
 });

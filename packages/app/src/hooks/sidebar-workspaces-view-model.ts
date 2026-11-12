@@ -1,4 +1,5 @@
 import { deriveEffectiveWorkspaceStatus } from "@/workspace-status";
+import type { ReportedWorkLookup } from "@/workspace-status/reported-work";
 import equal from "fast-deep-equal";
 import type { PrHint } from "@/git/pr-hint";
 import { selectPrHintFromStatus } from "@/git/pr-hint";
@@ -149,6 +150,7 @@ export function createSidebarWorkspaceEntry(input: {
   projectViewKey?: string;
   pendingCreateAttempts?: Record<string, PendingCreateAttempt>;
   workspaceAgentActivity?: ReadonlyMap<string, WorkspaceAgentActivity>;
+  reportedWork?: ReportedWorkLookup;
 }): SidebarWorkspaceEntry {
   const projectViewKey = input.projectViewKey ?? input.workspace.projectId;
   const effectiveStatus = deriveEffectiveWorkspaceStatus(input);
@@ -207,6 +209,7 @@ export function deriveProjectStatusBucket(input: {
   workspaces: readonly SidebarWorkspacePlacement[];
   sessions: Record<string, ProjectStatusSession | undefined>;
   pendingCreateAttempts?: Record<string, PendingCreateAttempt>;
+  reportedWork?: ReportedWorkLookup;
 }): SidebarStateBucket {
   const workspaceIdsByServer = new Map<string, string[]>();
   for (const placement of input.workspaces) {
@@ -235,6 +238,7 @@ export function deriveProjectStatusBucket(input: {
           workspace,
           pendingCreateAttempts: input.pendingCreateAttempts,
           workspaceAgentActivity: session.workspaceAgentActivity,
+          reportedWork: input.reportedWork,
         }).status,
       );
     }
@@ -352,6 +356,7 @@ export function buildSidebarWorkspaceEntries(input: {
   placements: readonly SidebarWorkspacePlacement[];
   sessions: SidebarWorkspaceSession[];
   pendingCreateAttempts?: Record<string, PendingCreateAttempt>;
+  reportedWork?: ReportedWorkLookup;
   previousEntries?: ReadonlyMap<string, SidebarWorkspaceEntry>;
 }): ReadonlyMap<string, SidebarWorkspaceEntry> {
   if (input.placements.length === 0 || input.sessions.length === 0) {
@@ -379,6 +384,7 @@ export function buildSidebarWorkspaceEntries(input: {
       projectViewKey: placement.projectViewKey,
       pendingCreateAttempts: input.pendingCreateAttempts,
       workspaceAgentActivity: session.workspaceAgentActivity,
+      reportedWork: input.reportedWork,
     });
     const previousEntry = input.previousEntries?.get(placement.workspaceKey);
     const nextEntry =
