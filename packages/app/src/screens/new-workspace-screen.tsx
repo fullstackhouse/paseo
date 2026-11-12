@@ -110,6 +110,7 @@ import { buildNewWorkspaceProjectIconTargets } from "./new-workspace/project-ico
 import { useNewWorkspaceProjectPicker } from "./new-workspace/project-picker";
 import { useNewWorkspaceForm } from "./new-workspace/form";
 import { ImportSessionButton } from "./new-workspace/import-session-button";
+import { RecentProjects } from "./new-workspace/form/recent-projects";
 import { useImportSession } from "@/hooks/use-import-session";
 import {
   buildTerminalsQueryKey,
@@ -1468,7 +1469,6 @@ export function NewWorkspaceScreen({
       onOpenChange: handleProjectPickerOpenChange,
       options: projectPickerOptions,
       projectByOptionId,
-      recentOptionIds: recentProjectOptionIds,
       iconDataByProjectViewKey: projectIconDataByProjectViewKey,
       selectedProject,
       selectedOptionId: selectedProjectOptionId,
@@ -1521,6 +1521,29 @@ export function NewWorkspaceScreen({
       disabled: isPending,
     },
   });
+
+  const recentProjects = useMemo(
+    () => (
+      <RecentProjects
+        optionIds={recentProjectOptionIds}
+        projectByOptionId={projectByOptionId}
+        iconDataByProjectViewKey={projectIconDataByProjectViewKey}
+        selectedOptionId={selectedProjectOptionId}
+        disabled={isPending}
+        onSelect={handleSelectProjectOption}
+        style={isCompact ? styles.compactRecentProjects : undefined}
+      />
+    ),
+    [
+      handleSelectProjectOption,
+      isCompact,
+      isPending,
+      projectByOptionId,
+      projectIconDataByProjectViewKey,
+      recentProjectOptionIds,
+      selectedProjectOptionId,
+    ],
+  );
 
   const importSession = useImportSession({ serverId: selectedServerId });
 
@@ -1591,6 +1614,7 @@ export function NewWorkspaceScreen({
         isCompact={isCompact}
         fullscreen={isComposerFullscreen}
         title={t("newWorkspace.title")}
+        recentProjects={recentProjects}
         formStack={formStack}
         onImportSession={importSession.open}
       >
@@ -1627,6 +1651,7 @@ function NewWorkspaceLayout({
   isCompact,
   fullscreen,
   title,
+  recentProjects,
   formStack,
   onImportSession,
   children,
@@ -1635,6 +1660,8 @@ function NewWorkspaceLayout({
   /** The composer covers the screen; the header leaves and the dock fills the content. */
   fullscreen: boolean;
   title: string;
+  /** Quick picks for the project, under the title; renders nothing when there are none. */
+  recentProjects: ReactNode;
   formStack: ReactNode;
   onImportSession: () => void;
   children: ReactNode;
@@ -1646,12 +1673,16 @@ function NewWorkspaceLayout({
   const setupFields = isCompact ? (
     <>
       <View style={styles.compactSetupSpace} pointerEvents="none" />
+      {recentProjects}
       {formStack}
     </>
   ) : (
     <>
-      <View style={styles.composerTitleContainer} pointerEvents="none">
-        <Text style={styles.composerTitle}>{title}</Text>
+      <View style={styles.composerHeader}>
+        <View style={styles.composerTitleContainer} pointerEvents="none">
+          <Text style={styles.composerTitle}>{title}</Text>
+        </View>
+        {recentProjects}
       </View>
       {formStack}
     </>
@@ -1688,10 +1719,19 @@ const styles = StyleSheet.create((theme) => ({
   compactSetupSpace: {
     flex: 1,
   },
-  composerTitleContainer: {
+  // Title and recent projects form one header; its bottom gap leaves the field badges' tooltips
+  // room to open upward without covering the recent projects.
+  composerHeader: {
     marginBottom: theme.spacing[8],
+    gap: theme.spacing[3],
+  },
+  composerTitleContainer: {
     paddingLeft: theme.spacing[6],
     paddingRight: theme.spacing[4],
+  },
+  // Replaces the row's focus-ring bleed; with its inner inset, the gap to the fields is spacing[3].
+  compactRecentProjects: {
+    marginBottom: theme.spacing[2],
   },
   composerTitle: {
     fontSize: theme.fontSize["2xl"],

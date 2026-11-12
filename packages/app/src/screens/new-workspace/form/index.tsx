@@ -19,7 +19,6 @@ import {
 import { branchIcon, folderIcon, ProjectIcon, pullRequestIcon } from "./icons";
 import { LaunchControl } from "./launch-control";
 import { AddProjectOption, IsolationOption, ProjectOption, RefOption } from "./options";
-import { RecentProjects } from "./recent-projects";
 
 type Isolation = "local" | "worktree";
 type RenderOption = NonNullable<ComboboxProps["renderOption"]>;
@@ -37,8 +36,6 @@ export interface NewWorkspaceFormProps {
   project: PickerControl & {
     options: ComboboxOption[];
     projectByOptionId: Map<string, HostProjectListItem>;
-    /** The host's most recent projects, offered as one-click pills; empty hides the row. */
-    recentOptionIds: string[];
     iconDataByProjectViewKey: Map<string, string | null>;
     selectedProject: HostProjectListItem | null;
     selectedOptionId: string;
@@ -286,17 +283,6 @@ export function useNewWorkspaceForm(props: NewWorkspaceFormProps): ReactElement 
     />
   );
 
-  const recentProjects = (
-    <RecentProjects
-      optionIds={project.recentOptionIds}
-      projectByOptionId={project.projectByOptionId}
-      iconDataByProjectViewKey={project.iconDataByProjectViewKey}
-      selectedOptionId={project.selectedOptionId}
-      disabled={isPending}
-      onSelect={project.onSelect}
-    />
-  );
-
   const pickers = (
     <>
       <Combobox
@@ -346,41 +332,31 @@ export function useNewWorkspaceForm(props: NewWorkspaceFormProps): ReactElement 
 
   if (isCompact) {
     return (
-      <>
-        {recentProjects}
-        <View testID="new-workspace-ref-picker-row" style={styles.compactStack}>
-          {projectField}
-          {hostField}
-          {isolationField}
-          {baseField}
-          {launchField}
-          {/* Isolation and Base come and go with the project; their rows stay reserved so the
+      <View testID="new-workspace-ref-picker-row" style={styles.compactStack}>
+        {projectField}
+        {hostField}
+        {isolationField}
+        {baseField}
+        {launchField}
+        {/* Isolation and Base come and go with the project; their rows stay reserved so the
             stack keeps one height and nothing above the composer jumps. */}
-          {isolationField ? null : <View style={styles.reservedField} pointerEvents="none" />}
-          {baseField ? null : <View style={styles.reservedField} pointerEvents="none" />}
-          {pickers}
-        </View>
-      </>
+        {isolationField ? null : <View style={styles.reservedField} pointerEvents="none" />}
+        {baseField ? null : <View style={styles.reservedField} pointerEvents="none" />}
+        {pickers}
+      </View>
     );
   }
 
   return (
-    <>
-      {recentProjects}
-      <View
-        testID="new-workspace-ref-picker-row"
-        style={styles.desktopRow}
-        pointerEvents="box-none"
-      >
-        <View style={styles.desktopControl}>{projectField}</View>
-        <View style={styles.desktopControl}>{hostField}</View>
-        {isolationField ? <View style={styles.desktopControl}>{isolationField}</View> : null}
-        {baseField ? <View style={styles.desktopControl}>{baseField}</View> : null}
-        <View style={styles.launchSpacer} pointerEvents="none" />
-        {launchField}
-        {pickers}
-      </View>
-    </>
+    <View testID="new-workspace-ref-picker-row" style={styles.desktopRow} pointerEvents="box-none">
+      <View style={styles.desktopControl}>{projectField}</View>
+      <View style={styles.desktopControl}>{hostField}</View>
+      {isolationField ? <View style={styles.desktopControl}>{isolationField}</View> : null}
+      {baseField ? <View style={styles.desktopControl}>{baseField}</View> : null}
+      <View style={styles.launchSpacer} pointerEvents="none" />
+      {launchField}
+      {pickers}
+    </View>
   );
 }
 
