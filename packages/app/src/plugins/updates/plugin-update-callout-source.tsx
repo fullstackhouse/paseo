@@ -1,10 +1,13 @@
 import type { PluginUpdateProposal } from "@getpaseo/protocol/messages";
 import { useMutation } from "@tanstack/react-query";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSidebarCallouts } from "@/contexts/sidebar-callout-context";
 import { useFetchQuery } from "@/data/query";
 import { useStableEvent } from "@/hooks/use-stable-event";
-import { resolvePluginUpdateCallout } from "@/plugins/updates/resolve-plugin-update-callout";
+import {
+  resolvePluginUpdateCallout,
+  selectPluginUpdateProposals,
+} from "@/plugins/updates/resolve-plugin-update-callout";
 import { useHostFeature } from "@/runtime/host-features";
 import { useHostRuntimeClient, useHostRuntimeIsConnected, useHosts } from "@/runtime/host-runtime";
 
@@ -14,7 +17,7 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-/** One sidebar callout per host whose installed plugins have updates, applied in place. */
+/** Applies managed plugin updates automatically; only failures need a sidebar callout. */
 export function PluginUpdateCalloutSource() {
   const hosts = useHosts();
   return hosts.map((host) => (
@@ -72,21 +75,54 @@ function HostPluginUpdateCallout({
     };
   }, [client, connected, supported, refetchPreview]);
 
+  const [failures, setFailures] = useState(new Map<string, string>());
   const apply = useMutation({
     mutationFn: async (proposals: PluginUpdateProposal[]) => {
       if (!client) throw new Error("Plugin host is offline");
-      const results = await client.applyPluginUpdates(proposals);
-      const failures = results.filter((result) => result.outcome === "error");
-      if (failures.length > 0) {
-        throw new Error(failures.map((result) => `${result.id}: ${result.error}`).join("\n"));
-      }
+      return client.applyPluginUpdates(proposals);
+    },
+    onSuccess: (results, proposals) => {
+      setFailures((previous) => {
+        const next = new Map(previous);
+        for (const proposal of proposals) {
+          const key = JSON.stringify(proposal);
+          const result = results.find((candidate) => candidate.id === proposal.id);
+          if (result?.outcome === "error") next.set(key, `${result.id}: ${result.error}`);
+          else next.delete(key);
+        }
+        return next;
+      });
+    },
+    onError: (error, proposals) => {
+      setFailures((previous) => {
+        const next = new Map(previous);
+        for (const proposal of proposals)
+          next.set(JSON.stringify(proposal), `${proposal.id}: ${errorMessage(error)}`);
+        return next;
+      });
     },
     onSettled: () => refetchPreview(),
   });
   const applyUpdates = apply.mutate;
-  const resetApply = apply.reset;
+  const isApplying = apply.isPending;
+  const attempted = useRef(new Set<string>());
 
-  const applyError = apply.isError ? errorMessage(apply.error) : null;
+  useEffect(() => {
+    if (!client || !connected || !supported || isApplying) return;
+    const proposals = selectPluginUpdateProposals(preview.data).filter(
+      (proposal) => !attempted.current.has(JSON.stringify(proposal)),
+    );
+    if (proposals.length === 0) return;
+    // Catalog events and the post-apply refresh can repeat a failed proposal. Only a
+    // new target/installation or an explicit retry should attempt it again.
+    for (const proposal of proposals) attempted.current.add(JSON.stringify(proposal));
+    applyUpdates(proposals);
+  }, [client, connected, supported, isApplying, preview.data, applyUpdates]);
+
+  const applyError =
+    selectPluginUpdateProposals(preview.data)
+      .flatMap((proposal) => failures.get(JSON.stringify(proposal)) ?? [])
+      .join("\n") || null;
   const descriptor = useMemo(
     () =>
       resolvePluginUpdateCallout({
@@ -101,7 +137,7 @@ function HostPluginUpdateCallout({
   const update = useStableEvent(() => {
     if (descriptor) applyUpdates(descriptor.proposals);
   });
-  const dismiss = useStableEvent(() => resetApply());
+  const dismiss = useStableEvent(() => setFailures(new Map()));
 
   useEffect(() => {
     if (!descriptor) return;
