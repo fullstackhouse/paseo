@@ -4,6 +4,7 @@ import type { UserComposerAttachment } from "@/attachments/types";
 import type { TextReplacement } from "@/composer/types";
 import type { DraftAgentControlsProps } from "@/composer/agent-controls";
 import type { DraftCommandTarget } from "@/agent-commands";
+import type { MaterializedAgentProfile } from "@/agent-profiles";
 import {
   useAgentFormState,
   type CreateAgentInitialValues,
@@ -60,6 +61,8 @@ type DraftComposerState = UseAgentFormStateResult & {
   metadata: Record<string, JsonValue>;
   agentControls: DraftAgentControlsProps;
   commandDraft: DraftCommandTarget;
+  /** Applies a full setup (provider, model, mode, thinking, features) as a user choice. */
+  applyAgentSetup: (setup: MaterializedAgentProfile) => void;
 };
 
 export interface AgentInputDraft {
@@ -367,6 +370,7 @@ export function useAgentInputDraft(input: UseAgentInputDraftInput): AgentInputDr
         onSetMetadata: setMetadata,
       }),
       commandDraft,
+      applyAgentSetup: applyDraftAgentProfile,
     };
   }, [
     commandDraft,

@@ -1481,6 +1481,7 @@ export const en = {
   },
   newWorkspace: {
     title: "New workspace",
+    recentProjects: "Recent projects",
     create: "Create",
     isolation: {
       local: "Project directory",

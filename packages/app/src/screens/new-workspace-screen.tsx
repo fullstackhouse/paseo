@@ -127,6 +127,8 @@ import {
 } from "./new-workspace/existing-worktrees";
 import { useNewWorkspaceForm } from "./new-workspace/form";
 import { ImportSessionButton } from "./new-workspace/import-session-button";
+import { RecentProjectCards } from "./new-workspace/recent-project-cards";
+import type { RecentProjectChoice } from "./new-workspace/project-picker";
 import { useImportSession } from "@/hooks/use-import-session";
 import {
   buildTerminalsQueryKey,
@@ -1021,6 +1023,7 @@ export function NewWorkspaceScreen({
     selectedSourceDirectory,
     projectPickerOptions,
     projectByOptionId,
+    recentProjectChoices,
     selectedProjectOptionId,
     projectTriggerLabel,
     handleSelectProjectOption: selectProjectOption,
@@ -1632,6 +1635,39 @@ export function NewWorkspaceScreen({
     },
   });
 
+  const chatComposerState = chatDraft.composerState;
+  // A card picks its project and the setup its last agent ran with, which the card shows.
+  const handleSelectRecentProject = useCallback(
+    (choice: RecentProjectChoice) => {
+      handleSelectProjectOption(choice.optionId);
+      if (choice.agentSetup) chatComposerState?.applyAgentSetup(choice.agentSetup);
+    },
+    [chatComposerState, handleSelectProjectOption],
+  );
+  const recentProjects = useMemo(
+    () => (
+      <RecentProjectCards
+        layout={isCompact ? "scroll" : "grid"}
+        serverId={selectedServerId}
+        choices={recentProjectChoices}
+        iconDataByProjectViewKey={projectIconDataByProjectViewKey}
+        selectedOptionId={selectedProjectOptionId}
+        disabled={isPending}
+        onSelect={handleSelectRecentProject}
+        style={isCompact ? styles.compactRecentProjects : styles.wideRecentProjects}
+      />
+    ),
+    [
+      handleSelectRecentProject,
+      isCompact,
+      isPending,
+      projectIconDataByProjectViewKey,
+      recentProjectChoices,
+      selectedProjectOptionId,
+      selectedServerId,
+    ],
+  );
+
   const importSession = useImportSession({ serverId: selectedServerId });
 
   const isComposerFullscreen = composerEditing.isFullscreen(isTerminalLaunch);
@@ -1701,6 +1737,7 @@ export function NewWorkspaceScreen({
         isCompact={isCompact}
         fullscreen={isComposerFullscreen}
         title={t("newWorkspace.title")}
+        recentProjects={recentProjects}
         formStack={formStack}
         onImportSession={importSession.open}
       >
@@ -1796,6 +1833,7 @@ function NewWorkspaceLayout({
   isCompact,
   fullscreen,
   title,
+  recentProjects,
   formStack,
   onImportSession,
   children,
@@ -1804,6 +1842,8 @@ function NewWorkspaceLayout({
   /** The composer covers the screen; the header leaves and the dock fills the content. */
   fullscreen: boolean;
   title: string;
+  /** Recent project cards: under the composer when wide, above the fields when compact. */
+  recentProjects: ReactNode;
   formStack: ReactNode;
   onImportSession: () => void;
   children: ReactNode;
@@ -1815,6 +1855,7 @@ function NewWorkspaceLayout({
   const setupFields = isCompact ? (
     <>
       <View style={styles.compactSetupSpace} pointerEvents="none" />
+      {recentProjects}
       {formStack}
     </>
   ) : (
@@ -1837,6 +1878,7 @@ function NewWorkspaceLayout({
           <>
             {children}
             {isCompact || fullscreen ? null : importSessionButton}
+            {isCompact || fullscreen ? null : recentProjects}
           </>
         </ComposerDock>
       </View>
@@ -1861,6 +1903,16 @@ const styles = StyleSheet.create((theme) => ({
     marginBottom: theme.spacing[8],
     paddingLeft: theme.spacing[6],
     paddingRight: theme.spacing[4],
+  },
+  // On the composer's inset, like the Import session pill above it.
+  wideRecentProjects: {
+    marginTop: theme.spacing[8],
+    paddingHorizontal: theme.spacing[4],
+  },
+  // On the compact fields' inset; the cards' row bleeds back out to the screen edges.
+  compactRecentProjects: {
+    marginBottom: theme.spacing[4],
+    paddingHorizontal: theme.spacing[4],
   },
   composerTitle: {
     fontSize: theme.fontSize["2xl"],

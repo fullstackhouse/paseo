@@ -1497,6 +1497,7 @@ export const ptBR: TranslationResources = {
   },
   newWorkspace: {
     title: "Novo workspace",
+    recentProjects: "Projetos recentes",
     create: "Criar",
     isolation: {
       local: "Diretório do projeto",

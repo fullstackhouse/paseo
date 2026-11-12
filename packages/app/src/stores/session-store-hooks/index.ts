@@ -11,6 +11,7 @@ import {
   selectHasWorkspaces,
   selectProjectOrder,
   selectProjectRootPaths,
+  selectRecentProjects,
   selectRecommendedProjectPaths,
   selectWorkspace,
   selectWorkspaceDirectory,
@@ -18,6 +19,7 @@ import {
   selectWorkspaceFields,
   selectWorkspaceKeys,
   workspaceEqualityFns,
+  type RecentProjectActivity,
   type WorkspaceStructure,
 } from "./selectors";
 import { useSessionStore, type WorkspaceDescriptor } from "../session-store";
@@ -26,7 +28,12 @@ import { useSessionStore, type WorkspaceDescriptor } from "../session-store";
 // Do not write raw `useSessionStore` selectors that return the workspaces Map, a session object,
 // or the sessions dict — it breaks re-render isolation.
 
-export type { WorkspaceStructure, WorkspaceStructureProject } from "./selectors";
+export type {
+  RecentAgentSetup,
+  RecentProjectActivity,
+  WorkspaceStructure,
+  WorkspaceStructureProject,
+} from "./selectors";
 
 export function useWorkspace(
   serverId: string | null,
@@ -146,6 +153,14 @@ export function useProjectRootPaths(serverId: string | null): string[] {
   return useStoreWithEqualityFn(
     useSessionStore,
     (state) => selectProjectRootPaths(state, serverId),
+    workspaceEqualityFns.deep,
+  );
+}
+
+export function useRecentProjects(serverId: string | null): RecentProjectActivity[] {
+  return useStoreWithEqualityFn(
+    useSessionStore,
+    (state) => selectRecentProjects(state, serverId),
     workspaceEqualityFns.deep,
   );
 }

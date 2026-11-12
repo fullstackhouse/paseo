@@ -1460,6 +1460,7 @@ export const zhCN: TranslationResources = {
   },
   newWorkspace: {
     title: "新建 workspace",
+    recentProjects: "最近的项目",
     create: "创建",
     isolation: {
       local: "项目目录",
