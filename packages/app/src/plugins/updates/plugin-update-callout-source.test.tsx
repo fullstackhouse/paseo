@@ -28,13 +28,13 @@ vi.mock("@/runtime/host-runtime", () => ({
   useHostRuntimeIsConnected: () => host.connected,
 }));
 
-function update(commit = "b".repeat(40)): PluginUpdatePreview {
+function update(commit = "b".repeat(40), id = "example"): PluginUpdatePreview {
   return {
-    id: "example",
+    id,
     outcome: "update",
     links: [],
     proposal: {
-      id: "example",
+      id,
       expected: {
         identity: { kind: "git", remote: "https://github.com/acme/example", pluginPath: "" },
         installationRoot: "/plugins/example",
@@ -161,6 +161,38 @@ describe("automatic plugin updates", () => {
     act(() => failure.actions![0].onPress());
     await waitFor(() => expect(rpc.applyPluginUpdates).toHaveBeenCalledTimes(2));
     await settle();
+  });
+
+  it("retains a failed plugin's retry after another plugin updates successfully", async () => {
+    let visible: SidebarCalloutOptions | null = null;
+    callouts.show.mockImplementation((options) => {
+      visible = options;
+      return () => {
+        visible = null;
+      };
+    });
+    rpc.applyPluginUpdates.mockResolvedValueOnce([
+      { id: "example", outcome: "error", error: "build failed" },
+    ]);
+    mount();
+    await waitFor(() => expect(visible?.description).toBe("example: build failed"));
+    await settle();
+    const second = update("c".repeat(40), "second");
+    rpc.previewPluginUpdates.mockResolvedValue([update(), second]);
+    rpc.applyPluginUpdates.mockImplementationOnce(async () => {
+      rpc.previewPluginUpdates.mockResolvedValue([update()]);
+      return [{ id: "second", outcome: "updated" }];
+    });
+    act(() => catalogChanged());
+    await waitFor(() => expect(rpc.applyPluginUpdates).toHaveBeenCalledTimes(2));
+    await settle();
+    expect(rpc.applyPluginUpdates).toHaveBeenLastCalledWith([second.proposal]);
+    expect(visible).toMatchObject({ description: "example: build failed" });
+    act(() => visible!.actions![0].onPress());
+    await waitFor(() => expect(rpc.applyPluginUpdates).toHaveBeenCalledTimes(3));
+    expect(rpc.applyPluginUpdates).toHaveBeenLastCalledWith([update().proposal]);
+    await settle();
+    expect(visible).toBeNull();
   });
 
   it("does not retry a dismissed failure, but does install a newer target", async () => {

@@ -1,6 +1,6 @@
 import type { PluginUpdateProposal } from "@getpaseo/protocol/messages";
 import { useMutation } from "@tanstack/react-query";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSidebarCallouts } from "@/contexts/sidebar-callout-context";
 import { useFetchQuery } from "@/data/query";
 import { useStableEvent } from "@/hooks/use-stable-event";
@@ -75,19 +75,35 @@ function HostPluginUpdateCallout({
     };
   }, [client, connected, supported, refetchPreview]);
 
+  const [failures, setFailures] = useState(new Map<string, string>());
   const apply = useMutation({
     mutationFn: async (proposals: PluginUpdateProposal[]) => {
       if (!client) throw new Error("Plugin host is offline");
-      const results = await client.applyPluginUpdates(proposals);
-      const failures = results.filter((result) => result.outcome === "error");
-      if (failures.length > 0) {
-        throw new Error(failures.map((result) => `${result.id}: ${result.error}`).join("\n"));
-      }
+      return client.applyPluginUpdates(proposals);
+    },
+    onSuccess: (results, proposals) => {
+      setFailures((previous) => {
+        const next = new Map(previous);
+        for (const proposal of proposals) {
+          const key = JSON.stringify(proposal);
+          const result = results.find((candidate) => candidate.id === proposal.id);
+          if (result?.outcome === "error") next.set(key, `${result.id}: ${result.error}`);
+          else next.delete(key);
+        }
+        return next;
+      });
+    },
+    onError: (error, proposals) => {
+      setFailures((previous) => {
+        const next = new Map(previous);
+        for (const proposal of proposals)
+          next.set(JSON.stringify(proposal), `${proposal.id}: ${errorMessage(error)}`);
+        return next;
+      });
     },
     onSettled: () => refetchPreview(),
   });
   const applyUpdates = apply.mutate;
-  const resetApply = apply.reset;
   const isApplying = apply.isPending;
   const attempted = useRef(new Set<string>());
 
@@ -103,7 +119,10 @@ function HostPluginUpdateCallout({
     applyUpdates(proposals);
   }, [client, connected, supported, isApplying, preview.data, applyUpdates]);
 
-  const applyError = apply.isError ? errorMessage(apply.error) : null;
+  const applyError =
+    selectPluginUpdateProposals(preview.data)
+      .flatMap((proposal) => failures.get(JSON.stringify(proposal)) ?? [])
+      .join("\n") || null;
   const descriptor = useMemo(
     () =>
       resolvePluginUpdateCallout({
@@ -118,7 +137,7 @@ function HostPluginUpdateCallout({
   const update = useStableEvent(() => {
     if (descriptor) applyUpdates(descriptor.proposals);
   });
-  const dismiss = useStableEvent(() => resetApply());
+  const dismiss = useStableEvent(() => setFailures(new Map()));
 
   useEffect(() => {
     if (!descriptor) return;
