@@ -26,7 +26,7 @@ function cleanup() {
 import { QueryClient, QueryClientProvider, onlineManager } from "@tanstack/react-query";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { PullRequestPanel } from "@/plugins/react-native/pull-request";
-import { PullRequestPaneView } from "@/git/pull-request-panel/pane";
+import { PullRequestPaneView } from "@/git/pull-request-panel/view";
 import { mapPluginPullRequest } from "@/plugins/react-native/pull-request-data";
 import type { PullRequestPanelData } from "@getpaseo/plugin/client/ui";
 // The shared test adapter normally drops uniProps. Apply them here so the real

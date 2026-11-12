@@ -1,5 +1,6 @@
 import type { PullRequestPanelData } from "@getpaseo/plugin/client/ui";
-import { deriveAvatarColor, formatAge, type PrPaneData } from "@/git/pull-request-panel/data";
+import { deriveAvatarColor, formatAge } from "@/git/pull-request-panel/presentation";
+import type { PrPaneData } from "@/git/pull-request-panel/data";
 import { getForgePresentation } from "@/git/forge";
 
 /** Keep presentation fields host-owned when plugins supply forge data. */
