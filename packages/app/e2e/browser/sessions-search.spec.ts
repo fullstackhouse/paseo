@@ -176,3 +176,19 @@ test.describe("History search", () => {
     });
   }
 });
+
+test.describe("History search on a wide touch screen", () => {
+  test.use({ viewport: { width: 1024, height: 1366 }, isMobile: true, hasTouch: true });
+
+  test("does not autofocus search", async ({ page }) => {
+    await resetSeededPageState(page);
+    // Without a coarse pointer this test would pass for the wrong reason.
+    expect(
+      await page.evaluate(() => matchMedia("(hover: hover) and (pointer: fine)").matches),
+    ).toBe(false);
+    await openSessions(page);
+    const searchInput = page.getByTestId("sessions-search-input");
+    await expect(searchInput).toBeVisible({ timeout: 30_000 });
+    await expect(searchInput).not.toBeFocused();
+  });
+});
