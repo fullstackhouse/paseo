@@ -147,6 +147,8 @@ test.describe("History search", () => {
     }) => {
       await resetSeededPageState(page);
       await openSessions(page);
+      // History opens from the desktop sidebar, so the field autofocuses before the resize.
+      await expect(page.getByTestId("sessions-search-input")).toBeFocused();
       await page.setViewportSize(viewport);
 
       await verifyChronologicalFiltering(page);
