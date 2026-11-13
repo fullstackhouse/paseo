@@ -47,6 +47,7 @@ import {
 } from "./window/window-manager.js";
 import { setupDarwinCompositorWatchdog } from "./window/compositor-watchdog/index.js";
 import { showWindowWhenReady } from "./window/show-when-ready.js";
+import { registerSubframeNavigationGuard } from "./window/subframe-navigation.js";
 import { resolveDesktopWindowChromeMode, windowChromeModeArgument } from "./window/chrome.js";
 import { registerDialogHandlers } from "./features/dialogs.js";
 import {
@@ -748,6 +749,7 @@ async function createWindow(
   }
   setupDefaultContextMenu(mainWindow);
   setupDragDropPrevention(mainWindow);
+  registerSubframeNavigationGuard(mainWindow, (url) => shell.openExternal(url));
   mainWindow.webContents.on("will-attach-webview", (event, webPreferences, params) => {
     if (!isPaseoBrowserWebviewAttach(params)) {
       event.preventDefault();
