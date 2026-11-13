@@ -27,6 +27,7 @@ temporary by design: every patch is meant to go upstream and then drop out of `f
 - FSH-only (not upstream yet): docs and a `paseo-run` skill for running a branch, or testing a plugin, next to the Paseo you work in
 - FSH-only (not upstream yet): new workspaces branch off the repo's default branch, not whatever branch the source checkout is on. The daemon picks the ref: the default branch's upstream (any remote), then origin's copy, then local
 - FSH-only (not upstream yet): remove a project from its settings page (Settings → Projects → project → Danger zone), not just from the sidebar menu
+- FSH-only (upstreamable, getpaseo/paseo#8373): Linux desktop notifications play a sound when **Play sound** is on. Electron sends them without a sound hint, so GNOME and KDE stayed silent; they now go through `notify-send` with `sound-name:message-new-instant`, and the notification server plays it (Do Not Disturb and per-app sound settings apply). Without `notify-send` the silent Electron banner shows as before. getpaseo/paseo#8370 proposes the same idea upstream
 - FSH-only: macOS builds are signed with a self-signed FSH certificate instead of ad hoc, so folder-access answers survive updates (see Install below)
 - FSH-only: the desktop app's update callout installs new FSH builds through `scripts/install-fsh.sh`, on macOS (DMG) and Fedora (RPM) (see Install below)
 - FSH-only: Settings → About has no **Release channel** picker. FSH builds update from GitHub's latest release, which has no beta channel
