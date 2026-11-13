@@ -124,9 +124,11 @@ export class CreateAgentLifecycleDispatch {
       return;
     }
 
+    // A rollback waits for the directory, so the failure leaves no worktree behind when reported.
     await this.archiveAutoCreatedWorktree({
       agentId: null,
       createdWorktree,
+      directoryRemoval: "wait",
     }).catch((archiveError) => {
       this.dependencies.logger.warn(
         {
@@ -160,6 +162,7 @@ export class CreateAgentLifecycleDispatch {
         await this.archiveAutoCreatedWorktree({
           agentId,
           createdWorktree: target.result,
+          directoryRemoval: "background",
         });
         return;
       }
@@ -173,6 +176,7 @@ export class CreateAgentLifecycleDispatch {
   private async archiveAutoCreatedWorktree(options: {
     agentId: string | null;
     createdWorktree: CreatePaseoWorktreeWorkflowResult;
+    directoryRemoval: "wait" | "background";
   }): Promise<void> {
     const { createdWorktree } = options;
     const worktreePath = createdWorktree.worktree.worktreePath;
@@ -204,7 +208,7 @@ export class CreateAgentLifecycleDispatch {
       {
         scope: { kind: "workspace", workspaceId: createdWorktree.workspace.workspaceId },
         requestId: randomUUID(),
-        directoryRemoval: "background",
+        directoryRemoval: options.directoryRemoval,
       },
     );
 
