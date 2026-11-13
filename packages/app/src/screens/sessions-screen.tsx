@@ -17,7 +17,7 @@ import { type AgentHistoryHostError, useAgentHistory } from "@/hooks/use-agent-h
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { useImportSession } from "@/hooks/use-import-session";
 import { useHosts } from "@/runtime/host-runtime";
-import { isWeb } from "@/constants/platform";
+import { useHasFinePointer } from "@/hooks/use-fine-pointer";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { buildOpenProjectRoute } from "@/utils/host-routes";
 
@@ -63,10 +63,12 @@ function resolveEmptyText(input: {
 }
 
 // Content remounts on every screen focus, so autoFocus fires each time History opens.
-// Compact layouts skip it so a software keyboard doesn't cover the list.
+// Touch screens skip it so the on-screen keyboard doesn't cover the list; a wide tablet
+// browser is not compact, so width alone doesn't catch it. Native never has a fine pointer.
 function useShouldAutoFocusSearch(): boolean {
   const isCompact = useIsCompactFormFactor();
-  return isWeb && !isCompact;
+  const hasFinePointer = useHasFinePointer();
+  return hasFinePointer && !isCompact;
 }
 
 export function SessionsScreen() {
