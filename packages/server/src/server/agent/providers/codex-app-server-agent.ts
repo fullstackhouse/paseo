@@ -57,8 +57,9 @@ import path from "node:path";
 import { isDeepStrictEqual } from "node:util";
 import { z } from "zod";
 import { renderPromptAttachmentAsText } from "../prompt-attachments.js";
-import { composeAgentSystemPrompt } from "../system-prompt.js";
+import { composeAgentSystemPrompt, composeSystemPromptParts } from "../system-prompt.js";
 import { CodexInstructionSnapshot } from "./codex/instruction-snapshot.js";
+import { codexAlwaysLoadMcpNote } from "./codex/always-load-mcp.js";
 import { CodexAsyncQuestions, codexAsyncQuestionToTimeline } from "./codex/async-questions.js";
 import {
   fileChangesToPreview,
@@ -3928,7 +3929,7 @@ export class CodexAppServerAgentSession implements AgentSession {
       validateProviderOptions("codex", CodexProviderOptionsSchema, config.providerOptions) ?? {};
     this.config = config;
     this.instructionSnapshot = new CodexInstructionSnapshot(
-      composeAgentSystemPrompt(config),
+      this.composeDeveloperInstructions(),
       resumeHandle?.metadata?.paseoInstructionReceipt,
     );
     this.harnessEnvironment = deps.environment ?? buildCodexAppServerEnv();
@@ -4534,7 +4535,7 @@ export class CodexAppServerAgentSession implements AgentSession {
       // the unnamespaced key emitted by earlier Paseo versions.
       params.modelProvider = this.deps.customCodexConfig.model_provider;
     }
-    const developerInstructions = composeAgentSystemPrompt(this.config);
+    const developerInstructions = this.composeDeveloperInstructions();
     if (developerInstructions) {
       params.developerInstructions = developerInstructions;
     }
@@ -4706,7 +4707,7 @@ export class CodexAppServerAgentSession implements AgentSession {
     if (options?.outputSchema) {
       params.outputSchema = normalizeCodexOutputSchema(options.outputSchema);
     }
-    const developerInstructions = composeAgentSystemPrompt(this.config);
+    const developerInstructions = this.composeDeveloperInstructions();
     const codexConfig = this.buildCodexInnerConfig();
     if (codexConfig) {
       params.config = codexConfig;
@@ -5511,7 +5512,7 @@ export class CodexAppServerAgentSession implements AgentSession {
       model: this.config.model ?? null,
       serviceTier: this.serviceTier,
       config: this.buildCodexInnerConfig(),
-      developerInstructions: composeAgentSystemPrompt(this.config),
+      developerInstructions: this.composeDeveloperInstructions(),
       userMessageTurns: this.codexUserMessageTurns(),
       threadRollbackAvailable: this.threadRollbackAvailable,
       setThreadId: async (threadId) => {
@@ -6067,7 +6068,7 @@ export class CodexAppServerAgentSession implements AgentSession {
     const approvalPolicy = this.hasWorkflowModeOverride ? preset.approvalPolicy : undefined;
     const sandbox = this.hasWorkflowModeOverride ? preset.sandbox : undefined;
     const innerConfig = this.buildCodexInnerConfig();
-    const developerInstructions = composeAgentSystemPrompt(this.config);
+    const developerInstructions = this.composeDeveloperInstructions();
     const params: Record<string, unknown> = {
       model,
       cwd: this.config.cwd ?? null,
@@ -6083,6 +6084,13 @@ export class CodexAppServerAgentSession implements AgentSession {
       params.approvalsReviewer = preset.approvalsReviewer;
     }
     return { params, approvalPolicy, sandbox };
+  }
+
+  private composeDeveloperInstructions(): string | undefined {
+    return composeSystemPromptParts(
+      composeAgentSystemPrompt(this.config),
+      codexAlwaysLoadMcpNote(this.config.mcpServers),
+    );
   }
 
   private buildCodexInnerConfig(): Record<string, unknown> | null {
