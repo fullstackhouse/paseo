@@ -2,6 +2,10 @@ import path from "node:path";
 import { existsSync } from "node:fs";
 import { app, BrowserWindow, Notification, ipcMain, nativeImage } from "electron";
 import { getDesktopSettingsStore } from "../settings/desktop-settings-electron.js";
+import {
+  showLinuxNotificationWithSound,
+  stopWaitingForLinuxNotifications,
+} from "./linux-notification.js";
 
 interface NotificationInput {
   title?: unknown;
@@ -29,7 +33,7 @@ function toRecord(value: unknown): Record<string, unknown> | undefined {
     : undefined;
 }
 
-function getNotificationIcon(): Electron.NativeImage | null {
+function getNotificationIconPath(): string | null {
   const candidates = [
     path.resolve(__dirname, "../assets/icon.png"),
     path.resolve(__dirname, "../assets/64x64.png"),
@@ -40,9 +44,8 @@ function getNotificationIcon(): Electron.NativeImage | null {
     if (!existsSync(iconPath)) {
       continue;
     }
-    const icon = nativeImage.createFromPath(iconPath);
-    if (!icon.isEmpty()) {
-      return icon;
+    if (!nativeImage.createFromPath(iconPath).isEmpty()) {
+      return iconPath;
     }
   }
 
@@ -78,7 +81,48 @@ export function ensureNotificationCenterRegistration(): void {
   probe.show();
 }
 
+function deliverNotificationClick(
+  sender: Electron.WebContents,
+  data: Record<string, unknown> | undefined,
+): void {
+  const win = focusSenderWindow(sender);
+  if (win && data && Object.keys(data).length > 0) {
+    const payload: NotificationClickPayload = { data };
+    win.webContents.send("paseo:event:notification-click", payload);
+  }
+}
+
+function showElectronNotification(input: {
+  title: string;
+  body: string | undefined;
+  iconPath: string | null;
+  silent: boolean;
+  onClick: () => void;
+}): void {
+  const notification = new Notification({
+    title: input.title,
+    ...(input.body ? { body: input.body } : {}),
+    ...(input.iconPath ? { icon: input.iconPath } : {}),
+    silent: input.silent,
+  });
+
+  activeNotifications.add(notification);
+
+  notification.on("click", () => {
+    input.onClick();
+    activeNotifications.delete(notification);
+  });
+
+  notification.on("close", () => {
+    activeNotifications.delete(notification);
+  });
+
+  notification.show();
+}
+
 export function registerNotificationHandlers(): void {
+  app.on("will-quit", stopWaitingForLinuxNotifications);
+
   ipcMain.handle("paseo:notification:isSupported", () => {
     return Notification.isSupported();
   });
@@ -95,31 +139,24 @@ export function registerNotificationHandlers(): void {
 
     const body = toTrimmedString(rawInput?.body) ?? undefined;
     const data = toRecord(rawInput?.data);
-    const icon = getNotificationIcon();
+    const iconPath = getNotificationIconPath();
     const settings = await getDesktopSettingsStore().get();
-    const notification = new Notification({
-      title,
-      ...(body ? { body } : {}),
-      ...(icon ? { icon } : {}),
-      silent: !settings.notifications.playSound,
-    });
+    const playSound = settings.notifications.playSound;
+    const onClick = () => deliverNotificationClick(event.sender, data);
 
-    activeNotifications.add(notification);
+    if (playSound && process.platform === "linux") {
+      showLinuxNotificationWithSound(
+        { appName: app.name, title, body, iconPath },
+        {
+          onClick,
+          onFailed: () =>
+            showElectronNotification({ title, body, iconPath, silent: false, onClick }),
+        },
+      );
+      return true;
+    }
 
-    notification.on("click", () => {
-      const win = focusSenderWindow(event.sender);
-      if (win && data && Object.keys(data).length > 0) {
-        const payload: NotificationClickPayload = { data };
-        win.webContents.send("paseo:event:notification-click", payload);
-      }
-      activeNotifications.delete(notification);
-    });
-
-    notification.on("close", () => {
-      activeNotifications.delete(notification);
-    });
-
-    notification.show();
+    showElectronNotification({ title, body, iconPath, silent: !playSound, onClick });
     return true;
   });
 }
