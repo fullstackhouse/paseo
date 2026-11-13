@@ -6,6 +6,8 @@ temporary by design: every patch is meant to go upstream and then drop out of `f
 
 ## Patches on `fsh`
 
+- FSH-only (upstreamable): archiving a workspace removes it from the app's sidebar even when the app last synced from its cached directory; before, the daemon skipped the removal and the row stayed until a daemon restart
+
 - FSH-only (upstreamable): plugins can render the Explorer pull-request panel through `PullRequestPanel`, using their own checks and activity data without a workspace checkout. Inbox uses it for its read-only GitHub tab.
 
 - FSH-only: don't automatically show the worktree scripts setup callout; configure scripts in project settings.
