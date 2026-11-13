@@ -3,6 +3,8 @@ import { expect, type Page } from "@playwright/test";
 import { test } from "../support/fixtures";
 import { connectSeedClient } from "../support/helpers/seed-client";
 import { createTempGitRepo } from "../support/helpers/workspace";
+import { buildSessionsRoute } from "@/utils/host-routes";
+import { expectAppRoute } from "../support/helpers/route-assertions";
 import {
   createIdleAgent,
   openSessions,
@@ -138,6 +140,17 @@ test.describe("History search", () => {
     await tempRepo?.cleanup();
   });
 
+  test("does not autofocus search in a compact layout", async ({ page }) => {
+    await resetSeededPageState(page);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.getByTestId("menu-button").filter({ visible: true }).first().click();
+    await page.getByTestId("sidebar-sessions").filter({ visible: true }).click();
+    await expectAppRoute(page, buildSessionsRoute(), { timeout: 30_000 });
+    const searchInput = page.getByTestId("sessions-search-input");
+    await expect(searchInput).toBeVisible({ timeout: 30_000 });
+    await expect(searchInput).not.toBeFocused();
+  });
+
   for (const viewport of [
     { width: 1440, height: 1000 },
     { width: 390, height: 844 },
@@ -147,6 +160,8 @@ test.describe("History search", () => {
     }) => {
       await resetSeededPageState(page);
       await openSessions(page);
+      // The default viewport is wide with a mouse pointer, so the field autofocuses on open.
+      await expect(page.getByTestId("sessions-search-input")).toBeFocused();
       await page.setViewportSize(viewport);
 
       await verifyChronologicalFiltering(page);
@@ -160,4 +175,20 @@ test.describe("History search", () => {
       await verifyEmptySearchAndRecovery(page);
     });
   }
+});
+
+test.describe("History search on a wide touch screen", () => {
+  test.use({ viewport: { width: 1024, height: 1366 }, isMobile: true, hasTouch: true });
+
+  test("does not autofocus search", async ({ page }) => {
+    await resetSeededPageState(page);
+    // Without a coarse pointer this test would pass for the wrong reason.
+    expect(
+      await page.evaluate(() => matchMedia("(hover: hover) and (pointer: fine)").matches),
+    ).toBe(false);
+    await openSessions(page);
+    const searchInput = page.getByTestId("sessions-search-input");
+    await expect(searchInput).toBeVisible({ timeout: 30_000 });
+    await expect(searchInput).not.toBeFocused();
+  });
 });
