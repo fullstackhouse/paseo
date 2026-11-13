@@ -46,6 +46,7 @@ import type {
   AgentStreamEvent,
 } from "./agent/agent-sdk-types.js";
 import { createWorktree } from "../utils/worktree.js";
+import { waitForPendingWorktreeRemoval } from "../utils/worktree-removal-queue.js";
 import { createRealpathAwarePathMatcher } from "../utils/path.js";
 import {
   readPaseoWorktreeMetadata,
@@ -6245,6 +6246,7 @@ test("archive_workspace_request archives a worktree-kind workspace and removes t
     });
 
     expect(workspace.archivedAt).toBeTruthy();
+    await waitForPendingWorktreeRemoval(worktree.worktreePath);
     expect(existsSync(worktree.worktreePath)).toBe(false);
     const response = emitted.find((message) => message.type === "archive_workspace_response") as
       | { payload: Record<string, unknown> }

@@ -117,6 +117,7 @@ export async function archiveIfSafe(input: {
       {
         scope: { kind: "workspace", workspaceId },
         requestId: "auto-archive-on-merge",
+        directoryRemoval: "background",
       },
     );
     log.info(

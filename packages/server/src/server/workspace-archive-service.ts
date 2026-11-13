@@ -12,6 +12,7 @@ import {
   runWorktreeTeardownCommands,
   WorktreeTeardownError,
 } from "../utils/worktree.js";
+import { enqueueWorktreeRemoval } from "../utils/worktree-removal-queue.js";
 import type { TerminalManager } from "../terminal/terminal-manager.js";
 import type {
   PersistedWorkspaceRecord,
@@ -78,6 +79,16 @@ export interface ArchiveResult {
 export interface ArchiveByScopeRequest {
   scope: ArchiveScope;
   requestId: string;
+  // "wait" (default) resolves after the backing directory is removed, so
+  // `removedDirectory` is meaningful. "background" resolves once the records
+  // are archived; removal continues on the worktree removal queue, failures
+  // are logged, and `removedDirectory` is always false.
+  directoryRemoval?: "wait" | "background";
+}
+
+interface DirectoryRemovalResult {
+  removedDirectory: boolean;
+  directoryLeftBehind?: { path: string; reason: string };
 }
 
 export async function requireActiveWorkspaceForArchive(
@@ -130,9 +141,12 @@ export async function resolveWorkspaceIdAtPath(
   return dependencies.findWorkspaceIdForCwd(targetPath);
 }
 
-// Resolves the in-scope record set, tears each down
-// (agents + terminals + record), then removes the backing directory iff it is
-// Paseo-owned AND no active workspace still references it.
+// Resolves the in-scope record set, tears each down (agents + terminals +
+// record), then removes the backing directory iff it is Paseo-owned AND no
+// active workspace still references it. The archiving marker clears and the
+// final workspace updates go out once the records are archived; directory
+// removal (teardown commands, git worktree remove, rm, prune) runs after that
+// through the per-repository worktree removal queue.
 export async function archiveByScope(
   dependencies: ArchiveDependencies,
   request: ArchiveByScopeRequest,
@@ -153,57 +167,73 @@ async function archiveByScopeWithPriority(
     dependencies.markWorkspaceArchiving(targetWorkspaceIds, new Date().toISOString());
   }
 
-  let removedDirectory = false;
-  let directoryLeftBehind: ArchiveResult["directoryLeftBehind"];
-
+  let records: { archivedAgents: Set<string>; archivedWorkspaceIds: string[] };
   try {
     if (targetWorkspaceIds.length > 0) {
       await dependencies.emitWorkspaceUpdatesForWorkspaceIds(targetWorkspaceIds);
     }
-
-    const { archivedAgents, archivedWorkspaceIds } = await archiveTargetRecords(
-      dependencies,
-      targetWorkspaceIds,
-      request.requestId,
-    );
-
-    if (target.backing?.mainRepoRoot) {
-      try {
-        await dependencies.workspaceGitService.getSnapshot(target.backing.mainRepoRoot, {
-          force: true,
-          reason: "archive-worktree",
-        });
-      } catch (error) {
-        dependencies.sessionLogger?.warn(
-          { err: error, cwd: target.backing.mainRepoRoot, requestId: request.requestId },
-          "Failed to force-refresh workspace git snapshot after archiving",
-        );
-      }
-    }
-
-    if (target.backing !== null) {
-      const removal = await maybeRemoveDirectory(
-        dependencies,
-        request,
-        target,
-        archivedWorkspaceIds,
-      );
-      removedDirectory = removal.removedDirectory;
-      directoryLeftBehind = removal.directoryLeftBehind;
-    }
-
-    return {
-      archivedAgentIds: Array.from(archivedAgents),
-      archivedWorkspaceIds,
-      removedDirectory,
-      ...(directoryLeftBehind ? { directoryLeftBehind } : {}),
-    };
+    records = await archiveTargetRecords(dependencies, targetWorkspaceIds, request.requestId);
   } finally {
     if (targetWorkspaceIds.length > 0) {
       dependencies.clearWorkspaceArchiving(targetWorkspaceIds);
       await dependencies.emitWorkspaceUpdatesForWorkspaceIds(targetWorkspaceIds);
     }
   }
+
+  const archivedAgentIds = Array.from(records.archivedAgents);
+  const archivedWorkspaceIds = records.archivedWorkspaceIds;
+  const backing = target.backing;
+  if (backing === null) {
+    return { archivedAgentIds, archivedWorkspaceIds, removedDirectory: false };
+  }
+
+  const removal = enqueueWorktreeRemoval({
+    repositoryKey: backing.mainRepoRoot ?? backing.path,
+    worktreePath: backing.path,
+    remove: () =>
+      removeBackingDirectory(dependencies, request, target, backing, archivedWorkspaceIds),
+  });
+
+  if (request.directoryRemoval === "background") {
+    void removal.catch((error: unknown) => {
+      dependencies.sessionLogger?.warn(
+        { err: error, targetPath: backing.path, requestId: request.requestId },
+        "Worktree disk removal failed during archive; workspace already archived",
+      );
+    });
+    return { archivedAgentIds, archivedWorkspaceIds, removedDirectory: false };
+  }
+
+  const { removedDirectory, directoryLeftBehind } = await removal;
+  return {
+    archivedAgentIds,
+    archivedWorkspaceIds,
+    removedDirectory,
+    ...(directoryLeftBehind ? { directoryLeftBehind } : {}),
+  };
+}
+
+async function removeBackingDirectory(
+  dependencies: ArchiveDependencies,
+  request: Pick<ArchiveByScopeRequest, "requestId">,
+  target: ArchiveTarget,
+  backing: BackingDirectory,
+  archivedWorkspaceIds: string[],
+): Promise<DirectoryRemovalResult> {
+  if (backing.mainRepoRoot) {
+    try {
+      await dependencies.workspaceGitService.getSnapshot(backing.mainRepoRoot, {
+        force: true,
+        reason: "archive-worktree",
+      });
+    } catch (error) {
+      dependencies.sessionLogger?.warn(
+        { err: error, cwd: backing.mainRepoRoot, requestId: request.requestId },
+        "Failed to force-refresh workspace git snapshot after archiving",
+      );
+    }
+  }
+  return maybeRemoveDirectory(dependencies, request, target, archivedWorkspaceIds);
 }
 
 async function resolveArchiveTarget(
@@ -387,10 +417,7 @@ async function maybeRemoveDirectory(
   request: Pick<ArchiveByScopeRequest, "requestId">,
   target: ArchiveTarget,
   archivedWorkspaceIds: string[],
-): Promise<{
-  removedDirectory: boolean;
-  directoryLeftBehind?: { path: string; reason: string };
-}> {
+): Promise<DirectoryRemovalResult> {
   const backing = target.backing;
   if (!backing?.isPaseoOwnedWorktree) {
     // Missing ownership proof for a worktree-backed directory: the record
