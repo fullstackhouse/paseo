@@ -1013,6 +1013,44 @@ describe("WorkspaceGitServiceImpl", () => {
     service.dispose();
   });
 
+  test("fetches origin as soon as the workspace pull request turns merged", async () => {
+    const merged = createPullRequestStatusResult();
+    if (!merged.status) throw new Error("Expected pull request status");
+    merged.status = { ...merged.status, state: "merged", isMerged: true };
+    let prStatus = createPullRequestStatusResult();
+    const getPullRequestStatus = vi.fn(async () => prStatus);
+    const runGitFetch = vi.fn(async () => ({ changes: [], error: null }));
+    const service = createService({
+      getPullRequestStatus,
+      hasOriginRemote: vi.fn(async () => true),
+      runGitFetch,
+    });
+    const subscription = service.registerWorkspace({ cwd: REPO_CWD }, vi.fn());
+    try {
+      await vi.waitFor(() => {
+        expect(runGitFetch).toHaveBeenCalledTimes(1);
+        expect(service.getMetrics().workspaceRefreshInFlightCount).toBe(0);
+      });
+
+      const open = await service.getSnapshot(REPO_CWD, { force: true, reason: "pr-open" });
+      expect(open.forge.pullRequest).toMatchObject({ isMerged: false });
+      await flushPromises();
+      expect(runGitFetch).toHaveBeenCalledTimes(1);
+
+      prStatus = merged;
+      const after = await service.getSnapshot(REPO_CWD, { force: true, reason: "pr-merged" });
+      expect(after.forge.pullRequest).toMatchObject({ isMerged: true });
+      await vi.waitFor(() => expect(runGitFetch).toHaveBeenCalledTimes(2));
+
+      await service.getSnapshot(REPO_CWD, { force: true, reason: "pr-still-merged" });
+      await flushPromises();
+      expect(runGitFetch).toHaveBeenCalledTimes(2);
+    } finally {
+      subscription.unsubscribe();
+      await service.dispose();
+    }
+  });
+
   test("repo-level fetch intervals are shared for workspaces in the same repo", async () => {
     const firstFetch = createDeferred<void>();
     const runGitFetch = vi.fn(async () => {
