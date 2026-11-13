@@ -7,7 +7,13 @@ import React, { type ReactElement } from "react";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
-import type { PluginListItem, PluginLogEntry } from "@getpaseo/protocol/messages";
+import type {
+  PluginListItem,
+  PluginLogEntry,
+  PluginUpdatePreview,
+  PluginUpdateProposal,
+  PluginUpdateResult,
+} from "@getpaseo/protocol/messages";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { HostPluginsPage } from "./plugins-page";
 
@@ -125,6 +131,11 @@ function createClient() {
     disablePlugin: vi.fn(async () => plugin(false)),
     removePlugin: vi.fn(async () => undefined),
     getPluginLogs: vi.fn(async (): Promise<PluginLogEntry[]> => []),
+    previewPluginUpdates: vi.fn(async (): Promise<PluginUpdatePreview[]> => []),
+    applyPluginUpdates: vi.fn(
+      async (proposals: PluginUpdateProposal[]): Promise<PluginUpdateResult[]> =>
+        proposals.map(({ id }) => ({ id, outcome: "updated" })),
+    ),
   };
 }
 
@@ -170,6 +181,37 @@ describe("HostPluginsPage", () => {
     renderPage(null);
 
     expect(screen.getByRole("alert").textContent).toContain("Plugin host is offline");
+  });
+
+  it("checks for plugin updates and applies the outdated ones", async () => {
+    const client = createClient();
+    client.listPlugins.mockResolvedValue([plugin()]);
+    client.previewPluginUpdates.mockResolvedValueOnce([
+      {
+        id: "example",
+        outcome: "update",
+        links: [],
+        proposal: {
+          id: "example",
+          expected: {
+            identity: { kind: "git", remote: "https://github.com/acme/example", pluginPath: "" },
+            installationRoot: "/plugins/example",
+            revision: "a".repeat(40),
+          },
+          target: { kind: "git", commit: "b".repeat(40) },
+        },
+      },
+    ]);
+    renderPage(client);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Check for updates" }));
+
+    expect(await screen.findByText("Updated example")).toBeDefined();
+    expect(client.applyPluginUpdates).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByRole("button", { name: "Check for updates" }));
+    expect(await screen.findByText("All plugins are up to date")).toBeDefined();
+    expect(client.applyPluginUpdates).toHaveBeenCalledTimes(1);
   });
 
   it("renders a catalog error and retries through the real query", async () => {

@@ -1491,6 +1491,14 @@ export const ru: TranslationResources = {
       updating: "Обновление...",
       failedTitle: "Не удалось обновить плагин",
     },
+    check: {
+      action: "Проверить обновления плагинов",
+      button: "Проверить обновления",
+      checking: "Проверка…",
+      upToDate: "Все плагины обновлены",
+      updated: "Обновлено: {{plugins}}",
+      failed: "Не удалось обновить плагины:\n{{errors}}",
+    },
   },
   desktop: {
     windowControls: {

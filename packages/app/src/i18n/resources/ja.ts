@@ -1486,6 +1486,14 @@ export const ja: TranslationResources = {
       updating: "アップデート中...",
       failedTitle: "プラグインのアップデートに失敗しました",
     },
+    check: {
+      action: "プラグインのアップデートを確認",
+      button: "アップデートを確認",
+      checking: "確認中…",
+      upToDate: "すべてのプラグインは最新です",
+      updated: "{{plugins}} を更新しました",
+      failed: "プラグインの更新に失敗しました:\n{{errors}}",
+    },
   },
   desktop: {
     windowControls: {

@@ -1508,6 +1508,14 @@ export const es: TranslationResources = {
       updating: "Actualizando...",
       failedTitle: "No se pudo actualizar el plugin",
     },
+    check: {
+      action: "Buscar actualizaciones de plugins",
+      button: "Buscar actualizaciones",
+      checking: "Comprobando…",
+      upToDate: "Todos los plugins están actualizados",
+      updated: "Actualizado: {{plugins}}",
+      failed: "Error al actualizar plugins:\n{{errors}}",
+    },
   },
   desktop: {
     windowControls: {

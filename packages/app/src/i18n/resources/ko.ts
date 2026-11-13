@@ -1479,6 +1479,14 @@ export const ko: TranslationResources = {
       updating: "업데이트 중...",
       failedTitle: "플러그인 업데이트 실패",
     },
+    check: {
+      action: "플러그인 업데이트 확인",
+      button: "업데이트 확인",
+      checking: "확인 중…",
+      upToDate: "모든 플러그인이 최신 상태입니다",
+      updated: "{{plugins}} 업데이트됨",
+      failed: "플러그인 업데이트 실패:\n{{errors}}",
+    },
   },
   desktop: {
     windowControls: {
