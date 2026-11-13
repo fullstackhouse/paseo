@@ -4014,6 +4014,66 @@ test("archiving the last workspace emits a remove carrying the now-empty project
   });
 });
 
+test("archiving a workspace unchanged since a sync catch-up emits and sequences its removal", async () => {
+  const emitted: SessionOutboundMessage[] = [];
+  const session = createSessionForWorkspaceTests({ onMessage: (message) => emitted.push(message) });
+  const capabilities = { [CLIENT_CAPS.ownedSubscriptions]: true };
+  const source = {};
+  session.updateClientCapabilities(capabilities, source);
+  await session.handleMessage(
+    { type: "fetch_workspaces_request", requestId: "initial", subscribe: {}, sync: {} },
+    source,
+  );
+  const initial = findByType(emitted, "fetch_workspaces_response")!.payload;
+  expect(initial.entries).toEqual([expect.objectContaining({ id: "ws-repo-running" })]);
+  await session.handleMessage(
+    {
+      type: "subscription.release.request",
+      requestId: "release-initial",
+      subscriptionId: initial.subscriptionId,
+    },
+    source,
+  );
+
+  // The app reconnects with its cached directory. Nothing changed, so the catch-up
+  // returns no entries, yet the app still shows ws-repo-running.
+  const reconnectSource = {};
+  session.updateClientCapabilities(capabilities, reconnectSource);
+  emitted.length = 0;
+  await session.handleMessage(
+    {
+      type: "fetch_workspaces_request",
+      requestId: "catch-up",
+      subscribe: {},
+      sync: { generation: initial.sync!.generation, afterSeq: initial.sync!.headSeq },
+    },
+    reconnectSource,
+  );
+  const caughtUp = findByType(emitted, "fetch_workspaces_response")!.payload;
+  expect(caughtUp.sync).toMatchObject({ mode: "changes", removals: [] });
+  expect(caughtUp.entries).toEqual([]);
+
+  const record = (await session.workspaceRegistry.get("ws-repo-running"))!;
+  const archived = { ...record, archivedAt: "2026-03-02T12:00:00.000Z" };
+  session.workspaceRegistry.list = async () => [archived];
+  session.workspaceRegistry.get = async (workspaceId: string) =>
+    workspaceId === archived.workspaceId ? archived : null;
+  emitted.length = 0;
+  await session.emitWorkspaceUpdatesForWorkspaceIds(["ws-repo-running"]);
+  await flushWorkspaceUpdateBackgroundWork();
+
+  const removal = filterByType(emitted, "workspace_update").find(
+    (message) => message.payload.kind === "remove",
+  )?.payload;
+  expect(removal).toMatchObject({ kind: "remove", id: "ws-repo-running" });
+  expect(removal?.seq).toBeGreaterThan(caughtUp.sync!.headSeq);
+
+  emitted.length = 0;
+  await session.emitWorkspaceUpdatesForWorkspaceIds(["ws-repo-running"]);
+  await flushWorkspaceUpdateBackgroundWork();
+  expect(filterByType(emitted, "workspace_update")).toEqual([]);
+});
+
 test("project.remove.request archives active workspaces and removes the project record", async () => {
   const emitted: SessionOutboundMessage[] = [];
   const session = createSessionForWorkspaceTests({
