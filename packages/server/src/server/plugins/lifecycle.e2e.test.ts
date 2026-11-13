@@ -899,7 +899,7 @@ test.each([false, true])(
         created.workspace!.id,
       );
       await client.archiveWorkspace(created.workspace!.id);
-      await expect(stat(cwd)).rejects.toMatchObject({ code: "ENOENT" });
+      await expectRemoved(cwd);
       const hookRecordsBeforeRestore = await readFile(orderFile, "utf8");
       await client.close();
       await daemon.close();
@@ -1113,7 +1113,7 @@ test("the placement example creates a sibling worktree, opens its first agent th
       .map((entry) => JSON.parse(entry.message));
     expect(opened.map((entry) => entry.config.cwd)).toContain(cwd);
     await client.archiveWorkspace(created.workspace!.id);
-    await expect(stat(cwd)).rejects.toMatchObject({ code: "ENOENT" });
+    await expectRemoved(cwd);
   } finally {
     await client.close();
     await daemon.close();
@@ -1307,3 +1307,15 @@ test("worktree includes reach the first agent without copying tracked or unignor
     await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   }
 }, 60_000);
+
+// Archive replies before the worktree directory removal finishes.
+async function expectRemoved(directory: string): Promise<void> {
+  await expect
+    .poll(() =>
+      stat(directory).then(
+        () => "present",
+        (error: NodeJS.ErrnoException) => error.code,
+      ),
+    )
+    .toBe("ENOENT");
+}

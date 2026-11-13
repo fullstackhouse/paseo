@@ -2,6 +2,9 @@ import { afterEach, expect, test } from "vitest";
 import type { SessionOutboundMessage } from "../messages.js";
 import { HubRelationshipHarness } from "./test-utils/relationship-harness.js";
 
+// Archive replies before the worktree is deleted; deletion is slow on Windows CI.
+const WORKTREE_REMOVAL_TIMEOUT_MS = 30_000;
+
 let relationship: HubRelationshipHarness | null = null;
 
 afterEach(async () => {
@@ -223,7 +226,12 @@ test("ordinary Hub requests survive daemon restart and restore an archived works
       requestId: "ordinary-archive",
     }),
   ).toMatchObject({ payload: { error: null, archivedAt: expect.any(String) } });
-  expect((await hub.worktreeState(agent.cwd)).exists).toBe(false);
+  // Archive replies before the worktree removal finishes.
+  await expect
+    .poll(async () => (await hub.worktreeState(agent.cwd)).exists, {
+      timeout: WORKTREE_REMOVAL_TIMEOUT_MS,
+    })
+    .toBe(false);
   expect(
     await hub.requestOrdinary({
       type: "workspace.recovery.inspect.request",
@@ -411,7 +419,6 @@ test("Hub archives a running execution's Paseo-created worktree", async () => {
   await hub.ownedRunningUpdate(worktreeCreated.payload.agentId!);
   const duringRun = await hub.worktreeState(worktreeCwd!);
   const response = await hub.archiveExecution("execution-worktree", "archive-worktree");
-  const afterArchive = await hub.worktreeState(worktreeCwd!);
 
   expect(worktreeCreated).toMatchObject({
     type: "hub.execution.agent.create.response",
@@ -420,7 +427,9 @@ test("Hub archives a running execution's Paseo-created worktree", async () => {
   expect(worktreeCwd).not.toBe(hub.repoRoot());
   expect(duringRun).toEqual({ exists: true, listed: true });
   expect(response).toMatchObject({ success: true, error: null, action: "archive" });
-  expect(afterArchive).toEqual({ exists: false, listed: false });
+  await expect
+    .poll(() => hub.worktreeState(worktreeCwd!), { timeout: WORKTREE_REMOVAL_TIMEOUT_MS })
+    .toEqual({ exists: false, listed: false });
   expect(workspaceId).toEqual(expect.any(String));
   expect(await hub.archivedWorkspaceAt(workspaceId!)).toEqual(expect.any(String));
   expect(await hub.ownedAgentArchivedAt(worktreeCreated.payload.agentId!)).toEqual(
@@ -485,8 +494,10 @@ test("archiving a second same-slug execution leaves the first worktree intact", 
   expect(reusedWorkspaceId).not.toBe(originalWorkspaceId);
   expect(hub.pathsReferToSameLocation(reused.payload.agent!.cwd, worktreeCwd)).toBe(false);
   expect(hub.pathsReferToSameLocation(reused.payload.agent!.cwd, secondWorktreeCwd)).toBe(true);
+  await expect
+    .poll(() => hub.worktreeState(secondWorktreeCwd), { timeout: WORKTREE_REMOVAL_TIMEOUT_MS })
+    .toEqual({ exists: false, listed: false });
   expect(await hub.worktreeState(worktreeCwd)).toEqual({ exists: true, listed: true });
-  expect(await hub.worktreeState(secondWorktreeCwd)).toEqual({ exists: false, listed: false });
   expect(await hub.agentRemainsAvailable(original.payload.agentId!)).toBe(true);
   expect(await hub.ownedAgentArchivedAt(reused.payload.agentId!)).toEqual(expect.any(String));
   expect(await hub.ownedWorkspaceArchivedAt(reused.payload.agentId!)).toEqual(expect.any(String));
@@ -513,7 +524,9 @@ test("Hub resolves persisted execution ownership after daemon restart", async ()
   expect(await hub.ownedAgentArchivedAt(created.payload.agentId!)).toEqual(expect.any(String));
   expect(workspaceId).toEqual(expect.any(String));
   expect(await hub.archivedWorkspaceAt(workspaceId!)).toEqual(expect.any(String));
-  expect(await hub.worktreeState(worktreeCwd)).toEqual({ exists: false, listed: false });
+  await expect
+    .poll(() => hub.worktreeState(worktreeCwd), { timeout: WORKTREE_REMOVAL_TIMEOUT_MS })
+    .toEqual({ exists: false, listed: false });
 }, 20_000);
 
 test("Hub treats missing and foreign executions as already controlled without exposing ownership", async () => {

@@ -7782,6 +7782,7 @@ export class Session {
         {
           scope: { kind: "workspace", workspaceId: existing.workspaceId },
           requestId: request.requestId,
+          directoryRemoval: "background",
         },
       );
 
