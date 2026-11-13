@@ -79,13 +79,13 @@ async function openWorkspaceFile(page: Page, name: string) {
   await openFileFromExplorer(page, name);
   await expectFileTabOpen(page, name);
 }
-async function associateMarkdownWithPlugin(page: Page) {
-  await page.evaluate(() => {
+async function associateWithPlugin(page: Page, associations: Record<string, string>) {
+  await page.evaluate((filePanelAssociations) => {
     const key = "@paseo:app-settings";
     const settings = JSON.parse(localStorage.getItem(key) ?? "{}");
-    settings.filePanelAssociations = { "ext:md": "plugin:file-panel-e2e/markdown" };
+    settings.filePanelAssociations = filePanelAssociations;
     localStorage.setItem(key, JSON.stringify(settings));
-  });
+  }, associations);
   await page.reload();
 }
 async function editMarkdownThroughPlugin(page: Page) {
@@ -133,6 +133,11 @@ test("directory plugins render PDF bytes and write Markdown through the file han
     await gotoWorkspace(page, workspace.workspaceId);
     await openFileExplorer(page);
     await openWorkspaceFile(page, "report.pdf");
+    // Paseo's own PDF panel and the plugin both claim .pdf, so Paseo asks.
+    await expect(page.getByText("Open .pdf files with", { exact: true })).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(page.getByTestId("pdf-file-preview").filter({ visible: true })).toBeVisible();
+    await associateWithPlugin(page, { "ext:pdf": `plugin:${PLUGIN_ID}/pdf` });
     await expect(page.getByText("PDF plugin: report.pdf", { exact: true })).toBeVisible();
     await expect(
       page.getByText(`Bytes ${PDF.length}; URL bytes ${PDF.length}`, { exact: true }),
@@ -176,7 +181,7 @@ test("directory plugins render PDF bytes and write Markdown through the file han
       page.getByRole("heading", { name: "Built-in Markdown", exact: true }),
     ).toBeVisible();
     await expect(page.getByRole("button", { name: "Edit Markdown through plugin" })).toHaveCount(0);
-    await associateMarkdownWithPlugin(page);
+    await associateWithPlugin(page, { "ext:md": `plugin:${PLUGIN_ID}/markdown` });
     await expect(
       page.getByText("Plugin Markdown: # Built-in Markdown", { exact: true }),
     ).toBeVisible();

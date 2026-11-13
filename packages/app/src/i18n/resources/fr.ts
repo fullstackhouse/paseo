@@ -2166,6 +2166,7 @@ export const fr: TranslationResources = {
           markdown: "Markdown",
           html: "HTML",
           image: "Image",
+          pdf: "PDF",
           source: "Source",
         },
       },

@@ -85,4 +85,14 @@ describe("built-in file panels", () => {
       ).toBeNull();
     },
   );
+
+  it("previews PDF files with the built-in PDF panel", () => {
+    const resolution = resolveFilePanel({
+      file: { path: "/output/report.PDF", kind: "binary" },
+      candidates: builtins,
+      associations: {},
+    });
+    expect(resolution.panel?.id).toBe("builtin:pdf");
+    expect(resolution.candidates.map((candidate) => candidate.id)).toEqual(["builtin:pdf"]);
+  });
 });

@@ -2142,6 +2142,7 @@ export const en = {
           markdown: "Markdown",
           html: "HTML",
           image: "Image",
+          pdf: "PDF",
           source: "Source",
         },
       },

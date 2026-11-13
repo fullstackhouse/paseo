@@ -3,6 +3,7 @@ import { useCallback, useState } from "react";
 import { ScrollView, Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { ZoomableImage } from "@/components/zoomable-viewport/image";
+import { DocumentFrame } from "./document-frame";
 import { useSessionStore } from "@/stores/session-store";
 import { FileHtmlPreview } from "./html-preview";
 import { FilePanelLoading } from "./loading";
@@ -65,6 +66,14 @@ function ImagePanel({ file }: PluginFilePanelProps) {
   return <ZoomableImage uri={url.url} testID="image-file-preview" />;
 }
 
+/** The platform's own viewer: Chromium's on web and desktop, WebKit's on iOS. */
+function PdfPanel({ file }: PluginFilePanelProps) {
+  const url = useFileUrl(file);
+  if (url.status === "loading") return <FilePanelLoading />;
+  if (url.status === "error") return <FilePanelError message={url.error.message} />;
+  return <DocumentFrame url={url.url} testID="pdf-file-preview" />;
+}
+
 function FilePanelError({ message }: { message: string }) {
   return (
     <View style={styles.centerState}>
@@ -77,6 +86,7 @@ const components = {
   "builtin:markdown": MarkdownPanel,
   "builtin:html": HtmlPanel,
   "builtin:image": ImagePanel,
+  "builtin:pdf": PdfPanel,
   "builtin:source": SourcePanel,
 };
 

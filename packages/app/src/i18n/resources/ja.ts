@@ -2139,6 +2139,7 @@ export const ja: TranslationResources = {
           markdown: "Markdown",
           html: "HTML",
           image: "画像",
+          pdf: "PDF",
           source: "ソース",
         },
       },

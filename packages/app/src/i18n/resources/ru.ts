@@ -2152,6 +2152,7 @@ export const ru: TranslationResources = {
           markdown: "Markdown",
           html: "HTML",
           image: "Изображение",
+          pdf: "PDF",
           source: "Исходный текст",
         },
       },

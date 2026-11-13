@@ -2092,6 +2092,7 @@ export const zhCN: TranslationResources = {
           markdown: "Markdown",
           html: "HTML",
           image: "图片",
+          pdf: "PDF",
           source: "源代码",
         },
       },

@@ -2167,6 +2167,7 @@ export const es: TranslationResources = {
           markdown: "Markdown",
           html: "HTML",
           image: "Imagen",
+          pdf: "PDF",
           source: "Código fuente",
         },
       },

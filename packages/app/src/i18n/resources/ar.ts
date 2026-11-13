@@ -2115,6 +2115,7 @@ export const ar: TranslationResources = {
           markdown: "Markdown",
           html: "HTML",
           image: "صورة",
+          pdf: "PDF",
           source: "المصدر",
         },
       },

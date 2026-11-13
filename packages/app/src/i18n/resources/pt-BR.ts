@@ -2152,6 +2152,7 @@ export const ptBR: TranslationResources = {
           markdown: "Markdown",
           html: "HTML",
           image: "Imagem",
+          pdf: "PDF",
           source: "Fonte",
         },
       },
