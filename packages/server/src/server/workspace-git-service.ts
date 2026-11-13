@@ -513,6 +513,8 @@ interface RepoGitTarget {
   recovery: WatchRecoveryState;
   intervalId: NodeJS.Timeout | null;
   fetchInFlight: boolean;
+  /** A fetch was requested while one ran; that one may have read origin before the change. */
+  fetchRequestedDuringFlight: boolean;
   bufferedFetchMetadataEvents: FileChange[];
   recentFetchRemoteRefChanges: Map<
     string,
@@ -2483,6 +2485,7 @@ export class WorkspaceGitServiceImpl implements WorkspaceGitService {
       recovery: { attemptCount: 0, timer: null, establishedAt: null, setupTimeoutCount: 0 },
       intervalId: null,
       fetchInFlight: false,
+      fetchRequestedDuringFlight: false,
       bufferedFetchMetadataEvents: [],
       recentFetchRemoteRefChanges: new Map(),
       knownRemoteRefs: null,
@@ -3841,7 +3844,7 @@ export class WorkspaceGitServiceImpl implements WorkspaceGitService {
     });
     // Carry the resolved forge (probe-aware) so the wire projection labels
     // self-managed GitLab hosts correctly instead of falling back to "github".
-    target.latestForge = { ...forgeSnapshot, forge: resolution.forge };
+    this.rememberLoadedForge(target, { ...forgeSnapshot, forge: resolution.forge });
     // Publish the host with the snapshot; the parent lookup finishes in the background. Read the
     // previous entry after the wait: a lookup for the old entry may have completed meanwhile.
     target.latestForgeWeb = forgeWebForResolution({
@@ -3850,8 +3853,37 @@ export class WorkspaceGitServiceImpl implements WorkspaceGitService {
       previous: target.latestForgeWeb,
       nowMs: this.deps.now().getTime(),
     });
-    target.latestForgeLoadedAtMs = this.deps.now().getTime();
     this.queueForgeWebReferenceLookup(target);
+  }
+
+  /**
+   * Store a freshly loaded forge snapshot. When the workspace's pull request just turned merged,
+   * fetch origin now instead of on the next background interval: the merge landed on the forge,
+   * so until origin is fetched the branch's commits still diff as unmerged work.
+   */
+  private rememberLoadedForge(
+    target: WorkspaceGitTarget,
+    forge: WorkspaceGitRuntimeSnapshot["forge"],
+  ): void {
+    const previous = target.latestForge?.pullRequest ?? null;
+    target.latestForge = forge;
+    target.latestForgeLoadedAtMs = this.deps.now().getTime();
+    const next = forge.pullRequest;
+    if (previous && !previous.isMerged && next?.isMerged && next.url === previous.url) {
+      this.requestRepoFetch(target);
+    }
+  }
+
+  private requestRepoFetch(target: WorkspaceGitTarget): void {
+    const repoTarget = target.repoGitRoot ? this.repoTargets.get(target.repoGitRoot) : undefined;
+    if (!repoTarget || repoTarget.closed) {
+      return;
+    }
+    if (repoTarget.fetchInFlight) {
+      repoTarget.fetchRequestedDuringFlight = true;
+      return;
+    }
+    void this.runRepoFetch(repoTarget);
   }
 
   private combineSnapshot(target: WorkspaceGitTarget): WorkspaceGitRuntimeSnapshot {
@@ -3902,8 +3934,7 @@ export class WorkspaceGitServiceImpl implements WorkspaceGitService {
       return;
     }
 
-    target.latestForge = github;
-    target.latestForgeLoadedAtMs = this.deps.now().getTime();
+    this.rememberLoadedForge(target, github);
     this.rememberSnapshot(target, this.combineSnapshot(target), {
       forceEmit: false,
     });
@@ -4040,6 +4071,10 @@ export class WorkspaceGitServiceImpl implements WorkspaceGitService {
       this.applyRepoFetchResult(target, result, eventsBeforeFetchSnapshot);
     } finally {
       target.fetchInFlight = false;
+    }
+    if (target.fetchRequestedDuringFlight && !target.closed) {
+      target.fetchRequestedDuringFlight = false;
+      void this.runRepoFetch(target);
     }
   }
 
