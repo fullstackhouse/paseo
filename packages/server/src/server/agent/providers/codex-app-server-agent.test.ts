@@ -1421,6 +1421,39 @@ describe("Codex app-server provider", () => {
     expect(turnStart).not.toHaveProperty("config.mcp_servers.hub.tools.reply");
   });
 
+  test("forwards PASEO_AGENT_ID to stdio MCP servers, which Codex starts with a stripped env", async () => {
+    const session = createSession({
+      mcpServers: {
+        asks: { type: "stdio", command: "node", args: ["bridge.mjs"], env: { ASKS: "1" } },
+        hub: { type: "http", url: "http://127.0.0.1/hub" },
+      },
+    });
+    const request = vi.fn(async (method: string) => {
+      if (method === "thread/loaded/list") return { data: ["test-thread"] };
+      if (method === "turn/start") return {};
+      throw new Error(`Unexpected request: ${method}`);
+    });
+    session.activeForegroundTurnId = null;
+    session.client = createStub<CodexClientLike>({ request });
+
+    await session.startTurn("ask");
+
+    const turnStart = request.mock.calls.find(([method]) => method === "turn/start")?.[1];
+    expect(turnStart).toMatchObject({
+      config: {
+        mcp_servers: {
+          asks: {
+            command: "node",
+            args: ["bridge.mjs"],
+            env: { ASKS: "1" },
+            env_vars: ["PASEO_AGENT_ID"],
+          },
+        },
+      },
+    });
+    expect(turnStart).not.toHaveProperty("config.mcp_servers.hub.env_vars");
+  });
+
   test("passes ephemeral: true to thread/start when constructed as ephemeral", async () => {
     const requests: Array<{ method: string; params: unknown }> = [];
     const fakeClient: CodexClientLike = {

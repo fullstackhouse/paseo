@@ -898,8 +898,14 @@ interface CodexMcpServerConfig {
   command?: string;
   args?: string[];
   env?: Record<string, string>;
+  env_vars?: string[];
   tool_timeout_sec?: number;
 }
+
+// Codex starts stdio MCP servers with only a few default variables (PATH, HOME…), dropping the
+// agent's PASEO_AGENT_ID. `env_vars` names variables to copy from the app-server's environment,
+// which Paseo spawns per agent with that ID, so MCP servers can tell which agent is calling.
+const CODEX_MCP_FORWARDED_ENV_VARS = ["PASEO_AGENT_ID"];
 
 function toCodexMcpConfig(config: McpServerConfig): CodexMcpServerConfig {
   switch (config.type) {
@@ -908,6 +914,7 @@ function toCodexMcpConfig(config: McpServerConfig): CodexMcpServerConfig {
         command: config.command,
         args: config.args,
         env: config.env,
+        env_vars: CODEX_MCP_FORWARDED_ENV_VARS,
       };
     case "http":
       return {
