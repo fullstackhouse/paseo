@@ -73,3 +73,32 @@ export function buildUpdateContribution(
     },
   };
 }
+
+export interface PluginUpdateCheckCommandCenterSource {
+  /** True when a connected host can apply plugin updates. */
+  available: boolean;
+  labels: { section: string; title: string };
+  icon?: CommandCenterIcon;
+  check(): Promise<void>;
+}
+
+export function buildPluginUpdateCheckContribution(
+  source: PluginUpdateCheckCommandCenterSource,
+): CommandCenterContribution | null {
+  if (!source.available) return null;
+  return {
+    id: "check-plugin-updates",
+    group: "actions",
+    groupRank: 0,
+    rank: 10,
+    keywords: ["plugin", "plugins", "update", "upgrade", "check"],
+    visibility: "query",
+    run: () => void source.check(),
+    presentation: {
+      kind: "action",
+      title: source.labels.title,
+      sectionTitle: source.labels.section,
+      icon: source.icon,
+    },
+  };
+}

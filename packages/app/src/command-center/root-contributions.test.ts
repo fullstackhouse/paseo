@@ -3,8 +3,10 @@ import type { SidebarGroupMode } from "@/stores/sidebar-view-store";
 import type { CommandCenterIconProps } from "./contributions";
 import {
   buildGroupingContribution,
+  buildPluginUpdateCheckContribution,
   buildUpdateContribution,
   type GroupingCommandCenterSource,
+  type PluginUpdateCheckCommandCenterSource,
   type UpdateCommandCenterSource,
 } from "./root-contributions";
 
@@ -113,5 +115,36 @@ describe("update command center contribution", () => {
     expect(buildUpdateContribution(update({ status: "up-to-date" }).value)).toBeNull();
     expect(buildUpdateContribution(update({ isInstalling: true }).value)).toBeNull();
     expect(buildUpdateContribution(update({ isDesktopApp: false }).value)).toBeNull();
+  });
+});
+
+describe("plugin update check command center contribution", () => {
+  function check(available: boolean) {
+    let checks = 0;
+    const value: PluginUpdateCheckCommandCenterSource = {
+      available,
+      labels: { section: "Actions", title: "Check for plugin updates" },
+      check: async () => {
+        checks += 1;
+      },
+    };
+    return { value, checks: () => checks };
+  }
+
+  it("runs the check from the query results", () => {
+    const fixture = check(true);
+    const contribution = buildPluginUpdateCheckContribution(fixture.value);
+
+    expect(contribution).toMatchObject({
+      visibility: "query",
+      presentation: { title: "Check for plugin updates" },
+    });
+    expect(contribution?.keywords).toContain("plugin");
+    contribution?.run();
+    expect(fixture.checks()).toBe(1);
+  });
+
+  it("is absent when no connected host can update plugins", () => {
+    expect(buildPluginUpdateCheckContribution(check(false).value)).toBeNull();
   });
 });

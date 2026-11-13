@@ -1,5 +1,5 @@
 import { usesDesktopBindings } from "@/keyboard";
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import { router, type Href } from "expo-router";
 import { useTranslation } from "react-i18next";
 import {
@@ -14,6 +14,7 @@ import {
   Keyboard,
   PanelLeft,
   Plus,
+  Puzzle,
   Settings,
 } from "lucide-react-native";
 import { withUnistyles } from "react-native-unistyles";
@@ -26,6 +27,8 @@ import { useImportSession } from "@/hooks/use-import-session";
 import { useKeyboardActionDispatcher } from "@/keyboard/keyboard-action-dispatcher-context";
 import { useHardwareKeyboardPresent } from "@/keyboard";
 import { resolveShortcutKeysForAction } from "@/keyboard/keyboard-shortcuts";
+import { useToast } from "@/contexts/toast-context";
+import { usePluginUpdateCheck } from "@/plugins/updates/use-plugin-update-check";
 import { useKeyboardShortcutsStore } from "@/stores/keyboard-shortcuts-store";
 import { usePanelStore } from "@/stores/panel-store";
 import { useSidebarViewStore } from "@/stores/sidebar-view-store";
@@ -41,7 +44,10 @@ import { getShortcutOs } from "@/utils/shortcut-platform";
 import type { CommandCenterContribution, CommandCenterIconProps } from "./contributions";
 import { getCommandCenterIcon } from "./icon";
 import { useCommandCenterActions } from "./provider";
-import { buildGroupingContribution } from "./root-contributions";
+import {
+  buildGroupingContribution,
+  buildPluginUpdateCheckContribution,
+} from "./root-contributions";
 
 const ThemedPlus = withUnistyles(Plus, (theme) => ({ color: theme.colors.foregroundMuted }));
 const ThemedFolderPlus = withUnistyles(FolderPlus, (theme) => ({
@@ -65,6 +71,7 @@ const ThemedFolder = withUnistyles(Folder, (theme) => ({ color: theme.colors.for
 const ThemedCircleDashed = withUnistyles(CircleDashed, (theme) => ({
   color: theme.colors.foregroundMuted,
 }));
+const ThemedPuzzle = withUnistyles(Puzzle, (theme) => ({ color: theme.colors.foregroundMuted }));
 const ThemedPanelLeft = withUnistyles(PanelLeft, (theme) => ({
   color: theme.colors.foregroundMuted,
 }));
@@ -110,6 +117,10 @@ function CircleDashedIcon({ size }: CommandCenterIconProps) {
   return <ThemedCircleDashed size={size} strokeWidth={2.2} />;
 }
 
+function PuzzleIcon({ size }: CommandCenterIconProps) {
+  return <ThemedPuzzle size={size} strokeWidth={2.2} />;
+}
+
 function PanelLeftIcon({ size }: CommandCenterIconProps) {
   return <ThemedPanelLeft size={size} strokeWidth={2.2} />;
 }
@@ -136,6 +147,17 @@ export function CommandCenterRootActions() {
   const toggleMobileAgentList = usePanelStore((state) => state.toggleMobileAgentList);
   const toggleDesktopAgentList = usePanelStore((state) => state.toggleDesktopAgentList);
   const toggleAgentList = isCompact ? toggleMobileAgentList : toggleDesktopAgentList;
+  const toast = useToast();
+  const pluginUpdateCheck = usePluginUpdateCheck();
+  const pluginUpdatesAvailable = pluginUpdateCheck.available && !pluginUpdateCheck.checking;
+  const runPluginUpdateCheck = pluginUpdateCheck.check;
+  const checkPluginUpdates = useCallback(async () => {
+    // The next toast replaces this one, so the result needs no explicit dismiss.
+    toast.show(t("pluginUpdates.check.checking"), { durationMs: null });
+    const { kind, message } = await runPluginUpdateCheck();
+    if (kind === "error") toast.error(message);
+    else toast.show(message, { variant: "success" });
+  }, [runPluginUpdateCheck, t, toast]);
   const shortcutPlatform = useMemo(
     () => ({ isMac: getShortcutOs() === "mac", usesDesktopBindings }),
     [],
@@ -364,15 +386,28 @@ export function CommandCenterRootActions() {
       }),
     );
 
+    const pluginUpdateCheckAction = buildPluginUpdateCheckContribution({
+      available: pluginUpdatesAvailable,
+      labels: {
+        section: t("shell.commandCenter.actions"),
+        title: t("pluginUpdates.check.action"),
+      },
+      icon: PuzzleIcon,
+      check: checkPluginUpdates,
+    });
+    if (pluginUpdateCheckAction) availableActions.push(pluginUpdateCheckAction);
+
     return availableActions;
   }, [
     browserHostLabel,
+    checkPluginUpdates,
     groupMode,
     homeRoute,
     keyboardActionDispatcher,
     openAddProject,
     openImportSession,
     overrides,
+    pluginUpdatesAvailable,
     schedulesRoute,
     sessionsRoute,
     setGroupMode,
