@@ -6341,7 +6341,13 @@ export class Session {
       const lastEmitted = subscription.lastEmittedByWorkspaceId.get(workspaceId);
       this.workspaceGitObserver.recordDescriptorState(workspaceId, nextWorkspace);
       if (!nextWorkspace) {
-        if (this.shouldSkipWorkspaceRemoval(lastEmitted, options?.removedProjectId)) {
+        if (
+          this.shouldSkipWorkspaceRemoval({
+            lastEmitted,
+            removedProjectId: options?.removedProjectId,
+            syncEnabled: subscription.syncEnabled === true,
+          })
+        ) {
           continue;
         }
         if (this.workspaceUpdatesSubscriptions.get(subscription.subscriptionId) !== subscription) {
@@ -6395,13 +6401,18 @@ export class Session {
     return { ...workspace, status: optimisticStatus };
   }
 
-  private shouldSkipWorkspaceRemoval(
-    lastEmitted: WorkspaceUpdatePayload | undefined,
-    removedProjectId: string | undefined,
-  ): boolean {
+  private shouldSkipWorkspaceRemoval(input: {
+    lastEmitted: WorkspaceUpdatePayload | undefined;
+    removedProjectId: string | undefined;
+    syncEnabled: boolean;
+  }): boolean {
+    const { lastEmitted, removedProjectId, syncEnabled } = input;
     if (lastEmitted?.kind === "remove") {
       return !removedProjectId || lastEmitted.removedProjectId === removedProjectId;
     }
+    // A sync catch-up seeds lastEmitted with changed rows only, while the client still
+    // holds every row from its cached directory. Never skip a removal it may be showing.
+    if (syncEnabled) return false;
     return !lastEmitted && !removedProjectId;
   }
 
