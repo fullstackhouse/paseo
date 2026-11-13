@@ -14,6 +14,7 @@ import {
 import type { ArchiveResult, ActiveWorkspaceRef } from "../workspace-archive-service.js";
 import type { WorkspaceGitRuntimeSnapshot } from "../workspace-git-service.js";
 import { createWorktree, type WorktreeConfig } from "../../utils/worktree.js";
+import { waitForPendingWorktreeRemoval } from "../../utils/worktree-removal-queue.js";
 import type { ForgeService } from "../../../services/forge-service.js";
 import type { StoredAgentRecord } from "../agent/agent-storage.js";
 
@@ -483,6 +484,7 @@ describe("archiveIfSafe", () => {
       {
         scope: { kind: "workspace", workspaceId: "ws-auto-archive" },
         requestId: "auto-archive-on-merge",
+        directoryRemoval: "background",
       },
     );
     expect(harness.log.info).toHaveBeenCalledWith(
@@ -585,6 +587,7 @@ describe("archiveIfSafe", () => {
 
     expect(archivedWorkspaceIds.has(workspaceA)).toBe(true);
     expect(archivedWorkspaceIds.has(workspaceB)).toBe(false);
+    await waitForPendingWorktreeRemoval(worktree.worktreePath);
     expect(existsSync(worktree.worktreePath)).toBe(true);
   });
 
@@ -611,6 +614,7 @@ describe("archiveIfSafe", () => {
     });
 
     expect(archivedWorkspaceIds.has(workspaceA)).toBe(true);
+    await waitForPendingWorktreeRemoval(worktree.worktreePath);
     expect(existsSync(worktree.worktreePath)).toBe(false);
   });
 

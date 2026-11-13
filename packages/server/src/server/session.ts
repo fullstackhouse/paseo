@@ -8386,9 +8386,13 @@ export class Session {
     request: Extract<SessionInboundMessage, { type: "archive_workspace_request" }>,
   ): Promise<void> {
     try {
+      // FSH: reply once the records are archived. Directory removal keeps running inside this
+      // archive's queue item, so an undo still waits for it or cancels it before the point of no
+      // return; only the reply stops waiting for `git worktree remove`, which can take 20-90 s.
+      const recordsArchived = Promise.withResolvers<"records-archived">();
       // Claim the archive queue before any await, so an undo sent right behind this request
       // queues after it and cancels it instead of running first.
-      const outcome = await this.workspaceArchiveOperations.archive(
+      const archiving = this.workspaceArchiveOperations.archive(
         request.workspaceId,
         async (signal) => {
           const existing = await this.workspaceRegistry.get(request.workspaceId);
@@ -8427,12 +8431,22 @@ export class Session {
               scope: { kind: "workspace", workspaceId: existing.workspaceId },
               requestId: request.requestId,
               signal,
+              onRecordsArchived: () => recordsArchived.resolve("records-archived"),
             },
           );
         },
       );
+      const outcome = await Promise.race([recordsArchived.promise, archiving]);
+      if (outcome === "records-archived") {
+        void archiving.catch((error: unknown) => {
+          this.sessionLogger.warn(
+            { err: error, workspaceId: request.workspaceId, requestId: request.requestId },
+            "Worktree disk removal failed during archive; workspace already archived",
+          );
+        });
+      }
 
-      if (outcome.kind === "canceled") {
+      if (outcome !== "records-archived" && outcome.kind === "canceled") {
         this.emit({
           type: "archive_workspace_response",
           payload: {

@@ -1369,7 +1369,7 @@ export async function createPaseoDaemon(
         isCheckoutUntrusted: (checkoutPath) => isCheckoutUntrusted(workspaceRegistry, checkoutPath),
         sessionLogger: logger,
       },
-      { scope: { kind: "workspace", workspaceId }, requestId },
+      { scope: { kind: "workspace", workspaceId }, requestId, directoryRemoval: "background" },
     );
   const hubAgentLifecycle = new CreateAgentLifecycleDispatch({
     paseoHome: config.paseoHome,
@@ -1507,6 +1507,7 @@ export async function createPaseoDaemon(
       {
         scope: { kind: "workspace", workspaceId },
         requestId: "schedule-run-finish",
+        directoryRemoval: "background",
       },
     );
   };

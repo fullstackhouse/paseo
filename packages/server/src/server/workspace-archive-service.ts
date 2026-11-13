@@ -1,3 +1,4 @@
+import { enqueueWorktreeRemoval } from "../utils/worktree-removal-queue.js";
 import { resolve } from "node:path";
 
 import type { Logger } from "pino";
@@ -90,6 +91,16 @@ export interface ArchiveByScopeRequest {
   // Aborting cancels the archive at its next checkpoint. Removing the worktree directory is the
   // point of no return: once it starts the archive completes.
   signal?: AbortSignal;
+  // FSH: called once the records are archived, before the backing directory is removed. The
+  // archiving marker clears and the final workspace updates go out first, so a caller can answer
+  // its client while removal (teardown, git worktree remove, rm, prune) still runs. The archive
+  // itself, and so any queue or checkout gate holding it, ends only after removal: an undo still
+  // waits for it or cancels it before the point of no return.
+  onRecordsArchived?: (result: ArchiveResult) => void;
+  // FSH: "wait" (default) resolves after the backing directory is removed, so `removedDirectory`
+  // is meaningful. "background" resolves at onRecordsArchived; removal continues, failures are
+  // logged, and `removedDirectory` is false.
+  directoryRemoval?: "wait" | "background";
 }
 
 // Cancellation carries the operation stamp even before the workspace record is archived.
@@ -166,7 +177,29 @@ export async function archiveByScope(
   dependencies: ArchiveDependencies,
   request: ArchiveByScopeRequest,
 ): Promise<ArchiveResult> {
-  return runWithGitCommandPriority("high", () => archiveByScopeWithPriority(dependencies, request));
+  if (request.directoryRemoval !== "background") {
+    return runWithGitCommandPriority("high", () =>
+      archiveByScopeWithPriority(dependencies, request),
+    );
+  }
+  const recordsArchived = Promise.withResolvers<ArchiveResult>();
+  const full = runWithGitCommandPriority("high", () =>
+    archiveByScopeWithPriority(dependencies, {
+      ...request,
+      directoryRemoval: "wait",
+      onRecordsArchived: (result) => {
+        request.onRecordsArchived?.(result);
+        recordsArchived.resolve(result);
+      },
+    }),
+  );
+  void full.catch((error: unknown) => {
+    dependencies.sessionLogger?.warn(
+      { err: error, requestId: request.requestId },
+      "Worktree disk removal failed during archive; workspace already archived",
+    );
+  });
+  return Promise.race([recordsArchived.promise, full]);
 }
 
 async function archiveByScopeWithPriority(
@@ -195,6 +228,13 @@ async function archiveByScopeWithPriority(
 
     let removedDirectory = false;
     let directoryLeftBehind: ArchiveResult["directoryLeftBehind"];
+    let archivingCleared = false;
+    const clearArchiving = async () => {
+      if (archivingCleared || targetWorkspaceIds.length === 0) return;
+      archivingCleared = true;
+      dependencies.clearWorkspaceArchiving(targetWorkspaceIds);
+      await dependencies.emitWorkspaceUpdatesForWorkspaceIds(targetWorkspaceIds);
+    };
 
     try {
       if (targetWorkspaceIds.length > 0) {
@@ -208,6 +248,14 @@ async function archiveByScopeWithPriority(
         { requestId: request.requestId, checkpoint, archivedAt },
       );
       checkpoint();
+      if (request.onRecordsArchived) {
+        await clearArchiving();
+        request.onRecordsArchived({
+          archivedAgentIds: Array.from(archivedAgents),
+          archivedWorkspaceIds,
+          removedDirectory: false,
+        });
+      }
 
       if (target.backing?.mainRepoRoot) {
         try {
@@ -224,12 +272,20 @@ async function archiveByScopeWithPriority(
       }
 
       if (target.backing !== null) {
-        const removal = await maybeRemoveDirectory(
-          dependencies,
-          { requestId: request.requestId, checkpoint },
-          target,
-          archivedWorkspaceIds,
-        );
+        // FSH: registered on the worktree removal queue so creating or restoring a worktree at
+        // this path waits for the deletion instead of racing it.
+        const backing = target.backing;
+        const removal = await enqueueWorktreeRemoval({
+          repositoryKey: backing.mainRepoRoot ?? backing.path,
+          worktreePath: backing.path,
+          remove: () =>
+            maybeRemoveDirectory(
+              dependencies,
+              { requestId: request.requestId, checkpoint },
+              target,
+              archivedWorkspaceIds,
+            ),
+        });
         removedDirectory = removal.removedDirectory;
         directoryLeftBehind = removal.directoryLeftBehind;
       }
@@ -241,10 +297,7 @@ async function archiveByScopeWithPriority(
         ...(directoryLeftBehind ? { directoryLeftBehind } : {}),
       };
     } finally {
-      if (targetWorkspaceIds.length > 0) {
-        dependencies.clearWorkspaceArchiving(targetWorkspaceIds);
-        await dependencies.emitWorkspaceUpdatesForWorkspaceIds(targetWorkspaceIds);
-      }
+      await clearArchiving();
     }
   };
 

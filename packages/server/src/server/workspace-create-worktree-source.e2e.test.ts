@@ -281,7 +281,8 @@ test("existing branch changes remain visible after archive and restore", async (
   await client.checkoutRefresh(cwd);
   expect(updates).toContainEqual(expect.objectContaining(gitStatus));
   expect((await client.archiveWorkspace(workspace.id)).error).toBeNull();
-  expect(existsSync(cwd)).toBe(false);
+  // FSH: archive replies before the worktree removal finishes.
+  await expect.poll(() => existsSync(cwd), { timeout: 15000, interval: 100 }).toBe(false);
   await client.checkoutRefresh(cwd);
   expect((await client.getCheckoutStatus(cwd)).isGit).toBe(false);
   updates.length = 0;
@@ -573,7 +574,8 @@ function createDivergentBases(repoDir: string): void {
 
 async function archiveAndRestoreWorkspace({ client, workspace, cwd }: RestorableWorkspace) {
   expect((await client.archiveWorkspace(workspace.id)).error).toBeNull();
-  expect(existsSync(cwd)).toBe(false);
+  // FSH: archive replies before the worktree removal finishes.
+  await expect.poll(() => existsSync(cwd), { timeout: 15000, interval: 100 }).toBe(false);
   expect(await client.inspectWorkspaceRecovery(workspace.id)).toMatchObject({ action: "restore" });
   await client.restoreWorkspace(workspace.id);
 }

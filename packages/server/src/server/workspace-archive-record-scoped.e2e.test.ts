@@ -4,6 +4,7 @@ import {
   existsSync,
   mkdtempSync,
   readFileSync,
+  realpathSync,
   rmSync,
   statSync,
   writeFileSync,
@@ -399,7 +400,7 @@ test("an archived workspace keeps its base when a later workspace reuses its pat
 });
 
 test.each(["worktree", "workspace"] as const)(
-  "%s archive immediately removes the deleted worktree from a warm CLI listing",
+  "%s archive removes the deleted worktree from a warm CLI listing",
   async (command) => {
     const repoDir = createGitRepo();
     const created = await ctx.client.createWorkspace({
@@ -423,14 +424,16 @@ test.each(["worktree", "workspace"] as const)(
       [command, "archive", command === "worktree" ? name : workspace.id, "--json"],
       repoDir,
     );
+    // `workspace archive` replies before the directory is removed; `worktree
+    // archive` waits for it. Either way the warm listing drops it once removed.
+    await expect
+      .poll(
+        () => execFileSync("git", ["worktree", "list", "--porcelain"], { cwd: repoDir }).toString(),
+        { timeout: 15000, interval: 100 },
+      )
+      .not.toContain(worktreePath);
     expect(existsSync(worktreePath)).toBe(false);
-    expect(
-      execFileSync("git", ["worktree", "list", "--porcelain"], { cwd: repoDir }).toString(),
-    ).not.toContain(worktreePath);
     const after = JSON.parse(await runCli(["worktree", "ls", "--json"], repoDir));
-    console.log(
-      `${command} archive: warm listing=${JSON.stringify(before)}\nimmediate listing=${JSON.stringify(after)}`,
-    );
     expect(after).toEqual([]);
   },
   60000,
@@ -569,7 +572,9 @@ test.skipIf(process.platform === "win32")(
         retryError: null,
       });
       expect((await activeWorkspaceIds()).has(workspace.id)).toBe(false);
-      expect(existsSync(workspace.workspaceDirectory)).toBe(false);
+      await expect
+        .poll(() => existsSync(workspace.workspaceDirectory), { timeout: 15000, interval: 100 })
+        .toBe(false);
     } finally {
       writeFileSync(stopSetupPath, "stop\n");
     }
@@ -726,6 +731,13 @@ test.skipIf(process.platform === "win32" || process.getuid?.() === 0)(
 
       expect(firstArchive.error).toBeNull();
       expect((await activeWorkspaceIds()).has(workspace.id)).toBe(false);
+      // FSH: removals for one repository run in order, and `worktree archive` waits for its own.
+      // Once it returns, the first archive's background removal has given up.
+      const barrier = await createWorktreeWorkspace(repoDir, "self-heal-barrier");
+      const barrierArchive = await ctx.client.archivePaseoWorktree({
+        worktreePath: barrier.workspaceDirectory,
+      });
+      expect(barrierArchive.success).toBe(true);
       expect(existsSync(directory)).toBe(true);
     } finally {
       if (existsSync(directory)) chmodSync(directory, originalMode);
@@ -734,7 +746,9 @@ test.skipIf(process.platform === "win32" || process.getuid?.() === 0)(
     const retry = await ctx.client.archiveWorkspace(workspace.id);
 
     expect(retry.error).toBeNull();
-    expect(existsSync(directory)).toBe(false);
+    await expect
+      .poll(() => existsSync(directory), { timeout: 15000, interval: 100 })
+      .toBe(false);
   },
   60000,
 );
@@ -826,3 +840,138 @@ test("keeps the worktree on disk when a sibling workspace still references it", 
   expect(remaining.has(siblingWorkspaceId)).toBe(true);
   expect(existsSync(worktreeDir)).toBe(true);
 }, 60000);
+
+// Worktree teardown blocks until the test writes `release-teardown` into the
+// source checkout, then records the cwd it ran in.
+function createRepoWithGatedTeardown(): { repoDir: string; releaseTeardown: () => void } {
+  const repoDir = createGitRepo();
+  writeFileSync(
+    path.join(repoDir, "paseo.json"),
+    JSON.stringify({
+      worktree: {
+        teardown: [
+          'while [ ! -f "$PASEO_SOURCE_CHECKOUT_PATH/release-teardown" ]; do sleep 0.05; done; pwd > "$PASEO_SOURCE_CHECKOUT_PATH/teardown-cwd"',
+        ],
+      },
+    }),
+  );
+  execFileSync("git", ["add", "paseo.json"], { cwd: repoDir, stdio: "pipe" });
+  execFileSync("git", ["-c", "commit.gpgsign=false", "commit", "-m", "add gated teardown"], {
+    cwd: repoDir,
+    stdio: "pipe",
+  });
+  return {
+    repoDir,
+    releaseTeardown: () => writeFileSync(path.join(repoDir, "release-teardown"), "go\n"),
+  };
+}
+
+async function createWorktreeWorkspace(
+  repoDir: string,
+  worktreeSlug: string,
+): Promise<{ id: string; workspaceDirectory: string }> {
+  const result = await ctx.client.createWorkspace({
+    source: { kind: "worktree", cwd: repoDir, worktreeSlug, baseBranch: "main" },
+  });
+  const workspace = result.workspace;
+  if (!workspace?.workspaceDirectory) {
+    throw new Error(result.error ?? "Failed to create worktree workspace");
+  }
+  return { id: workspace.id, workspaceDirectory: workspace.workspaceDirectory };
+}
+
+function rejectAfter(ms: number, message: string): Promise<never> {
+  return new Promise((_, reject) => setTimeout(() => reject(new Error(message)), ms));
+}
+
+test.skipIf(process.platform === "win32")(
+  "archiving a workspace replies before worktree teardown and removal finish",
+  async () => {
+    const { repoDir, releaseTeardown } = createRepoWithGatedTeardown();
+    try {
+      const workspace = await createWorktreeWorkspace(repoDir, "slow-teardown");
+
+      const archive = await Promise.race([
+        ctx.client.archiveWorkspace(workspace.id),
+        rejectAfter(5000, "archive did not reply while teardown was still running"),
+      ]);
+
+      expect(archive.error).toBeNull();
+      expect((await activeWorkspaceIds()).has(workspace.id)).toBe(false);
+      expect(existsSync(workspace.workspaceDirectory)).toBe(true);
+
+      releaseTeardown();
+      await expect
+        .poll(() => existsSync(workspace.workspaceDirectory), { timeout: 15000, interval: 100 })
+        .toBe(false);
+      expect(readFileSync(path.join(repoDir, "teardown-cwd"), "utf8").trim()).toBe(
+        path.join(
+          realpathSync(path.dirname(workspace.workspaceDirectory)),
+          path.basename(workspace.workspaceDirectory),
+        ),
+      );
+    } finally {
+      releaseTeardown();
+    }
+  },
+  60000,
+);
+
+test.skipIf(process.platform === "win32")(
+  "recreating a worktree with the same slug waits for the archived one's removal",
+  async () => {
+    const { repoDir, releaseTeardown } = createRepoWithGatedTeardown();
+    try {
+      const first = await createWorktreeWorkspace(repoDir, "same-slug");
+      const archive = await Promise.race([
+        ctx.client.archiveWorkspace(first.id),
+        rejectAfter(5000, "archive did not reply while teardown was still running"),
+      ]);
+      expect(archive.error).toBeNull();
+
+      const recreating = createWorktreeWorkspace(repoDir, "same-slug");
+      releaseTeardown();
+      const second = await recreating;
+
+      expect(existsSync(path.join(repoDir, "teardown-cwd"))).toBe(true);
+      expect(second.workspaceDirectory).toBe(first.workspaceDirectory);
+      expect(existsSync(second.workspaceDirectory)).toBe(true);
+      expect((await activeWorkspaceIds()).has(second.id)).toBe(true);
+      expect(
+        execFileSync("git", ["worktree", "list", "--porcelain"], { cwd: repoDir }).toString(),
+      ).toContain(`worktree ${realpathSync(second.workspaceDirectory)}\n`);
+    } finally {
+      releaseTeardown();
+    }
+  },
+  60000,
+);
+
+test.skipIf(process.platform === "win32")(
+  "restoring a workspace right after archive waits for its worktree removal and recreates it",
+  async () => {
+    const { repoDir, releaseTeardown } = createRepoWithGatedTeardown();
+    try {
+      const workspace = await createWorktreeWorkspace(repoDir, "restore-after-archive");
+      const archive = await Promise.race([
+        ctx.client.archiveWorkspace(workspace.id),
+        rejectAfter(5000, "archive did not reply while teardown was still running"),
+      ]);
+      expect(archive.error).toBeNull();
+
+      const restoring = ctx.client.restoreWorkspace(workspace.id);
+      releaseTeardown();
+      await restoring;
+
+      expect(existsSync(path.join(repoDir, "teardown-cwd"))).toBe(true);
+      expect(existsSync(workspace.workspaceDirectory)).toBe(true);
+      expect((await activeWorkspaceIds()).has(workspace.id)).toBe(true);
+      expect(
+        execFileSync("git", ["worktree", "list", "--porcelain"], { cwd: repoDir }).toString(),
+      ).toContain(`worktree ${realpathSync(workspace.workspaceDirectory)}\n`);
+    } finally {
+      releaseTeardown();
+    }
+  },
+  60000,
+);

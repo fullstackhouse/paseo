@@ -14,6 +14,7 @@ import {
 } from "../../../utils/worktree.js";
 import type { PluginWorktreeManagerRuntime } from "../../plugins/runtime.js";
 import type { PluginWorktreeRestoreTarget } from "@getpaseo/plugin/server";
+import { waitForPendingWorktreeRemoval } from "../../../utils/worktree-removal-queue.js";
 import { WorktreeRequestError, toWorktreeRequestError } from "../../worktree-errors.js";
 import {
   resolveWorkspaceDisplayName,
@@ -113,6 +114,9 @@ export function createWorkspaceRecoveryService(deps: {
       };
     }
 
+    // FSH: an archive replies before its worktree removal finishes. Settle it first so an
+    // unarchive never adopts a directory that is about to be deleted.
+    await waitForPendingWorktreeRemoval(workspace.worktreeRoot ?? workspace.cwd);
     if (await deps.isDirectory(workspace.cwd)) {
       return createRecoveryPlan({ action: "unarchive", workspace });
     }

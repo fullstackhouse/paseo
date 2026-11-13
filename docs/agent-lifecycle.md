@@ -323,6 +323,16 @@ hides the row by the latest local intent, so a late remove or upsert from a supe
 does not flip it back. Tabs and layout are purged only once the undo window closes with the
 archive committed.
 
+Archive replies once the records are archived (FSH). Removing the backing worktree
+(`worktree.teardown` commands in place, `git worktree remove`, `rm`, `git worktree prune`) keeps
+running inside the same archive operation, so an Undo still waits for it or cancels it before the
+directory removal starts. Removals for one repository run in order
+(`packages/server/src/utils/worktree-removal-queue.ts`). Only the MCP `archive_workspace` tool and
+`paseo worktree archive` wait for it, because they report or promise the removal. Creating a
+worktree at that path, and recovery inspect/restore, wait for the pending removal first. If the
+daemon stops mid-removal, the directory stays behind an archived record, the same state a failed
+teardown leaves: Unarchive adopts it, and archiving the workspace again removes it.
+
 Auto-archive after a PR merge (`autoArchiveAfterMerge`) skips a workspace while any of its agents
 has a run in flight, because workspace archive closes every agent in it. The skip is not retried:
 the workspace stays until you archive it or its git snapshot changes again.

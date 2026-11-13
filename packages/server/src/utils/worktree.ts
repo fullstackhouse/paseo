@@ -49,6 +49,7 @@ import {
   normalizePathForIdentity,
 } from "./path.js";
 import { terminateWithTreeKill } from "./tree-kill.js";
+import { waitForPendingWorktreeRemoval } from "./worktree-removal-queue.js";
 import { validateWorktreePath } from "./worktree-path.js";
 import type { PluginWorktreeManagerRuntime } from "../server/plugins/runtime.js";
 
@@ -1645,6 +1646,9 @@ export async function resolveDefaultWorktreePath(
     await getPaseoWorktreesRoot(options.cwd, options.paseoHome, options.worktreesRoot),
     options.worktreeSlug,
   );
+  // FSH: let an archived worktree at this slug finish its removal so the slug is reused instead
+  // of suffixed.
+  await waitForPendingWorktreeRemoval(original);
   let candidate = original;
   let suffix = 1;
   while (await pathExists(candidate)) candidate = `${original}-${suffix++}`;
@@ -1671,6 +1675,12 @@ export async function createWorktree({
 }: CreateWorktreeOptions): Promise<
   Omit<CreatedWorktree, "branchName"> & { branchName: string | null }
 > {
+  let worktreePath =
+    explicitWorktreePath ??
+    (await resolveDefaultWorktreePath({ cwd, paseoHome, worktreesRoot, worktreeSlug }));
+  // FSH: an archived worktree at this path may still be tearing down or deleting; its branch
+  // stays checked out there until `git worktree remove` runs.
+  await waitForPendingWorktreeRemoval(worktreePath);
   const branchesBefore =
     source.kind === "checkout-branch" ||
     source.kind === "checkout-change-request" ||
@@ -1689,9 +1699,6 @@ export async function createWorktree({
       ? await readLocalBranchTip(cwd, fetchedBranch)
       : null;
   try {
-    let worktreePath =
-      explicitWorktreePath ??
-      (await resolveDefaultWorktreePath({ cwd, paseoHome, worktreesRoot, worktreeSlug }));
     await mkdir(dirname(worktreePath), { recursive: true });
 
     // Primitive owner for `git worktree add`; callers route through createWorktreeCore.
