@@ -152,6 +152,28 @@ describe("archiveWorkspaceOptimistically", () => {
   });
 });
 
+describe("archiveWorkspaceOptimistically when the daemon already removed the workspace", () => {
+  it("treats a timeout after the live removal as archived instead of restoring the row", async () => {
+    const archived = workspace();
+    getHostRuntimeStore().acceptWorkspaceSnapshots(SERVER_ID, [archived]);
+    const releaseArchive = deferred<ArchiveWorkspacePayload>();
+    const client = createClient(vi.fn(async () => releaseArchive.promise));
+
+    const archive = archiveWorkspaceOptimistically({ client, workspace: target() });
+
+    // The daemon's live `workspace_update { kind: "remove" }` lands before the RPC settles.
+    // WorkspaceDirectoryReplica.removeWorkspace deletes the row and clears the pending marker.
+    getHostRuntimeStore().removeWorkspaceSnapshot(SERVER_ID, archived.id);
+    clearWorkspaceArchivePending({ serverId: SERVER_ID, workspaceId: archived.id });
+
+    // Archive cleanup outlasts the client's 60 s RPC timeout.
+    releaseArchive.reject(new Error("Request timed out"));
+    await expect(archive).resolves.toBeUndefined();
+
+    expect(storedWorkspace(archived.id)).toBeUndefined();
+  });
+});
+
 describe("archiveWorkspacesOptimistically", () => {
   it("returns failures and restores only the workspaces whose archive failed", async () => {
     const first = workspace({ id: "workspace-1" });
