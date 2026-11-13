@@ -1452,6 +1452,76 @@ describe("Codex app-server provider", () => {
     expect(startCall?.params).toMatchObject({ ephemeral: true });
   });
 
+  test("names alwaysLoad MCP servers in thread/start developer instructions", async () => {
+    // Codex defers every MCP tool behind tool search, so without this note the
+    // model never learns that plugin tools like status_set exist.
+    const requests: Array<{ method: string; params: unknown }> = [];
+    const fakeClient: CodexClientLike = {
+      async request(method: string, params?: unknown) {
+        requests.push({ method, params });
+        if (method === "thread/start") return { thread: { id: "mcp-thread" } };
+        return null;
+      },
+    };
+    const session = new CodexAppServerAgentSession(
+      createConfig({
+        thinkingOptionId: "medium",
+        systemPrompt: "Base prompt.",
+        mcpServers: {
+          status: { type: "stdio", command: "node", args: ["bridge.mjs"], alwaysLoad: true },
+          asks: { type: "http", url: "http://127.0.0.1/asks", alwaysLoad: true },
+          lazy: { type: "stdio", command: "node", args: ["lazy.mjs"] },
+        },
+      }),
+      null,
+      createTestLogger(),
+      () => {
+        throw new Error("Test session cannot spawn Codex app-server");
+      },
+    );
+    castInternals<{ client: CodexClientLike }>(session).client = fakeClient;
+
+    await castInternals<{ ensureThread: () => Promise<void> }>(session).ensureThread();
+
+    const params = requests.find((req) => req.method === "thread/start")?.params as {
+      developerInstructions?: string;
+    };
+    const instructions = params.developerInstructions ?? "";
+    expect(instructions.startsWith("Base prompt.\n\n")).toBe(true);
+    expect(instructions).toContain("`mcp__status__*`");
+    expect(instructions).toContain("`mcp__asks__*`");
+    expect(instructions).not.toContain("lazy");
+    expect(instructions).toContain("tool search");
+  });
+
+  test("adds no MCP note when no server is alwaysLoad", async () => {
+    const requests: Array<{ method: string; params: unknown }> = [];
+    const fakeClient: CodexClientLike = {
+      async request(method: string, params?: unknown) {
+        requests.push({ method, params });
+        if (method === "thread/start") return { thread: { id: "plain-thread" } };
+        return null;
+      },
+    };
+    const session = new CodexAppServerAgentSession(
+      createConfig({
+        thinkingOptionId: "medium",
+        mcpServers: { lazy: { type: "stdio", command: "node", args: ["lazy.mjs"] } },
+      }),
+      null,
+      createTestLogger(),
+      () => {
+        throw new Error("Test session cannot spawn Codex app-server");
+      },
+    );
+    castInternals<{ client: CodexClientLike }>(session).client = fakeClient;
+
+    await castInternals<{ ensureThread: () => Promise<void> }>(session).ensureThread();
+
+    const params = requests.find((req) => req.method === "thread/start")?.params;
+    expect(params).not.toHaveProperty("developerInstructions");
+  });
+
   test("omits ephemeral from thread/start by default", async () => {
     const requests: Array<{ method: string; params: unknown }> = [];
     const fakeClient: CodexClientLike = {

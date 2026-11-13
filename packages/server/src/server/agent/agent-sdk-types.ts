@@ -37,6 +37,8 @@ export interface McpStdioServerConfig {
   /**
    * When true, all tools from this server are always included in the prompt
    * and never deferred behind tool search. Honored by the Claude provider.
+   * Codex always defers MCP tools, so its provider names these servers in the
+   * developer instructions instead (`codex/always-load-mcp.ts`).
    */
   alwaysLoad?: boolean;
 }
@@ -51,6 +53,8 @@ export interface McpHttpServerConfig {
   /**
    * When true, all tools from this server are always included in the prompt
    * and never deferred behind tool search. Honored by the Claude provider.
+   * Codex always defers MCP tools, so its provider names these servers in the
+   * developer instructions instead (`codex/always-load-mcp.ts`).
    */
   alwaysLoad?: boolean;
 }
@@ -65,6 +69,8 @@ export interface McpSseServerConfig {
   /**
    * When true, all tools from this server are always included in the prompt
    * and never deferred behind tool search. Honored by the Claude provider.
+   * Codex always defers MCP tools, so its provider names these servers in the
+   * developer instructions instead (`codex/always-load-mcp.ts`).
    */
   alwaysLoad?: boolean;
 }
