@@ -17,6 +17,8 @@ import { type AgentHistoryHostError, useAgentHistory } from "@/hooks/use-agent-h
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { useImportSession } from "@/hooks/use-import-session";
 import { useHosts } from "@/runtime/host-runtime";
+import { isWeb } from "@/constants/platform";
+import { useIsCompactFormFactor } from "@/constants/layout";
 import { buildOpenProjectRoute } from "@/utils/host-routes";
 
 /** Long enough that a typed word is one request, short enough to feel live. */
@@ -60,6 +62,13 @@ function resolveEmptyText(input: {
   return "No sessions for this host";
 }
 
+// Content remounts on every screen focus, so autoFocus fires each time History opens.
+// Compact layouts skip it so a software keyboard doesn't cover the list.
+function useShouldAutoFocusSearch(): boolean {
+  const isCompact = useIsCompactFormFactor();
+  return isWeb && !isCompact;
+}
+
 export function SessionsScreen() {
   const isFocused = useIsFocused();
 
@@ -75,6 +84,7 @@ function SessionsScreenContent() {
   const { t } = useTranslation();
   const importSession = useImportSession();
   const hosts = useHosts();
+  const autoFocusSearch = useShouldAutoFocusSearch();
   const [selectedHost, setSelectedHost] = useState(ALL_HOSTS_OPTION_ID);
   const [searchInput, setSearchInput] = useState("");
   const search = useDebouncedValue(searchInput, SEARCH_DEBOUNCE_MS).trim();
@@ -163,6 +173,7 @@ function SessionsScreenContent() {
               clearAccessibilityLabel={t("sessions.actions.clearSearch")}
               testID="sessions-search-input"
               clearTestID="sessions-search-clear"
+              autoFocus={autoFocusSearch}
             />
           ) : null}
           {showHostFilter ? (
