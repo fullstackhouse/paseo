@@ -41,6 +41,11 @@ export function stopWaitingForLinuxNotifications(): void {
 const spawnNotifySend: SpawnNotifySend = (command, args) =>
   spawn(command, args, { stdio: ["ignore", "pipe", "ignore"] });
 
+// GNOME and KDE parse the body as markup (`body-markup`); the title is plain text.
+function escapeBodyMarkup(body: string): string {
+  return body.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
 export function buildNotifySendArgs(input: LinuxNotificationInput): string[] {
   return [
     `--app-name=${input.appName}`,
@@ -51,7 +56,7 @@ export function buildNotifySendArgs(input: LinuxNotificationInput): string[] {
     ...(input.iconPath ? [`--icon=${input.iconPath}`] : []),
     "--",
     input.title,
-    ...(input.body ? [input.body] : []),
+    ...(input.body ? [escapeBodyMarkup(input.body)] : []),
   ];
 }
 

@@ -54,6 +54,17 @@ describe("linux notification with sound", () => {
     ]);
   });
 
+  it("escapes markup in the body but not the title", () => {
+    const args = buildNotifySendArgs({
+      appName: "Paseo",
+      title: "Fix <Foo> & bar",
+      body: "Use <Foo> in a && b",
+      iconPath: null,
+    });
+
+    expect(args.slice(-2)).toEqual(["Fix <Foo> & bar", "Use &lt;Foo&gt; in a &amp;&amp; b"]);
+  });
+
   it("reports a click when notify-send prints the default action", async () => {
     const child = new FakeNotifySend();
     const outcomes = show(child);
