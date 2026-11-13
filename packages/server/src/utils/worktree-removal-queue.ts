@@ -50,7 +50,8 @@ export function enqueueWorktreeRemoval<T>(input: EnqueueWorktreeRemovalInput<T>)
 
 // Resolves once no removal is queued or running for worktreePath.
 export async function waitForPendingWorktreeRemoval(worktreePath: string): Promise<void> {
-  const matchesPath = createRealpathAwarePathMatcher(worktreePath);
+  // Resolve like enqueueWorktreeRemoval does, so a drive-less path still matches on Windows.
+  const matchesPath = createRealpathAwarePathMatcher(resolve(worktreePath));
   for (;;) {
     const matching = [...pendingRemovals].filter((pending) => matchesPath(pending.worktreePath));
     if (matching.length === 0) {
