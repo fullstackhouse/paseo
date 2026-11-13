@@ -80,6 +80,13 @@ async function enableVimKeybindings(page: Page) {
   });
 }
 
+/** Paseo's own PDF panel also claims .pdf, so the first open asks. */
+async function choosePdfExample(page: Page) {
+  await page.getByRole("radio", { name: "PDF — pdf-panel", exact: true }).click();
+  await page.getByRole("checkbox", { name: "Don't ask me again", exact: true }).click();
+  await page.getByRole("button", { name: "Use", exact: true }).click();
+}
+
 async function chooseRichMarkdown(page: Page) {
   await page.getByRole("radio", { name: "Rich Markdown — markdown-panel", exact: true }).click();
   await page.getByRole("checkbox", { name: "Don't ask me again", exact: true }).click();
@@ -174,6 +181,7 @@ test("directory examples mount the PDF frame and write Markdown through the file
     await gotoWorkspace(page, workspace.workspaceId);
     await openFileExplorer(page);
     await openFile(page, "report.pdf");
+    await choosePdfExample(page);
     await expect(page.getByTitle("Document preview", { exact: true })).toHaveAttribute(
       "src",
       /^blob:/,

@@ -1894,7 +1894,7 @@ example implements these steps.
 
 A plugin panel is a candidate for every file its selector matches, text or binary. The built-in
 panels require the host's file kind: Markdown, HTML, and **Source** open text files; Image opens
-images. The Markdown and HTML panels each have a Preview and a Source view of the file, switched
+images; PDF opens `.pdf` files (on Android it says the file can't be shown). The Markdown and HTML panels each have a Preview and a Source view of the file, switched
 in their toolbar. **Source**, Paseo's editor, is the built-in panel for text files that no other
 built-in panel claims; it is never offered beside another built-in panel. Candidates are ordered:
 the built-in panel that claims the file, then plugin panels in host catalog order, then Source
@@ -1905,8 +1905,8 @@ Otherwise Paseo opens the first candidate. When a plugin panel is among several 
 association applies, Paseo asks once per tab open, over the panel it already opened. A file with
 one candidate never asks. With a Markdown plugin installed, the picker offers **Markdown — Paseo**
 and **Rich Markdown — markdown-panel**. A plugin that claims a text extension no built-in panel
-claims competes with Source, so its first open asks; a plugin that alone claims a binary file
-opens without asking.
+claims competes with Source, so its first open asks. A PDF plugin competes with the built-in PDF
+panel the same way. A plugin that alone claims any other binary file opens without asking.
 
 **Don't ask me again** remembers the choice on this device for the extension. When a candidate
 matches an exact filename, the choice applies to that basename instead. An unavailable association
