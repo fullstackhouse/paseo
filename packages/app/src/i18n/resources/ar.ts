@@ -1472,6 +1472,14 @@ export const ar: TranslationResources = {
       updating: "جارٍ التحديث...",
       failedTitle: "فشل تحديث الإضافة",
     },
+    check: {
+      action: "التحقق من تحديثات الإضافات",
+      button: "التحقق من التحديثات",
+      checking: "جارٍ التحقق…",
+      upToDate: "جميع الإضافات محدّثة",
+      updated: "تم تحديث {{plugins}}",
+      failed: "فشل تحديث الإضافات:\n{{errors}}",
+    },
   },
   desktop: {
     windowControls: {

@@ -1461,6 +1461,14 @@ export const zhCN: TranslationResources = {
       updating: "正在更新...",
       failedTitle: "插件更新失败",
     },
+    check: {
+      action: "检查插件更新",
+      button: "检查更新",
+      checking: "正在检查…",
+      upToDate: "所有插件均为最新",
+      updated: "已更新 {{plugins}}",
+      failed: "插件更新失败：\n{{errors}}",
+    },
   },
   desktop: {
     windowControls: {

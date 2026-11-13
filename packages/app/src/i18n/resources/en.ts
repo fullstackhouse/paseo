@@ -1480,6 +1480,14 @@ export const en = {
       updating: "Updating...",
       failedTitle: "Plugin update failed",
     },
+    check: {
+      action: "Check for plugin updates",
+      button: "Check for updates",
+      checking: "Checking…",
+      upToDate: "All plugins are up to date",
+      updated: "Updated {{plugins}}",
+      failed: "Plugin update failed:\n{{errors}}",
+    },
   },
   desktop: {
     windowControls: {

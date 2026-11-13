@@ -1502,6 +1502,14 @@ export const fr: TranslationResources = {
       updating: "Mise à jour…",
       failedTitle: "Échec de la mise à jour du plugin",
     },
+    check: {
+      action: "Rechercher des mises à jour de plugins",
+      button: "Rechercher des mises à jour",
+      checking: "Vérification…",
+      upToDate: "Tous les plugins sont à jour",
+      updated: "{{plugins}} mis à jour",
+      failed: "Échec de la mise à jour des plugins :\n{{errors}}",
+    },
   },
   desktop: {
     windowControls: {

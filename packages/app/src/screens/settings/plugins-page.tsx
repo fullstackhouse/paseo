@@ -29,6 +29,11 @@ import { SettingsSection } from "@/components/settings/headings/settings-section
 import { resolvePluginPageState } from "@/screens/settings/plugins-page-state";
 import { openPluginInstallForm } from "@/screens/settings/plugin-install-form-model";
 import { pluginRegistry, useInstalledPlugins } from "@/plugins/registry";
+import {
+  checkPluginUpdates,
+  describePluginUpdateCheck,
+  type PluginUpdateClient,
+} from "@/plugins/updates/check-plugin-updates";
 import { settingsStyles } from "@/styles/settings";
 import { confirmDialog } from "@/utils/confirm-dialog";
 
@@ -289,6 +294,51 @@ function PluginLogsSheet({
   );
 }
 
+/** Resolves to the success message; rejects with the failures so the page shows an error. */
+async function applyAvailablePluginUpdates(client: PluginUpdateClient): Promise<string> {
+  const result = describePluginUpdateCheck(await checkPluginUpdates([{ label: null, client }]));
+  if (result.kind === "error") throw new Error(result.message);
+  return result.message;
+}
+
+function PluginUpdateCheckButton({
+  serverId,
+  client,
+  connected,
+  pending,
+  operation,
+  onCheck,
+}: {
+  serverId: string;
+  client: PluginUpdateClient | null;
+  connected: boolean;
+  pending: boolean;
+  /** The page's latest management operation. */
+  operation: { action: string } | undefined;
+  onCheck(client: PluginUpdateClient): void;
+}) {
+  const { t } = useTranslation();
+  // COMPAT(pluginSourceUpdates): added in v0.8.0; remove gate after 2027-03-16 once daemon floor supports reviewed updates.
+  const supported = useHostFeature(serverId, "pluginSourceUpdates");
+  const press = useCallback(() => {
+    if (client) onCheck(client);
+  }, [client, onCheck]);
+  if (!supported || !connected || !client) return null;
+  const checking = pending && operation?.action === "update-check";
+  return (
+    <Button
+      variant="ghost"
+      size="sm"
+      onPress={press}
+      loading={checking}
+      disabled={pending}
+      testID="plugin-update-check-button"
+    >
+      {checking ? t("pluginUpdates.check.checking") : t("pluginUpdates.check.button")}
+    </Button>
+  );
+}
+
 export function HostPluginsPage({ serverId }: { serverId: string }) {
   const { t } = useTranslation();
   const client = useHostRuntimeClient(serverId);
@@ -410,6 +460,29 @@ export function HostPluginsPage({ serverId }: { serverId: string }) {
     },
     [client, mutation, t],
   );
+  const checkForUpdates = useCallback(
+    (updateClient: PluginUpdateClient) => {
+      setFeedback(null);
+      mutation.mutate({
+        action: "update-check",
+        run: () => applyAvailablePluginUpdates(updateClient),
+      });
+    },
+    [mutation],
+  );
+  const updateCheckButton = useMemo(
+    () => (
+      <PluginUpdateCheckButton
+        serverId={serverId}
+        client={client}
+        connected={connected}
+        pending={mutation.isPending}
+        operation={mutation.variables}
+        onCheck={checkForUpdates}
+      />
+    ),
+    [checkForUpdates, client, connected, mutation.isPending, mutation.variables, serverId],
+  );
   const toggleGlobal = useCallback(
     (enabled: boolean) => {
       setFeedback(null);
@@ -520,7 +593,7 @@ export function HostPluginsPage({ serverId }: { serverId: string }) {
 
   return (
     <View>
-      <SettingsSection title={t("settings.plugins.title")}>
+      <SettingsSection title={t("settings.plugins.title")} trailing={updateCheckButton}>
         <Alert
           size="sm"
           variant="warning"

@@ -1498,6 +1498,14 @@ export const ptBR: TranslationResources = {
       updating: "Atualizando...",
       failedTitle: "Falha ao atualizar o plugin",
     },
+    check: {
+      action: "Verificar atualizações de plugins",
+      button: "Verificar atualizações",
+      checking: "Verificando…",
+      upToDate: "Todos os plugins estão atualizados",
+      updated: "Atualizado: {{plugins}}",
+      failed: "Falha ao atualizar plugins:\n{{errors}}",
+    },
   },
   desktop: {
     windowControls: {
