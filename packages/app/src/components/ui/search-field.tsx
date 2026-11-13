@@ -27,6 +27,7 @@ export interface SearchFieldProps {
   clearAccessibilityLabel: string;
   testID?: string;
   clearTestID?: string;
+  autoFocus?: boolean;
 }
 
 /**
@@ -44,6 +45,7 @@ export function SearchField({
   clearAccessibilityLabel,
   testID,
   clearTestID,
+  autoFocus,
 }: SearchFieldProps): ReactElement {
   const [isFocused, setIsFocused] = useState(false);
   const inputRef = useRef<EditingTextInputHandle>(null);
@@ -69,6 +71,7 @@ export function SearchField({
         autoCapitalize="none"
         autoCorrect={false}
         returnKeyType="search"
+        autoFocus={autoFocus}
         style={styles.input}
       />
       {value.length > 0 ? (
