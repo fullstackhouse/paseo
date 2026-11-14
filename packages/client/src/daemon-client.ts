@@ -1050,6 +1050,8 @@ type CorrelatedResponsePayload<TType extends CorrelatedResponseType> =
 export type AgentBackgroundWorkListPayload =
   CorrelatedResponsePayload<"agent.background_work.list.response">;
 export type AgentBackgroundWorkItem = AgentBackgroundWorkListPayload["items"][number];
+export type ProviderSubagentDescriptor = ProviderSubagentListPayload["subagents"][number];
+export type ScheduleSummary = ScheduleListPayload["schedules"][number];
 
 type PluginCatalogResponseEntry =
   CorrelatedResponsePayload<"plugin.catalog.get.response">["plugins"][number];
@@ -3899,6 +3901,46 @@ export class DaemonClient {
   ): OwnedSubscription<CorrelatedResponsePayload<"session.events.set_subscription.response">> {
     this.assertAgentBackgroundWorkSupported();
     return this.observeEvents(["agent.background_work.update"], options);
+  }
+
+  /** Gated read of an agent's provider subagents, for SDK handles. */
+  async listAgentProviderSubagents(
+    agentId: string,
+    options: { requestId?: string; timeout?: number } = {},
+  ): Promise<ProviderSubagentDescriptor[]> {
+    this.assertProviderSubagentsSupported();
+    return (await this.listProviderSubagents(agentId, options)).subagents;
+  }
+
+  observeProviderSubagents(
+    options: { signal?: AbortSignal } = {},
+  ): OwnedSubscription<CorrelatedResponsePayload<"session.events.set_subscription.response">> {
+    this.assertProviderSubagentsSupported();
+    return this.observeEvents(["agent.provider_subagents.update"], options);
+  }
+
+  private assertProviderSubagentsSupported(): void {
+    // COMPAT(providerSubagents): added in v0.1.107, remove gate after 2027-01-12.
+    if (this.lastServerInfoMessage?.features?.providerSubagents !== true) {
+      throw new Error("Update the host to see an agent's subagents.");
+    }
+  }
+
+  /** Lists the heartbeats that prompt `agentId` (schedules targeting it), in every status. */
+  async listAgentHeartbeats(
+    agentId: string,
+    options: { requestId?: string; timeout?: number } = {},
+  ): Promise<ScheduleSummary[]> {
+    const payload = await this.sendCorrelatedSessionRequest({
+      requestId: options.requestId,
+      timeout: options.timeout,
+      message: { type: "schedule/list" },
+      responseType: "schedule/list/response",
+    });
+    if (payload.error) throw new Error(payload.error);
+    return payload.schedules.filter(
+      (schedule) => schedule.target.type === "agent" && schedule.target.agentId === agentId,
+    );
   }
 
   private assertAgentBackgroundWorkSupported(): void {
