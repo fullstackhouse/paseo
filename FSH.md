@@ -18,6 +18,7 @@ temporary by design: every patch is meant to go upstream and then drop out of `f
 - getpaseo/paseo#7692: Cmd+Shift+[ / ] for previous/next tab on macOS desktop
 - getpaseo/paseo#7645: plugins can add items to sidebar workspace rows
 - getpaseo/paseo#6220: clients and plugins can see an agent's background work
+- FSH-only (upstreamable): plugin and SDK agent handles read an agent's provider subagents (`agents.ref(id).providerSubagents.list()/subscribe()`, gated on `features.providerSubagents`) and the heartbeats that prompt it (`agents.ref(id).heartbeats.list()`), over the existing protocol
 - getpaseo/paseo#9307: `agent.turn.after` drops the always-empty `timeline` from the SDK type, so plugins reading it fail typecheck instead of silently seeing no reply; `latestTurn()` in `@getpaseo/plugin/server` reads the turn
 - FSH-only (upstreamable): a turn that ends while provider subagents still run doesn't notify or mark the agent unread; the wake turn after they report back does, or the held-back finish fires 5 s after the last subagent settles when no wake turn starts (#72)
 - FSH-only (not upstream yet): an idle agent's background work (a background shell, a `Monitor` watch) keeps its workspace in Working instead of Done
