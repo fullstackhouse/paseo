@@ -62,6 +62,8 @@ import type {
   FetchAgentTimelineDirection,
   FetchAgentTimelinePayload,
   FetchAgentTimelineProjection,
+  ProviderSubagentDescriptor,
+  ScheduleSummary,
   SendMessageOptions,
   WaitForFinishResult,
 } from "./daemon-client.js";
@@ -392,6 +394,46 @@ export interface PaseoAgentBackgroundWorkSubscribeOptions {
   onError?: (error: unknown) => void;
 }
 
+export type PaseoAgentProviderSubagent = ProviderSubagentDescriptor;
+
+export interface PaseoAgentProviderSubagentsHandle {
+  /**
+   * Reads the subagents the agent's provider started (Claude Task agents, Codex subagents), in
+   * every status. A subagent is live while its `status` is `"running"`.
+   */
+  list(options?: { requestId?: string; timeout?: number }): Promise<PaseoAgentProviderSubagent[]>;
+  /**
+   * Calls `listener` with the agent's subagents once the subscription is established, again after
+   * each reconnect, then with the full list each time one is added, changes status, or is removed.
+   * Returns the unsubscribe function.
+   *
+   * When reading the current list fails, `options.onError` receives the error and `listener` is
+   * not called again until a later reconnect reads the list successfully; without `onError` the
+   * error is logged.
+   */
+  subscribe(
+    listener: (subagents: PaseoAgentProviderSubagent[]) => void,
+    options?: PaseoAgentProviderSubagentsSubscribeOptions,
+  ): () => void;
+}
+
+export interface PaseoAgentProviderSubagentsSubscribeOptions {
+  /** Receives the error when reading the agent's current subagents fails. */
+  onError?: (error: unknown) => void;
+}
+
+/** A heartbeat: a schedule whose cron prompt goes back into this agent. */
+export type PaseoAgentHeartbeat = ScheduleSummary;
+
+export interface PaseoAgentHeartbeatsHandle {
+  /**
+   * Reads the heartbeats that prompt this agent, in every status. One is pending while its
+   * `status` is `"active"`; `nextRunAt` says when it fires next. Schedules that create new agents
+   * are not listed. Requires `automation.manage`.
+   */
+  list(options?: { requestId?: string; timeout?: number }): Promise<PaseoAgentHeartbeat[]>;
+}
+
 export interface PaseoAgentHandle {
   readonly id: string;
   readonly address: AgentAddress;
@@ -416,6 +458,8 @@ export interface PaseoAgentHandle {
   readonly archivedAt: NonNullable<PaseoAgent["archivedAt"]> | null;
   readonly timeline: PaseoAgentTimelineHandle;
   readonly backgroundWork: PaseoAgentBackgroundWorkHandle;
+  readonly providerSubagents: PaseoAgentProviderSubagentsHandle;
+  readonly heartbeats: PaseoAgentHeartbeatsHandle;
   current(): PaseoAgent | null;
   refresh(requestId?: string): Promise<PaseoAgentRefetchResult | null>;
   /**
@@ -687,6 +731,7 @@ export function createPaseoApi(
     listenAgents,
     (agentId, handler) => own(() => daemonClient.subscribeAgentTimeline(agentId, handler)),
     () => own(() => daemonClient.observeAgentBackgroundWork()),
+    () => own(() => daemonClient.observeProviderSubagents()),
   );
   const createAgent = async (
     options: PaseoAgentCreateOptions,
@@ -1002,11 +1047,45 @@ function createWorkspaceHandleFactory(
   };
 }
 
+type PaseoAgentProviderSubagentChange =
+  | { kind: "upsert"; subagent: PaseoAgentProviderSubagent }
+  | { kind: "remove"; subagentId: string };
+
+function toProviderSubagentChange(
+  payload: Extract<SessionOutboundMessage, { type: "agent.provider_subagents.update" }>["payload"],
+  agentId: string,
+): PaseoAgentProviderSubagentChange | null {
+  if (payload.kind === "upsert") {
+    return payload.subagent.parentAgentId === agentId
+      ? { kind: "upsert", subagent: payload.subagent }
+      : null;
+  }
+  if (payload.kind === "remove") {
+    return payload.parentAgentId === agentId
+      ? { kind: "remove", subagentId: payload.subagentId }
+      : null;
+  }
+  return null;
+}
+
+/** Returns whether the change altered the list. Never replaces a subagent with an older copy. */
+function applyProviderSubagentChange(
+  subagents: Map<string, PaseoAgentProviderSubagent>,
+  change: PaseoAgentProviderSubagentChange,
+): boolean {
+  if (change.kind === "remove") return subagents.delete(change.subagentId);
+  const known = subagents.get(change.subagent.id);
+  if (known && known.updatedAt > change.subagent.updatedAt) return false;
+  subagents.set(change.subagent.id, change.subagent);
+  return true;
+}
+
 function createAgentHandleFactory(
   daemonClient: DaemonClient,
   listen: (handler: PaseoAgentUpdateHandler) => () => void,
   subscribeTimeline: DaemonClient["subscribeAgentTimeline"],
   observeBackgroundWork: () => ReturnType<DaemonClient["observeAgentBackgroundWork"]>,
+  observeProviderSubagents: () => ReturnType<DaemonClient["observeProviderSubagents"]>,
 ): AgentHandleFactory {
   return (agent) => {
     const id = typeof agent === "string" ? agent : agent.id;
@@ -1091,6 +1170,66 @@ function createAgentHandleFactory(
               );
           };
         },
+      },
+      providerSubagents: {
+        list: (options) => daemonClient.listAgentProviderSubagents(id, options),
+        subscribe: (listener, options) => {
+          // `null` until a list read succeeds: updates are deltas, so without a list there is no
+          // full list to report.
+          let subagents: Map<string, PaseoAgentProviderSubagent> | null = null;
+          // Changes that arrive while the current list is being read; replayed on top of it.
+          let pending: PaseoAgentProviderSubagentChange[] | null = [];
+          let sequence = 0;
+          let released = false;
+          const emit = (known: Map<string, PaseoAgentProviderSubagent>) =>
+            listener([...known.values()]);
+          const observation = observeProviderSubagents();
+          observation.subscribe({
+            snapshot: () => {
+              const listed = ++sequence;
+              subagents = null;
+              pending = [];
+              void daemonClient
+                .listAgentProviderSubagents(id)
+                .then((listedSubagents) => {
+                  if (released || listed !== sequence) return undefined;
+                  const known = new Map(listedSubagents.map((subagent) => [subagent.id, subagent]));
+                  for (const change of pending ?? []) applyProviderSubagentChange(known, change);
+                  pending = null;
+                  subagents = known;
+                  emit(known);
+                  return undefined;
+                })
+                .catch((error: unknown) => {
+                  if (released || listed !== sequence) return;
+                  pending = null;
+                  if (options?.onError) options.onError(error);
+                  else console.error("Provider subagent list failed", error);
+                });
+            },
+            update: (message) => {
+              if (message.type !== "agent.provider_subagents.update") return;
+              const change = toProviderSubagentChange(message.payload, id);
+              if (!change) return;
+              if (pending) {
+                pending.push(change);
+                return;
+              }
+              if (subagents && applyProviderSubagentChange(subagents, change)) emit(subagents);
+            },
+          });
+          return () => {
+            released = true;
+            void observation
+              .release()
+              .catch((error) =>
+                console.error("Provider subagent subscription cleanup failed", error),
+              );
+          };
+        },
+      },
+      heartbeats: {
+        list: (options) => daemonClient.listAgentHeartbeats(id, options),
       },
       get workspaceId() {
         return current?.workspaceId ?? null;
