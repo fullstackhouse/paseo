@@ -2040,3 +2040,207 @@ test("background work asks for a host update when the daemon lacks it", async ()
   expect(() => handle.backgroundWork.subscribe(() => {})).toThrow("Update the host");
   await client.close();
 });
+
+const PROVIDER_SUBAGENT_FEATURES = { ownedSubscriptions: true, providerSubagents: true };
+
+function providerSubagent(overrides: Record<string, unknown> = {}) {
+  return {
+    id: "sub-1",
+    parentAgentId: "agent-a",
+    parentSubagentId: null,
+    provider: "claude",
+    title: "Explore",
+    description: "Find the callers",
+    status: "running",
+    createdAt: "2026-11-14T10:00:00.000Z",
+    updatedAt: "2026-11-14T10:00:00.000Z",
+    toolCallId: "tool-1",
+    ...overrides,
+  };
+}
+
+function answerProviderSubagentList(ws: FakeWebSocket, subagents: unknown[]): void {
+  const request = parseSentSessionMessage(ws.sent.at(-1));
+  expect(request).toMatchObject({
+    type: "agent.provider_subagents.list.request",
+    parentAgentId: "agent-a",
+  });
+  ws.message(
+    sessionMessage({
+      type: "agent.provider_subagents.list.response",
+      payload: { requestId: request.requestId, parentAgentId: "agent-a", subagents, error: null },
+    }),
+  );
+}
+
+function providerSubagentUpdate(payload: Record<string, unknown>): string {
+  return sessionMessage({
+    type: "agent.provider_subagents.update",
+    payload: { subscriptionId: "subagents-sdk", ...payload },
+  });
+}
+
+test("agent handles list provider subagents", async () => {
+  const { client, ws } = await connectClient(PROVIDER_SUBAGENT_FEATURES);
+
+  const pending = client.agents.ref("agent-a").providerSubagents.list();
+  answerProviderSubagentList(ws, [providerSubagent()]);
+
+  await expect(pending).resolves.toEqual([providerSubagent()]);
+  await client.close();
+});
+
+test("agent handles follow only their own provider subagents", async () => {
+  const { client, ws } = await connectClient(PROVIDER_SUBAGENT_FEATURES);
+  const received: unknown[] = [];
+
+  const unsubscribe = client.agents
+    .ref("agent-a")
+    .providerSubagents.subscribe((subagents) => received.push(subagents));
+  expect(parseSentSessionMessage(ws.sent.at(-1))).toMatchObject({
+    type: "session.events.set_subscription.request",
+    events: ["agent.provider_subagents.update"],
+  });
+  acknowledgeObservation(ws, "subagents-sdk");
+  answerProviderSubagentList(ws, []);
+  await vi.waitFor(() => expect(received).toEqual([[]]));
+
+  ws.message(
+    providerSubagentUpdate({
+      kind: "upsert",
+      subagent: providerSubagent({ id: "other", parentAgentId: "agent-b" }),
+    }),
+  );
+  ws.message(providerSubagentUpdate({ kind: "upsert", subagent: providerSubagent() }));
+  const completed = providerSubagent({
+    status: "completed",
+    updatedAt: "2026-11-14T10:01:00.000Z",
+  });
+  ws.message(providerSubagentUpdate({ kind: "upsert", subagent: completed }));
+  ws.message(
+    providerSubagentUpdate({ kind: "remove", parentAgentId: "agent-a", subagentId: "sub-1" }),
+  );
+  await vi.waitFor(() => expect(received).toEqual([[], [providerSubagent()], [completed], []]));
+
+  unsubscribe();
+  ws.message(providerSubagentUpdate({ kind: "upsert", subagent: providerSubagent() }));
+  expect(received).toHaveLength(4);
+  await client.close();
+});
+
+test("provider subagent subscriptions replay changes that overtake their list", async () => {
+  const { client, ws } = await connectClient(PROVIDER_SUBAGENT_FEATURES);
+  const received: unknown[] = [];
+
+  client.agents.ref("agent-a").providerSubagents.subscribe((subagents) => received.push(subagents));
+  acknowledgeObservation(ws, "subagents-sdk");
+  await vi.waitFor(() =>
+    expect(parseSentSessionMessage(ws.sent.at(-1))).toMatchObject({
+      type: "agent.provider_subagents.list.request",
+    }),
+  );
+  const finished = providerSubagent({
+    status: "failed",
+    updatedAt: "2026-11-14T10:02:00.000Z",
+  });
+  const added = providerSubagent({ id: "sub-2" });
+  ws.message(providerSubagentUpdate({ kind: "upsert", subagent: finished }));
+  ws.message(providerSubagentUpdate({ kind: "upsert", subagent: added }));
+  answerProviderSubagentList(ws, [providerSubagent()]);
+
+  await vi.waitFor(() => expect(received).toEqual([[finished, added]]));
+  await client.close();
+});
+
+test("provider subagent subscriptions report a failed list to onError", async () => {
+  const { client, ws } = await connectClient(PROVIDER_SUBAGENT_FEATURES);
+  const received: unknown[] = [];
+  const errors: unknown[] = [];
+
+  client.agents.ref("agent-a").providerSubagents.subscribe((s) => received.push(s), {
+    onError: (error) => errors.push(error),
+  });
+  acknowledgeObservation(ws, "subagents-sdk");
+  await vi.waitFor(() =>
+    expect(parseSentSessionMessage(ws.sent.at(-1))).toMatchObject({
+      type: "agent.provider_subagents.list.request",
+    }),
+  );
+  const request = parseSentSessionMessage(ws.sent.at(-1));
+  ws.message(
+    sessionMessage({
+      type: "agent.provider_subagents.list.response",
+      payload: {
+        requestId: request.requestId,
+        parentAgentId: "agent-a",
+        subagents: [],
+        error: "boom",
+      },
+    }),
+  );
+
+  await vi.waitFor(() => expect(errors).toHaveLength(1));
+  expect((errors[0] as Error).message).toContain("boom");
+  expect(received).toEqual([]);
+  await client.close();
+});
+
+test("provider subagents ask for a host update when the daemon lacks them", async () => {
+  const { client } = await connectClient({ ownedSubscriptions: true });
+  const handle = client.agents.ref("agent-a");
+
+  await expect(handle.providerSubagents.list()).rejects.toThrow("Update the host");
+  expect(() => handle.providerSubagents.subscribe(() => {})).toThrow("Update the host");
+  await client.close();
+});
+
+function scheduleSummary(id: string, target: Record<string, unknown>, status = "active") {
+  return {
+    id,
+    name: null,
+    prompt: "Check progress",
+    cadence: { type: "cron", expression: "*/5 * * * *" },
+    target,
+    status,
+    createdAt: "2026-11-14T10:00:00.000Z",
+    updatedAt: "2026-11-14T10:00:00.000Z",
+    nextRunAt: status === "active" ? "2026-11-14T10:05:00.000Z" : null,
+    lastRunAt: null,
+    pausedAt: null,
+    expiresAt: null,
+    maxRuns: null,
+  };
+}
+
+test("agent handles list only the schedules that prompt that agent", async () => {
+  const { client, ws } = await connectClient();
+  const agentA = "11111111-1111-4111-8111-111111111111";
+  const agentB = "22222222-2222-4222-8222-222222222222";
+  const heartbeat = scheduleSummary("heartbeat", { type: "agent", agentId: agentA });
+  const paused = scheduleSummary("paused", { type: "agent", agentId: agentA }, "paused");
+
+  const pending = client.agents.ref(agentA).schedules.list();
+  const request = parseSentSessionMessage(ws.sent.at(-1));
+  expect(request).toMatchObject({ type: "schedule/list" });
+  ws.message(
+    sessionMessage({
+      type: "schedule/list/response",
+      payload: {
+        requestId: request.requestId,
+        schedules: [
+          heartbeat,
+          paused,
+          scheduleSummary("other", { type: "agent", agentId: agentB }),
+          scheduleSummary("new", {
+            type: "new-agent",
+            config: { provider: "claude", cwd: "/repo" },
+          }),
+        ],
+        error: null,
+      },
+    }),
+  );
+
+  await expect(pending).resolves.toEqual([heartbeat, paused]);
+  await client.close();
+});
