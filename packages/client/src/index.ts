@@ -408,8 +408,8 @@ export interface PaseoAgentProviderSubagentsHandle {
    * Returns the unsubscribe function.
    *
    * When reading the current list fails, `options.onError` receives the error and `listener` is
-   * not called; without `onError` the error is logged. The read is not retried: the next
-   * reconnect reads the list again.
+   * not called again until a later reconnect reads the list successfully; without `onError` the
+   * error is logged.
    */
   subscribe(
     listener: (subagents: PaseoAgentProviderSubagent[]) => void,
@@ -422,15 +422,16 @@ export interface PaseoAgentProviderSubagentsSubscribeOptions {
   onError?: (error: unknown) => void;
 }
 
-export type PaseoAgentSchedule = ScheduleSummary;
+/** A heartbeat: a schedule whose cron prompt goes back into this agent. */
+export type PaseoAgentHeartbeat = ScheduleSummary;
 
-export interface PaseoAgentSchedulesHandle {
+export interface PaseoAgentHeartbeatsHandle {
   /**
-   * Reads the schedules whose prompts go to this agent, heartbeats included, in every status.
-   * One is pending while its `status` is `"active"`; `nextRunAt` says when it fires next.
-   * Schedules that start a new agent are not listed. Requires `automation.manage`.
+   * Reads the heartbeats that prompt this agent, in every status. One is pending while its
+   * `status` is `"active"`; `nextRunAt` says when it fires next. Schedules that create new agents
+   * are not listed. Requires `automation.manage`.
    */
-  list(options?: { requestId?: string; timeout?: number }): Promise<PaseoAgentSchedule[]>;
+  list(options?: { requestId?: string; timeout?: number }): Promise<PaseoAgentHeartbeat[]>;
 }
 
 export interface PaseoAgentHandle {
@@ -458,7 +459,7 @@ export interface PaseoAgentHandle {
   readonly timeline: PaseoAgentTimelineHandle;
   readonly backgroundWork: PaseoAgentBackgroundWorkHandle;
   readonly providerSubagents: PaseoAgentProviderSubagentsHandle;
-  readonly schedules: PaseoAgentSchedulesHandle;
+  readonly heartbeats: PaseoAgentHeartbeatsHandle;
   current(): PaseoAgent | null;
   refresh(requestId?: string): Promise<PaseoAgentRefetchResult | null>;
   /**
@@ -730,7 +731,7 @@ export function createPaseoApi(
     listenAgents,
     (agentId, handler) => own(() => daemonClient.subscribeAgentTimeline(agentId, handler)),
     () => own(() => daemonClient.observeAgentBackgroundWork()),
-    () => own(() => daemonClient.observeProviderSubagents()),
+    createProviderSubagentFeed(() => own(() => daemonClient.observeProviderSubagents())),
   );
   const createAgent = async (
     options: PaseoAgentCreateOptions,
@@ -1067,6 +1068,65 @@ function toProviderSubagentChange(
   return null;
 }
 
+interface ProviderSubagentFeedListener {
+  /** The shared subscription was established or restored; read the current list. */
+  snapshot(): void;
+  change(change: PaseoAgentProviderSubagentChange): void;
+}
+
+interface ProviderSubagentFeed {
+  /** Throws when the host lacks provider subagents. Returns the removal function. */
+  add(agentId: string, listener: ProviderSubagentFeedListener): () => void;
+}
+
+/**
+ * One event subscription per API instance, shared by every handle's `subscribe()`. The daemon sends
+ * every agent's subagent changes and timeline rows on it, so one per handle would multiply that
+ * traffic by the number of followed agents.
+ */
+function createProviderSubagentFeed(
+  observe: () => ReturnType<DaemonClient["observeProviderSubagents"]>,
+): ProviderSubagentFeed {
+  const listeners = new Map<ProviderSubagentFeedListener, string>();
+  let observation: ReturnType<DaemonClient["observeProviderSubagents"]> | null = null;
+  let established = false;
+  return {
+    add(agentId, listener) {
+      if (!observation) {
+        const created = observe();
+        observation = created;
+        established = false;
+        created.subscribe({
+          snapshot: () => {
+            if (observation !== created) return;
+            established = true;
+            for (const each of listeners.keys()) each.snapshot();
+          },
+          update: (message) => {
+            if (observation !== created) return;
+            if (message.type !== "agent.provider_subagents.update") return;
+            for (const [each, eachAgentId] of listeners) {
+              const change = toProviderSubagentChange(message.payload, eachAgentId);
+              if (change) each.change(change);
+            }
+          },
+        });
+      }
+      listeners.set(listener, agentId);
+      if (established) listener.snapshot();
+      return () => {
+        if (!listeners.delete(listener) || listeners.size > 0 || !observation) return;
+        const released = observation;
+        observation = null;
+        established = false;
+        void released
+          .release()
+          .catch((error) => console.error("Provider subagent subscription cleanup failed", error));
+      };
+    },
+  };
+}
+
 /** Returns whether the change altered the list. Never replaces a subagent with an older copy. */
 function applyProviderSubagentChange(
   subagents: Map<string, PaseoAgentProviderSubagent>,
@@ -1084,7 +1144,7 @@ function createAgentHandleFactory(
   listen: (handler: PaseoAgentUpdateHandler) => () => void,
   subscribeTimeline: DaemonClient["subscribeAgentTimeline"],
   observeBackgroundWork: () => ReturnType<DaemonClient["observeAgentBackgroundWork"]>,
-  observeProviderSubagents: () => ReturnType<DaemonClient["observeProviderSubagents"]>,
+  providerSubagentFeed: ProviderSubagentFeed,
 ): AgentHandleFactory {
   return (agent) => {
     const id = typeof agent === "string" ? agent : agent.id;
@@ -1171,32 +1231,31 @@ function createAgentHandleFactory(
         },
       },
       providerSubagents: {
-        list: async (options) => {
-          daemonClient.assertProviderSubagentsSupported();
-          return (await daemonClient.listProviderSubagents(id, options)).subagents;
-        },
+        list: (options) => daemonClient.listAgentProviderSubagents(id, options),
         subscribe: (listener, options) => {
-          const observation = observeProviderSubagents();
-          const subagents = new Map<string, PaseoAgentProviderSubagent>();
+          // `null` until a list read succeeds: updates are deltas, so without a list there is no
+          // full list to report.
+          let subagents: Map<string, PaseoAgentProviderSubagent> | null = null;
           // Changes that arrive while the current list is being read; replayed on top of it.
-          let pending: PaseoAgentProviderSubagentChange[] | null = null;
+          let pending: PaseoAgentProviderSubagentChange[] | null = [];
           let sequence = 0;
           let released = false;
-          const emit = () => listener([...subagents.values()]);
-          observation.subscribe({
+          const emit = (known: Map<string, PaseoAgentProviderSubagent>) =>
+            listener([...known.values()]);
+          const remove = providerSubagentFeed.add(id, {
             snapshot: () => {
               const listed = ++sequence;
+              subagents = null;
               pending = [];
               void daemonClient
-                .listProviderSubagents(id)
-                .then(({ subagents: listedSubagents }) => {
+                .listAgentProviderSubagents(id)
+                .then((listedSubagents) => {
                   if (released || listed !== sequence) return undefined;
-                  subagents.clear();
-                  for (const subagent of listedSubagents) subagents.set(subagent.id, subagent);
-                  for (const change of pending ?? [])
-                    applyProviderSubagentChange(subagents, change);
+                  const known = new Map(listedSubagents.map((subagent) => [subagent.id, subagent]));
+                  for (const change of pending ?? []) applyProviderSubagentChange(known, change);
                   pending = null;
-                  emit();
+                  subagents = known;
+                  emit(known);
                   return undefined;
                 })
                 .catch((error: unknown) => {
@@ -1206,29 +1265,22 @@ function createAgentHandleFactory(
                   else console.error("Provider subagent list failed", error);
                 });
             },
-            update: (message) => {
-              if (message.type !== "agent.provider_subagents.update") return;
-              const change = toProviderSubagentChange(message.payload, id);
-              if (!change) return;
+            change: (change) => {
               if (pending) {
                 pending.push(change);
                 return;
               }
-              if (applyProviderSubagentChange(subagents, change)) emit();
+              if (subagents && applyProviderSubagentChange(subagents, change)) emit(subagents);
             },
           });
           return () => {
             released = true;
-            void observation
-              .release()
-              .catch((error) =>
-                console.error("Provider subagent subscription cleanup failed", error),
-              );
+            remove();
           };
         },
       },
-      schedules: {
-        list: (options) => daemonClient.listAgentSchedules(id, options),
+      heartbeats: {
+        list: (options) => daemonClient.listAgentHeartbeats(id, options),
       },
       get workspaceId() {
         return current?.workspaceId ?? null;

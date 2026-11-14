@@ -72,13 +72,13 @@ const unsubscribe = agent.providerSubagents.subscribe((subagents) => {
 });
 ```
 
-`subscribe()` calls the listener with the agent's subagents once the subscription is established, again after each reconnect, then with the whole list each time one is added, changes status, or is removed. `list()` reads them once. Each subagent has `id`, `parentAgentId`, `parentSubagentId` for nested subagents, `provider`, `title`, `description`, `status` (`"running"`, `"completed"`, `"failed"` or `"canceled"`), `createdAt` and `updatedAt`. `onError` behaves as it does for background work.
+`subscribe()` calls the listener with the agent's subagents once the subscription is established, again after each reconnect, then with the whole list each time one is added, changes status, or is removed. `list()` reads them once. Each subagent has `id`, `parentAgentId`, `parentSubagentId` for nested subagents, `provider`, `title`, `description`, `status` (`"running"`, `"completed"`, `"failed"` or `"canceled"`), `createdAt` and `updatedAt`, among other fields. When reading the list fails, `onError` receives the error (without it, the error is logged) and the listener is not called again until a later reconnect reads the list, because updates carry single changes rather than the whole list.
 
 `list()` rejects and `subscribe()` throws when the host does not advertise `features.providerSubagents`; ask the user to update the host.
 
-## Read an agent's schedules
+## Read an agent's heartbeats
 
-`agent.schedules.list()` returns the schedules whose prompts go to this agent, heartbeats included, in every status. A schedule is pending while its `status` is `"active"`; `nextRunAt` says when it fires next. Schedules that start a new agent are not listed, because they do not prompt this one. There is no push event for schedules, so read again when you need a fresh answer. Listing schedules needs the `automation.manage` permission.
+`agent.heartbeats.list()` returns the heartbeats that prompt this agent, in every status. A heartbeat is pending while its `status` is `"active"`; `nextRunAt` says when it fires next. Schedules that create new agents are not listed, because they do not prompt this one. There is no push event for heartbeats, so read again when you need a fresh answer. Listing heartbeats needs the `automation.manage` permission.
 
 ## Follow timeline events
 

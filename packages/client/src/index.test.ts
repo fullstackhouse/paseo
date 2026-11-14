@@ -2181,7 +2181,89 @@ test("provider subagent subscriptions report a failed list to onError", async ()
 
   await vi.waitFor(() => expect(errors).toHaveLength(1));
   expect((errors[0] as Error).message).toContain("boom");
+
+  // Updates are deltas: without a listed base they cannot make a full list.
+  ws.message(
+    providerSubagentUpdate({ kind: "upsert", subagent: providerSubagent({ id: "sub-2" }) }),
+  );
+  await new Promise((resolve) => setTimeout(resolve, 0));
   expect(received).toEqual([]);
+  await client.close();
+});
+
+test("provider subagent subscriptions share one event subscription", async () => {
+  const { client, ws } = await connectClient(PROVIDER_SUBAGENT_FEATURES);
+  const first: unknown[] = [];
+  const second: unknown[] = [];
+
+  const unsubscribeFirst = client.agents
+    .ref("agent-a")
+    .providerSubagents.subscribe((subagents) => first.push(subagents));
+  acknowledgeObservation(ws, "subagents-sdk");
+  answerProviderSubagentList(ws, []);
+  await vi.waitFor(() => expect(first).toEqual([[]]));
+
+  client.agents.ref("agent-b").providerSubagents.subscribe((subagents) => second.push(subagents));
+  const request = parseSentSessionMessage(ws.sent.at(-1));
+  expect(request).toMatchObject({
+    type: "agent.provider_subagents.list.request",
+    parentAgentId: "agent-b",
+  });
+  ws.message(
+    sessionMessage({
+      type: "agent.provider_subagents.list.response",
+      payload: {
+        requestId: request.requestId,
+        parentAgentId: "agent-b",
+        subagents: [],
+        error: null,
+      },
+    }),
+  );
+  await vi.waitFor(() => expect(second).toEqual([[]]));
+  expect(
+    ws.sent
+      .map((frame) => parseSentSessionMessage(frame))
+      .filter((message) => message?.type === "session.events.set_subscription.request"),
+  ).toHaveLength(1);
+
+  const forB = providerSubagent({ id: "sub-b", parentAgentId: "agent-b" });
+  ws.message(providerSubagentUpdate({ kind: "upsert", subagent: forB }));
+  await vi.waitFor(() => expect(second).toEqual([[], [forB]]));
+  expect(first).toEqual([[]]);
+
+  unsubscribeFirst();
+  ws.message(providerSubagentUpdate({ kind: "upsert", subagent: providerSubagent() }));
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  expect(first).toEqual([[]]);
+  await client.close();
+});
+
+test("provider subagent subscriptions ignore timeline rows and older copies", async () => {
+  const { client, ws } = await connectClient(PROVIDER_SUBAGENT_FEATURES);
+  const received: unknown[] = [];
+  const current = providerSubagent({ updatedAt: "2026-11-14T10:02:00.000Z" });
+
+  client.agents.ref("agent-a").providerSubagents.subscribe((subagents) => received.push(subagents));
+  acknowledgeObservation(ws, "subagents-sdk");
+  answerProviderSubagentList(ws, [current]);
+  await vi.waitFor(() => expect(received).toEqual([[current]]));
+
+  ws.message(providerSubagentUpdate({ kind: "upsert", subagent: providerSubagent() }));
+  ws.message(
+    providerSubagentUpdate({
+      kind: "timeline",
+      parentAgentId: "agent-a",
+      subagentId: "sub-1",
+      provider: "claude",
+      item: { type: "assistant_message", text: "working" },
+      timestamp: "2026-11-14T10:03:00.000Z",
+      seq: 1,
+      epoch: "epoch-1",
+    }),
+  );
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  expect(received).toEqual([[current]]);
   await client.close();
 });
 
@@ -2212,14 +2294,14 @@ function scheduleSummary(id: string, target: Record<string, unknown>, status = "
   };
 }
 
-test("agent handles list only the schedules that prompt that agent", async () => {
+test("agent handles list only the heartbeats that prompt that agent", async () => {
   const { client, ws } = await connectClient();
   const agentA = "11111111-1111-4111-8111-111111111111";
   const agentB = "22222222-2222-4222-8222-222222222222";
   const heartbeat = scheduleSummary("heartbeat", { type: "agent", agentId: agentA });
   const paused = scheduleSummary("paused", { type: "agent", agentId: agentA }, "paused");
 
-  const pending = client.agents.ref(agentA).schedules.list();
+  const pending = client.agents.ref(agentA).heartbeats.list();
   const request = parseSentSessionMessage(ws.sent.at(-1));
   expect(request).toMatchObject({ type: "schedule/list" });
   ws.message(
@@ -2242,5 +2324,21 @@ test("agent handles list only the schedules that prompt that agent", async () =>
   );
 
   await expect(pending).resolves.toEqual([heartbeat, paused]);
+  await client.close();
+});
+
+test("heartbeat lists reject when the host reports an error", async () => {
+  const { client, ws } = await connectClient();
+
+  const pending = client.agents.ref("agent-a").heartbeats.list();
+  const request = parseSentSessionMessage(ws.sent.at(-1));
+  ws.message(
+    sessionMessage({
+      type: "schedule/list/response",
+      payload: { requestId: request.requestId, schedules: [], error: "denied" },
+    }),
+  );
+
+  await expect(pending).rejects.toThrow("denied");
   await client.close();
 });

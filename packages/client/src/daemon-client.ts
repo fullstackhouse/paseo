@@ -3903,6 +3903,15 @@ export class DaemonClient {
     return this.observeEvents(["agent.background_work.update"], options);
   }
 
+  /** Gated read of an agent's provider subagents, for SDK handles. */
+  async listAgentProviderSubagents(
+    agentId: string,
+    options: { requestId?: string; timeout?: number } = {},
+  ): Promise<ProviderSubagentDescriptor[]> {
+    this.assertProviderSubagentsSupported();
+    return (await this.listProviderSubagents(agentId, options)).subagents;
+  }
+
   observeProviderSubagents(
     options: { signal?: AbortSignal } = {},
   ): OwnedSubscription<CorrelatedResponsePayload<"session.events.set_subscription.response">> {
@@ -3910,15 +3919,15 @@ export class DaemonClient {
     return this.observeEvents(["agent.provider_subagents.update"], options);
   }
 
-  assertProviderSubagentsSupported(): void {
+  private assertProviderSubagentsSupported(): void {
     // COMPAT(providerSubagents): added in v0.1.107, remove gate after 2027-01-12.
     if (this.lastServerInfoMessage?.features?.providerSubagents !== true) {
       throw new Error("Update the host to see an agent's subagents.");
     }
   }
 
-  /** Lists the schedules (heartbeats) whose prompts go to `agentId`, in every status. */
-  async listAgentSchedules(
+  /** Lists the heartbeats that prompt `agentId` (schedules targeting it), in every status. */
+  async listAgentHeartbeats(
     agentId: string,
     options: { requestId?: string; timeout?: number } = {},
   ): Promise<ScheduleSummary[]> {

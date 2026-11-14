@@ -70,13 +70,13 @@ const unsubscribe = agent.providerSubagents.subscribe((subagents) => {
 });
 ```
 
-订阅建立后，`subscribe()` 会用该 agent 的子 agent 调用一次监听器，每次重连后再调用一次，之后每当有子 agent 新增、状态变化或被移除时都传入完整列表。`list()` 读取一次。每个子 agent 包含 `id`、`parentAgentId`、嵌套子 agent 的 `parentSubagentId`、`provider`、`title`、`description`、`status`（`"running"`、`"completed"`、`"failed"` 或 `"canceled"`）、`createdAt` 和 `updatedAt`。`onError` 的行为与后台工作相同。
+订阅建立后，`subscribe()` 会用该 agent 的子 agent 调用一次监听器，每次重连后再调用一次，之后每当有子 agent 新增、状态变化或被移除时都传入完整列表。`list()` 读取一次。每个子 agent 包含 `id`、`parentAgentId`、嵌套子 agent 的 `parentSubagentId`、`provider`、`title`、`description`、`status`（`"running"`、`"completed"`、`"failed"` 或 `"canceled"`）、`createdAt` 和 `updatedAt` 等字段。读取列表失败时，`onError` 会收到错误（不传时错误会被记录到日志），并且在之后某次重连成功读取列表之前不会再调用监听器，因为更新只携带单个变化，而不是完整列表。
 
 当主机未声明 `features.providerSubagents` 时，`list()` 会 reject，`subscribe()` 会抛出错误；请让用户更新主机。
 
-## 读取一个 Agent 的计划任务 {#read-an-agents-schedules}
+## 读取一个 Agent 的心跳 {#read-an-agents-heartbeats}
 
-`agent.schedules.list()` 返回所有提示词发给这个 agent 的计划任务（包括心跳），不限状态。`status` 为 `"active"` 时计划任务处于待触发状态；`nextRunAt` 表示下一次触发时间。启动新 agent 的计划任务不会列出，因为它们不会提示这个 agent。计划任务没有推送事件，需要最新结果时请重新读取。列出计划任务需要 `automation.manage` 权限。
+`agent.heartbeats.list()` 返回所有提示这个 agent 的心跳，不限状态。`status` 为 `"active"` 时心跳处于待触发状态；`nextRunAt` 表示下一次触发时间。创建新 agent 的计划任务不会列出，因为它们不会提示这个 agent。心跳没有推送事件，需要最新结果时请重新读取。列出心跳需要 `automation.manage` 权限。
 
 ## 跟踪时间线事件 {#follow-timeline-events}
 
