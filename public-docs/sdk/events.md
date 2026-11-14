@@ -61,6 +61,25 @@ Pass `subscribe(listener, { onError })` to receive the error when reading the cu
 
 `list()` rejects and `subscribe()` throws when the host does not advertise `features.agentBackgroundWork`; ask the user to update the host.
 
+## Follow an agent's subagents
+
+Provider subagents are the agents an agent's provider started inside its own session, such as Claude Task agents and Codex subagents. They are not Paseo agents and have no handle of their own.
+
+```ts
+const unsubscribe = agent.providerSubagents.subscribe((subagents) => {
+  const running = subagents.filter((subagent) => subagent.status === "running");
+  render(running);
+});
+```
+
+`subscribe()` calls the listener with the agent's subagents once the subscription is established, again after each reconnect, then with the whole list each time one is added, changes status, or is removed. `list()` reads them once. Each subagent has `id`, `parentAgentId`, `parentSubagentId` for nested subagents, `provider`, `title`, `description`, `status` (`"running"`, `"completed"`, `"failed"` or `"canceled"`), `createdAt` and `updatedAt`. `onError` behaves as it does for background work.
+
+`list()` rejects and `subscribe()` throws when the host does not advertise `features.providerSubagents`; ask the user to update the host.
+
+## Read an agent's schedules
+
+`agent.schedules.list()` returns the schedules whose prompts go to this agent, heartbeats included, in every status. A schedule is pending while its `status` is `"active"`; `nextRunAt` says when it fires next. Schedules that start a new agent are not listed, because they do not prompt this one. There is no push event for schedules, so read again when you need a fresh answer. Listing schedules needs the `automation.manage` permission.
+
 ## Follow timeline events
 
 ```ts
