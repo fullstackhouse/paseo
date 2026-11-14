@@ -22,7 +22,10 @@ import {
 import { CreationClient } from "./creation/index.js";
 import type { CreationSnapshot } from "@getpaseo/protocol/messages";
 import type { z } from "zod";
-import type { SessionEventSubscription } from "@getpaseo/protocol/messages";
+import type {
+  ProviderSubagentEventFilter,
+  SessionEventSubscription,
+} from "@getpaseo/protocol/messages";
 import type { LocalSpeechModel } from "@getpaseo/protocol/speech/rpc-schemas";
 import { CLIENT_CAPS, type ClientCapability } from "@getpaseo/protocol/client-capabilities";
 import type { AgentAttentionNotificationPayload } from "@getpaseo/protocol/agent-attention-notification";
@@ -2720,7 +2723,11 @@ export class DaemonClient {
 
   observeEvents(
     events: SessionEventSubscription[],
-    options?: { signal?: AbortSignal; notifications?: boolean },
+    options?: {
+      signal?: AbortSignal;
+      notifications?: boolean;
+      providerSubagentFilter?: ProviderSubagentEventFilter;
+    },
   ): OwnedSubscription<CorrelatedResponsePayload<"session.events.set_subscription.response">> {
     return this.observe(
       "session.events.set_subscription.response",
@@ -2728,6 +2735,9 @@ export class DaemonClient {
         type: "session.events.set_subscription.request",
         events,
         notifications: options?.notifications,
+        ...(options?.providerSubagentFilter
+          ? { providerSubagentFilter: options.providerSubagentFilter }
+          : {}),
       },
       options,
     );
@@ -3912,11 +3922,22 @@ export class DaemonClient {
     return (await this.listProviderSubagents(agentId, options)).subagents;
   }
 
+  /**
+   * Observes provider subagent updates. Hosts that advertise
+   * `features.providerSubagentEventFilter` apply `filter` before sending; older hosts send every
+   * update, so callers still check the parent agent and kind of what arrives.
+   */
   observeProviderSubagents(
-    options: { signal?: AbortSignal } = {},
+    options: { signal?: AbortSignal; filter?: ProviderSubagentEventFilter } = {},
   ): OwnedSubscription<CorrelatedResponsePayload<"session.events.set_subscription.response">> {
     this.assertProviderSubagentsSupported();
-    return this.observeEvents(["agent.provider_subagents.update"], options);
+    const { filter, ...rest } = options;
+    // COMPAT(providerSubagentEventFilter): added after v0.15.3, remove gate after 2027-05-14.
+    const filtered = filter && this.lastServerInfoMessage?.features?.providerSubagentEventFilter;
+    return this.observeEvents(["agent.provider_subagents.update"], {
+      ...rest,
+      ...(filtered ? { providerSubagentFilter: filter } : {}),
+    });
   }
 
   private assertProviderSubagentsSupported(): void {

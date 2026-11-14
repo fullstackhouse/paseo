@@ -2294,3 +2294,67 @@ test("heartbeat lists reject when the host reports an error", async () => {
   await expect(pending).rejects.toThrow("denied");
   await client.close();
 });
+
+test("provider subagent subscriptions ask filtering hosts for only their agent's changes", async () => {
+  const { client, ws } = await connectClient({
+    ...PROVIDER_SUBAGENT_FEATURES,
+    providerSubagentEventFilter: true,
+  });
+
+  const unsubscribe = client.agents.ref("agent-a").providerSubagents.subscribe(() => {});
+
+  expect(parseSentSessionMessage(ws.sent.at(-1))).toMatchObject({
+    type: "session.events.set_subscription.request",
+    events: ["agent.provider_subagents.update"],
+    providerSubagentFilter: { parentAgentIds: ["agent-a"], kinds: ["upsert", "remove"] },
+  });
+  acknowledgeObservation(ws, "subagents-sdk");
+  answerProviderSubagentList(ws, []);
+  unsubscribe();
+  await client.close();
+});
+
+test("provider subagent subscriptions send no filter to hosts without it", async () => {
+  const { client, ws } = await connectClient(PROVIDER_SUBAGENT_FEATURES);
+
+  const unsubscribe = client.agents.ref("agent-a").providerSubagents.subscribe(() => {});
+
+  const request = parseSentSessionMessage(ws.sent.at(-1));
+  expect(request.type).toBe("session.events.set_subscription.request");
+  expect(request).not.toHaveProperty("providerSubagentFilter");
+  acknowledgeObservation(ws, "subagents-sdk");
+  answerProviderSubagentList(ws, []);
+  unsubscribe();
+  await client.close();
+});
+
+function refuseObservation(ws: FakeWebSocket): void {
+  const request = parseSentSessionMessage(ws.sent.at(-1));
+  expect(request.type).toBe("session.events.set_subscription.request");
+  ws.message(
+    sessionMessage({
+      type: "rpc_error",
+      payload: { requestId: request.requestId, error: "Denied", code: "access_denied" },
+    }),
+  );
+}
+
+test("agent handle subscriptions report a refused subscription to onError", async () => {
+  const { client, ws } = await connectClient({
+    ...PROVIDER_SUBAGENT_FEATURES,
+    ...BACKGROUND_WORK_FEATURES,
+  });
+  const errors: unknown[] = [];
+  const agent = client.agents.ref("agent-a");
+  const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+
+  agent.providerSubagents.subscribe(() => {}, { onError: (error) => errors.push(error) });
+  refuseObservation(ws);
+  agent.backgroundWork.subscribe(() => {}, { onError: (error) => errors.push(error) });
+  refuseObservation(ws);
+
+  await vi.waitFor(() => expect(errors).toHaveLength(2));
+  for (const error of errors) expect((error as Error).message).toContain("Denied");
+  consoleError.mockRestore();
+  await client.close();
+});
