@@ -73,4 +73,24 @@ describe("provider subagent protocol", () => {
       }),
     ).toMatchObject({ payload: { subagents: [{ id: "child-1" }] } });
   });
+
+  test("accepts an optional provider subagent filter on event subscriptions", () => {
+    const filter = { parentAgentIds: ["parent-1"], kinds: ["upsert", "remove"] };
+    expect(
+      SessionInboundMessageSchema.parse({
+        type: "session.events.set_subscription.request",
+        requestId: "request-1",
+        events: ["agent.provider_subagents.update"],
+        providerSubagentFilter: filter,
+      }),
+    ).toMatchObject({ providerSubagentFilter: filter });
+    expect(() =>
+      SessionInboundMessageSchema.parse({
+        type: "session.events.set_subscription.request",
+        requestId: "request-2",
+        events: ["agent.provider_subagents.update"],
+        providerSubagentFilter: { kinds: ["unknown"] },
+      }),
+    ).toThrow();
+  });
 });
