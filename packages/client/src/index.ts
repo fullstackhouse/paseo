@@ -731,7 +731,7 @@ export function createPaseoApi(
     listenAgents,
     (agentId, handler) => own(() => daemonClient.subscribeAgentTimeline(agentId, handler)),
     () => own(() => daemonClient.observeAgentBackgroundWork()),
-    createProviderSubagentFeed(() => own(() => daemonClient.observeProviderSubagents())),
+    () => own(() => daemonClient.observeProviderSubagents()),
   );
   const createAgent = async (
     options: PaseoAgentCreateOptions,
@@ -1068,65 +1068,6 @@ function toProviderSubagentChange(
   return null;
 }
 
-interface ProviderSubagentFeedListener {
-  /** The shared subscription was established or restored; read the current list. */
-  snapshot(): void;
-  change(change: PaseoAgentProviderSubagentChange): void;
-}
-
-interface ProviderSubagentFeed {
-  /** Throws when the host lacks provider subagents. Returns the removal function. */
-  add(agentId: string, listener: ProviderSubagentFeedListener): () => void;
-}
-
-/**
- * One event subscription per API instance, shared by every handle's `subscribe()`. The daemon sends
- * every agent's subagent changes and timeline rows on it, so one per handle would multiply that
- * traffic by the number of followed agents.
- */
-function createProviderSubagentFeed(
-  observe: () => ReturnType<DaemonClient["observeProviderSubagents"]>,
-): ProviderSubagentFeed {
-  const listeners = new Map<ProviderSubagentFeedListener, string>();
-  let observation: ReturnType<DaemonClient["observeProviderSubagents"]> | null = null;
-  let established = false;
-  return {
-    add(agentId, listener) {
-      if (!observation) {
-        const created = observe();
-        observation = created;
-        established = false;
-        created.subscribe({
-          snapshot: () => {
-            if (observation !== created) return;
-            established = true;
-            for (const each of listeners.keys()) each.snapshot();
-          },
-          update: (message) => {
-            if (observation !== created) return;
-            if (message.type !== "agent.provider_subagents.update") return;
-            for (const [each, eachAgentId] of listeners) {
-              const change = toProviderSubagentChange(message.payload, eachAgentId);
-              if (change) each.change(change);
-            }
-          },
-        });
-      }
-      listeners.set(listener, agentId);
-      if (established) listener.snapshot();
-      return () => {
-        if (!listeners.delete(listener) || listeners.size > 0 || !observation) return;
-        const released = observation;
-        observation = null;
-        established = false;
-        void released
-          .release()
-          .catch((error) => console.error("Provider subagent subscription cleanup failed", error));
-      };
-    },
-  };
-}
-
 /** Returns whether the change altered the list. Never replaces a subagent with an older copy. */
 function applyProviderSubagentChange(
   subagents: Map<string, PaseoAgentProviderSubagent>,
@@ -1144,7 +1085,7 @@ function createAgentHandleFactory(
   listen: (handler: PaseoAgentUpdateHandler) => () => void,
   subscribeTimeline: DaemonClient["subscribeAgentTimeline"],
   observeBackgroundWork: () => ReturnType<DaemonClient["observeAgentBackgroundWork"]>,
-  providerSubagentFeed: ProviderSubagentFeed,
+  observeProviderSubagents: () => ReturnType<DaemonClient["observeProviderSubagents"]>,
 ): AgentHandleFactory {
   return (agent) => {
     const id = typeof agent === "string" ? agent : agent.id;
@@ -1242,7 +1183,8 @@ function createAgentHandleFactory(
           let released = false;
           const emit = (known: Map<string, PaseoAgentProviderSubagent>) =>
             listener([...known.values()]);
-          const remove = providerSubagentFeed.add(id, {
+          const observation = observeProviderSubagents();
+          observation.subscribe({
             snapshot: () => {
               const listed = ++sequence;
               subagents = null;
@@ -1265,7 +1207,10 @@ function createAgentHandleFactory(
                   else console.error("Provider subagent list failed", error);
                 });
             },
-            change: (change) => {
+            update: (message) => {
+              if (message.type !== "agent.provider_subagents.update") return;
+              const change = toProviderSubagentChange(message.payload, id);
+              if (!change) return;
               if (pending) {
                 pending.push(change);
                 return;
@@ -1275,7 +1220,11 @@ function createAgentHandleFactory(
           });
           return () => {
             released = true;
-            remove();
+            void observation
+              .release()
+              .catch((error) =>
+                console.error("Provider subagent subscription cleanup failed", error),
+              );
           };
         },
       },

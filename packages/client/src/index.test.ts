@@ -2191,54 +2191,6 @@ test("provider subagent subscriptions report a failed list to onError", async ()
   await client.close();
 });
 
-test("provider subagent subscriptions share one event subscription", async () => {
-  const { client, ws } = await connectClient(PROVIDER_SUBAGENT_FEATURES);
-  const first: unknown[] = [];
-  const second: unknown[] = [];
-
-  const unsubscribeFirst = client.agents
-    .ref("agent-a")
-    .providerSubagents.subscribe((subagents) => first.push(subagents));
-  acknowledgeObservation(ws, "subagents-sdk");
-  answerProviderSubagentList(ws, []);
-  await vi.waitFor(() => expect(first).toEqual([[]]));
-
-  client.agents.ref("agent-b").providerSubagents.subscribe((subagents) => second.push(subagents));
-  const request = parseSentSessionMessage(ws.sent.at(-1));
-  expect(request).toMatchObject({
-    type: "agent.provider_subagents.list.request",
-    parentAgentId: "agent-b",
-  });
-  ws.message(
-    sessionMessage({
-      type: "agent.provider_subagents.list.response",
-      payload: {
-        requestId: request.requestId,
-        parentAgentId: "agent-b",
-        subagents: [],
-        error: null,
-      },
-    }),
-  );
-  await vi.waitFor(() => expect(second).toEqual([[]]));
-  expect(
-    ws.sent
-      .map((frame) => parseSentSessionMessage(frame))
-      .filter((message) => message?.type === "session.events.set_subscription.request"),
-  ).toHaveLength(1);
-
-  const forB = providerSubagent({ id: "sub-b", parentAgentId: "agent-b" });
-  ws.message(providerSubagentUpdate({ kind: "upsert", subagent: forB }));
-  await vi.waitFor(() => expect(second).toEqual([[], [forB]]));
-  expect(first).toEqual([[]]);
-
-  unsubscribeFirst();
-  ws.message(providerSubagentUpdate({ kind: "upsert", subagent: providerSubagent() }));
-  await new Promise((resolve) => setTimeout(resolve, 0));
-  expect(first).toEqual([[]]);
-  await client.close();
-});
-
 test("provider subagent subscriptions ignore timeline rows and older copies", async () => {
   const { client, ws } = await connectClient(PROVIDER_SUBAGENT_FEATURES);
   const received: unknown[] = [];
