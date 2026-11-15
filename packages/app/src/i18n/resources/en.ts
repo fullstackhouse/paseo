@@ -1401,6 +1401,10 @@ export const en = {
         tomorrow: "Until tomorrow morning",
         nextWeek: "Until next week",
         indefinite: "Until I wake it",
+        custom: "Custom…",
+        customPlaceholder: "2h, fri 14:00, 2026-11-20 9:30",
+        customHint: "Type a time, a day or a duration",
+        customInvalid: "Can’t read that as a future time",
       },
       confirmations: {
         hideTitle: "Hide workspace?",

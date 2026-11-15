@@ -1383,6 +1383,10 @@ export const zhCN: TranslationResources = {
         tomorrow: "直到明天早上",
         nextWeek: "直到下周",
         indefinite: "直到我恢复",
+        custom: "自定义…",
+        customPlaceholder: "2h, fri 14:00, 2026-11-20 9:30",
+        customHint: "输入时间、日期或时长",
+        customInvalid: "无法识别为将来的时间",
       },
       confirmations: {
         hideTitle: "隐藏 workspace？",

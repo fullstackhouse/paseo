@@ -1400,6 +1400,10 @@ export const ko: TranslationResources = {
         tomorrow: "내일 아침까지",
         nextWeek: "다음 주까지",
         indefinite: "직접 깨울 때까지",
+        custom: "직접 지정…",
+        customPlaceholder: "2h, fri 14:00, 2026-11-20 9:30",
+        customHint: "시간, 날짜 또는 기간을 입력하세요",
+        customInvalid: "미래 시간으로 인식할 수 없습니다",
       },
       confirmations: {
         hideTitle: "워크스페이스를 숨길까요?",

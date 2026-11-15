@@ -1393,6 +1393,10 @@ export const ar: TranslationResources = {
         tomorrow: "حتى صباح الغد",
         nextWeek: "حتى الأسبوع القادم",
         indefinite: "حتى أوقظها",
+        custom: "مخصص…",
+        customPlaceholder: "2h, fri 14:00, 2026-11-20 9:30",
+        customHint: "اكتب وقتًا أو يومًا أو مدة",
+        customInvalid: "تعذّر فهمه كوقت في المستقبل",
       },
       confirmations: {
         hideTitle: "إخفاء مساحة العمل؟",

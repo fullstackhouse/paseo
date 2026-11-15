@@ -1429,6 +1429,10 @@ export const es: TranslationResources = {
         tomorrow: "Hasta mañana por la mañana",
         nextWeek: "Hasta la próxima semana",
         indefinite: "Hasta que lo reactive",
+        custom: "Personalizado…",
+        customPlaceholder: "2h, fri 14:00, 2026-11-20 9:30",
+        customHint: "Escribe una hora, un día o una duración",
+        customInvalid: "No se reconoce como una hora futura",
       },
       confirmations: {
         hideTitle: "¿Ocultar espacio de trabajo?",

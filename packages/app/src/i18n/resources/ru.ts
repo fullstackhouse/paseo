@@ -1411,6 +1411,10 @@ export const ru: TranslationResources = {
         tomorrow: "До завтрашнего утра",
         nextWeek: "До следующей недели",
         indefinite: "Пока не верну",
+        custom: "Своё время…",
+        customPlaceholder: "2h, fri 14:00, 2026-11-20 9:30",
+        customHint: "Введите время, день или длительность",
+        customInvalid: "Не удалось распознать будущее время",
       },
       confirmations: {
         hideTitle: "Скрыть рабочее пространство?",
