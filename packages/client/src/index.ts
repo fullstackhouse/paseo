@@ -26,6 +26,7 @@ import type {
   ListProviderModelsResponseMessage,
   ProjectListRequestMessage,
   ProjectListResponseMessage,
+  ProviderSubagentEventFilter,
   ListProviderModesResponseMessage,
   MutableDaemonConfig,
   MutableDaemonConfigPatch,
@@ -414,7 +415,8 @@ export interface PaseoAgentBackgroundWorkHandle {
    *
    * When reading the current list fails, `options.onError` receives the error and `listener` is
    * not called; without `onError` the error is logged. The read is not retried: the next
-   * reconnect reads the list again.
+   * reconnect reads the list again. When the host refuses the subscription itself, `onError`
+   * receives that error and the subscription ends.
    */
   subscribe(
     listener: (items: PaseoAgentBackgroundWorkItem[]) => void,
@@ -423,7 +425,7 @@ export interface PaseoAgentBackgroundWorkHandle {
 }
 
 export interface PaseoAgentBackgroundWorkSubscribeOptions {
-  /** Receives the error when reading the agent's current list fails. */
+  /** Receives the error when reading the agent's current list, or subscribing, fails. */
   onError?: (error: unknown) => void;
 }
 
@@ -442,7 +444,8 @@ export interface PaseoAgentProviderSubagentsHandle {
    *
    * When reading the current list fails, `options.onError` receives the error and `listener` is
    * not called again until a later reconnect reads the list successfully; without `onError` the
-   * error is logged.
+   * error is logged. When the host refuses the subscription itself, `onError` receives that error
+   * and the subscription ends.
    */
   subscribe(
     listener: (subagents: PaseoAgentProviderSubagent[]) => void,
@@ -451,7 +454,7 @@ export interface PaseoAgentProviderSubagentsHandle {
 }
 
 export interface PaseoAgentProviderSubagentsSubscribeOptions {
-  /** Receives the error when reading the agent's current subagents fails. */
+  /** Receives the error when reading the agent's current subagents, or subscribing, fails. */
   onError?: (error: unknown) => void;
 }
 
@@ -802,7 +805,7 @@ export function createPaseoApi(
     listenAgents,
     (agentId, handler) => own(() => daemonClient.subscribeAgentTimeline(agentId, handler)),
     () => own(() => daemonClient.observeAgentBackgroundWork()),
-    () => own(() => daemonClient.observeProviderSubagents()),
+    (filter) => own(() => daemonClient.observeProviderSubagents({ filter })),
   );
   const createAgent = async (
     options: PaseoAgentCreateOptions,
@@ -1161,7 +1164,9 @@ function createAgentHandleFactory(
   listen: (handler: PaseoAgentUpdateHandler) => () => void,
   subscribeTimeline: DaemonClient["subscribeAgentTimeline"],
   observeBackgroundWork: () => ReturnType<DaemonClient["observeAgentBackgroundWork"]>,
-  observeProviderSubagents: () => ReturnType<DaemonClient["observeProviderSubagents"]>,
+  observeProviderSubagents: (
+    filter: ProviderSubagentEventFilter,
+  ) => ReturnType<DaemonClient["observeProviderSubagents"]>,
 ): AgentHandleFactory {
   return (agent) => {
     const id = typeof agent === "string" ? agent : agent.id;
@@ -1239,6 +1244,10 @@ function createAgentHandleFactory(
               sequence++;
               listener(message.payload.items);
             },
+            // The host refused the subscription; it is over. The client already logs the error.
+            error: (error) => {
+              if (!released) options?.onError?.(error);
+            },
           });
           return () => {
             released = true;
@@ -1262,7 +1271,10 @@ function createAgentHandleFactory(
           let released = false;
           const emit = (known: Map<string, PaseoAgentProviderSubagent>) =>
             listener([...known.values()]);
-          const observation = observeProviderSubagents();
+          const observation = observeProviderSubagents({
+            parentAgentIds: [id],
+            kinds: ["upsert", "remove"],
+          });
           observation.subscribe({
             snapshot: () => {
               const listed = ++sequence;
@@ -1295,6 +1307,10 @@ function createAgentHandleFactory(
                 return;
               }
               if (subagents && applyProviderSubagentChange(subagents, change)) emit(subagents);
+            },
+            // The host refused the subscription; it is over. The client already logs the error.
+            error: (error) => {
+              if (!released) options?.onError?.(error);
             },
           });
           return () => {

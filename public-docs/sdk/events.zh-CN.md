@@ -55,7 +55,7 @@ unsubscribe();
 
 订阅建立后，`subscribe()` 会向监听器投递当前列表；每次重连后和每次变化时，也会投递完整列表。用 `list()` 执行单次读取。每项包含 `id`、`kind`（`"shell"`、`"monitor"` 或 `"other"`，未知值按 `"other"` 处理）、可为 `null` 的 `description`、可选的 `command`，以及 Paseo 首次观察到该项的时间 `startedAt`。列表属于当前 Provider 会话，不会持久化。运行时丢失后，旧项会被清除。列表不可用时会报告错误，而不是返回空列表。
 
-传入 `subscribe(listener, { onError })` 可接收读取当前列表失败的错误；此时不会调用监听器，下次重连时会重新读取。未提供 `onError` 时会记录错误。
+传入 `subscribe(listener, { onError })` 可接收订阅建立或读取列表时的错误。建立失败后需重新订阅；读取列表失败时，下次重连会重新读取。未提供 `onError` 时会记录错误。下文的 `providerSubagents.subscribe()` 同样如此。
 
 主机未声明 `features.agentBackgroundWork` 时，`list()` 会 reject，`subscribe()` 会抛出错误；请让用户更新主机。对具有 `canStop` 的项目调用 `backgroundWork.stop(item)`，等待提供方确认。停止操作需要 `features.agentBackgroundWorkStop`。
 

@@ -6810,3 +6810,73 @@ test("deduplicates repeated command names in list_commands_response for live age
     },
   });
 });
+
+test("filters provider subagent updates by parent agent and kind for subscriptions that ask", async () => {
+  const messages: SessionOutboundMessage[] = [];
+  const agentEventListeners: Array<(event: AgentManagerEvent) => void> = [];
+  const session = createSessionForTest({
+    messages,
+    agentManager: {
+      getAgent: vi.fn(() => null),
+      subscribe: vi.fn((listener: (event: AgentManagerEvent) => void) => {
+        agentEventListeners.push(listener);
+        return () => {};
+      }),
+    },
+  });
+  const subagent = (parentAgentId: string) => ({
+    id: `sub-${parentAgentId}`,
+    parentAgentId,
+    parentSubagentId: null,
+    provider: "claude" as const,
+    title: null,
+    description: null,
+    status: "running" as const,
+    createdAt: "2026-11-14T10:00:00.000Z",
+    updatedAt: "2026-11-14T10:00:00.000Z",
+    toolCallId: null,
+  });
+
+  await session.handleMessage({
+    type: "session.events.set_subscription.request",
+    requestId: "events-1",
+    events: ["agent.provider_subagents.update"],
+    providerSubagentFilter: { parentAgentIds: ["agent-a"], kinds: ["upsert", "remove"] },
+  });
+  if (agentEventListeners.length === 0) throw new Error("Agent event listener was not installed");
+  const forward = (event: AgentManagerEvent) => {
+    for (const listener of agentEventListeners) listener(event);
+  };
+  messages.length = 0;
+
+  forward({ type: "provider_subagent", event: { type: "upsert", subagent: subagent("agent-b") } });
+  forward({
+    type: "provider_subagent",
+    event: {
+      type: "timeline",
+      parentAgentId: "agent-a",
+      subagentId: "sub-agent-a",
+      provider: "claude",
+      epoch: "epoch-1",
+      row: {
+        seq: 1,
+        timestamp: "2026-11-14T10:00:01.000Z",
+        item: { type: "assistant_message", text: "working" },
+      },
+    },
+  } as AgentManagerEvent);
+  forward({ type: "provider_subagent", event: { type: "upsert", subagent: subagent("agent-a") } });
+  forward({
+    type: "provider_subagent",
+    event: { type: "remove", parentAgentId: "agent-a", subagentId: "sub-agent-a" },
+  } as AgentManagerEvent);
+
+  const updates = messages.filter((message) => message.type === "agent.provider_subagents.update");
+  expect(updates.map((message) => message.payload)).toEqual([
+    expect.objectContaining({
+      kind: "upsert",
+      subagent: expect.objectContaining({ id: "sub-agent-a" }),
+    }),
+    expect.objectContaining({ kind: "remove", subagentId: "sub-agent-a" }),
+  ]);
+});

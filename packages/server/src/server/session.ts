@@ -14,6 +14,7 @@ import { searchTimeline } from "./agent/chat-search/index.js";
 import type { BrowserToolsBroker } from "./browser-tools/broker.js";
 import { BrowserAutomationHostCapabilitySchema } from "@getpaseo/protocol/browser-automation/capabilities";
 import type {
+  ProviderSubagentEventFilter,
   SessionEventSubscription,
   UsageReportEntry,
   ProviderUsage,
@@ -867,7 +868,12 @@ export class Session {
   private readonly workspaceLabelService: WorkspaceLabelService | null;
   private readonly eventSubscriptions = new Map<
     string,
-    { owner: OwnedSubscription; events: Set<SessionEventSubscription>; notifications: boolean }
+    {
+      owner: OwnedSubscription;
+      events: Set<SessionEventSubscription>;
+      notifications: boolean;
+      providerSubagentFilter: ProviderSubagentEventFilter | null;
+    }
   >();
   private readonly workspaceUpdateTails = new Map<string, Promise<void>>();
   private readonly terminalManager: TerminalManager | null;
@@ -2157,6 +2163,7 @@ export class Session {
     const delivered = new Set<object>();
     for (const subscription of this.eventSubscriptions.values()) {
       if (!subscription.events.has("agent.provider_subagents.update")) continue;
+      if (!matchesProviderSubagentFilter(subscription.providerSubagentFilter, update)) continue;
       if (
         update.type === "timeline" &&
         !this.supportsSubagentTimelineItem(update.row.item, subscription.owner.source)
@@ -3246,6 +3253,7 @@ export class Session {
           owner,
           events: new Set(msg.events),
           notifications: msg.notifications === true,
+          providerSubagentFilter: msg.providerSubagentFilter ?? null,
         });
         this.emitForSource(
           {
@@ -9847,6 +9855,17 @@ function normalizeCloneRepository(input: {
 
 function isValidGitHubRepoSegment(value: string): boolean {
   return /^[A-Za-z0-9._-]+$/u.test(value);
+}
+
+function matchesProviderSubagentFilter(
+  filter: ProviderSubagentEventFilter | null,
+  update: Extract<AgentManagerEvent, { type: "provider_subagent" }>["event"],
+): boolean {
+  if (!filter) return true;
+  if (filter.kinds && !filter.kinds.includes(update.type)) return false;
+  const parentAgentId =
+    update.type === "upsert" ? update.subagent.parentAgentId : update.parentAgentId;
+  return !filter.parentAgentIds || filter.parentAgentIds.includes(parentAgentId);
 }
 
 function sessionEventCategory(message: SessionOutboundMessage): SessionEventSubscription | null {
