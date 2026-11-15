@@ -3370,11 +3370,21 @@ export const SessionEventSubscriptionSchema = z.enum([
   "hub.execution.agent.stream",
 ]);
 export type SessionEventSubscription = z.infer<typeof SessionEventSubscriptionSchema>;
+// Narrows which agent.provider_subagents.update events a subscription receives. An omitted field
+// does not filter.
+export const ProviderSubagentEventFilterSchema = z.object({
+  parentAgentIds: z.array(z.string()).optional(),
+  kinds: z.array(z.enum(["upsert", "timeline", "remove"])).optional(),
+});
+export type ProviderSubagentEventFilter = z.infer<typeof ProviderSubagentEventFilterSchema>;
 export const SessionEventsSetSubscriptionRequestSchema = z.object({
   type: z.literal("session.events.set_subscription.request"),
   requestId: z.string(),
   events: z.array(SessionEventSubscriptionSchema),
   notifications: z.boolean().optional(),
+  // COMPAT(providerSubagentEventFilter): added after v0.15.3, send only when
+  // server_info.features.providerSubagentEventFilter; remove gate after 2027-05-14.
+  providerSubagentFilter: ProviderSubagentEventFilterSchema.optional(),
 });
 export const SessionEventsSetSubscriptionResponseSchema = z.object({
   type: z.literal("session.events.set_subscription.response"),
@@ -3943,6 +3953,8 @@ export const ServerInfoStatusPayloadSchema = z
         providerSubagents: z.boolean().optional(),
         // COMPAT(agentBackgroundWork): added after v0.11.0-beta.5, remove gate after 2027-04-06.
         agentBackgroundWork: z.boolean().optional(),
+        // COMPAT(providerSubagentEventFilter): added after v0.15.3, remove gate after 2027-05-14.
+        providerSubagentEventFilter: z.boolean().optional(),
         // COMPAT(projectedSubagentTimeline): added after v0.8.0, remove gates after 2027-03-14; retain wire field.
         projectedSubagentTimeline: z.boolean().optional(),
         wholeTurnTimeline: z.boolean().optional(),

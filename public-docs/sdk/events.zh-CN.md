@@ -55,7 +55,7 @@ unsubscribe();
 
 订阅建立后，`subscribe()` 会用当前列表调用一次监听器，每次重连后再调用一次，之后每次变化时都传入完整列表。一次性读取请用 `list()`，例如等待列表清空的自动化。每个条目包含 `id`、`kind`（shell 和 Claude `Monitor` 监视为 `"shell"`，其余为 `"other"`；任何未知值都按 `"other"` 处理）、`description`（或 `null`）和 `startedAt`。provider 进程重启或 agent 关闭时，列表会清空。daemon 重启后不保留任何内容。
 
-传入 `subscribe(listener, { onError })` 可在读取当前列表失败时收到错误；此时不会调用监听器，并会在下次重连时重新读取列表。不传 `onError` 时，错误会被记录到日志。
+传入 `subscribe(listener, { onError })` 可在读取当前列表失败时收到错误；此时不会调用监听器，并会在下次重连时重新读取列表。不传 `onError` 时，错误会被记录到日志。当主机拒绝订阅本身时，`onError` 也会收到该错误，并且订阅结束；如需重试请重新订阅。下文的 `providerSubagents.subscribe()` 同样如此。
 
 当主机未声明 `features.agentBackgroundWork` 时，`list()` 会 reject，`subscribe()` 会抛出错误；请让用户更新主机。
 
