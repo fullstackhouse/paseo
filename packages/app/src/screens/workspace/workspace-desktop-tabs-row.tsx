@@ -13,11 +13,13 @@ import React, {
 } from "react";
 import { Pressable, Text, View, type LayoutChangeEvent, type ScrollView } from "react-native";
 import { useFilePanelOpenWithMenu } from "@/file-panels";
+import { useRevealFileInFileManager } from "@/workspace/reveal-file";
 import {
   CopyX,
   ArrowLeftToLine,
   ArrowRightToLine,
   Copy,
+  FolderOpen,
   Pencil,
   RotateCw,
   Columns2,
@@ -125,6 +127,7 @@ const AGENT_TOOLTIP_TITLE_MAX_LENGTH = 80;
 const ThemedLoadingSpinner = withUnistyles(LoadingSpinner);
 const ThemedX = withUnistyles(X);
 const ThemedCopy = withUnistyles(Copy);
+const ThemedFolderOpen = withUnistyles(FolderOpen);
 
 const ThemedRotateCw = withUnistyles(RotateCw);
 const ThemedArrowLeftToLine = withUnistyles(ArrowLeftToLine);
@@ -425,6 +428,8 @@ function TabContextMenuItem({
     switch (entry.icon) {
       case "copy":
         return <ThemedCopy size={16} uniProps={mutedColorMapping} />;
+      case "folder-open":
+        return <ThemedFolderOpen size={16} uniProps={mutedColorMapping} />;
       case "rotate-cw":
         return <ThemedRotateCw size={16} uniProps={mutedColorMapping} />;
       case "arrow-left-to-line":
@@ -771,6 +776,25 @@ function TabChip({
     { serverId, workspaceId, tabId: tab.tabId },
     contextMenuTestId,
   );
+  const revealFile = useRevealFileInFileManager({ serverId, workspaceId });
+  const displayedMenuEntries = useMemo(
+    () =>
+      menuEntries.flatMap((entry): WorkspaceTabMenuEntry[] => {
+        if (entry.kind !== "file-reveal") return [entry];
+        if (!revealFile) return [];
+        return [
+          {
+            kind: "item",
+            key: entry.key,
+            label: revealFile.label,
+            icon: "folder-open",
+            testID: `${contextMenuTestId}-reveal-file`,
+            onSelect: () => void revealFile.reveal(entry.path),
+          },
+        ];
+      }),
+    [contextMenuTestId, menuEntries, revealFile],
+  );
   const middleClickRef = useMiddleClickClose(
     useCallback(() => void onCloseTab(tab.tabId), [onCloseTab, tab.tabId]),
   );
@@ -956,11 +980,12 @@ function TabChip({
           pages={openWith.pages}
           testID={contextMenuTestId}
         >
-          {menuEntries.map((entry) => {
+          {displayedMenuEntries.map((entry) => {
             if (entry.kind === "separator") return <ContextMenuSeparator key={entry.key} />;
             if (entry.kind === "file-panel-open-with") {
               return <Fragment key={entry.key}>{openWith.trigger}</Fragment>;
             }
+            if (entry.kind === "file-reveal") return null;
             return <TabContextMenuItem key={entry.key} entry={entry} />;
           })}
         </ContextMenuContent>
