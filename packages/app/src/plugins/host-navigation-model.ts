@@ -36,7 +36,15 @@ export function createPluginHostNavigation(
       const plugin = findScreen(input);
       if (!plugin)
         throw new Error(`Plugin screen is unavailable: ${input.pluginId}/${input.screenId}`);
-      const { screenId, params } = parsePluginOpenScreenInput(plugin, input);
+      const { screenId, params, workspaceId } = parsePluginOpenScreenInput(plugin, input);
+      if (workspaceId) {
+        owner.openWorkspace({
+          serverId: plugin.serverId,
+          workspaceId,
+          target: { kind: "plugin_screen", pluginId: plugin.id, screenId, params },
+        });
+        return;
+      }
       owner.openScreen({ serverId: plugin.serverId, pluginId: plugin.id, screenId, params });
     },
     hasPluginScreen: (input) => findScreen(input) !== null,
