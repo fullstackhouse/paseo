@@ -171,6 +171,16 @@ const MONITOR_TURN_EVENTS = [
   COMPLETED_TURN_EVENTS[2],
 ];
 
+// The order the SDK documents: the level (`background_tasks_changed`) precedes `task_started`.
+const MONITOR_LEVEL_FIRST_TURN_EVENTS = [
+  MONITOR_TURN_EVENTS[0],
+  MONITOR_TURN_EVENTS[1],
+  MONITOR_TURN_EVENTS[3],
+  MONITOR_TURN_EVENTS[2],
+  MONITOR_TURN_EVENTS[4],
+  MONITOR_TURN_EVENTS[5],
+];
+
 const MISSING_RESUMED_CONVERSATION_RESULT = {
   type: "result",
   subtype: "error_during_execution",
@@ -353,8 +363,11 @@ describe("Claude runtime exit", () => {
     }
   });
 
-  test("reports a task a Monitor call started as a monitor", async () => {
-    const queryFactory = vi.fn(() => createQueryMock(MONITOR_TURN_EVENTS));
+  test.each([
+    ["task_started first", MONITOR_TURN_EVENTS],
+    ["background_tasks_changed first", MONITOR_LEVEL_FIRST_TURN_EVENTS],
+  ])("reports a task a Monitor call started as a monitor (%s)", async (_order, turnEvents) => {
+    const queryFactory = vi.fn(() => createQueryMock(turnEvents));
     vi.spyOn(spawnUtils, "spawnProcess").mockReturnValue(createChildProcessStub());
     const client = new ClaudeAgentClient({
       logger: createTestLogger(),
@@ -369,10 +382,9 @@ describe("Claude runtime exit", () => {
 
       await session.run("watch CI and keep the dev server up");
 
-      expect(events).toContainEqual(
+      const backgroundWork = events.filter((event) => event.type === "background_work");
+      expect(backgroundWork.at(-1)).toEqual(
         expect.objectContaining({
-          type: "background_work",
-          provider: "claude",
           items: [
             { id: "bash-1", kind: "shell", description: "npm run dev" },
             { id: "watch-1", kind: "monitor", description: "CI checks" },

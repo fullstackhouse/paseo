@@ -49,7 +49,7 @@ import {
   resolveClaudeDisabledThinkingForModel,
 } from "./model-manifest.js";
 import { expandTilde } from "../../../../utils/path.js";
-import { toBackgroundWorkInputs } from "./background-work.js";
+import { toBackgroundWorkInputs, type ClaudeBackgroundTask } from "./background-work.js";
 import { parsePartialJsonObject } from "./partial-json.js";
 import { withClaudeReplayHistory, type ClaudeReplayHistory } from "./transcript-history.js";
 import { ClaudeSidechainTracker } from "./sidechain-tracker.js";
@@ -2334,6 +2334,8 @@ class ClaudeAgentSession implements AgentSession {
   private toolUseCache = new Map<string, ToolUseCacheEntry>();
   /** Background tasks a `Monitor` call started; Claude reports them as `local_bash` like shells. */
   private readonly monitorTaskIds = new Set<string>();
+  /** The last `background_tasks_changed` payload, re-sent when `task_started` reveals a monitor. */
+  private liveBackgroundTasks: readonly ClaudeBackgroundTask[] = [];
   private toolUseIndexToId = new Map<number, string>();
   private toolUseInputBuffers = new Map<string, string>();
   private subagentHandbackIds = new Set<string>();
@@ -4149,6 +4151,7 @@ class ClaudeAgentSession implements AgentSession {
 
   private failRunningRuntimeTasks(): void {
     this.monitorTaskIds.clear();
+    this.liveBackgroundTasks = [];
     this.dispatchEvents([
       ...foldSubagentObservations(this.taskProtocolSource.failRunningTasks()).map(
         (event): AgentStreamEvent => ({ type: "provider_subagent", provider: "claude", event }),
@@ -4595,7 +4598,7 @@ class ClaudeAgentSession implements AgentSession {
 
     const events: AgentStreamEvent[] = [];
     this.appendTaskStateEvent(message, events);
-    this.recordMonitorTask(message);
+    this.recordMonitorTask(message, events);
 
     // Subagent identity and lifecycle are announced by Claude Code's task protocol, so they are
     // read rather than inferred from sidechain frames. `task_started` precedes the child's first
@@ -4856,15 +4859,12 @@ class ClaudeAgentSession implements AgentSession {
         { tasks: message.tasks.map(({ task_id, task_type }) => ({ task_id, task_type })) },
         "claude.background_tasks_changed",
       );
+      this.liveBackgroundTasks = message.tasks;
       const liveTaskIds = new Set(message.tasks.map((task) => task.task_id));
       for (const taskId of this.monitorTaskIds) {
         if (!liveTaskIds.has(taskId)) this.monitorTaskIds.delete(taskId);
       }
-      events.push({
-        type: "background_work",
-        provider: "claude",
-        items: toBackgroundWorkInputs(message.tasks, this.monitorTaskIds),
-      });
+      events.push(this.buildBackgroundWorkEvent());
       return;
     }
     if (message.subtype === "task_progress") {
@@ -4872,13 +4872,27 @@ class ClaudeAgentSession implements AgentSession {
     }
   }
 
-  /** `task_started` names the tool call that started a task; a `Monitor` call means a watch. */
-  private recordMonitorTask(message: SDKMessage): void {
+  /**
+   * `task_started` names the tool call that started a task; a `Monitor` call means a watch. The
+   * level (`background_tasks_changed`) usually arrives first and already listed the task as a
+   * shell, so re-send the list with its kind corrected.
+   */
+  private recordMonitorTask(message: SDKMessage, events: AgentStreamEvent[]): void {
     if (message.type !== "system" || message.subtype !== "task_started") return;
     const toolUseId = message.tool_use_id;
-    if (toolUseId && this.toolUseCache.get(toolUseId)?.name === "Monitor") {
-      this.monitorTaskIds.add(message.task_id);
+    if (!toolUseId || this.toolUseCache.get(toolUseId)?.name !== "Monitor") return;
+    this.monitorTaskIds.add(message.task_id);
+    if (this.liveBackgroundTasks.some((task) => task.task_id === message.task_id)) {
+      events.push(this.buildBackgroundWorkEvent());
     }
+  }
+
+  private buildBackgroundWorkEvent(): AgentStreamEvent {
+    return {
+      type: "background_work",
+      provider: "claude",
+      items: toBackgroundWorkInputs(this.liveBackgroundTasks, this.monitorTaskIds),
+    };
   }
 
   private appendTaskNotificationEvents(
