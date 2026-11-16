@@ -398,6 +398,8 @@ attention on its newest eligible workspace-root agent, `error` for an agent whos
 its selected tab; attention on another agent remains unread until that agent is focused or the
 workspace is explicitly marked read.
 
+When an idle agent's background shells are the only thing holding `running`, the workspace descriptor sets `runningFromBackgroundWork` (FSH), so a client grouping by agent-reported status can file the workspace by the agent's report instead: a long-lived server the agent started shouldn't hide that it is waiting on you. A live Monitor watch (kind `monitor`), a running subagent, a running turn or a working terminal never set it.
+
 Attention is set by the agent finishing or failing and acknowledged by deliberate focus or
 interaction with its chat, including repeat clicks in an already focused pane. A completion
 arriving while focused stays unread until the next interaction; leaving does not acknowledge it.

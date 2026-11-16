@@ -10,6 +10,8 @@
  *   - the status changed from the snapshot
  *   - the statusEnteredAt changed from the snapshot (including the
  *     null↔value transition that the unmask case produces)
+ *   - runningFromBackgroundWork changed (status stays "running" while the
+ *     agent's turn or a subagent starts or stops alongside background work)
  *   - the update's activityAtMs is strictly newer than the snapshot's
  *   - the snapshot has no activityAtMs and the update has one (new activity
  *     where there was none)
@@ -22,6 +24,7 @@ export interface BootstrapUpdateSnapshot {
   status: string;
   statusEnteredAt: string | null;
   activityAtMs: number | null;
+  runningFromBackgroundWork?: boolean;
 }
 
 export interface BootstrapUpdateCheckInput {
@@ -45,6 +48,12 @@ export function shouldEmitPendingBootstrapUpdate(input: BootstrapUpdateCheckInpu
   const snapshotEnteredAt = snapshot.statusEnteredAt ?? null;
   const updateEnteredAt = update.statusEnteredAt ?? null;
   if (snapshotEnteredAt !== updateEnteredAt) {
+    return true;
+  }
+
+  if (
+    (snapshot.runningFromBackgroundWork ?? false) !== (update.runningFromBackgroundWork ?? false)
+  ) {
     return true;
   }
 

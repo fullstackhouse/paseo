@@ -73,6 +73,7 @@ class WorkspaceStatus {
 
   private readonly agents: AgentSnapshotPayload[] = [];
   private readonly providerSubagents: ProviderSubagentWorkspaceActivity[] = [];
+  private readonly monitorAgentIds = new Set<string>();
   private readonly terminals: Array<{
     cwd: string;
     workspaceId?: string;
@@ -98,6 +99,7 @@ class WorkspaceStatus {
       return times;
     },
     listProviderSubagentActivity: async () => this.providerSubagents,
+    agentWaitsOnBackgroundWork: (agentId) => this.monitorAgentIds.has(agentId),
     listTerminalActivityContributions: async () => this.terminals,
     isProviderVisibleToClient: () => true,
     buildWorkspaceDescriptor: async ({ workspace }) => ({
@@ -153,6 +155,10 @@ class WorkspaceStatus {
         labels: { [PARENT_AGENT_ID_LABEL]: "parent-agent" },
       }),
     );
+  }
+
+  hasMonitor(agentId: string): void {
+    this.monitorAgentIds.add(agentId);
   }
 
   hasProviderSubagent(input: ProviderSubagentWorkspaceActivity): void {
@@ -501,6 +507,53 @@ describe("WorkspaceDirectory", () => {
       status: "running",
       statusEnteredAt: "2026-03-01T12:01:00.000Z",
     });
+  });
+
+  test("marks running held only by an idle agent's background shells", async () => {
+    const workspace = new WorkspaceStatus();
+
+    workspace.hasRootAgent({ id: "parent-agent", status: "idle", backgroundWork: { count: 1 } });
+
+    await expect(workspace.workspaceDescriptor()).resolves.toMatchObject({
+      status: "running",
+      runningFromBackgroundWork: true,
+    });
+  });
+
+  test("a running subagent is not background-only running", async () => {
+    const workspace = new WorkspaceStatus();
+
+    workspace.hasRootAgent({ id: "parent-agent", status: "idle", backgroundWork: { count: 1 } });
+    workspace.hasProviderSubagent({
+      parentAgentId: "parent-agent",
+      status: "running",
+      updatedAt: "2026-03-01T12:02:00.000Z",
+    });
+
+    const descriptor = await workspace.workspaceDescriptor();
+    expect(descriptor.status).toBe("running");
+    expect(descriptor.runningFromBackgroundWork).toBeUndefined();
+  });
+
+  test("an agent waiting on a monitor is not background-only running", async () => {
+    const workspace = new WorkspaceStatus();
+
+    workspace.hasRootAgent({ id: "parent-agent", status: "idle", backgroundWork: { count: 1 } });
+    workspace.hasMonitor("parent-agent");
+
+    const descriptor = await workspace.workspaceDescriptor();
+    expect(descriptor.status).toBe("running");
+    expect(descriptor.runningFromBackgroundWork).toBeUndefined();
+  });
+
+  test("a running agent is not background-only running", async () => {
+    const workspace = new WorkspaceStatus();
+
+    workspace.hasRootAgent({ id: "parent-agent", status: "running", backgroundWork: { count: 1 } });
+
+    const descriptor = await workspace.workspaceDescriptor();
+    expect(descriptor.status).toBe("running");
+    expect(descriptor.runningFromBackgroundWork).toBeUndefined();
   });
 
   test("running cross-workspace subagent contributes to its own workspace", async () => {

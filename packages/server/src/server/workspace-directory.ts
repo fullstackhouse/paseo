@@ -84,6 +84,11 @@ export interface WorkspaceDirectoryDeps {
     workspaceIds?: Iterable<string>,
   ): Promise<ReadonlyMap<string, string>>;
   listProviderSubagentActivity(): Promise<ProviderSubagentWorkspaceActivity[]>;
+  /**
+   * FSH: true while the agent has background work it waits on (a Monitor watch). Without one, an
+   * idle agent's background work is shells, such as a dev server it started.
+   */
+  agentWaitsOnBackgroundWork?(agentId: string): boolean;
   listTerminalActivityContributions(): Promise<
     Array<{ cwd: string; workspaceId?: string; activity: TerminalActivity | null }>
   >;
@@ -357,6 +362,10 @@ export class WorkspaceDirectory {
       ) {
         descriptor.status = "running";
       }
+      if (descriptor.status === "running") {
+        // A running subagent is work the agent waits on, not a background shell.
+        delete descriptor.runningFromBackgroundWork;
+      }
       const entries = activityEntriesByWorkspaceId.get(workspaceId) ?? [];
       entries.push({ bucket: "running", changedAtIso: subagent.updatedAt });
       activityEntriesByWorkspaceId.set(workspaceId, entries);
@@ -374,6 +383,10 @@ export class WorkspaceDirectory {
   }): void {
     const { activeAgents, descriptorsByWorkspaceId } = params;
     const activeAgentsById = new Map(activeAgents.map((agent) => [agent.id, agent] as const));
+    // FSH: workspaces whose running state comes only from an idle root agent's background shells.
+    // Agent-reported status grouping lets the agent's report decide those.
+    const shellOnlyWorkspaceIds = new Set<string>();
+    const otherwiseRunningWorkspaceIds = new Set<string>();
 
     for (const agent of activeAgents) {
       const workspaceAgent = resolveWorkspaceRootAgent(agent, activeAgentsById);
@@ -407,6 +420,19 @@ export class WorkspaceDirectory {
       ) {
         existing.status = bucket;
       }
+      if (bucket === "running") {
+        const fromShells =
+          isWorkspaceRoot &&
+          agent.status !== "running" &&
+          this.deps.agentWaitsOnBackgroundWork?.(agent.id) !== true;
+        (fromShells ? shellOnlyWorkspaceIds : otherwiseRunningWorkspaceIds).add(workspaceId);
+      }
+    }
+    for (const workspaceId of shellOnlyWorkspaceIds) {
+      const descriptor = descriptorsByWorkspaceId.get(workspaceId);
+      if (descriptor?.status === "running" && !otherwiseRunningWorkspaceIds.has(workspaceId)) {
+        descriptor.runningFromBackgroundWork = true;
+      }
     }
   }
 
@@ -438,6 +464,7 @@ export class WorkspaceDirectory {
       ) {
         existing.status = bucket;
       }
+      if (bucket === "running") delete existing.runningFromBackgroundWork;
       const entries = activityEntriesByWorkspaceId.get(workspaceId) ?? [];
       entries.push({ bucket, changedAtIso: new Date(activity.changedAt).toISOString() });
       activityEntriesByWorkspaceId.set(workspaceId, entries);

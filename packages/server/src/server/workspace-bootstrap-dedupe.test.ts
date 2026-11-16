@@ -11,6 +11,32 @@ const SNAPSHOT_DONE_10_30: BootstrapUpdateSnapshot = {
 };
 
 describe("shouldEmitPendingBootstrapUpdate", () => {
+  test("emits when only runningFromBackgroundWork changed", () => {
+    const running = {
+      status: "running",
+      statusEnteredAt: "2026-05-12T10:30:00.000Z",
+      activityAtMs: null,
+    };
+    expect(
+      shouldEmitPendingBootstrapUpdate({
+        snapshot: { ...running, runningFromBackgroundWork: true },
+        update: running,
+      }),
+    ).toBe(true);
+    expect(
+      shouldEmitPendingBootstrapUpdate({
+        snapshot: running,
+        update: { ...running, runningFromBackgroundWork: true },
+      }),
+    ).toBe(true);
+    expect(
+      shouldEmitPendingBootstrapUpdate({
+        snapshot: { ...running, runningFromBackgroundWork: true },
+        update: { ...running, runningFromBackgroundWork: true },
+      }),
+    ).toBe(false);
+  });
+
   test("emits when there is no snapshot (first-time subscription)", () => {
     expect(
       shouldEmitPendingBootstrapUpdate({

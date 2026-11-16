@@ -4684,6 +4684,11 @@ export const WorkspaceDescriptorPayloadSchema = z
     background: z.boolean().optional(),
     archivingAt: z.string().nullable().optional().default(null),
     status: WorkspaceStateBucketSchema,
+    // FSH-only, added after v0.15.3. Optional by design: daemons set it only when true, and
+    // older daemons never send it. True when `status` is "running" only because an idle agent's
+    // background shells are live (e.g. a dev server), so clients may let the agent's reported
+    // status group it. A Monitor watch is work the agent waits on and does not set it.
+    runningFromBackgroundWork: z.boolean().optional(),
     // Best-effort workspace status entry timestamp. Old daemons omit the
     // field; old clients treat missing and null equivalently. The transform
     // coerces a missing field to `null` so downstream code never has to
