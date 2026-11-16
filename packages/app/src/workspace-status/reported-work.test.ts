@@ -67,6 +67,14 @@ describe("applyReportedWork", () => {
     }
   });
 
+  it("lets the report group a workspace held Running only by background work", () => {
+    const base = { status: "running" as const, runningFromBackgroundWork: true, enteredAt: at };
+    expect(applyReportedWork(base, "needs_you")).toEqual({ status: "attention", enteredAt: at });
+    expect(applyReportedWork(base, "done").status).toBe("done");
+    expect(applyReportedWork(base, "working")).toBe(base);
+    expect(applyReportedWork(base, null)).toBe(base);
+  });
+
   it("keeps turn state when nothing is reported", () => {
     const base = { status: "attention" as const, enteredAt: at };
     expect(applyReportedWork(base, null)).toBe(base);
@@ -89,17 +97,20 @@ describe("createReportedWorkLookup", () => {
 
 describe("isStatusDecidedByReport", () => {
   it("holds for Ready to review and Done when something was reported", () => {
-    expect(isStatusDecidedByReport("attention", "working")).toBe(true);
-    expect(isStatusDecidedByReport("attention", "needs_you")).toBe(true);
-    expect(isStatusDecidedByReport("done", "needs_you")).toBe(true);
-    expect(isStatusDecidedByReport("done", "done")).toBe(true);
+    expect(isStatusDecidedByReport({ status: "attention" }, "working")).toBe(true);
+    expect(isStatusDecidedByReport({ status: "attention" }, "needs_you")).toBe(true);
+    expect(isStatusDecidedByReport({ status: "done" }, "needs_you")).toBe(true);
+    expect(isStatusDecidedByReport({ status: "done" }, "done")).toBe(true);
   });
 
   it("leaves the turn in charge without a report or for live states", () => {
-    expect(isStatusDecidedByReport("attention", null)).toBe(false);
-    expect(isStatusDecidedByReport("done", undefined)).toBe(false);
+    expect(isStatusDecidedByReport({ status: "attention" }, null)).toBe(false);
+    expect(isStatusDecidedByReport({ status: "done" }, undefined)).toBe(false);
     for (const status of ["running", "failed", "needs_input"] as const) {
-      expect(isStatusDecidedByReport(status, "done")).toBe(false);
+      expect(isStatusDecidedByReport({ status }, "done")).toBe(false);
     }
+    expect(
+      isStatusDecidedByReport({ status: "running", runningFromBackgroundWork: false }, "done"),
+    ).toBe(false);
   });
 });

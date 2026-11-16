@@ -328,7 +328,7 @@ Workspace status is an aggregate activity signal computed **per `workspaceId`**.
 
 Running provider-native subagents contribute `running` to the workspace owned by their parent agent. Their completed, failed, and canceled states stay in the parent's subagents track.
 
-Live background work (a background shell or a Claude `Monitor` watch) also contributes `running` to the workspace that owns its agent, so an agent that ended its turn to wait on its own work does not read as done. The workspace returns to the agent's own bucket when the work stops.
+Live background work (a background shell or a Claude `Monitor` watch) also contributes `running` to the workspace that owns its agent, so an agent that ended its turn to wait on its own work does not read as done. The workspace returns to the agent's own bucket when the work stops. When background shells are the only thing holding `running`, the descriptor sets `runningFromBackgroundWork`, so a client grouping by agent-reported status can file the workspace by the agent's report instead: a long-lived server the agent started shouldn't hide that it is waiting on you. A live monitor (kind `monitor`) never sets it, because the agent ended its turn to wait on that monitor. Claude reports Monitor watches as `local_bash` like shells; the provider tells them apart by the tool call named in `task_started.tool_use_id`.
 
 A finished workspace can be marked unread after it has been reviewed. The daemon restores
 `finished` attention on its newest eligible workspace-root agent without sending a new completion

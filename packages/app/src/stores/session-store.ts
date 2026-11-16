@@ -127,6 +127,8 @@ export interface WorkspaceDescriptor {
   snoozedUntil?: string | null;
   labels?: string[];
   status: WorkspaceDescriptorPayload["status"];
+  /** Running only because an idle agent's background shells or monitors are live. */
+  runningFromBackgroundWork?: boolean;
   statusEnteredAt: Date | null;
   archivingAt: string | null;
   diffStat: { additions: number; deletions: number } | null;
@@ -174,6 +176,8 @@ export function normalizeWorkspaceDescriptor(
     // COMPAT(workspaceLabels): old daemons omit assignments.
     labels: payload.labels ?? [],
     status: payload.status,
+    // Optional by design: hosts send it only when true.
+    runningFromBackgroundWork: payload.runningFromBackgroundWork ?? false,
     statusEnteredAt,
     archivingAt: payload.archivingAt ?? null,
     diffStat: payload.diffStat ?? null,

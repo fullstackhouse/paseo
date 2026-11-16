@@ -134,6 +134,53 @@ const BACKGROUND_SHELL_TURN_EVENTS = [
   COMPLETED_TURN_EVENTS[2],
 ];
 
+const MONITOR_TURN_EVENTS = [
+  COMPLETED_TURN_EVENTS[0],
+  {
+    type: "assistant",
+    message: {
+      content: [
+        {
+          type: "tool_use",
+          id: "toolu_monitor",
+          name: "Monitor",
+          input: { command: "gh pr checks 1 --watch", description: "CI checks" },
+        },
+      ],
+    },
+  },
+  {
+    type: "system",
+    subtype: "task_started",
+    task_id: "watch-1",
+    tool_use_id: "toolu_monitor",
+    task_type: "local_bash",
+    description: "CI checks",
+  },
+  {
+    type: "system",
+    subtype: "background_tasks_changed",
+    tasks: [
+      { task_id: "bash-1", task_type: "local_bash", description: "npm run dev" },
+      { task_id: "watch-1", task_type: "local_bash", description: "CI checks" },
+    ],
+    uuid: "00000000-0000-4000-8000-000000000002",
+    session_id: "claude-runtime-exit-session",
+  },
+  COMPLETED_TURN_EVENTS[1],
+  COMPLETED_TURN_EVENTS[2],
+];
+
+// The order the SDK documents: the level (`background_tasks_changed`) precedes `task_started`.
+const MONITOR_LEVEL_FIRST_TURN_EVENTS = [
+  MONITOR_TURN_EVENTS[0],
+  MONITOR_TURN_EVENTS[1],
+  MONITOR_TURN_EVENTS[3],
+  MONITOR_TURN_EVENTS[2],
+  MONITOR_TURN_EVENTS[4],
+  MONITOR_TURN_EVENTS[5],
+];
+
 const MISSING_RESUMED_CONVERSATION_RESULT = {
   type: "result",
   subtype: "error_during_execution",
@@ -309,6 +356,39 @@ describe("Claude runtime exit", () => {
           type: "background_work",
           provider: "claude",
           items: [{ id: "bash-1", kind: "shell", description: "sleep 20" }],
+        }),
+      );
+    } finally {
+      await session.close();
+    }
+  });
+
+  test.each([
+    ["task_started first", MONITOR_TURN_EVENTS],
+    ["background_tasks_changed first", MONITOR_LEVEL_FIRST_TURN_EVENTS],
+  ])("reports a task a Monitor call started as a monitor (%s)", async (_order, turnEvents) => {
+    const queryFactory = vi.fn(() => createQueryMock(turnEvents));
+    vi.spyOn(spawnUtils, "spawnProcess").mockReturnValue(createChildProcessStub());
+    const client = new ClaudeAgentClient({
+      logger: createTestLogger(),
+      queryFactory,
+      resolveBinary: async () => "/test/claude/bin",
+    });
+    const session = await client.createSession({ provider: "claude", cwd: process.cwd() });
+
+    try {
+      const events: AgentStreamEvent[] = [];
+      session.subscribe((event) => events.push(event));
+
+      await session.run("watch CI and keep the dev server up");
+
+      const backgroundWork = events.filter((event) => event.type === "background_work");
+      expect(backgroundWork.at(-1)).toEqual(
+        expect.objectContaining({
+          items: [
+            { id: "bash-1", kind: "shell", description: "npm run dev" },
+            { id: "watch-1", kind: "monitor", description: "CI checks" },
+          ],
         }),
       );
     } finally {

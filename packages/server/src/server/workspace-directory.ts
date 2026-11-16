@@ -20,6 +20,7 @@ import {
   type TerminalActivity,
 } from "@getpaseo/protocol/terminal-activity";
 import type { ProviderSubagentDescriptor } from "./agent/provider-subagents/store.js";
+import type { AgentBackgroundWorkActivity } from "./agent/background-work/store.js";
 
 const FETCH_WORKSPACES_SORT_KEYS = [
   "status_priority",
@@ -68,16 +69,12 @@ export type ProviderSubagentWorkspaceActivity = Pick<
   "parentAgentId" | "status" | "updatedAt"
 >;
 
-/** An agent with live background work (a background shell, a monitor). */
-export interface AgentBackgroundWorkActivity {
-  agentId: string;
-  startedAt: string;
-}
-
 /** Work an agent runs after its turn ends; its workspace stays running until it stops. */
 interface BackgroundActivity {
   agentId: string;
   changedAtIso: string;
+  /** Subagents and monitors are work the agent waits on; a background shell may be a server. */
+  source: "subagent" | "monitor" | "background_work";
 }
 
 export interface WorkspaceDirectoryDeps {
@@ -303,10 +300,12 @@ export class WorkspaceDirectory {
           .map((subagent) => ({
             agentId: subagent.parentAgentId,
             changedAtIso: subagent.updatedAt,
+            source: "subagent" as const,
           })),
         ...backgroundWorkActivity.map((work) => ({
           agentId: work.agentId,
           changedAtIso: work.startedAt,
+          source: work.waitsOnWork ? ("monitor" as const) : ("background_work" as const),
         })),
       ],
       descriptorsByWorkspaceId,
@@ -358,7 +357,12 @@ export class WorkspaceDirectory {
     } = params;
     const activeAgentsById = new Map(activeAgents.map((agent) => [agent.id, agent] as const));
 
-    for (const activity of backgroundActivity) {
+    // Work the agent waits on first, so a background shell only claims a workspace nothing else
+    // holds running.
+    const ordered = [...backgroundActivity].sort(
+      (a, b) => Number(a.source === "background_work") - Number(b.source === "background_work"),
+    );
+    for (const activity of ordered) {
       const parent = activeAgentsById.get(activity.agentId);
       if (!parent) {
         continue;
@@ -377,6 +381,7 @@ export class WorkspaceDirectory {
         getWorkspaceStateBucketPriority(descriptor.status)
       ) {
         descriptor.status = "running";
+        if (activity.source === "background_work") descriptor.runningFromBackgroundWork = true;
       }
       const entries = activityEntriesByWorkspaceId.get(workspaceId) ?? [];
       entries.push({ bucket: "running", changedAtIso: activity.changedAtIso });

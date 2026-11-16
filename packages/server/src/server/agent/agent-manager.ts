@@ -102,7 +102,11 @@ import {
   type ProviderSubagentStoreEvent,
 } from "./provider-subagents/store.js";
 import { settleReplayedSubagents } from "./provider-subagents/settle-replayed.js";
-import { AgentBackgroundWorkStore, type AgentBackgroundWorkItem } from "./background-work/store.js";
+import {
+  AgentBackgroundWorkStore,
+  type AgentBackgroundWorkActivity,
+  type AgentBackgroundWorkItem,
+} from "./background-work/store.js";
 import { withTimeout } from "../../utils/promise-timeout.js";
 import { extractAttention } from "../persistence-hooks.js";
 
@@ -1350,7 +1354,7 @@ export class AgentManager {
     return this.backgroundWork.list(agentId);
   }
 
-  listBackgroundWorkActivity(): Array<{ agentId: string; startedAt: string }> {
+  listBackgroundWorkActivity(): AgentBackgroundWorkActivity[] {
     return this.backgroundWork.listActive().filter(({ agentId }) => {
       const agent = this.agents.get(agentId);
       return agent !== undefined && !agent.internal;

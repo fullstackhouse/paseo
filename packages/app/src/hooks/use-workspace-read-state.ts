@@ -25,7 +25,7 @@ export function useWorkspaceReadState({
   const reportedWork = useReportedWorkLookup();
   // The agent's report decides the group: read/unread would change only a status nobody sees.
   const decidedByReport =
-    status != null && isStatusDecidedByReport(status, reportedWork?.(serverId, workspaceId));
+    status != null && isStatusDecidedByReport({ status }, reportedWork?.(serverId, workspaceId));
   const hasClearableAttention = !decidedByReport && (status === "attention" || status === "failed");
   const canMarkUnread = !decidedByReport && supportsMarkUnread && status === "done";
 

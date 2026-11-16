@@ -4352,6 +4352,10 @@ export const WorkspaceDescriptorPayloadSchema = z
     background: z.boolean().optional(),
     archivingAt: z.string().nullable().optional().default(null),
     status: WorkspaceStateBucketSchema,
+    // FSH-only, added after v0.15.3. Optional by design: daemons set it only when true, and
+    // older daemons never send it. True when `status` is "running" only because an idle agent's background shells or monitors
+    // are live (e.g. a dev server), so clients may let the agent's reported status group it.
+    runningFromBackgroundWork: z.boolean().optional(),
     // Best-effort workspace status entry timestamp. Old daemons omit the
     // field; old clients treat missing and null equivalently. The transform
     // coerces a missing field to `null` so downstream code never has to
@@ -5056,8 +5060,9 @@ export const ProviderSubagentListResponseMessageSchema = z.object({
 
 export const AgentBackgroundWorkItemSchema = z.object({
   id: z.string(),
-  // Open string: "shell" or "other" today (Claude Monitor watches report as "shell").
-  // Clients treat unknown values as "other".
+  // Open string: "shell", "monitor" (a watch the agent waits on) or "other" today. Daemons before
+  // the FSH monitor split report Claude Monitor watches as "shell". Clients treat unknown values
+  // as "other".
   kind: z.string(),
   description: z.string().nullable(),
   startedAt: z.string(),

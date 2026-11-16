@@ -25,8 +25,13 @@ export function foldReportedWork(items: readonly WorkspaceSummaryItem[]): Report
   return result;
 }
 
-interface StatusWithTime {
+interface TurnStatus {
   status: WorkspaceDescriptor["status"];
+  /** Running only because an idle agent's background shells or monitors are live. */
+  runningFromBackgroundWork?: boolean;
+}
+
+interface StatusWithTime extends TurnStatus {
   enteredAt: Date | null;
 }
 
@@ -38,14 +43,17 @@ const REPORTED_WORK_STATUS = {
 
 /**
  * Whether the report, not the turn, decides the workspace's group. A running agent, a failure or a
- * permission prompt is live state and always wins; only "Ready to review" and "Done" are open to
- * the report. Read/unread act on the turn status, so they are hidden while this holds.
+ * permission prompt is live state and always wins; "Ready to review", "Done" and a Running held
+ * only by an idle agent's background work (a dev server) are open to the report. Read/unread act
+ * on the turn status, so they are hidden while this holds.
  */
 export function isStatusDecidedByReport(
-  turnStatus: WorkspaceDescriptor["status"],
+  turn: TurnStatus,
   reported: ReportedWork | null | undefined,
 ): reported is ReportedWork {
-  return reported != null && (turnStatus === "attention" || turnStatus === "done");
+  if (reported == null) return false;
+  if (turn.status === "running") return turn.runningFromBackgroundWork === true;
+  return turn.status === "attention" || turn.status === "done";
 }
 
 /** Regroups an idle workspace by what was reported. */
@@ -53,7 +61,7 @@ export function applyReportedWork(
   base: StatusWithTime,
   reported: ReportedWork | null | undefined,
 ): StatusWithTime {
-  if (!isStatusDecidedByReport(base.status, reported)) return base;
+  if (!isStatusDecidedByReport(base, reported)) return base;
   const status = REPORTED_WORK_STATUS[reported];
   return status === base.status ? base : { status, enteredAt: base.enteredAt };
 }
