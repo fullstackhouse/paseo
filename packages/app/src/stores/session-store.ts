@@ -176,7 +176,7 @@ export function normalizeWorkspaceDescriptor(
     // COMPAT(workspaceLabels): old daemons omit assignments.
     labels: payload.labels ?? [],
     status: payload.status,
-    // COMPAT(runningFromBackgroundWork): older hosts omit it.
+    // Optional by design: hosts send it only when true.
     runningFromBackgroundWork: payload.runningFromBackgroundWork ?? false,
     statusEnteredAt,
     archivingAt: payload.archivingAt ?? null,
