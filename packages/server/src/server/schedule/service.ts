@@ -4,7 +4,7 @@ import { stat } from "node:fs/promises";
 import { join } from "node:path";
 import type { Logger } from "pino";
 import type { AgentManager } from "../agent/agent-manager.js";
-import type { AgentSessionConfig } from "../agent/agent-sdk-types.js";
+import type { AgentRunResult, AgentSessionConfig } from "../agent/agent-sdk-types.js";
 import type { AgentStorage } from "../agent/agent-storage.js";
 import { curateAgentActivity } from "../agent/activity-curator.js";
 import { ensureAgentLoaded } from "../agent/agent-loading.js";
@@ -242,6 +242,7 @@ type ScheduleAgentManager = Pick<
     | "hydrateTimelineFromProvider"
     | "resumeAgentFromPersistence"
     | "runAgent"
+    | "subscribe"
     | "waitForAgentEvent"
     | "waitForAgentClose"
   >;
@@ -1033,6 +1034,39 @@ export class ScheduleService {
     });
   }
 
+  /**
+   * Runs the prompt until the turn ends or the agent stops on a permission prompt. The run's
+   * promise doesn't settle while a prompt is pending, so a blocked run would otherwise hang.
+   */
+  private async runUntilFinishedOrBlocked(
+    agentId: string,
+    prompt: string,
+  ): Promise<{ kind: "finished"; result: AgentRunResult } | { kind: "blocked" }> {
+    let unsubscribe: (() => void) | null = null;
+    const blocked = new Promise<{ kind: "blocked" }>((resolve) => {
+      unsubscribe = this.agentManager.subscribe(
+        (event) => {
+          if (event.type === "agent_state" && event.agent.pendingPermissions.size > 0) {
+            resolve({ kind: "blocked" });
+          }
+        },
+        { agentId, replayState: false },
+      );
+    });
+    try {
+      const run = this.agentManager.runAgent(agentId, prompt);
+      const outcome = await Promise.race([
+        run.then((result) => ({ kind: "finished" as const, result })),
+        blocked,
+      ]);
+      // The turn resumes once someone answers the prompt; nobody awaits it here.
+      if (outcome.kind === "blocked") run.catch(() => {});
+      return outcome;
+    } finally {
+      (unsubscribe as (() => void) | null)?.();
+    }
+  }
+
   private async executeSchedule(
     schedule: StoredSchedule,
     runId: string,
@@ -1084,6 +1118,14 @@ export class ScheduleService {
     if (!config) {
       throw new Error(`Schedule ${schedule.id} target changed during execution`);
     }
+    return this.executeNewAgentSchedule(schedule, runId, config);
+  }
+
+  private async executeNewAgentSchedule(
+    schedule: StoredSchedule,
+    runId: string,
+    config: Extract<ScheduleTarget, { type: "new-agent" }>["config"],
+  ): Promise<ScheduleExecutionResult> {
     await this.assertNewAgentCwdDirectory(config.cwd);
     let workspace: PersistedWorkspaceRecord | null = null;
     let agentId: string | null = null;
@@ -1127,11 +1169,11 @@ export class ScheduleService {
       if (created.initialPromptError) {
         throw created.initialPromptError;
       }
-      const result = await this.agentManager.runAgent(agent.id, schedule.prompt);
+      const outcome = await this.runUntilFinishedOrBlocked(agent.id, schedule.prompt);
       const waitResult = await this.agentManager.waitForAgentEvent(agent.id, {
         waitForActive: true,
       });
-      if (result.canceled) {
+      if (outcome.kind === "finished" && outcome.result.canceled) {
         throw new Error(`Scheduled agent ${agent.id} was canceled`);
       }
       const attention = await this.resolveFinishedRunAttention({
@@ -1141,14 +1183,16 @@ export class ScheduleService {
         workspaceId: workspace.workspaceId,
         waitResult,
       });
-      keepWorkspace = attention !== null;
-      const timelineText = curateAgentActivity(result.timeline);
+      // An agent waiting on a permission prompt stays, whatever plugins decide.
+      keepWorkspace = attention !== null || outcome.kind === "blocked";
+      const result = outcome.kind === "finished" ? outcome.result : null;
+      const timelineText = result ? curateAgentActivity(result.timeline) : "";
       return {
         agentId: agent.id,
         output: buildRunOutput({
           output: waitResult.lastMessage ?? null,
           timelineText,
-          finalText: result.finalText,
+          finalText: result?.finalText ?? "",
         }),
         attention,
       };

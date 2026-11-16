@@ -1059,18 +1059,25 @@ describe("ScheduleService", () => {
       clients: createTestAgentClients(),
       registry: agentStorage,
     });
-    manager.runAgent = async () => ({ sessionId: "s", finalText: "", timeline: [] }) as never;
-    manager.waitForAgentEvent = async () => ({
-      status: "running",
-      permission: {
-        id: "perm-1",
-        provider: "claude",
-        name: "Bash",
-        kind: "tool",
-        title: "Run gh pr merge",
-      } as AgentPermissionRequest,
-      lastMessage: null,
-    });
+    const permission = {
+      id: "perm-1",
+      provider: "claude",
+      name: "Bash",
+      kind: "tool",
+      title: "Run gh pr merge",
+    } as AgentPermissionRequest;
+    // Like a real turn, the run doesn't settle while the prompt is pending.
+    manager.runAgent = () => new Promise(() => {});
+    manager.subscribe = (callback) => {
+      setImmediate(() =>
+        callback({
+          type: "agent_state",
+          agent: { pendingPermissions: new Map([[permission.id, permission]]) },
+        } as never),
+      );
+      return () => {};
+    };
+    manager.waitForAgentEvent = async () => ({ status: "running", permission, lastMessage: null });
     const archived: string[] = [];
     const service = createScheduleService({
       paseoHome: tempDir,
