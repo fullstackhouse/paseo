@@ -1285,6 +1285,9 @@ export const ar: TranslationResources = {
     pinned: {
       title: "المثبتة",
     },
+    schedules: {
+      needsYou: "عمليات مجدولة تحتاجك: {{count}}",
+    },
     snoozed: {
       title: "مؤجلة",
       blocked: "بانتظارك: {{count}}",

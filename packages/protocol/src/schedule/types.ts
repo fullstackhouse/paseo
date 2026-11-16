@@ -42,6 +42,20 @@ export const ScheduleTargetSchema = z.discriminatedUnion("type", [
 ]);
 export type ScheduleTarget = z.infer<typeof ScheduleTargetSchema>;
 
+// COMPAT(scheduleRunAttention): FSH-only, added after v0.15.4, remove gate after 2027-05-16.
+// A finished run that needs a human. `reason` stays a string so new reasons don't break old
+// parsers; known values are in SCHEDULE_RUN_ATTENTION_REASONS. `resolvedAt` is set once the
+// human dismisses it or archives the run's workspace.
+export const ScheduleRunAttentionSchema = z.object({
+  reason: z.string(),
+  message: z.string().nullable(),
+  resolvedAt: z.string().nullable(),
+});
+export type ScheduleRunAttention = z.infer<typeof ScheduleRunAttentionSchema>;
+
+export const SCHEDULE_RUN_ATTENTION_REASONS = ["failed", "permission", "plugin"] as const;
+export type ScheduleRunAttentionReason = (typeof SCHEDULE_RUN_ATTENTION_REASONS)[number];
+
 export const ScheduleRunSchema = z.object({
   id: z.string(),
   scheduledFor: z.string(),
@@ -52,8 +66,14 @@ export const ScheduleRunSchema = z.object({
   workspaceId: z.string().nullable().optional(),
   output: z.string().nullable(),
   error: z.string().nullable(),
+  attention: ScheduleRunAttentionSchema.nullable().optional(),
 });
 export type ScheduleRun = z.infer<typeof ScheduleRunSchema>;
+
+/** A finished run whose attention nobody has resolved yet. */
+export function isScheduleRunAwaitingAttention(run: ScheduleRun): boolean {
+  return run.attention != null && run.attention.resolvedAt === null;
+}
 
 export const StoredScheduleSchema = z.object({
   id: z.string(),
@@ -75,6 +95,9 @@ export type StoredSchedule = z.infer<typeof StoredScheduleSchema>;
 
 export const ScheduleSummarySchema = StoredScheduleSchema.omit({
   runs: true,
+}).extend({
+  // COMPAT(scheduleRunAttention): runs whose attention is unresolved, newest last.
+  attentionRuns: z.array(ScheduleRunSchema).optional(),
 });
 export type ScheduleSummary = z.infer<typeof ScheduleSummarySchema>;
 
@@ -108,7 +131,13 @@ export interface UpdateScheduleInput {
   expiresAt?: string | null;
 }
 
+export interface ScheduleRunAttentionInput {
+  reason: ScheduleRunAttentionReason;
+  message: string | null;
+}
+
 export interface ScheduleExecutionResult {
   agentId: string | null;
   output: string | null;
+  attention?: ScheduleRunAttentionInput | null;
 }

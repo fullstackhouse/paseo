@@ -3293,6 +3293,8 @@ export class Session {
         return this.scheduleSession.handleScheduleRunOnceRequest(msg);
       case "schedule/update":
         return this.scheduleSession.handleScheduleUpdateRequest(msg);
+      case "schedule.run.resolve.request":
+        return this.scheduleSession.handleScheduleRunResolveRequest(msg);
       default:
         return undefined;
     }

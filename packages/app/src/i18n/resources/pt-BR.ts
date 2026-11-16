@@ -1311,6 +1311,9 @@ export const ptBR: TranslationResources = {
     pinned: {
       title: "Fixados",
     },
+    schedules: {
+      needsYou: "Execuções agendadas precisam de você: {{count}}",
+    },
     snoozed: {
       title: "Adiados",
       blocked: "Esperando você: {{count}}",

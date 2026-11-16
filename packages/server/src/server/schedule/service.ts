@@ -15,10 +15,12 @@ import type { PersistedWorkspaceRecord } from "../workspace-registry.js";
 import type { CreatePaseoWorktreeWorkflowResult } from "../worktree-session.js";
 import { ScheduleStore } from "./store.js";
 import { computeNextRunAt, validateScheduleCadence } from "./cron.js";
+import type { AgentPermissionRequest } from "@getpaseo/protocol/agent-types";
 import type {
   CreateScheduleInput,
   ScheduleExecutionResult,
   ScheduleRun,
+  ScheduleRunAttentionInput,
   ScheduleTarget,
   StoredSchedule,
   UpdateScheduleInput,
@@ -244,6 +246,22 @@ type ScheduleAgentManager = Pick<
     | "waitForAgentClose"
   >;
 
+/** What a finished run looks like before its attention is decided. */
+export interface ScheduleRunFinishInput {
+  schedule: StoredSchedule;
+  runId: string;
+  agentId: string;
+  workspaceId: string | null;
+  attention: ScheduleRunAttentionInput | null;
+}
+
+function describePermissionAttention(
+  permission: AgentPermissionRequest,
+): ScheduleRunAttentionInput {
+  const label = permission.title?.trim() || permission.name;
+  return { reason: "permission", message: `Waiting for permission: ${label}` };
+}
+
 interface ScheduleWorkspaceCreateInput {
   cwd: string;
   firstAgentContext: FirstAgentContext;
@@ -262,6 +280,13 @@ export interface ScheduleServiceOptions {
     input: ScheduleWorkspaceCreateInput,
   ) => Promise<CreatePaseoWorktreeWorkflowResult>;
   archiveWorkspace: (workspaceId: string) => Promise<void>;
+  /**
+   * Lets plugins decide that a finished run needs a human (e.g. it left open asks). Runs once
+   * per run that reached its agent; returns the attention to record, or null for none.
+   */
+  resolveRunAttention?: (
+    input: ScheduleRunFinishInput,
+  ) => Promise<ScheduleRunAttentionInput | null>;
   now?: () => Date;
   runner?: (schedule: StoredSchedule, runId: string) => Promise<ScheduleExecutionResult>;
 }
@@ -279,6 +304,9 @@ export class ScheduleService {
     input: ScheduleWorkspaceCreateInput,
   ) => Promise<CreatePaseoWorktreeWorkflowResult>;
   private readonly archiveWorkspace: (workspaceId: string) => Promise<void>;
+  private readonly resolveRunAttentionHook: (
+    input: ScheduleRunFinishInput,
+  ) => Promise<ScheduleRunAttentionInput | null>;
   private readonly now: () => Date;
   private readonly runner: (
     schedule: StoredSchedule,
@@ -296,6 +324,8 @@ export class ScheduleService {
     this.createDirectoryWorkspace = options.createDirectoryWorkspace;
     this.createPaseoWorktreeWorkspace = options.createPaseoWorktreeWorkspace;
     this.archiveWorkspace = options.archiveWorkspace;
+    this.resolveRunAttentionHook =
+      options.resolveRunAttention ?? (async (input) => input.attention);
     this.now = options.now ?? (() => new Date());
     this.runner = options.runner ?? ((schedule, runId) => this.executeSchedule(schedule, runId));
   }
@@ -504,6 +534,47 @@ export class ScheduleService {
     await this.store.delete(id);
   }
 
+  /** Marks one run's attention resolved. Resolving twice keeps the first time. */
+  async resolveRunAttention(input: { scheduleId: string; runId: string }): Promise<StoredSchedule> {
+    const nowIso = this.now().toISOString();
+    let found = false;
+    const updated = await this.store.update(input.scheduleId, (schedule) => {
+      const runs = schedule.runs.map((run) => {
+        if (run.id !== input.runId) return run;
+        found = true;
+        if (!run.attention || run.attention.resolvedAt !== null) return run;
+        return { ...run, attention: { ...run.attention, resolvedAt: nowIso } };
+      });
+      return found ? { ...schedule, runs, updatedAt: nowIso } : schedule;
+    });
+    const schedule = requireSchedule(updated, input.scheduleId);
+    if (!found) {
+      throw new Error(`Run ${input.runId} not found in schedule ${input.scheduleId}`);
+    }
+    return schedule;
+  }
+
+  /** Archiving a run's workspace means you dealt with it: resolve the runs that kept it. */
+  async resolveRunsForWorkspace(workspaceId: string): Promise<void> {
+    const nowIso = this.now().toISOString();
+    const schedules = await this.store.list();
+    for (const candidate of schedules) {
+      const affected = candidate.runs.some(
+        (run) => run.workspaceId === workspaceId && run.attention?.resolvedAt === null,
+      );
+      if (!affected) continue;
+      await this.store.update(candidate.id, (schedule) => ({
+        ...schedule,
+        updatedAt: nowIso,
+        runs: schedule.runs.map((run) =>
+          run.workspaceId === workspaceId && run.attention && run.attention.resolvedAt === null
+            ? { ...run, attention: { ...run.attention, resolvedAt: nowIso } }
+            : run,
+        ),
+      }));
+    }
+  }
+
   async completeForAgent(agentId: string): Promise<number> {
     const now = this.now();
     const schedules = await this.store.list();
@@ -643,6 +714,11 @@ export class ScheduleService {
           status: "failed",
           endedAt: now.toISOString(),
           error: "Daemon restarted before the scheduled run completed",
+          attention: {
+            reason: "failed",
+            message: "Daemon restarted before the scheduled run completed",
+            resolvedAt: null,
+          },
         };
         updated = { ...updated, runs };
         if (shouldCompleteSchedule(updated, now)) {
@@ -752,17 +828,20 @@ export class ScheduleService {
           agentId: result.agentId,
           output: result.output,
           error: null,
+          attention: result.attention ?? null,
           targetGone: false,
           manual,
         });
       } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
         await this.finishRun({
           scheduleId: schedule.id,
           runId,
           status: "failed",
           agentId: null,
           output: null,
-          error: error instanceof Error ? error.message : String(error),
+          error: message,
+          attention: { reason: "failed", message },
           targetGone: error instanceof ScheduleTargetGoneError,
           manual,
         });
@@ -843,6 +922,7 @@ export class ScheduleService {
     agentId: string | null;
     output: string | null;
     error: string | null;
+    attention: ScheduleRunAttentionInput | null;
     targetGone: boolean;
     manual: boolean;
   }): Promise<void> {
@@ -857,6 +937,7 @@ export class ScheduleService {
               agentId: params.agentId ?? run.agentId,
               output: params.output,
               error: params.error,
+              attention: params.attention ? { ...params.attention, resolvedAt: null } : null,
             }
           : run,
       );
@@ -924,6 +1005,34 @@ export class ScheduleService {
     requireSchedule(updatedSchedule, params.scheduleId);
   }
 
+  /**
+   * Decides what a run whose agent finished its turn needs from you: an agent error fails the run,
+   * a pending permission prompt needs you, and plugins may flag it too.
+   */
+  private async resolveFinishedRunAttention(input: {
+    schedule: StoredSchedule;
+    runId: string;
+    agentId: string;
+    workspaceId: string | null;
+    waitResult: {
+      status: string;
+      permission: AgentPermissionRequest | null;
+      lastMessage: string | null;
+    };
+  }): Promise<ScheduleRunAttentionInput | null> {
+    const { waitResult } = input;
+    if (!waitResult.permission && waitResult.status === "error") {
+      throw new Error(waitResult.lastMessage ?? `Scheduled agent ${input.agentId} failed`);
+    }
+    return this.resolveRunAttentionHook({
+      schedule: input.schedule,
+      runId: input.runId,
+      agentId: input.agentId,
+      workspaceId: input.workspaceId,
+      attention: waitResult.permission ? describePermissionAttention(waitResult.permission) : null,
+    });
+  }
+
   private async executeSchedule(
     schedule: StoredSchedule,
     runId: string,
@@ -953,12 +1062,13 @@ export class ScheduleService {
       const waitResult = await this.agentManager.waitForAgentEvent(agent.id, {
         waitForActive: true,
       });
-      if (waitResult.permission) {
-        throw new Error(`Scheduled agent ${agent.id} is waiting for permission`);
-      }
-      if (waitResult.status === "error") {
-        throw new Error(waitResult.lastMessage ?? `Scheduled agent ${agent.id} failed`);
-      }
+      const attention = await this.resolveFinishedRunAttention({
+        schedule,
+        runId,
+        agentId: agent.id,
+        workspaceId: agent.workspaceId ?? null,
+        waitResult,
+      });
       return {
         agentId: agent.id,
         output: buildRunOutput({
@@ -966,6 +1076,7 @@ export class ScheduleService {
           timelineText: "",
           finalText: waitResult.lastMessage ?? "",
         }),
+        attention,
       };
     }
 
@@ -976,6 +1087,8 @@ export class ScheduleService {
     await this.assertNewAgentCwdDirectory(config.cwd);
     let workspace: PersistedWorkspaceRecord | null = null;
     let agentId: string | null = null;
+    // A run that needs a human keeps its workspace, so its agent stays reachable.
+    let keepWorkspace = false;
     try {
       workspace = await this.createScheduleRunWorkspace(config, schedule.prompt);
       await this.recordRunWorkspace({
@@ -1021,12 +1134,14 @@ export class ScheduleService {
       if (result.canceled) {
         throw new Error(`Scheduled agent ${agent.id} was canceled`);
       }
-      if (waitResult.permission) {
-        throw new Error(`Scheduled agent ${agent.id} is waiting for permission`);
-      }
-      if (waitResult.status === "error") {
-        throw new Error(waitResult.lastMessage ?? `Scheduled agent ${agent.id} failed`);
-      }
+      const attention = await this.resolveFinishedRunAttention({
+        schedule,
+        runId,
+        agentId: agent.id,
+        workspaceId: workspace.workspaceId,
+        waitResult,
+      });
+      keepWorkspace = attention !== null;
       const timelineText = curateAgentActivity(result.timeline);
       return {
         agentId: agent.id,
@@ -1035,10 +1150,16 @@ export class ScheduleService {
           timelineText,
           finalText: result.finalText,
         }),
+        attention,
       };
+    } catch (error) {
+      // A failed run whose agent exists keeps its workspace, so you can see what went wrong.
+      keepWorkspace = agentId !== null;
+      throw error;
     } finally {
       if (
         workspace &&
+        !keepWorkspace &&
         shouldArchiveScheduleRunWorkspace({ agentId, archiveOnFinish: config.archiveOnFinish })
       ) {
         try {

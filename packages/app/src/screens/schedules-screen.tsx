@@ -19,6 +19,7 @@ import {
   ScheduleRunsSheet,
   type ScheduleRunsTarget,
 } from "@/components/schedules/schedule-runs-sheet";
+import { SchedulesNeedsYou } from "@/components/schedules/schedules-needs-you";
 import { SchedulesTable, type ScheduleRowView } from "@/components/schedules/schedules-table";
 import { Button } from "@/components/ui/button";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
@@ -37,6 +38,10 @@ import {
   type ScheduleBucket,
   type ScheduleTargetAgent,
 } from "@/schedules/schedule-derivation";
+import {
+  collectScheduleAttention,
+  type ScheduleAttentionItem,
+} from "@/schedules/schedule-attention";
 import { resolveSchedulesScreenBodyState } from "./schedules-screen-state";
 import { resolveScheduleTitle } from "@/utils/schedule-format";
 import {
@@ -174,6 +179,14 @@ function SchedulesScreenContent(): ReactElement {
       }));
   }, [resolvedRows, selectedHost, statusFilter, hosts.length]);
 
+  const attentionItems = useMemo(
+    () =>
+      collectScheduleAttention(schedules, new Date()).filter(
+        (item) => selectedHost === ALL_HOSTS_OPTION_ID || item.serverId === selectedHost,
+      ),
+    [schedules, selectedHost],
+  );
+
   const showLoadError = isError && loadState.status !== "loaded";
   const showHostFilter = hosts.length > 1;
 
@@ -182,6 +195,7 @@ function SchedulesScreenContent(): ReactElement {
       <MenuHeader title="Schedules" />
       <SchedulesScreenBody
         rows={visibleRows}
+        attentionItems={attentionItems}
         loadState={loadState}
         hostErrors={hostErrors}
         showLoadError={showLoadError}
@@ -210,6 +224,7 @@ function SchedulesScreenContent(): ReactElement {
 
 function SchedulesScreenBody({
   rows,
+  attentionItems,
   loadState,
   hostErrors,
   showLoadError,
@@ -225,6 +240,7 @@ function SchedulesScreenBody({
   onViewRuns,
 }: {
   rows: ScheduleRowView[];
+  attentionItems: ScheduleAttentionItem[];
   loadState: AggregateLoadState<AggregatedSchedule>;
   hostErrors: ScheduleHostError[];
   showLoadError: boolean;
@@ -315,6 +331,7 @@ function SchedulesScreenBody({
         testID="schedules-list"
       >
         {hostErrors.length > 0 ? <ScheduleHostErrorsBanner errors={hostErrors} /> : null}
+        <SchedulesNeedsYou items={attentionItems} showHost={hosts.length > 1} />
         {schedulesContent}
       </ScrollView>
     </View>
