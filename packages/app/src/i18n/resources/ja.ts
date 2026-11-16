@@ -1299,6 +1299,9 @@ export const ja: TranslationResources = {
     pinned: {
       title: "固定済み",
     },
+    schedules: {
+      needsYou: "対応が必要なスケジュール実行: {{count}}",
+    },
     snoozed: {
       title: "スヌーズ中",
       blocked: "あなたを待機中: {{count}}",

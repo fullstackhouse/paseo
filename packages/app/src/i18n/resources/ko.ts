@@ -1292,6 +1292,9 @@ export const ko: TranslationResources = {
     pinned: {
       title: "고정됨",
     },
+    schedules: {
+      needsYou: "확인이 필요한 예약 실행: {{count}}",
+    },
     snoozed: {
       title: "다시 알림",
       blocked: "응답 대기: {{count}}",

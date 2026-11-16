@@ -49,22 +49,23 @@ Paseo only sees the returned promise, so detached work gets no error reporting a
 
 ## Hooks
 
-| Hook                      | Waits | Payload                            | Handler may change                             |
-| ------------------------- | ----- | ---------------------------------- | ---------------------------------------------- |
-| `workspace.create.before` | yes   | `{ request }`                      | Entire create request                          |
-| `workspace.create.after`  | no    | `{ workspace }`                    |                                                |
-| `workspace.archive.after` | no    | `{ workspace }`                    |                                                |
-| `worktree.create.before`  | yes   | `{ request }`                      | Creation options and destination               |
-| `worktree.create.after`   | yes   | `{ worktree }`                     | Files in the worktree; throw to abort creation |
-| `agent.create.before`     | yes   | `{ request: { config, env? } }`    | Saved config except `cwd`; `env`               |
-| `agent.create.after`      | no    | `{ agent }`                        |                                                |
-| `agent.open.before`       | yes   | `{ request }`                      | Launch-only `env`, `tools`, `mcpServers`       |
-| `agent.close.after`       | no    | `{ agent }`                        |                                                |
-| `agent.archive.after`     | no    | `{ agent, archivedAt }`            |                                                |
-| `agent.turn.before`       | no    | `{ agent, turnId }`                |                                                |
-| `agent.turn.after`        | no    | `{ agent, turnId, outcome }`       |                                                |
-| `agent.permission.before` | no    | `{ agent, request }`               |                                                |
-| `agent.permission.after`  | no    | `{ agent, requestId, resolution }` |                                                |
+| Hook                         | Waits | Payload                            | Handler may change                             |
+| ---------------------------- | ----- | ---------------------------------- | ---------------------------------------------- |
+| `workspace.create.before`    | yes   | `{ request }`                      | Entire create request                          |
+| `workspace.create.after`     | no    | `{ workspace }`                    |                                                |
+| `workspace.archive.after`    | no    | `{ workspace }`                    |                                                |
+| `worktree.create.before`     | yes   | `{ request }`                      | Creation options and destination               |
+| `worktree.create.after`      | yes   | `{ worktree }`                     | Files in the worktree; throw to abort creation |
+| `agent.create.before`        | yes   | `{ request: { config, env? } }`    | Saved config except `cwd`; `env`               |
+| `agent.create.after`         | no    | `{ agent }`                        |                                                |
+| `agent.open.before`          | yes   | `{ request }`                      | Launch-only `env`, `tools`, `mcpServers`       |
+| `agent.close.after`          | no    | `{ agent }`                        |                                                |
+| `agent.archive.after`        | no    | `{ agent, archivedAt }`            |                                                |
+| `agent.turn.before`          | no    | `{ agent, turnId }`                |                                                |
+| `agent.turn.after`           | no    | `{ agent, turnId, outcome }`       |                                                |
+| `agent.permission.before`    | no    | `{ agent, request }`               |                                                |
+| `agent.permission.after`     | no    | `{ agent, requestId, resolution }` |                                                |
+| `schedule.run.finish.before` | yes   | `{ request }`                      | `attention` only                               |
 
 ## Shared payloads
 
@@ -588,6 +589,18 @@ server.addHook("agent.permission.after", async ({ agent, requestId, resolution }
 ```
 
 Agent hooks exclude the daemon's private disposable helpers. Public background workspaces and their ordinary agents use the same hooks.
+
+## schedule.run.finish.before
+
+A scheduled run's agent finished its turn, and Paseo is about to record the run. The request is `{ schedule: { id, name }, runId, agent, attention }`. `attention` is `null`, or `{ reason: "permission", message }` when the agent stopped on a permission prompt. Return a request with `attention` set to `{ reason: "plugin", message }` when the run needs a human. Paseo then keeps the run's workspace instead of archiving it and lists the run under **Needs you** on the Schedules screen. Only `attention` may change, and `message` is at most 500 characters. A failing hook leaves the daemon's own attention in place. Paseo doesn't notify for `plugin` attention, so send your own notification if the run needs one. Needs `server_info.features.scheduleRunAttention`. Older hosts reject the hook name, so register it inside `try`.
+
+```ts
+server.addHook("schedule.run.finish.before", async ({ request }) => {
+  const open = await countOpenItems(request.agent.id);
+  if (open === 0) return;
+  return { ...request, attention: { reason: "plugin", message: `${open} open items` } };
+});
+```
 
 ## Ordering and returned values
 

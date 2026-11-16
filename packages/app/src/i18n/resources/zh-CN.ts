@@ -1277,6 +1277,9 @@ export const zhCN: TranslationResources = {
     pinned: {
       title: "已置顶",
     },
+    schedules: {
+      needsYou: "需要你处理的计划运行：{{count}}",
+    },
     snoozed: {
       title: "已暂缓",
       blocked: "等待你处理：{{count}}",

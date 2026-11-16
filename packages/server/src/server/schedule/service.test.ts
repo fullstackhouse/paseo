@@ -39,6 +39,7 @@ import {
 } from "./service.js";
 import { ScheduleStore } from "./store.js";
 import type { ScheduleExecutionResult, StoredSchedule } from "@getpaseo/protocol/schedule/types";
+import type { ScheduleRunFinishInput } from "./service.js";
 
 interface ScheduleServiceInternals {
   executeSchedule(schedule: StoredSchedule, runId: string): Promise<ScheduleExecutionResult>;
@@ -963,6 +964,182 @@ describe("ScheduleService", () => {
     );
   });
 
+  test("a run a plugin flags as needing you keeps its workspace until you resolve it", async () => {
+    const {
+      workspaceRegistry,
+      createDirectoryWorkspace: createScheduleDirectoryWorkspace,
+      createArchiveWorkspace,
+    } = await createRegistryBackedScheduleWorkspaceDeps(tempDir);
+    const manager = new AgentManager({
+      logger: createTestLogger(),
+      clients: createTestAgentClients(),
+      registry: agentStorage,
+    });
+    const hookInputs: ScheduleRunFinishInput[] = [];
+    const service = createScheduleService({
+      paseoHome: tempDir,
+      logger: createTestLogger(),
+      agentManager: manager,
+      agentStorage,
+      providerSnapshotManager: NO_UNATTENDED_SCHEDULE_POLICY,
+      createDirectoryWorkspace: createScheduleDirectoryWorkspace,
+      archiveWorkspace: createArchiveWorkspace({ agentManager: manager, agentStorage }),
+      resolveRunAttention: async (input) => {
+        hookInputs.push(input);
+        return { reason: "plugin", message: "1 open ask" };
+      },
+      now: () => now,
+    });
+
+    const created = await service.create({
+      prompt: "leave an ask",
+      cadence: { type: "every", everyMs: 60_000 },
+      target: {
+        type: "new-agent",
+        config: { provider: "claude", model: "test-model", cwd: tempDir, isolation: "local" },
+      },
+      maxRuns: 1,
+    });
+    await service.tick();
+
+    const inspected = await service.inspect(created.id);
+    const run = inspected.runs[0]!;
+    expect(run.status).toBe("succeeded");
+    expect(run.attention).toEqual({ reason: "plugin", message: "1 open ask", resolvedAt: null });
+    expect(hookInputs).toEqual([
+      expect.objectContaining({ runId: run.id, agentId: run.agentId, attention: null }),
+    ]);
+    const storedAgent = await agentStorage.get(run.agentId!);
+    expect(storedAgent?.archivedAt ?? null).toBeNull();
+    expect((await workspaceRegistry.get(run.workspaceId!))?.archivedAt ?? null).toBeNull();
+
+    const resolved = await service.resolveRunAttention({ scheduleId: created.id, runId: run.id });
+    expect(resolved.runs[0]?.attention).toEqual({
+      reason: "plugin",
+      message: "1 open ask",
+      resolvedAt: now.toISOString(),
+    });
+  });
+
+  test("archiving a kept run workspace resolves its attention", async () => {
+    const manager = new AgentManager({
+      logger: createTestLogger(),
+      clients: createTestAgentClients(),
+      registry: agentStorage,
+    });
+    const service = createScheduleService({
+      paseoHome: tempDir,
+      logger: createTestLogger(),
+      agentManager: manager,
+      agentStorage,
+      providerSnapshotManager: NO_UNATTENDED_SCHEDULE_POLICY,
+      resolveRunAttention: async () => ({ reason: "plugin", message: null }),
+      now: () => now,
+    });
+    const created = await service.create({
+      prompt: "leave an ask",
+      cadence: { type: "every", everyMs: 60_000 },
+      target: { type: "new-agent", config: { provider: "claude", cwd: tempDir } },
+      maxRuns: 1,
+    });
+    await service.tick();
+    const run = (await service.inspect(created.id)).runs[0]!;
+    expect(run.attention?.resolvedAt).toBeNull();
+
+    await service.resolveRunsForWorkspace(run.workspaceId!);
+
+    expect((await service.inspect(created.id)).runs[0]?.attention?.resolvedAt).toBe(
+      now.toISOString(),
+    );
+  });
+
+  test("a run that stops on a permission prompt needs you instead of failing", async () => {
+    const manager = new AgentManager({
+      logger: createTestLogger(),
+      clients: createTestAgentClients(),
+      registry: agentStorage,
+    });
+    const permission = {
+      id: "perm-1",
+      provider: "claude",
+      name: "Bash",
+      kind: "tool",
+      title: "Run gh pr merge",
+    } as AgentPermissionRequest;
+    // Like a real turn, the run doesn't settle while the prompt is pending.
+    manager.runAgent = () => new Promise(() => {});
+    manager.subscribe = (callback) => {
+      setImmediate(() =>
+        callback({
+          type: "agent_state",
+          agent: { pendingPermissions: new Map([[permission.id, permission]]) },
+        } as never),
+      );
+      return () => {};
+    };
+    manager.waitForAgentEvent = async () => ({ status: "running", permission, lastMessage: null });
+    const archived: string[] = [];
+    const service = createScheduleService({
+      paseoHome: tempDir,
+      logger: createTestLogger(),
+      agentManager: manager,
+      agentStorage,
+      providerSnapshotManager: NO_UNATTENDED_SCHEDULE_POLICY,
+      archiveWorkspace: async (workspaceId) => {
+        archived.push(workspaceId);
+      },
+      now: () => now,
+    });
+    const created = await service.create({
+      prompt: "ask for permission",
+      cadence: { type: "every", everyMs: 60_000 },
+      target: { type: "new-agent", config: { provider: "claude", cwd: tempDir } },
+      maxRuns: 1,
+    });
+    await service.tick();
+
+    const run = (await service.inspect(created.id)).runs[0]!;
+    expect(run.status).toBe("succeeded");
+    expect(run.attention).toEqual({
+      reason: "permission",
+      message: "Waiting for permission: Run gh pr merge",
+      resolvedAt: null,
+    });
+    expect(archived).toEqual([]);
+  });
+
+  test("a run that finishes with nothing open is archived and needs nothing", async () => {
+    const manager = new AgentManager({
+      logger: createTestLogger(),
+      clients: createTestAgentClients(),
+      registry: agentStorage,
+    });
+    const archived: string[] = [];
+    const service = createScheduleService({
+      paseoHome: tempDir,
+      logger: createTestLogger(),
+      agentManager: manager,
+      agentStorage,
+      providerSnapshotManager: NO_UNATTENDED_SCHEDULE_POLICY,
+      archiveWorkspace: async (workspaceId) => {
+        archived.push(workspaceId);
+      },
+      now: () => now,
+    });
+    const created = await service.create({
+      prompt: "all good",
+      cadence: { type: "every", everyMs: 60_000 },
+      target: { type: "new-agent", config: { provider: "claude", cwd: tempDir } },
+      maxRuns: 1,
+    });
+    await service.tick();
+
+    const run = (await service.inspect(created.id)).runs[0]!;
+    expect(run.status).toBe("succeeded");
+    expect(run.attention ?? null).toBeNull();
+    expect(archived).toEqual([run.workspaceId]);
+  });
+
   test("archives the run workspace when scheduled agent creation fails before archive opt-out can preserve an agent", async () => {
     const {
       workspaceRegistry,
@@ -1349,35 +1526,16 @@ describe("ScheduleService", () => {
       clients: createTestAgentClients(),
       registry: agentStorage,
     });
-    manager.runAgent = async () => {
-      throw new Error("run exploded");
-    };
-    const agentId = "00000000-0000-0000-0000-000000000326";
+    // An agent that never got created leaves nothing to inspect, so its workspace is archived.
+    const agentId = null;
     const service = createScheduleService({
       paseoHome: tempDir,
       logger,
       agentManager: manager,
       agentStorage,
       providerSnapshotManager: NO_UNATTENDED_SCHEDULE_POLICY,
-      createAgent: async (input) => {
-        const snapshot = {
-          id: agentId,
-          provider: "claude",
-          cwd: input.cwd ?? tempDir,
-          workspaceId: input.workspaceId,
-          status: "idle",
-          lifecycle: "idle",
-        };
-        return {
-          snapshot: snapshot as Awaited<
-            ReturnType<ScheduleServiceOptions["createAgent"]>
-          >["snapshot"],
-          liveSnapshot: snapshot as Awaited<
-            ReturnType<ScheduleServiceOptions["createAgent"]>
-          >["liveSnapshot"],
-          initialPromptStarted: false,
-          initialPromptError: null,
-        };
+      createAgent: async () => {
+        throw new Error("run exploded");
       },
       archiveWorkspace: async () => {
         throw archiveError;
@@ -1776,7 +1934,7 @@ describe("ScheduleService", () => {
     expect(storedAgent?.archivedAt).toBeTruthy();
   });
 
-  test("records prompt-start failures as failed and archives the scheduled agent", async () => {
+  test("records prompt-start failures as failed and keeps the agent for you to inspect", async () => {
     class StartFailureScheduleSession implements AgentSession {
       readonly provider = "claude";
       readonly capabilities = SCHEDULE_TEST_CAPABILITIES;
@@ -1886,8 +2044,11 @@ describe("ScheduleService", () => {
     const storedAgents = await agentStorage.list();
     expect(storedAgents).toHaveLength(1);
     expect(inspected.runs[0]?.agentId).toBe(storedAgents[0]?.id);
-    expect(storedAgents[0]).toMatchObject({
-      archivedAt: expect.any(String),
+    expect(storedAgents[0]?.archivedAt ?? null).toBeNull();
+    expect(inspected.runs[0]?.attention).toMatchObject({
+      reason: "failed",
+      message: expect.stringContaining("start turn exploded"),
+      resolvedAt: null,
     });
   });
 
