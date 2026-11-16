@@ -415,8 +415,8 @@ export interface PaseoAgentBackgroundWorkHandle {
    *
    * When reading the current list fails, `options.onError` receives the error and `listener` is
    * not called; without `onError` the error is logged. The read is not retried: the next
-   * reconnect reads the list again. When the host refuses the subscription itself, `onError`
-   * receives that error and the subscription ends.
+   * reconnect reads the list again. When subscribing itself fails, including on a reconnect
+   * (refused, timed out), `onError` receives that error and the subscription ends.
    */
   subscribe(
     listener: (items: PaseoAgentBackgroundWorkItem[]) => void,
@@ -444,8 +444,8 @@ export interface PaseoAgentProviderSubagentsHandle {
    *
    * When reading the current list fails, `options.onError` receives the error and `listener` is
    * not called again until a later reconnect reads the list successfully; without `onError` the
-   * error is logged. When the host refuses the subscription itself, `onError` receives that error
-   * and the subscription ends.
+   * error is logged. When subscribing itself fails, including on a reconnect (refused,
+   * timed out), `onError` receives that error and the subscription ends.
    */
   subscribe(
     listener: (subagents: PaseoAgentProviderSubagent[]) => void,
@@ -1244,7 +1244,7 @@ function createAgentHandleFactory(
               sequence++;
               listener(message.payload.items);
             },
-            // The host refused the subscription; it is over. The client already logs the error.
+            // Subscribing failed (refused, timed out); the subscription is over. The client logs it.
             error: (error) => {
               if (!released) options?.onError?.(error);
             },
@@ -1308,7 +1308,7 @@ function createAgentHandleFactory(
               }
               if (subagents && applyProviderSubagentChange(subagents, change)) emit(subagents);
             },
-            // The host refused the subscription; it is over. The client already logs the error.
+            // Subscribing failed (refused, timed out); the subscription is over. The client logs it.
             error: (error) => {
               if (!released) options?.onError?.(error);
             },
