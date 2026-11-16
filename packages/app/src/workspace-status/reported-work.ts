@@ -37,14 +37,23 @@ const REPORTED_WORK_STATUS = {
 } as const satisfies Record<ReportedWork, WorkspaceDescriptor["status"]>;
 
 /**
- * Regroups an idle workspace by what was reported. A running agent, a failure or a permission
- * prompt is live state and always wins; only "Ready to review" and "Done" are open to the report.
+ * Whether the report, not the turn, decides the workspace's group. A running agent, a failure or a
+ * permission prompt is live state and always wins; only "Ready to review" and "Done" are open to
+ * the report. Read/unread act on the turn status, so they are hidden while this holds.
  */
+export function isStatusDecidedByReport(
+  turnStatus: WorkspaceDescriptor["status"],
+  reported: ReportedWork | null | undefined,
+): reported is ReportedWork {
+  return reported != null && (turnStatus === "attention" || turnStatus === "done");
+}
+
+/** Regroups an idle workspace by what was reported. */
 export function applyReportedWork(
   base: StatusWithTime,
   reported: ReportedWork | null | undefined,
 ): StatusWithTime {
-  if (!reported || (base.status !== "attention" && base.status !== "done")) return base;
+  if (!isStatusDecidedByReport(base.status, reported)) return base;
   const status = REPORTED_WORK_STATUS[reported];
   return status === base.status ? base : { status, enteredAt: base.enteredAt };
 }
