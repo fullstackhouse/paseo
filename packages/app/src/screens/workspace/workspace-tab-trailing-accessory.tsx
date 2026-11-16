@@ -122,6 +122,7 @@ export function MobileTabTrailingAccessory({
           if (entry.kind === "file-panel-open-with") {
             return <Fragment key={entry.key}>{openWith?.trigger}</Fragment>;
           }
+          if (entry.kind === "file-reveal") return null;
           return <MobileTabDropdownMenuItem key={entry.key} entry={entry} />;
         })}
       </DropdownMenuContent>
