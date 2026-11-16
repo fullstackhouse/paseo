@@ -78,6 +78,8 @@ export interface AgentBackgroundWorkActivity {
 interface BackgroundActivity {
   agentId: string;
   changedAtIso: string;
+  /** A running subagent is work; a background shell or monitor may be a long-lived server. */
+  source: "subagent" | "background_work";
 }
 
 export interface WorkspaceDirectoryDeps {
@@ -303,10 +305,12 @@ export class WorkspaceDirectory {
           .map((subagent) => ({
             agentId: subagent.parentAgentId,
             changedAtIso: subagent.updatedAt,
+            source: "subagent" as const,
           })),
         ...backgroundWorkActivity.map((work) => ({
           agentId: work.agentId,
           changedAtIso: work.startedAt,
+          source: "background_work" as const,
         })),
       ],
       descriptorsByWorkspaceId,
@@ -358,7 +362,11 @@ export class WorkspaceDirectory {
     } = params;
     const activeAgentsById = new Map(activeAgents.map((agent) => [agent.id, agent] as const));
 
-    for (const activity of backgroundActivity) {
+    // Subagents first, so background work only claims a workspace nothing else holds running.
+    const ordered = [...backgroundActivity].sort(
+      (a, b) => Number(a.source === "background_work") - Number(b.source === "background_work"),
+    );
+    for (const activity of ordered) {
       const parent = activeAgentsById.get(activity.agentId);
       if (!parent) {
         continue;
@@ -377,6 +385,7 @@ export class WorkspaceDirectory {
         getWorkspaceStateBucketPriority(descriptor.status)
       ) {
         descriptor.status = "running";
+        if (activity.source === "background_work") descriptor.runningFromBackgroundWork = true;
       }
       const entries = activityEntriesByWorkspaceId.get(workspaceId) ?? [];
       entries.push({ bucket: "running", changedAtIso: activity.changedAtIso });

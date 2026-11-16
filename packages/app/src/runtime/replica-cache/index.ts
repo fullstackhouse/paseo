@@ -323,6 +323,8 @@ const StoredWorkspaceSchema = z.strictObject({
   // current on reconnect, so the daemon has nothing newer to send back.
   labels: z.array(z.string()).optional(),
   status: z.enum(["needs_input", "failed", "running", "attention", "done"]),
+  // Optional because entries cached before the flag existed have none.
+  runningFromBackgroundWork: z.boolean().optional(),
   statusEnteredAt: IsoDateSchema.nullable(),
   activityAt: z.null(),
   archivingAt: z.string().nullable(),
@@ -721,6 +723,7 @@ function serializeWorkspace(workspace: WorkspaceDescriptor): StoredWorkspace {
     snoozedUntil: workspace.snoozedUntil ?? null,
     labels: workspace.labels,
     status: workspace.status,
+    runningFromBackgroundWork: workspace.runningFromBackgroundWork ?? false,
     statusEnteredAt: workspace.statusEnteredAt?.toISOString() ?? null,
     activityAt: null,
     archivingAt: workspace.archivingAt,

@@ -7,6 +7,8 @@ import { applyReportedWork, useReportedWorkLookup, type ReportedWorkLookup } fro
 
 interface EffectiveWorkspaceStatus {
   status: WorkspaceDescriptor["status"];
+  /** Running only because an idle agent's background shells or monitors are live. */
+  runningFromBackgroundWork?: boolean;
   enteredAt: Date | null;
 }
 
@@ -31,7 +33,11 @@ function deriveTurnWorkspaceStatus(input: {
   workspaceAgentActivity?: ReadonlyMap<string, WorkspaceAgentActivity>;
 }): EffectiveWorkspaceStatus {
   if (input.workspace.status !== "done") {
-    return { status: input.workspace.status, enteredAt: input.workspace.statusEnteredAt };
+    return {
+      status: input.workspace.status,
+      runningFromBackgroundWork: input.workspace.runningFromBackgroundWork,
+      enteredAt: input.workspace.statusEnteredAt,
+    };
   }
 
   const pendingStartedAt = getPendingInitialAgentCreateStartedAt({
