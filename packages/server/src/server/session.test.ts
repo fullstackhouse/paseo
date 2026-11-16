@@ -51,7 +51,11 @@ import { WorkspaceLabelError, type WorkspaceLabelService } from "./workspace-lab
 import { createPersistedProjectRecord } from "./workspace-registry.js";
 import { deriveProjectKey } from "./project-key.js";
 import type { SessionOptions } from "./session.js";
-import type { SessionInboundMessage, SessionOutboundMessage } from "./messages.js";
+import type {
+  ProviderSubagentEventFilter,
+  SessionInboundMessage,
+  SessionOutboundMessage,
+} from "./messages.js";
 import {
   asSessionInternals as asSessionInternalsHelper,
   asAgentManager,
@@ -6394,4 +6398,94 @@ test("filters provider subagent updates by parent agent and kind for subscriptio
     }),
     expect.objectContaining({ kind: "remove", subagentId: "sub-agent-a" }),
   ]);
+});
+
+test("applies each subscription's own provider subagent filter, and none when it has none", async () => {
+  const messages: SessionOutboundMessage[] = [];
+  const targetedMessages: Array<{ source: object; message: SessionOutboundMessage }> = [];
+  const agentEventListeners: Array<(event: AgentManagerEvent) => void> = [];
+  const session = createSessionForTest({
+    messages,
+    targetedMessages,
+    agentManager: {
+      getAgent: vi.fn(() => null),
+      subscribe: vi.fn((listener: (event: AgentManagerEvent) => void) => {
+        agentEventListeners.push(listener);
+        return () => {};
+      }),
+    },
+  });
+  const subscribe = async (providerSubagentFilter?: ProviderSubagentEventFilter) => {
+    const socket = {};
+    session.updateClientCapabilities(
+      {
+        [CLIENT_CAPS.ownedSubscriptions]: true,
+        // Timeline rows reach only clients that can render them.
+        [CLIENT_CAPS.projectedSubagentTimeline]: true,
+      },
+      socket,
+    );
+    await session.handleMessage(
+      {
+        type: "session.events.set_subscription.request",
+        requestId: "events",
+        events: ["agent.provider_subagents.update"],
+        ...(providerSubagentFilter ? { providerSubagentFilter } : {}),
+      },
+      socket,
+    );
+    return socket;
+  };
+  const unfiltered = await subscribe();
+  const timelineOnly = await subscribe({ kinds: ["timeline"] });
+  const agentBOnly = await subscribe({ parentAgentIds: ["agent-b"] });
+  if (agentEventListeners.length === 0) throw new Error("Agent event listener was not installed");
+  targetedMessages.length = 0;
+  const forward = (event: AgentManagerEvent) => {
+    for (const listener of agentEventListeners) listener(event);
+  };
+  const subagent = (parentAgentId: string) => ({
+    id: `sub-${parentAgentId}`,
+    parentAgentId,
+    parentSubagentId: null,
+    provider: "claude" as const,
+    title: null,
+    description: null,
+    status: "running" as const,
+    createdAt: "2026-11-15T10:00:00.000Z",
+    updatedAt: "2026-11-15T10:00:00.000Z",
+    toolCallId: null,
+  });
+
+  forward({ type: "provider_subagent", event: { type: "upsert", subagent: subagent("agent-a") } });
+  forward({ type: "provider_subagent", event: { type: "upsert", subagent: subagent("agent-b") } });
+  forward({
+    type: "provider_subagent",
+    event: {
+      type: "timeline",
+      parentAgentId: "agent-a",
+      subagentId: "sub-agent-a",
+      provider: "claude",
+      epoch: "epoch-1",
+      row: {
+        seq: 1,
+        timestamp: "2026-11-15T10:00:01.000Z",
+        item: { type: "assistant_message", text: "working" },
+      },
+    },
+  } as AgentManagerEvent);
+  forward({
+    type: "provider_subagent",
+    event: { type: "remove", parentAgentId: "agent-a", subagentId: "sub-agent-a" },
+  });
+
+  const kindsFor = (socket: object) =>
+    targetedMessages.flatMap(({ source, message }) =>
+      source === socket && message.type === "agent.provider_subagents.update"
+        ? [message.payload.kind]
+        : [],
+    );
+  expect(kindsFor(unfiltered)).toEqual(["upsert", "upsert", "timeline", "remove"]);
+  expect(kindsFor(timelineOnly)).toEqual(["timeline"]);
+  expect(kindsFor(agentBOnly)).toEqual(["upsert"]);
 });

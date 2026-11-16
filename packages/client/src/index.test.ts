@@ -2358,3 +2358,39 @@ test("agent handle subscriptions report a refused subscription to onError", asyn
   consoleError.mockRestore();
   await client.close();
 });
+
+test("agent handle subscriptions stay silent about a refusal that arrives after unsubscribe", async () => {
+  const { client, ws } = await connectClient({
+    ...PROVIDER_SUBAGENT_FEATURES,
+    ...BACKGROUND_WORK_FEATURES,
+  });
+  const errors: unknown[] = [];
+  const agent = client.agents.ref("agent-a");
+  const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+  try {
+    const stopSubagents = agent.providerSubagents.subscribe(() => {}, {
+      onError: (error) => errors.push(error),
+    });
+    const subagentRequest = parseSentSessionMessage(ws.sent.at(-1));
+    const stopBackgroundWork = agent.backgroundWork.subscribe(() => {}, {
+      onError: (error) => errors.push(error),
+    });
+    const backgroundWorkRequest = parseSentSessionMessage(ws.sent.at(-1));
+    stopSubagents();
+    stopBackgroundWork();
+    for (const request of [subagentRequest, backgroundWorkRequest]) {
+      ws.message(
+        sessionMessage({
+          type: "rpc_error",
+          payload: { requestId: request.requestId, error: "Denied", code: "access_denied" },
+        }),
+      );
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(errors).toEqual([]);
+  } finally {
+    consoleError.mockRestore();
+  }
+  await client.close();
+});
