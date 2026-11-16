@@ -18,4 +18,19 @@ describe("toBackgroundWorkInputs", () => {
       { id: "bash-2", kind: "shell", description: null },
     ]);
   });
+
+  test("tags tasks a Monitor call started as monitors", () => {
+    expect(
+      toBackgroundWorkInputs(
+        [
+          { task_id: "bash-1", task_type: "local_bash", description: "npm run dev" },
+          { task_id: "watch-1", task_type: "local_bash", description: "CI checks" },
+        ],
+        new Set(["watch-1"]),
+      ),
+    ).toEqual([
+      { id: "bash-1", kind: "shell", description: "npm run dev" },
+      { id: "watch-1", kind: "monitor", description: "CI checks" },
+    ]);
+  });
 });

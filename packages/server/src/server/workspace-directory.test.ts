@@ -10,10 +10,8 @@ import type { AgentSnapshotPayload, WorkspaceDescriptorPayload } from "./message
 import { WorkspaceDirectory } from "./workspace-directory.js";
 import type { PersistedProjectRecord, PersistedWorkspaceRecord } from "./workspace-registry.js";
 import type { TerminalActivity } from "@getpaseo/protocol/terminal-activity";
-import type {
-  AgentBackgroundWorkActivity,
-  ProviderSubagentWorkspaceActivity,
-} from "./workspace-directory.js";
+import type { ProviderSubagentWorkspaceActivity } from "./workspace-directory.js";
+import type { AgentBackgroundWorkActivity } from "./agent/background-work/store.js";
 
 const NOW = "2026-03-01T12:00:00.000Z";
 
@@ -148,8 +146,12 @@ class WorkspaceStatus {
     );
   }
 
-  hasBackgroundWork(input: AgentBackgroundWorkActivity): void {
-    this.backgroundWork.push(input);
+  hasBackgroundWork(input: Omit<AgentBackgroundWorkActivity, "waitsOnWork">): void {
+    this.backgroundWork.push({ ...input, waitsOnWork: false });
+  }
+
+  hasMonitor(input: Omit<AgentBackgroundWorkActivity, "waitsOnWork">): void {
+    this.backgroundWork.push({ ...input, waitsOnWork: true });
   }
 
   hasProviderSubagent(input: ProviderSubagentWorkspaceActivity): void {
@@ -486,6 +488,17 @@ describe("WorkspaceDirectory", () => {
       status: "running",
       updatedAt: "2026-03-01T12:02:00.000Z",
     });
+
+    const descriptor = await workspace.workspaceDescriptor();
+    expect(descriptor.status).toBe("running");
+    expect(descriptor.runningFromBackgroundWork).toBeUndefined();
+  });
+
+  test("an agent waiting on a monitor is not background-only running", async () => {
+    const workspace = new WorkspaceStatus();
+
+    workspace.hasRootAgent({ id: "parent-agent", status: "idle" });
+    workspace.hasMonitor({ agentId: "parent-agent", startedAt: "2026-03-01T12:01:00.000Z" });
 
     const descriptor = await workspace.workspaceDescriptor();
     expect(descriptor.status).toBe("running");

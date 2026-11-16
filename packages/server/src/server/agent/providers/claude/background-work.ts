@@ -11,20 +11,24 @@ export interface ClaudeBackgroundTask {
 /** Subagents and workflows already live in the subagents track. */
 const SUBAGENT_TASK_TYPES = new Set([CLAUDE_SUBAGENT_TASK_TYPE, CLAUDE_WORKFLOW_TASK_TYPE]);
 
-/** Maps `background_tasks_changed.tasks` to provider-agnostic background work. */
+/**
+ * Maps `background_tasks_changed.tasks` to provider-agnostic background work. `monitorTaskIds` are
+ * the tasks a `Monitor` call started (from `task_started.tool_use_id`): they report as `local_bash`
+ * like shells, but the agent is waiting on them, so they get their own kind.
+ */
 export function toBackgroundWorkInputs(
   tasks: readonly ClaudeBackgroundTask[],
+  monitorTaskIds: ReadonlySet<string> = new Set(),
 ): AgentBackgroundWorkInput[] {
   return tasks
     .filter((task) => !SUBAGENT_TASK_TYPES.has(task.task_type))
     .map((task) => ({
       id: task.task_id,
-      kind: toKind(task.task_type),
+      kind: monitorTaskIds.has(task.task_id) ? "monitor" : toKind(task.task_type),
       description: readDescription(task.description),
     }));
 }
 
-/** Claude Monitor watches report as `local_bash`, so they map to "shell" too. */
 function toKind(taskType: string): string {
   if (taskType === "local_bash") return "shell";
   return "other";

@@ -1,6 +1,6 @@
 export interface AgentBackgroundWorkInput {
   id: string;
-  /** Open string: "shell" or "other" today (Claude Monitor watches report as "shell"). */
+  /** Open string: "shell", "monitor" (a watch the agent waits on) or "other" today. */
   kind: string;
   description: string | null;
 }
@@ -14,6 +14,12 @@ export interface AgentBackgroundWorkItem extends AgentBackgroundWorkInput {
  * replaces it. `startedAt` is stamped the first time an id is seen and kept while it stays listed.
  * Nothing is persisted: the work dies with the provider process.
  */
+export interface AgentBackgroundWorkActivity {
+  agentId: string;
+  startedAt: string;
+  waitsOnWork: boolean;
+}
+
 export class AgentBackgroundWorkStore {
   private readonly items = new Map<string, AgentBackgroundWorkItem[]>();
 
@@ -46,14 +52,18 @@ export class AgentBackgroundWorkStore {
     return [...(this.items.get(agentId) ?? [])];
   }
 
-  /** Agents with at least one live item, each with the start of its oldest item. */
-  listActive(): Array<{ agentId: string; startedAt: string }> {
+  /**
+   * Agents with at least one live item, each with the start of its oldest item and whether any item
+   * is a monitor (the agent ended its turn to wait on it, rather than leaving a process running).
+   */
+  listActive(): AgentBackgroundWorkActivity[] {
     return Array.from(this.items, ([agentId, items]) => ({
       agentId,
       startedAt: items.reduce(
         (oldest, item) => (item.startedAt < oldest ? item.startedAt : oldest),
         items[0].startedAt,
       ),
+      waitsOnWork: items.some((item) => item.kind === "monitor"),
     }));
   }
 

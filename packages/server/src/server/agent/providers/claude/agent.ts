@@ -2332,6 +2332,8 @@ class ClaudeAgentSession implements AgentSession {
   private planResumeMode: PermissionMode | null = null;
   private availableModes: AgentMode[] = DEFAULT_MODES;
   private toolUseCache = new Map<string, ToolUseCacheEntry>();
+  /** Background tasks a `Monitor` call started; Claude reports them as `local_bash` like shells. */
+  private readonly monitorTaskIds = new Set<string>();
   private toolUseIndexToId = new Map<number, string>();
   private toolUseInputBuffers = new Map<string, string>();
   private subagentHandbackIds = new Set<string>();
@@ -4146,6 +4148,7 @@ class ClaudeAgentSession implements AgentSession {
   }
 
   private failRunningRuntimeTasks(): void {
+    this.monitorTaskIds.clear();
     this.dispatchEvents([
       ...foldSubagentObservations(this.taskProtocolSource.failRunningTasks()).map(
         (event): AgentStreamEvent => ({ type: "provider_subagent", provider: "claude", event }),
@@ -4592,6 +4595,7 @@ class ClaudeAgentSession implements AgentSession {
 
     const events: AgentStreamEvent[] = [];
     this.appendTaskStateEvent(message, events);
+    this.recordMonitorTask(message);
 
     // Subagent identity and lifecycle are announced by Claude Code's task protocol, so they are
     // read rather than inferred from sidechain frames. `task_started` precedes the child's first
@@ -4852,15 +4856,28 @@ class ClaudeAgentSession implements AgentSession {
         { tasks: message.tasks.map(({ task_id, task_type }) => ({ task_id, task_type })) },
         "claude.background_tasks_changed",
       );
+      const liveTaskIds = new Set(message.tasks.map((task) => task.task_id));
+      for (const taskId of this.monitorTaskIds) {
+        if (!liveTaskIds.has(taskId)) this.monitorTaskIds.delete(taskId);
+      }
       events.push({
         type: "background_work",
         provider: "claude",
-        items: toBackgroundWorkInputs(message.tasks),
+        items: toBackgroundWorkInputs(message.tasks, this.monitorTaskIds),
       });
       return;
     }
     if (message.subtype === "task_progress") {
       return;
+    }
+  }
+
+  /** `task_started` names the tool call that started a task; a `Monitor` call means a watch. */
+  private recordMonitorTask(message: SDKMessage): void {
+    if (message.type !== "system" || message.subtype !== "task_started") return;
+    const toolUseId = message.tool_use_id;
+    if (toolUseId && this.toolUseCache.get(toolUseId)?.name === "Monitor") {
+      this.monitorTaskIds.add(message.task_id);
     }
   }
 

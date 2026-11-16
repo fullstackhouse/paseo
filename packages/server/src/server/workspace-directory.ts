@@ -20,6 +20,7 @@ import {
   type TerminalActivity,
 } from "@getpaseo/protocol/terminal-activity";
 import type { ProviderSubagentDescriptor } from "./agent/provider-subagents/store.js";
+import type { AgentBackgroundWorkActivity } from "./agent/background-work/store.js";
 
 const FETCH_WORKSPACES_SORT_KEYS = [
   "status_priority",
@@ -68,18 +69,12 @@ export type ProviderSubagentWorkspaceActivity = Pick<
   "parentAgentId" | "status" | "updatedAt"
 >;
 
-/** An agent with live background work (a background shell, a monitor). */
-export interface AgentBackgroundWorkActivity {
-  agentId: string;
-  startedAt: string;
-}
-
 /** Work an agent runs after its turn ends; its workspace stays running until it stops. */
 interface BackgroundActivity {
   agentId: string;
   changedAtIso: string;
-  /** A running subagent is work; a background shell or monitor may be a long-lived server. */
-  source: "subagent" | "background_work";
+  /** Subagents and monitors are work the agent waits on; a background shell may be a server. */
+  source: "subagent" | "monitor" | "background_work";
 }
 
 export interface WorkspaceDirectoryDeps {
@@ -310,7 +305,7 @@ export class WorkspaceDirectory {
         ...backgroundWorkActivity.map((work) => ({
           agentId: work.agentId,
           changedAtIso: work.startedAt,
-          source: "background_work" as const,
+          source: work.waitsOnWork ? ("monitor" as const) : ("background_work" as const),
         })),
       ],
       descriptorsByWorkspaceId,
@@ -362,7 +357,8 @@ export class WorkspaceDirectory {
     } = params;
     const activeAgentsById = new Map(activeAgents.map((agent) => [agent.id, agent] as const));
 
-    // Subagents first, so background work only claims a workspace nothing else holds running.
+    // Work the agent waits on first, so a background shell only claims a workspace nothing else
+    // holds running.
     const ordered = [...backgroundActivity].sort(
       (a, b) => Number(a.source === "background_work") - Number(b.source === "background_work"),
     );

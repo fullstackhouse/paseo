@@ -92,13 +92,20 @@ describe("AgentBackgroundWorkStore", () => {
       ],
       T1,
     );
-    store.apply("agent-b", [{ id: "bash-3", kind: "shell", description: null }], T1);
+    store.apply(
+      "agent-b",
+      [
+        { id: "bash-3", kind: "shell", description: null },
+        { id: "watch-1", kind: "monitor", description: "CI" },
+      ],
+      T1,
+    );
     store.apply("agent-c", [{ id: "bash-4", kind: "shell", description: null }], T0);
     store.clear("agent-c");
 
     expect(store.listActive()).toEqual([
-      { agentId: "agent-a", startedAt: T0 },
-      { agentId: "agent-b", startedAt: T1 },
+      { agentId: "agent-a", startedAt: T0, waitsOnWork: false },
+      { agentId: "agent-b", startedAt: T1, waitsOnWork: true },
     ]);
   });
 });
