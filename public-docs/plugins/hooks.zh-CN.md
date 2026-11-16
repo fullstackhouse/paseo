@@ -47,22 +47,23 @@ Paseo 只观察返回的 Promise，因此独立任务没有错误报告，也没
 
 ## 钩子一览 {#hooks}
 
-| 钩子                      | 等待 | 载荷                               | 可修改                                    |
-| ------------------------- | ---- | ---------------------------------- | ----------------------------------------- |
-| `workspace.create.before` | 是   | `{ request }`                      | 整个创建请求                              |
-| `workspace.create.after`  | 否   | `{ workspace }`                    |                                           |
-| `workspace.archive.after` | 否   | `{ workspace }`                    |                                           |
-| `worktree.create.before`  | 是   | `{ request }`                      | 创建选项和目标路径                        |
-| `worktree.create.after`   | 是   | `{ worktree }`                     | worktree 中的文件；抛出错误中止创建       |
-| `agent.create.before`     | 是   | `{ request: { config, env? } }`    | 除 `cwd` 外的已保存配置；`env`            |
-| `agent.create.after`      | 否   | `{ agent }`                        |                                           |
-| `agent.open.before`       | 是   | `{ request }`                      | 仅用于启动的 `env`、`tools`、`mcpServers` |
-| `agent.close.after`       | 否   | `{ agent }`                        |                                           |
-| `agent.archive.after`     | 否   | `{ agent, archivedAt }`            |                                           |
-| `agent.turn.before`       | 否   | `{ agent, turnId }`                |                                           |
-| `agent.turn.after`        | 否   | `{ agent, turnId, outcome }`       |                                           |
-| `agent.permission.before` | 否   | `{ agent, request }`               |                                           |
-| `agent.permission.after`  | 否   | `{ agent, requestId, resolution }` |                                           |
+| 钩子                         | 等待 | 载荷                               | 可修改                                    |
+| ---------------------------- | ---- | ---------------------------------- | ----------------------------------------- |
+| `workspace.create.before`    | 是   | `{ request }`                      | 整个创建请求                              |
+| `workspace.create.after`     | 否   | `{ workspace }`                    |                                           |
+| `workspace.archive.after`    | 否   | `{ workspace }`                    |                                           |
+| `worktree.create.before`     | 是   | `{ request }`                      | 创建选项和目标路径                        |
+| `worktree.create.after`      | 是   | `{ worktree }`                     | worktree 中的文件；抛出错误中止创建       |
+| `agent.create.before`        | 是   | `{ request: { config, env? } }`    | 除 `cwd` 外的已保存配置；`env`            |
+| `agent.create.after`         | 否   | `{ agent }`                        |                                           |
+| `agent.open.before`          | 是   | `{ request }`                      | 仅用于启动的 `env`、`tools`、`mcpServers` |
+| `agent.close.after`          | 否   | `{ agent }`                        |                                           |
+| `agent.archive.after`        | 否   | `{ agent, archivedAt }`            |                                           |
+| `agent.turn.before`          | 否   | `{ agent, turnId }`                |                                           |
+| `agent.turn.after`           | 否   | `{ agent, turnId, outcome }`       |                                           |
+| `agent.permission.before`    | 否   | `{ agent, request }`               |                                           |
+| `agent.permission.after`     | 否   | `{ agent, requestId, resolution }` |                                           |
+| `schedule.run.finish.before` | 是   | `{ request }`                      | 仅 `attention`                            |
 
 ## 共享载荷 {#shared-payloads}
 
@@ -571,6 +572,18 @@ server.addHook("agent.permission.after", async ({ agent, requestId, resolution }
 ```
 
 Agent 钩子不包括 daemon 的私有临时辅助 Agent。公开的后台工作区及其普通 Agent 使用相同钩子。
+
+## schedule.run.finish.before {#schedulerunfinishbefore}
+
+计划运行的 Agent 结束本轮、Paseo 即将记录这次运行时触发。请求为 `{ schedule: { id, name }, runId, agent, attention }`。`attention` 为 `null`，或在 Agent 停在权限提示时为 `{ reason: "permission", message }`。运行需要人处理时，返回把 `attention` 设为 `{ reason: "plugin", message }` 的请求：Paseo 会保留该运行的工作区而不归档，并在计划页面的 **Needs you** 中列出它。只能修改 `attention`，`message` 最多 500 个字符。钩子失败时保留 daemon 自己的 attention。Paseo 不会为 `plugin` attention 发通知，需要时请自行发送。需要 `server_info.features.scheduleRunAttention`。旧版主机会拒绝这个钩子名，请在 `try` 中注册。
+
+```ts
+server.addHook("schedule.run.finish.before", async ({ request }) => {
+  const open = await countOpenItems(request.agent.id);
+  if (open === 0) return;
+  return { ...request, attention: { reason: "plugin", message: `${open} open items` } };
+});
+```
 
 ## 顺序与返回值 {#ordering-and-returned-values}
 
