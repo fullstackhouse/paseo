@@ -99,6 +99,15 @@ export const ScheduleUpdateRequestSchema = z.object({
   expiresAt: z.string().nullable().optional(),
 });
 
+// COMPAT(scheduleRunAttention): FSH-only, added after v0.15.4, remove gate after 2027-05-16.
+// Marks a run's attention resolved, so it leaves "Needs you".
+export const ScheduleRunResolveRequestSchema = z.object({
+  type: z.literal("schedule.run.resolve.request"),
+  requestId: z.string(),
+  scheduleId: z.string(),
+  runId: z.string(),
+});
+
 export const ScheduleCreateResponseSchema = z.object({
   type: z.literal("schedule/create/response"),
   payload: z.object({
@@ -176,6 +185,15 @@ export const ScheduleUpdateResponseSchema = z.object({
   payload: z.object({
     requestId: z.string(),
     schedule: StoredScheduleSchema.nullable(),
+    error: z.string().nullable(),
+  }),
+});
+
+export const ScheduleRunResolveResponseSchema = z.object({
+  type: z.literal("schedule.run.resolve.response"),
+  payload: z.object({
+    requestId: z.string(),
+    schedule: ScheduleSummarySchema.nullable(),
     error: z.string().nullable(),
   }),
 });

@@ -1345,6 +1345,9 @@ export const en = {
     pinned: {
       title: "Pinned",
     },
+    schedules: {
+      needsYou: "Scheduled runs need you: {{count}}",
+    },
     snoozed: {
       title: "Snoozed",
       blocked: "Waiting on you: {{count}}",

@@ -398,3 +398,26 @@ test("session-open instructions compose, survive old hooks, and are ignored for 
   );
   expect(history).not.toHaveProperty("appendSystemPrompt");
 });
+
+test("schedule run finish hooks set attention but cannot change the run they describe", async () => {
+  const request = {
+    schedule: { id: "sched-1", name: "Weekly" },
+    runId: "run-1",
+    agent: {
+      id: "agent-1",
+      workspaceId: "wks_1",
+      parentAgentId: null,
+      provider: "claude",
+      cwd: "/project",
+      title: null,
+    },
+    attention: null,
+  };
+  const flagged = { ...request, attention: { reason: "plugin" as const, message: "2 open asks" } };
+  await expect(
+    validateBeforeResult("schedule.run.finish.before", request, flagged),
+  ).resolves.toEqual(flagged);
+  await expect(
+    validateBeforeResult("schedule.run.finish.before", request, { ...flagged, runId: "run-2" }),
+  ).rejects.toThrow("can only change attention");
+});

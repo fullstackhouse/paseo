@@ -273,3 +273,28 @@ export function useScheduleMutations({
     isRunningNow: runNowMutation.isPending,
   };
 }
+
+/** Dismisses a scheduled run from Needs you, on whichever host it ran. */
+export function useResolveScheduleRun(): {
+  resolveRun: (input: { serverId: string; scheduleId: string; runId: string }) => Promise<void>;
+  isResolving: boolean;
+} {
+  const queryClient = useQueryClient();
+  const { t } = useTranslation();
+  const mutation = useMutation({
+    mutationFn: async (input: { serverId: string; scheduleId: string; runId: string }) => {
+      const client = requireClient(input.serverId, t("common.errors.daemonClientUnavailable"));
+      const payload = await client.scheduleRunResolve({
+        scheduleId: input.scheduleId,
+        runId: input.runId,
+      });
+      if (payload.error) {
+        throw new Error(payload.error);
+      }
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: schedulesQueryBaseKey });
+    },
+  });
+  return { resolveRun: mutation.mutateAsync, isResolving: mutation.isPending };
+}

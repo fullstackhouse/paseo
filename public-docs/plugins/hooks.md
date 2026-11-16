@@ -65,6 +65,7 @@ Paseo only sees the returned promise, so detached work gets no error reporting a
 | `agent.turn.after`        | no    | `{ agent, turnId, outcome }`              |                                                                |
 | `agent.permission.before` | no    | `{ agent, request }`                      |                                                                |
 | `agent.permission.after`  | no    | `{ agent, requestId, resolution }`        |                                                                |
+| `schedule.run.finish.before` | yes   | `{ request }`                      | `attention` only                               |
 
 ## Shared payloads
 
@@ -653,6 +654,18 @@ server.addHook("agent.turn.after", async ({ agent }) => {
 ```
 
 `background` is fixed when the agent is created and a hook cannot change it. An agent created in a background workspace without `background: true` reads `false`. Hosts older than 0.16.0 omit the field, so it reads as `undefined`.
+
+## schedule.run.finish.before
+
+A scheduled run's agent finished its turn, and Paseo is about to record the run. The request is `{ schedule: { id, name }, runId, agent, attention }`. `attention` is `null`, or `{ reason: "permission", message }` when the agent stopped on a permission prompt. Return a request with `attention` set to `{ reason: "plugin", message }` when the run needs a human. Paseo then keeps the run's workspace instead of archiving it and lists the run under **Needs you** on the Schedules screen. Only `attention` may change, and `message` is at most 500 characters. A failing hook leaves the daemon's own attention in place. Paseo doesn't notify for `plugin` attention, so send your own notification if the run needs one. Needs `server_info.features.scheduleRunAttention`. Older hosts reject the hook name, so register it inside `try`.
+
+```ts
+server.addHook("schedule.run.finish.before", async ({ request }) => {
+  const open = await countOpenItems(request.agent.id);
+  if (open === 0) return;
+  return { ...request, attention: { reason: "plugin", message: `${open} open items` } };
+});
+```
 
 ## Ordering and returned values
 

@@ -52,6 +52,37 @@ describe("describeScheduleRun", () => {
     expect(describeScheduleRun(run({ output: null }), NOW).output).toBeNull();
   });
 
+  it("marks a run that needs you until its attention is resolved", () => {
+    const flagged = run({
+      attention: { reason: "plugin", message: " 2 open asks ", resolvedAt: null },
+    });
+    expect(describeScheduleRun(flagged, NOW).badge).toEqual({
+      label: "Needs you",
+      variant: "warning",
+    });
+    expect(describeScheduleRun(flagged, NOW).attentionMessage).toBe("2 open asks");
+
+    const resolved = run({
+      attention: { reason: "plugin", message: "2 open asks", resolvedAt: NOW.toISOString() },
+    });
+    expect(describeScheduleRun(resolved, NOW).badge.label).toBe("Succeeded");
+    expect(describeScheduleRun(resolved, NOW).attentionMessage).toBeNull();
+  });
+
+  it("shows a failed run that needs you through its error, not twice", () => {
+    const failed = describeScheduleRun(
+      run({
+        status: "failed",
+        error: "boom",
+        attention: { reason: "failed", message: "boom", resolvedAt: null },
+      }),
+      NOW,
+    );
+    expect(failed.badge.label).toBe("Needs you");
+    expect(failed.error).toBe("boom");
+    expect(failed.attentionMessage).toBeNull();
+  });
+
   it("treats a missing workspace as null", () => {
     expect(describeScheduleRun(run({ workspaceId: undefined }), NOW).workspaceId).toBeNull();
   });

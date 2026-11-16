@@ -732,6 +732,10 @@ type ScheduleUpdatePayload = Extract<
   SessionOutboundMessage,
   { type: "schedule/update/response" }
 >["payload"];
+type ScheduleRunResolvePayload = Extract<
+  SessionOutboundMessage,
+  { type: "schedule.run.resolve.response" }
+>["payload"];
 export type FetchAgentTimelinePayload = FetchAgentTimelineResponseMessage["payload"];
 export type AgentForkContextPayload = AgentForkContextResponseMessage["payload"];
 
@@ -7559,6 +7563,27 @@ export class DaemonClient {
         ...(options.expiresAt !== undefined ? { expiresAt: options.expiresAt } : {}),
       },
       responseType: "schedule/update/response",
+    });
+  }
+
+  /** Marks a scheduled run's attention resolved so it leaves "Needs you". */
+  async scheduleRunResolve(options: {
+    scheduleId: string;
+    runId: string;
+    requestId?: string;
+  }): Promise<ScheduleRunResolvePayload> {
+    // COMPAT(scheduleRunAttention): FSH-only, added after v0.15.4, remove gate after 2027-05-16.
+    if (this.lastServerInfoMessage?.features?.scheduleRunAttention !== true) {
+      throw new Error("Update the host to dismiss scheduled runs.");
+    }
+    return this.sendCorrelatedSessionRequest({
+      requestId: options.requestId,
+      message: {
+        type: "schedule.run.resolve.request",
+        scheduleId: options.scheduleId,
+        runId: options.runId,
+      },
+      responseType: "schedule.run.resolve.response",
     });
   }
 

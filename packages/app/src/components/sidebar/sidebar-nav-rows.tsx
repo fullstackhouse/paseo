@@ -2,9 +2,10 @@ import { router, usePathname } from "expo-router";
 import { CalendarClock, History, Plus, Search } from "lucide-react-native";
 import { memo, useCallback, useMemo, useRef, type ComponentType, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { View, type StyleProp, type ViewStyle } from "react-native";
+import { Text, View, type StyleProp, type ViewStyle } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { SidebarHeaderRow } from "@/components/sidebar/sidebar-header-row";
+import { useScheduleAttention } from "@/hooks/use-schedules";
 import { useShortcutKeys } from "@/hooks/use-shortcut-keys";
 import { PluginSidebarItem } from "@/plugins/sidebar-items";
 import { canCreateWorktreeForProjectKind } from "@/projects/host-projects";
@@ -178,6 +179,12 @@ function SidebarSchedulesRow({ onBeforeNavigate }: SidebarNavRowProps) {
     router.push(buildSchedulesRoute());
   }, [onBeforeNavigate]);
 
+  const attentionCount = useScheduleAttention().length;
+  const trailing = useMemo(
+    () => (attentionCount > 0 ? <SchedulesAttentionCount count={attentionCount} /> : undefined),
+    [attentionCount],
+  );
+
   return (
     <SidebarHeaderRow
       icon={CalendarClock}
@@ -186,7 +193,22 @@ function SidebarSchedulesRow({ onBeforeNavigate }: SidebarNavRowProps) {
       isActive={pathname.includes("/schedules")}
       testID="sidebar-schedules"
       variant="compact"
+      trailing={trailing}
     />
+  );
+}
+
+/** Scheduled runs waiting on you, across hosts. */
+function SchedulesAttentionCount({ count }: { count: number }) {
+  const { t } = useTranslation();
+  return (
+    <Text
+      style={styles.attentionCount}
+      accessibilityLabel={t("sidebar.schedules.needsYou", { count })}
+      testID="sidebar-schedules-needs-you-count"
+    >
+      {count}
+    </Text>
   );
 }
 
@@ -197,7 +219,12 @@ const BUILTIN_ROWS: Record<BuiltinSidebarNavId, ComponentType<SidebarNavRowProps
   schedules: SidebarSchedulesRow,
 };
 
-const styles = StyleSheet.create({
+const styles = StyleSheet.create((theme) => ({
+  attentionCount: {
+    color: theme.colors.statusDotWarning,
+    fontSize: theme.fontSize.sm,
+    fontWeight: theme.fontWeight.semibold,
+  },
   firstRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -206,4 +233,4 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
   },
-});
+}));

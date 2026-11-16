@@ -63,6 +63,7 @@ Paseo 只观察返回的 Promise，因此独立任务没有错误报告，也没
 | `agent.turn.after`        | 否   | `{ agent, turnId, outcome }`              |                                                                 |
 | `agent.permission.before` | 否   | `{ agent, request }`                      |                                                                 |
 | `agent.permission.after`  | 否   | `{ agent, requestId, resolution }`        |                                                                 |
+| `schedule.run.finish.before` | 是   | `{ request }`                      | 仅 `attention`                            |
 
 ## 共享载荷 {#shared-payloads}
 
@@ -637,6 +638,18 @@ server.addHook("agent.turn.after", async ({ agent }) => {
 ```
 
 `background` 在创建 Agent 时确定，钩子无法修改。在后台工作区中创建但没有传 `background: true` 的 Agent 读取到 `false`。早于 0.16.0 的主机不发送该字段，读取结果为 `undefined`。
+
+## schedule.run.finish.before {#schedulerunfinishbefore}
+
+计划运行的 Agent 结束本轮、Paseo 即将记录这次运行时触发。请求为 `{ schedule: { id, name }, runId, agent, attention }`。`attention` 为 `null`，或在 Agent 停在权限提示时为 `{ reason: "permission", message }`。运行需要人处理时，返回把 `attention` 设为 `{ reason: "plugin", message }` 的请求：Paseo 会保留该运行的工作区而不归档，并在计划页面的 **Needs you** 中列出它。只能修改 `attention`，`message` 最多 500 个字符。钩子失败时保留 daemon 自己的 attention。Paseo 不会为 `plugin` attention 发通知，需要时请自行发送。需要 `server_info.features.scheduleRunAttention`。旧版主机会拒绝这个钩子名，请在 `try` 中注册。
+
+```ts
+server.addHook("schedule.run.finish.before", async ({ request }) => {
+  const open = await countOpenItems(request.agent.id);
+  if (open === 0) return;
+  return { ...request, attention: { reason: "plugin", message: `${open} open items` } };
+});
+```
 
 ## 顺序与返回值 {#ordering-and-returned-values}
 

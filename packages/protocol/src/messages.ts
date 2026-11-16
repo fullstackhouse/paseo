@@ -78,6 +78,7 @@ import {
   ScheduleDeleteRequestSchema,
   ScheduleRunOnceRequestSchema,
   ScheduleUpdateRequestSchema,
+  ScheduleRunResolveRequestSchema,
   ScheduleCreateResponseSchema,
   ScheduleListResponseSchema,
   ScheduleInspectResponseSchema,
@@ -87,6 +88,7 @@ import {
   ScheduleDeleteResponseSchema,
   ScheduleRunOnceResponseSchema,
   ScheduleUpdateResponseSchema,
+  ScheduleRunResolveResponseSchema,
 } from "./schedule/rpc-schemas.js";
 import {
   SpeechLocalModelsDeleteRequestSchema,
@@ -3918,6 +3920,7 @@ export const SessionInboundMessageSchema = z.discriminatedUnion("type", [
   ScheduleDeleteRequestSchema,
   ScheduleRunOnceRequestSchema,
   ScheduleUpdateRequestSchema,
+  ScheduleRunResolveRequestSchema,
   LoopRunRequestSchema,
   LoopListRequestSchema,
   LoopInspectRequestSchema,
@@ -4197,6 +4200,8 @@ export const ServerInfoStatusPayloadSchema = z
         workspaceSnooze: z.boolean().optional(),
         // COMPAT(workspaceSnoozeWakePrompt): FSH-only, added after v0.13.0, remove gate after 2027-05-10.
         workspaceSnoozeWakePrompt: z.boolean().optional(),
+        // COMPAT(scheduleRunAttention): FSH-only, added after v0.15.4, remove gate after 2027-05-16.
+        scheduleRunAttention: z.boolean().optional(),
         // COMPAT(skillManagement): added in v0.4.0, remove gate after 2027-08-16.
         skillManagement: z.boolean().optional(),
         // COMPAT(idleRuntimeCleanupSetting): added in v0.13.0, remove gate after 2027-04-26.
@@ -8111,6 +8116,7 @@ export const SessionOutboundMessageSchema = z.discriminatedUnion("type", [
   ScheduleDeleteResponseSchema,
   ScheduleRunOnceResponseSchema,
   ScheduleUpdateResponseSchema,
+  ScheduleRunResolveResponseSchema,
   LoopRunResponseSchema,
   LoopListResponseSchema,
   LoopInspectResponseSchema,
@@ -8321,6 +8327,7 @@ export type ScheduleResumeResponse = z.infer<typeof ScheduleResumeResponseSchema
 export type ScheduleDeleteResponse = z.infer<typeof ScheduleDeleteResponseSchema>;
 export type ScheduleRunOnceResponse = z.infer<typeof ScheduleRunOnceResponseSchema>;
 export type ScheduleUpdateResponse = z.infer<typeof ScheduleUpdateResponseSchema>;
+export type ScheduleRunResolveResponse = z.infer<typeof ScheduleRunResolveResponseSchema>;
 export type LoopRunResponse = z.infer<typeof LoopRunResponseSchema>;
 export type LoopListResponse = z.infer<typeof LoopListResponseSchema>;
 export type LoopInspectResponse = z.infer<typeof LoopInspectResponseSchema>;
@@ -8398,6 +8405,7 @@ export type ScheduleResumeRequest = z.infer<typeof ScheduleResumeRequestSchema>;
 export type ScheduleDeleteRequest = z.infer<typeof ScheduleDeleteRequestSchema>;
 export type ScheduleRunOnceRequest = z.infer<typeof ScheduleRunOnceRequestSchema>;
 export type ScheduleUpdateRequest = z.infer<typeof ScheduleUpdateRequestSchema>;
+export type ScheduleRunResolveRequest = z.infer<typeof ScheduleRunResolveRequestSchema>;
 export type LoopRunRequest = z.infer<typeof LoopRunRequestSchema>;
 export type LoopListRequest = z.infer<typeof LoopListRequestSchema>;
 export type LoopInspectRequest = z.infer<typeof LoopInspectRequestSchema>;

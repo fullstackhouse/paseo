@@ -1365,6 +1365,9 @@ export const fr: TranslationResources = {
     pinned: {
       title: "Épinglés",
     },
+    schedules: {
+      needsYou: "Exécutions planifiées qui vous attendent : {{count}}",
+    },
     snoozed: {
       title: "En veille",
       blocked: "En attente de vous : {{count}}",

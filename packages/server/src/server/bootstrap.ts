@@ -10,7 +10,7 @@ import {
 } from "./agent/finish-subscriptions/index.js";
 import { createWorkspaceRuntimeStore } from "./workspace-runtime-store/index.js";
 import type { PluginRegistries } from "@getpaseo/protocol/plugin-registry";
-import { describeHookWorkspace } from "./plugins/lifecycle/index.js";
+import { describeHookAgent, describeHookWorkspace } from "./plugins/lifecycle/index.js";
 import express from "express";
 import { createServer as createHTTPServer, type IncomingMessage, type ServerResponse } from "http";
 import { constants, existsSync, unlinkSync } from "fs";
@@ -1520,8 +1520,38 @@ export async function createPaseoDaemon(
     createDirectoryWorkspace: createScheduleLocalWorkspaceExternal,
     createPaseoWorktreeWorkspace: createSchedulePaseoWorktreeExternal,
     archiveWorkspace: archiveScheduleWorkspaceExternal,
+    resolveRunAttention: async (input) => {
+      const agent = agentManager.getAgent(input.agentId);
+      if (!agent) return input.attention;
+      try {
+        const result = await pluginRuntime.before("schedule.run.finish.before", {
+          schedule: { id: input.schedule.id, name: input.schedule.name },
+          runId: input.runId,
+          agent: describeHookAgent({ ...agent, title: agent.config.title }),
+          attention: input.attention,
+        });
+        return result.attention;
+      } catch (error) {
+        logger.warn(
+          { err: error, scheduleId: input.schedule.id, runId: input.runId },
+          "Plugin schedule.run.finish.before failed; keeping the daemon's attention",
+        );
+        return input.attention;
+      }
+    },
   });
   await scheduleService.start();
+  workspaceRegistry.subscribeToMutations(async (mutation) => {
+    if (mutation.kind !== "archive" || !mutation.workspace) return;
+    try {
+      await scheduleService.resolveRunsForWorkspace(mutation.workspace.workspaceId);
+    } catch (error) {
+      logger.warn(
+        { err: error, workspaceId: mutation.workspace.workspaceId },
+        "Failed to resolve scheduled runs for archived workspace",
+      );
+    }
+  });
 
   const changeRequestWatches = createChangeRequestWatches({
     router: createChangeRequestRouter({ forgeResolver }),

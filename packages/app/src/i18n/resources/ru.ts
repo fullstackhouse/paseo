@@ -1354,6 +1354,9 @@ export const ru: TranslationResources = {
     pinned: {
       title: "Закреплённые",
     },
+    schedules: {
+      needsYou: "Запланированные запуски ждут вас: {{count}}",
+    },
     snoozed: {
       title: "Отложенные",
       blocked: "Ждут вас: {{count}}",

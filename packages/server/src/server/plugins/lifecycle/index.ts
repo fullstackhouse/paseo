@@ -28,6 +28,7 @@ import type {
   PluginHookEvents,
 } from "@getpaseo/plugin/server";
 import { WorkspaceCreateRequestSchema } from "@getpaseo/protocol/messages";
+import { SCHEDULE_RUN_ATTENTION_REASONS } from "@getpaseo/protocol/schedule/types";
 import type { PersistedWorkspaceRecord } from "../../workspace-registry.js";
 
 export type PluginWireBeforeRequests = Omit<PluginHookRequests, "agent.open.before"> & {
@@ -123,6 +124,29 @@ const beforeSchemas = {
     type: true,
     requestId: true,
   }).strict(),
+  "schedule.run.finish.before": z
+    .object({
+      schedule: z.object({ id: z.string(), name: z.string().nullable() }).strict(),
+      runId: z.string(),
+      agent: z
+        .object({
+          id: z.string(),
+          workspaceId: z.string().nullable(),
+          parentAgentId: z.string().nullable(),
+          provider: z.string(),
+          cwd: z.string(),
+          title: z.string().nullable(),
+        })
+        .strict(),
+      attention: z
+        .object({
+          reason: z.enum(SCHEDULE_RUN_ATTENTION_REASONS),
+          message: z.string().max(500).nullable(),
+        })
+        .strict()
+        .nullable(),
+    })
+    .strict(),
 };
 
 const sessionOpenLocalResultSchema = beforeSchemas["agent.open.before"].extend({
@@ -303,6 +327,17 @@ export async function validateBeforeResult<Name extends keyof PluginWireBeforeRe
     const next = beforeSchemas["workspace.create.before"].parse(result);
     // Omitted means unchanged; an explicit {} still replaces.
     return { ...result, metadata: next.metadata ?? previous.metadata };
+  }
+  if (name === "schedule.run.finish.before") {
+    const previous = beforeSchemas["schedule.run.finish.before"].parse(input);
+    const next = beforeSchemas["schedule.run.finish.before"].parse(result);
+    if (
+      previous.runId !== next.runId ||
+      !isDeepStrictEqual(previous.schedule, next.schedule) ||
+      !isDeepStrictEqual(previous.agent, next.agent)
+    ) {
+      throw new Error("schedule.run.finish.before hooks can only change attention");
+    }
   }
   if (name === "worktree.create.before") {
     const previous = beforeSchemas["worktree.create.before"].parse(input);

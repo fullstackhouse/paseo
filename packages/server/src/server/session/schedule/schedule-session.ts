@@ -1,5 +1,6 @@
 import type pino from "pino";
 import type { SessionInboundMessage, SessionOutboundMessage } from "../../messages.js";
+import { isScheduleRunAwaitingAttention } from "@getpaseo/protocol/schedule/types";
 import type { ScheduleService } from "../../schedule/service.js";
 
 export interface ScheduleSessionHost {
@@ -29,8 +30,8 @@ export class ScheduleSession {
     SessionOutboundMessage,
     { type: "schedule/list/response" }
   >["payload"]["schedules"][number] {
-    const { runs: _runs, ...summary } = schedule;
-    return summary;
+    const { runs, ...summary } = schedule;
+    return { ...summary, attentionRuns: runs.filter(isScheduleRunAwaitingAttention) };
   }
 
   private emitScheduleRpcError(
@@ -46,7 +47,8 @@ export class ScheduleSession {
           | "schedule/resume"
           | "schedule/delete"
           | "schedule/run-once"
-          | "schedule/update";
+          | "schedule/update"
+          | "schedule.run.resolve.request";
       }
     >,
     error: unknown,
@@ -238,6 +240,27 @@ export class ScheduleSession {
         payload: {
           requestId: request.requestId,
           schedule,
+          error: null,
+        },
+      });
+    } catch (error) {
+      this.emitScheduleRpcError(request, error);
+    }
+  }
+
+  async handleScheduleRunResolveRequest(
+    request: Extract<SessionInboundMessage, { type: "schedule.run.resolve.request" }>,
+  ): Promise<void> {
+    try {
+      const schedule = await this.scheduleService.resolveRunAttention({
+        scheduleId: request.scheduleId,
+        runId: request.runId,
+      });
+      this.host.emit({
+        type: "schedule.run.resolve.response",
+        payload: {
+          requestId: request.requestId,
+          schedule: this.toScheduleSummary(schedule),
           error: null,
         },
       });

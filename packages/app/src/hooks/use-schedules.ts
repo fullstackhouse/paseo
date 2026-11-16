@@ -13,6 +13,10 @@ import {
   type ScheduleHostError,
   type ScheduleHostInput,
 } from "@/schedules/aggregated-schedules";
+import {
+  collectScheduleAttention,
+  type ScheduleAttentionItem,
+} from "@/schedules/schedule-attention";
 
 export type {
   AggregateLoadState,
@@ -33,7 +37,12 @@ export interface UseSchedulesResult {
   isRefetching: boolean;
 }
 
-export function useSchedules(): UseSchedulesResult {
+export interface UseSchedulesOptions {
+  /** Refetch on an interval while mounted; schedules have no push updates. */
+  refetchIntervalMs?: number;
+}
+
+export function useSchedules(options: UseSchedulesOptions = {}): UseSchedulesResult {
   const hosts = useHosts();
   const runtime = getHostRuntimeStore();
   const hostInputs = useMemo<ScheduleHostInput[]>(
@@ -52,6 +61,9 @@ export function useSchedules(): UseSchedulesResult {
     queryFn: () => fetchAggregatedSchedules({ hosts: hostInputs, runtime }),
     dataShape: "list",
     staleTimeMs: 5_000,
+    ...(options.refetchIntervalMs !== undefined
+      ? { refetchInterval: options.refetchIntervalMs }
+      : {}),
   });
 
   let loadState: AggregateLoadState<AggregatedSchedule>;
@@ -73,4 +85,17 @@ export function useSchedules(): UseSchedulesResult {
     },
     isRefetching: query.isRefetching,
   };
+}
+
+// The sidebar is always mounted, so this also keeps the Schedules screen's list fresh.
+const ATTENTION_REFETCH_INTERVAL_MS = 60_000;
+
+/** Scheduled runs waiting on you, across connected hosts, newest first. */
+export function useScheduleAttention(): ScheduleAttentionItem[] {
+  const { loadState } = useSchedules({ refetchIntervalMs: ATTENTION_REFETCH_INTERVAL_MS });
+  const schedules = loadState.status === "loaded" ? loadState.data : null;
+  return useMemo(
+    () => (schedules ? collectScheduleAttention(schedules, new Date()) : []),
+    [schedules],
+  );
 }

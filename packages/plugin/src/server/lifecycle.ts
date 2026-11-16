@@ -100,6 +100,25 @@ export interface PluginSessionOpenRequest {
   mcpServers: NonNullable<AgentSessionConfig["mcpServers"]>;
 }
 
+/** Why a finished scheduled run needs a human. */
+export interface PluginScheduleRunAttention {
+  reason: "failed" | "permission" | "plugin";
+  message: string | null;
+}
+
+/**
+ * A scheduled run whose agent has finished its turn, before Paseo records the run. Set
+ * `attention` to flag the run as needing a human: Paseo keeps its workspace instead of archiving
+ * it and lists the run under Needs you. Only `attention` may change. Needs
+ * `server_info.features.scheduleRunAttention`.
+ */
+export interface PluginScheduleRunFinishRequest {
+  readonly schedule: { readonly id: string; readonly name: string | null };
+  readonly runId: string;
+  readonly agent: PluginHookAgent;
+  attention: PluginScheduleRunAttention | null;
+}
+
 export type PluginTurnOutcome =
   | { kind: "completed" }
   | { kind: "failed"; error: { message: string; code?: string } }
@@ -141,6 +160,7 @@ export interface PluginHookRequests {
   };
   "agent.open.before": PluginSessionOpenRequest;
   "workspace.create.before": Omit<WorkspaceCreateRequest, "type" | "requestId">;
+  "schedule.run.finish.before": PluginScheduleRunFinishRequest;
 }
 
 /** What a hook may return. An omitted `metadata` stays as it was. */
@@ -217,6 +237,7 @@ export const pluginHookRegistry = {
   "agent.turn.after": { waits: false },
   "agent.permission.before": { waits: false },
   "agent.permission.after": { waits: false },
+  "schedule.run.finish.before": { waits: true },
 } as const satisfies Record<keyof PluginHooks, { waits: boolean }>;
 
 // COMPAT(pluginHookNames): added in v0.14, remove after 2027-04-30
