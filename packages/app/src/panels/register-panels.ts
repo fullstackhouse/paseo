@@ -17,6 +17,7 @@ import { lineagePanelRegistration } from "@/panels/lineage-panel";
 import { overviewPanelRegistration } from "@/panels/overview-panel";
 import { pluginButtonPanelRegistration } from "@/plugins/buttons/panel";
 import { pluginPanelRegistration } from "@/plugins/workspace-panels/panel";
+import { pluginScreenTabRegistration } from "@/plugins/screen-tab/panel";
 import { newTabPanelRegistration } from "@/panels/new-tab-panel";
 
 let panelsRegistered = false;
@@ -42,5 +43,6 @@ export function ensurePanelsRegistered(): void {
   registerPanel(changesTreePanelRegistration);
   registerPanel(pluginPanelRegistration);
   registerPanel(pluginButtonPanelRegistration);
+  registerPanel(pluginScreenTabRegistration);
   panelsRegistered = true;
 }

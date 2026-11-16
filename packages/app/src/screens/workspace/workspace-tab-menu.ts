@@ -164,7 +164,11 @@ function getCloseButtonTestId(tab: WorkspaceTabDescriptor): string {
   ) {
     return `workspace-${tab.target.kind}-close`;
   }
-  if (tab.target.kind === "plugin" || tab.target.kind === "plugin_button") {
+  if (
+    tab.target.kind === "plugin" ||
+    tab.target.kind === "plugin_button" ||
+    tab.target.kind === "plugin_screen"
+  ) {
     return `workspace-plugin-close-${encodeFilePathForPathSegment(buildDeterministicWorkspaceTabId(tab.target))}`;
   }
   if (tab.target.kind === "new_tab") {

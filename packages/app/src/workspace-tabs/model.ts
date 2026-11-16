@@ -32,6 +32,14 @@ export type PluginWorkspaceTabTarget =
       agentId: string;
     };
 
+/** A plugin screen opened as a tab: one tab per plugin, screen and params. */
+export interface PluginScreenWorkspaceTabTarget {
+  kind: "plugin_screen";
+  pluginId: string;
+  screenId: string;
+  params: Record<string, string>;
+}
+
 export type WorkspaceTabTarget =
   | { kind: "new_tab" }
   | { kind: "draft"; draftId: string; setup?: WorkspaceDraftTabSetup }
@@ -47,6 +55,7 @@ export type WorkspaceTabTarget =
   | WorkspaceFileTabTarget
   | WorkspaceWorkingDiffTabTarget
   | PluginWorkspaceTabTarget
+  | PluginScreenWorkspaceTabTarget
   | { kind: "plugin_button"; pluginId: string; buttonId: string; agentId: string }
   | { kind: "setup"; workspaceId: string }
   | { kind: "commit_diff"; sha: string };

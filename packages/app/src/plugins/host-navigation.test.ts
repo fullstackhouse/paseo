@@ -48,6 +48,29 @@ describe("plugin host navigation", () => {
     ]);
   });
 
+  it("opens a screen as a tab in the workspace it names", () => {
+    const { navigation, destinations, screens } = setup();
+    navigation.openPluginScreen!({
+      pluginId: "inbox",
+      screenId: "review",
+      params: { runId: "r1" },
+      workspaceId: "one",
+    });
+    expect(screens).toEqual([]);
+    expect(destinations).toEqual([
+      {
+        serverId: "selected",
+        workspaceId: "one",
+        target: {
+          kind: "plugin_screen",
+          pluginId: "inbox",
+          screenId: "review",
+          params: { runId: "r1" },
+        },
+      },
+    ]);
+  });
+
   it("reports and refuses screens that are not on the host", () => {
     const { navigation, screens } = setup();
     expect(navigation.hasPluginScreen!({ pluginId: "inbox", screenId: "review" })).toBe(true);

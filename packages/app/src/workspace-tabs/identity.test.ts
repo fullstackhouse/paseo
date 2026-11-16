@@ -4,6 +4,7 @@ import {
   normalizeWorkspaceTabTarget,
   workspaceTabTargetsEqual,
 } from "./identity";
+import type { WorkspaceTabTarget } from "./model";
 
 describe("New tab identity", () => {
   it("stays outside deterministic target identity", () => {
@@ -226,6 +227,44 @@ describe("composer button panel identity", () => {
     );
     for (const field of ["pluginId", "buttonId", "agentId"] as const) {
       const other = { ...target, [field]: "other" };
+      expect(workspaceTabTargetsEqual(target, other)).toBe(false);
+      expect(buildDeterministicWorkspaceTabId(other)).not.toBe(
+        buildDeterministicWorkspaceTabId(target),
+      );
+    }
+  });
+});
+
+describe("plugin screen tab identity", () => {
+  const target = {
+    kind: "plugin_screen",
+    pluginId: "inbox",
+    screenId: "review",
+    params: { runId: "r1", pr: "acme/shop#2" },
+  } as const;
+
+  it("normalizes restored screen identity and rejects missing identifiers", () => {
+    expect(
+      normalizeWorkspaceTabTarget({ ...target, pluginId: " inbox ", screenId: " review " }),
+    ).toEqual(target);
+    for (const field of ["pluginId", "screenId"] as const) {
+      expect(normalizeWorkspaceTabTarget({ ...target, [field]: " " })).toBeNull();
+    }
+  });
+
+  it("reuses the tab for the same params in any order and splits on other params", () => {
+    const reordered = { ...target, params: { pr: "acme/shop#2", runId: "r1" } };
+    expect(workspaceTabTargetsEqual(target, reordered)).toBe(true);
+    expect(buildDeterministicWorkspaceTabId(reordered)).toBe(
+      buildDeterministicWorkspaceTabId(target),
+    );
+    const others: WorkspaceTabTarget[] = [
+      { ...target, params: { runId: "r2", pr: "acme/shop#2" } },
+      { ...target, params: { runId: "r1" } },
+      { ...target, screenId: "inbox" },
+      { ...target, pluginId: "asks" },
+    ];
+    for (const other of others) {
       expect(workspaceTabTargetsEqual(target, other)).toBe(false);
       expect(buildDeterministicWorkspaceTabId(other)).not.toBe(
         buildDeterministicWorkspaceTabId(target),
