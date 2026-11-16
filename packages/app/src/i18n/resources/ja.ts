@@ -1458,6 +1458,10 @@ export const ja: TranslationResources = {
         tomorrow: "明日の朝まで",
         nextWeek: "来週まで",
         indefinite: "解除するまで",
+        custom: "カスタム…",
+        customPlaceholder: "2h, fri 14:00, 2026-11-20 9:30",
+        customHint: "時刻、日付、または期間を入力",
+        customInvalid: "未来の日時として読み取れません",
       },
       confirmations: {
         hideTitle: "ワークスペースを非表示にしますか？",

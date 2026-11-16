@@ -1470,6 +1470,10 @@ export const ptBR: TranslationResources = {
         tomorrow: "Até amanhã de manhã",
         nextWeek: "Até a próxima semana",
         indefinite: "Até eu retomar",
+        custom: "Personalizado…",
+        customPlaceholder: "2h, fri 14:00, 2026-11-20 9:30",
+        customHint: "Digite um horário, um dia ou uma duração",
+        customInvalid: "Não reconhecido como um horário futuro",
       },
       confirmations: {
         hideTitle: "Ocultar workspace?",

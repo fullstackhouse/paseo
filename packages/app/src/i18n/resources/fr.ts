@@ -1474,6 +1474,10 @@ export const fr: TranslationResources = {
         tomorrow: "Jusqu’à demain matin",
         nextWeek: "Jusqu’à la semaine prochaine",
         indefinite: "Jusqu’à ce que je le réveille",
+        custom: "Personnalisé…",
+        customPlaceholder: "2h, fri 14:00, 2026-11-20 9:30",
+        customHint: "Saisissez une heure, un jour ou une durée",
+        customInvalid: "Pas une date future reconnue",
       },
       confirmations: {
         hideTitle: "Masquer l’espace de travail ?",
