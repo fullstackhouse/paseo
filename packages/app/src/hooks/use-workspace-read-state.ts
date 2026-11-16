@@ -3,6 +3,7 @@ import { i18n } from "@/i18n/i18next";
 import { useHostFeature } from "@/runtime/host-features";
 import { getHostRuntimeStore } from "@/runtime/host-runtime";
 import { useWorkspaceFields } from "@/stores/session-store-hooks";
+import { isStatusDecidedByReport, useReportedWorkLookup } from "@/workspace-status/reported-work";
 import { markWorkspaceUnread } from "@/workspace/mark-unread";
 
 export interface WorkspaceReadStateController {
@@ -21,8 +22,12 @@ export function useWorkspaceReadState({
 }): WorkspaceReadStateController {
   const status = useWorkspaceFields(serverId, workspaceId, (workspace) => workspace.status);
   const supportsMarkUnread = useHostFeature(serverId, "workspaceMarkUnread");
-  const hasClearableAttention = status === "attention" || status === "failed";
-  const canMarkUnread = supportsMarkUnread && status === "done";
+  const reportedWork = useReportedWorkLookup();
+  // The agent's report decides the group: read/unread would change only a status nobody sees.
+  const decidedByReport =
+    status != null && isStatusDecidedByReport(status, reportedWork?.(serverId, workspaceId));
+  const hasClearableAttention = !decidedByReport && (status === "attention" || status === "failed");
+  const canMarkUnread = !decidedByReport && supportsMarkUnread && status === "done";
 
   const clearAttention = useCallback(async () => {
     if (!hasClearableAttention) {

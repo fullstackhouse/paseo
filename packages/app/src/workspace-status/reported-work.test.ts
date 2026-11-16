@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { WorkspaceSummaryItem } from "@/plugins/workspace-summary/store";
-import { applyReportedWork, createReportedWorkLookup, foldReportedWork } from "./reported-work";
+import {
+  applyReportedWork,
+  createReportedWorkLookup,
+  foldReportedWork,
+  isStatusDecidedByReport,
+} from "./reported-work";
 
 let nextKey = 0;
 function item(fields: Partial<WorkspaceSummaryItem>): WorkspaceSummaryItem {
@@ -79,5 +84,22 @@ describe("createReportedWorkLookup", () => {
     expect(lookup("other", "a")).toBe("done");
     expect(lookup("s", "b")).toBe("needs_you");
     expect(lookup("s", "c")).toBeNull();
+  });
+});
+
+describe("isStatusDecidedByReport", () => {
+  it("holds for Ready to review and Done when something was reported", () => {
+    expect(isStatusDecidedByReport("attention", "working")).toBe(true);
+    expect(isStatusDecidedByReport("attention", "needs_you")).toBe(true);
+    expect(isStatusDecidedByReport("done", "needs_you")).toBe(true);
+    expect(isStatusDecidedByReport("done", "done")).toBe(true);
+  });
+
+  it("leaves the turn in charge without a report or for live states", () => {
+    expect(isStatusDecidedByReport("attention", null)).toBe(false);
+    expect(isStatusDecidedByReport("done", undefined)).toBe(false);
+    for (const status of ["running", "failed", "needs_input"] as const) {
+      expect(isStatusDecidedByReport(status, "done")).toBe(false);
+    }
   });
 });
