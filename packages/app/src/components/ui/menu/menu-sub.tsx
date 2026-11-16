@@ -32,6 +32,7 @@ export function MenuSubTrigger({
   value,
   indicator = false,
   leading,
+  showSelectedCheck,
   disabled,
   testID,
   children,
@@ -48,6 +49,8 @@ export function MenuSubTrigger({
    * of the column.
    */
   leading?: ReactElement | null;
+  /** Reserves the check column, for a trigger standing in a list of `showSelectedCheck` items. */
+  showSelectedCheck?: boolean;
   disabled?: boolean;
   testID?: string;
 }>): ReactElement {
@@ -95,6 +98,7 @@ export function MenuSubTrigger({
         disabled={disabled}
         onSelect={handleSelect}
         leading={leading}
+        showSelectedCheck={showSelectedCheck}
         trailing={trailing}
         testID={testID}
       >

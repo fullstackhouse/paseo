@@ -1,13 +1,23 @@
 import { useCallback, useMemo, useState, type ReactElement } from "react";
 import { useTranslation } from "react-i18next";
 import { useMutation } from "@tanstack/react-query";
-import { MenuItem, MenuSeparator, type MenuPageDefinition } from "@/components/ui/menu";
+import {
+  MenuHint,
+  MenuItem,
+  MenuSeparator,
+  MenuSubTrigger,
+  MenuTextField,
+  useMenuContext,
+  type MenuPageDefinition,
+} from "@/components/ui/menu";
 import { useToast } from "@/contexts/toast-context";
 import { getHostRuntimeStore } from "@/runtime/host-runtime";
+import { parseSnoozeUntil } from "./custom-until";
 import { snoozePresets, type SnoozePreset, type SnoozePresetId } from "./presets";
 
 /** The `MenuSubTrigger` on a workspace's menu that opens the snooze choices. */
 export const WORKSPACE_SNOOZE_PAGE_ID = "workspaceSnooze";
+const WORKSPACE_SNOOZE_CUSTOM_PAGE_ID = "workspaceSnoozeCustom";
 
 /** What the agent hears when a "Snooze and continue" ends. Agent-facing, so not translated. */
 const CONTINUE_PROMPT = "Continue where you left off.";
@@ -53,60 +63,101 @@ export function useSetWorkspaceSnooze(): SetWorkspaceSnooze {
   return useCallback((input: SetWorkspaceSnoozeInput) => mutate(input), [mutate]);
 }
 
-/** The Snooze page behind a workspace's menu, shared by the kebab and the context menu. */
+/** The Snooze pages behind a workspace's menu, shared by the kebab and the context menu. */
 export function useWorkspaceSnoozeMenuPages(
   target: SnoozeTarget | null,
 ): readonly MenuPageDefinition[] {
   const { t } = useTranslation();
+  const setSnooze = useSetWorkspaceSnooze();
+  // Shared by the presets page and the custom page, which can both be open at once as flyouts.
+  const [continueWork, setContinueWork] = useState(false);
+  const snoozeUntil = useCallback(
+    (until: string | null) => {
+      if (!target) return;
+      setSnooze({
+        target,
+        snoozed: true,
+        until,
+        ...(continueWork ? { wakePrompt: CONTINUE_PROMPT } : {}),
+      });
+      setContinueWork(false);
+    },
+    [continueWork, setSnooze, target],
+  );
   return useMemo(() => {
     if (!target) return [];
     return [
       {
         id: WORKSPACE_SNOOZE_PAGE_ID,
         title: t("sidebar.workspace.snooze.title"),
-        content: <WorkspaceSnoozePage target={target} />,
+        content: (
+          <WorkspaceSnoozePage
+            canContinue={target.canContinue}
+            continueWork={continueWork}
+            onContinueWorkChange={setContinueWork}
+            onSnooze={snoozeUntil}
+          />
+        ),
+      },
+      {
+        id: WORKSPACE_SNOOZE_CUSTOM_PAGE_ID,
+        title: t("sidebar.workspace.snooze.custom"),
+        // A page you type into is not one the pointer opens or dismisses on its own.
+        hoverIntent: false,
+        content: <WorkspaceSnoozeCustomPage onSnooze={snoozeUntil} />,
       },
     ];
-  }, [t, target]);
+  }, [continueWork, snoozeUntil, t, target]);
 }
+
+function useSnoozeTimeFormatter(options: Intl.DateTimeFormatOptions): Intl.DateTimeFormat {
+  const { i18n } = useTranslation();
+  return useMemo(() => new Intl.DateTimeFormat(i18n.language, options), [i18n.language, options]);
+}
+
+const PRESET_TIME_FORMAT: Intl.DateTimeFormatOptions = {
+  weekday: "short",
+  hour: "2-digit",
+  minute: "2-digit",
+};
+const CUSTOM_TIME_FORMAT: Intl.DateTimeFormatOptions = {
+  weekday: "short",
+  day: "numeric",
+  month: "short",
+  hour: "2-digit",
+  minute: "2-digit",
+};
 
 /**
  * One page for both kinds of snooze. "Continue work when it ends" toggles in place and keeps the
  * menu open; while it is on, "Until I wake it" goes away: an open-ended snooze has no moment to
  * resume at.
  */
-function WorkspaceSnoozePage({ target }: { target: SnoozeTarget }): ReactElement {
-  const { t, i18n } = useTranslation();
-  const setSnooze = useSetWorkspaceSnooze();
-  const [continueWork, setContinueWork] = useState(false);
-  const toggleContinueWork = useCallback(() => setContinueWork((value) => !value), []);
-  const snoozeUntil = useCallback(
-    (until: string | null) =>
-      setSnooze({
-        target,
-        snoozed: true,
-        until,
-        ...(continueWork ? { wakePrompt: CONTINUE_PROMPT } : {}),
-      }),
-    [continueWork, setSnooze, target],
+function WorkspaceSnoozePage({
+  canContinue,
+  continueWork,
+  onContinueWorkChange,
+  onSnooze,
+}: {
+  canContinue: boolean;
+  continueWork: boolean;
+  onContinueWorkChange: (value: boolean) => void;
+  onSnooze: (until: string | null) => void;
+}): ReactElement {
+  const { t } = useTranslation();
+  const toggleContinueWork = useCallback(
+    () => onContinueWorkChange(!continueWork),
+    [continueWork, onContinueWorkChange],
   );
   // Read once per open: the presets are relative to when you look at them.
   const presets = useMemo(
     () => snoozePresets(new Date()).filter((preset) => !continueWork || preset.until !== null),
     [continueWork],
   );
-  const formatter = useMemo(
-    () =>
-      new Intl.DateTimeFormat(i18n.language, {
-        weekday: "short",
-        hour: "2-digit",
-        minute: "2-digit",
-      }),
-    [i18n.language],
-  );
+  const formatter = useSnoozeTimeFormatter(PRESET_TIME_FORMAT);
   return (
     <>
-      {target.canContinue ? (
+      {canContinue ? (
         <>
           <MenuItem
             selected={continueWork}
@@ -126,10 +177,58 @@ function WorkspaceSnoozePage({ target }: { target: SnoozeTarget }): ReactElement
           preset={preset}
           label={t(PRESET_LABEL_KEYS[preset.id])}
           description={preset.until ? formatter.format(new Date(preset.until)) : undefined}
-          onSnooze={snoozeUntil}
-          alignWithToggle={target.canContinue}
+          onSnooze={onSnooze}
+          alignWithToggle={canContinue}
         />
       ))}
+      <MenuSubTrigger
+        id={WORKSPACE_SNOOZE_CUSTOM_PAGE_ID}
+        showSelectedCheck={canContinue}
+        testID="workspace-snooze-custom"
+      >
+        {t("sidebar.workspace.snooze.custom")}
+      </MenuSubTrigger>
+    </>
+  );
+}
+
+/** A typed end time (`fri 14:00`, `2h`, `2026-11-20 09:30`), previewed as you type. */
+function WorkspaceSnoozeCustomPage({
+  onSnooze,
+}: {
+  onSnooze: (until: string | null) => void;
+}): ReactElement {
+  const { t } = useTranslation();
+  const menu = useMenuContext("WorkspaceSnoozeCustomPage");
+  const [text, setText] = useState("");
+  const until = parseSnoozeUntil(text, new Date());
+  const formatter = useSnoozeTimeFormatter(CUSTOM_TIME_FORMAT);
+  const submit = useCallback(() => {
+    // Re-read at submit time: a relative entry like `2h` counts from the press, not the keystroke.
+    const resolved = parseSnoozeUntil(text, new Date());
+    if (resolved) onSnooze(resolved.toISOString());
+  }, [onSnooze, text]);
+  // Enter closes the menu the way pressing the row does, once there is something to snooze until.
+  const submitFromKeyboard = useCallback(() => {
+    if (parseSnoozeUntil(text, new Date())) menu.selectItem(submit, true);
+  }, [menu, submit, text]);
+  let hint = t("sidebar.workspace.snooze.customHint");
+  if (until) hint = formatter.format(until);
+  else if (text.trim()) hint = t("sidebar.workspace.snooze.customInvalid");
+  return (
+    <>
+      <MenuTextField
+        onChangeText={setText}
+        placeholder={t("sidebar.workspace.snooze.customPlaceholder")}
+        autoFocus
+        onSubmitEditing={submitFromKeyboard}
+        testID="workspace-snooze-custom-input"
+      />
+      <MenuHint testID="workspace-snooze-custom-hint">{hint}</MenuHint>
+      <MenuSeparator />
+      <MenuItem disabled={!until} onSelect={submit} testID="workspace-snooze-custom-submit">
+        {t("sidebar.workspace.snooze.title")}
+      </MenuItem>
     </>
   );
 }
