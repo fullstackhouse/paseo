@@ -44,6 +44,7 @@ export type WorkspaceTabMenuEntry =
       label: string;
       icon?:
         | "copy"
+        | "folder-open"
         | "rotate-cw"
         | "arrow-left-to-line"
         | "arrow-right-to-line"
@@ -65,6 +66,12 @@ export type WorkspaceTabMenuEntry =
       /** Where the file tab's "Open with…" row goes; it renders only for files with several panels. */
       kind: "file-panel-open-with";
       key: string;
+    }
+  | {
+      /** Where the file tab's "Reveal in Finder" row goes; desktop only, when a file manager is available. */
+      kind: "file-reveal";
+      key: string;
+      path: string;
     };
 
 interface BuildWorkspaceTabMenuEntriesInput {
@@ -255,6 +262,7 @@ export function buildWorkspaceTabMenuEntries(
         void onCopyFilePath(filePath);
       },
     });
+    entries.push({ kind: "file-reveal", key: "file-reveal", path: filePath });
     entries.push({ kind: "file-panel-open-with", key: "file-panel-open-with" });
   }
 
