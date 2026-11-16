@@ -63,6 +63,12 @@ const WorkspaceTabTargetStorageSchema = z.discriminatedUnion("kind", [
     buttonId: z.string(),
     agentId: z.string(),
   }),
+  z.strictObject({
+    kind: z.literal("plugin_screen"),
+    pluginId: z.string(),
+    screenId: z.string(),
+    params: z.record(z.string(), z.string()),
+  }),
   z.discriminatedUnion("context", [
     z.strictObject({
       kind: z.literal("plugin"),

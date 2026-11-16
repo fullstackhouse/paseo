@@ -28,6 +28,13 @@ export function createPluginNavigation(input: {
         buildPluginSurfaceRoute(serverId, pluginId, { kind: "surface", id: surfaceId }, params),
       );
     },
+    openScreenTab({ pluginId, screenId, params, workspaceId: targetWorkspaceId }) {
+      navigateToWorkspace({
+        serverId,
+        workspaceId: targetWorkspaceId,
+        target: { kind: "plugin_screen", pluginId, screenId, params },
+      });
+    },
     openWorkspacePanel(pluginId, panelId, location) {
       if (!workspaceId) throw new Error("No active workspace");
       navigateToWorkspace({

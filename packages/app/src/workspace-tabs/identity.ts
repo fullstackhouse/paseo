@@ -51,6 +51,8 @@ export function normalizeWorkspaceTabTarget(
 
 function normalizeSimpleWorkspaceTabTarget(value: WorkspaceTabTarget): WorkspaceTabTarget | null {
   switch (value.kind) {
+    case "plugin_screen":
+      return normalizePluginScreenTabTarget(value);
     case "agent": {
       const agentId = trimNonEmpty(value.agentId);
       return agentId ? { kind: "agent", agentId } : null;
@@ -150,7 +152,10 @@ function secondaryWorkspaceTabTargetsEqual(
   left: WorkspaceTabTarget,
   right: WorkspaceTabTarget,
 ): boolean {
-  if (left.kind === "plugin_button" && right.kind === "plugin_button") {
+  if (
+    (left.kind === "plugin_button" && right.kind === "plugin_button") ||
+    (left.kind === "plugin_screen" && right.kind === "plugin_screen")
+  ) {
     return buildDeterministicWorkspaceTabId(left) === buildDeterministicWorkspaceTabId(right);
   }
   if (left.kind === "browser" && right.kind === "browser") {
@@ -250,6 +255,13 @@ export function buildDeterministicWorkspaceTabId(target: WorkspaceTabTarget): st
       ? `plugin_workspace_${identity}`
       : `plugin_agent_${identity}_${target.agentId.length}_${target.agentId}`;
   }
+  if (target.kind === "plugin_screen") {
+    const params = Object.keys(target.params)
+      .sort()
+      .map((key) => lengthPrefixed(key) + lengthPrefixed(target.params[key]))
+      .join("");
+    return `plugin_screen_${lengthPrefixed(target.pluginId)}${lengthPrefixed(target.screenId)}${params}`;
+  }
   if (target.kind === "plugin_button") {
     return `plugin_button_${target.pluginId.length}_${target.pluginId}_${target.buttonId.length}_${target.buttonId}_${target.agentId.length}_${target.agentId}`;
   }
@@ -267,6 +279,23 @@ function normalizePluginTabTarget(
   }
   const agentId = trimNonEmpty(value.agentId);
   return agentId ? { kind: "plugin", pluginId, panelId, context: "agent", agentId } : null;
+}
+
+function lengthPrefixed(value: string): string {
+  return `${value.length}_${value}_`;
+}
+
+function normalizePluginScreenTabTarget(
+  value: Extract<WorkspaceTabTarget, { kind: "plugin_screen" }>,
+): WorkspaceTabTarget | null {
+  const pluginId = trimNonEmpty(value.pluginId);
+  const screenId = trimNonEmpty(value.screenId);
+  if (!pluginId || !screenId) return null;
+  const params: Record<string, string> = {};
+  for (const [key, entry] of Object.entries(value.params ?? {})) {
+    if (typeof entry === "string") params[key] = entry;
+  }
+  return { kind: "plugin_screen", pluginId, screenId, params };
 }
 
 function trimNonEmpty(value: string | null | undefined): string | null {

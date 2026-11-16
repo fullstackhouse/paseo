@@ -85,6 +85,8 @@ export interface PluginScreenTarget {
   readonly screenId: string;
   readonly params?: PluginScreenParams;
   readonly serverId?: string;
+  /** Opens the screen as a tab in this workspace instead of over the app. Older hosts ignore it. */
+  readonly workspaceId?: string;
 }
 
 /** String keys and values: params travel in the screen's URL. */
@@ -93,6 +95,8 @@ export type PluginScreenParams = Record<string, string>;
 export interface PluginOpenScreenInput {
   screenId: string;
   params?: PluginScreenParams;
+  /** Opens the screen as a tab in this workspace instead of over the app. Older hosts ignore it. */
+  workspaceId?: string;
 }
 
 export interface PluginScreenLocation {

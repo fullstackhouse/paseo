@@ -154,6 +154,15 @@ const manifests = {
     compactSheet: null,
     resourceKey: (target) => `${target.pluginId}:${target.buttonId}:${target.agentId}`,
   },
+  plugin_screen: {
+    kind: "plugin_screen",
+    supportedHosts: ["main", "explorer"],
+    showCloseButton: true,
+    singleton: false,
+    compactSheet: null,
+    resourceKey: (target) =>
+      `${target.pluginId}:${target.screenId}:${JSON.stringify(Object.entries(target.params).sort())}`,
+  },
   plugin: {
     kind: "plugin",
     // Plugin targets are narrowed by the target-aware plugin panel capability resolver.

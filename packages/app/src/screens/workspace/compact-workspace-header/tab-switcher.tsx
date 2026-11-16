@@ -137,6 +137,7 @@ function getFallbackTabOptionDescription(
     return tab.target.panelId;
   }
   if (tab.target.kind === "plugin_button") return tab.target.buttonId;
+  if (tab.target.kind === "plugin_screen") return tab.target.screenId;
   return tab.target.path;
 }
 

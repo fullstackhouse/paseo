@@ -381,7 +381,10 @@ reload, history, links, and the host switcher keep them without a store. Expo Ro
 route's segments (`serverId`, `pluginId`, ...) into the same search params as the query, so param
 keys are stored under a `param.` prefix; plugins never see it and may use any key.
 `openScreen` validates its input once (`parsePluginOpenScreenInput`); code past it trusts the
-params.
+params. With a `workspaceId`, the screen opens as a `plugin_screen` workspace tab instead
+(`plugins/screen-tab/panel.tsx`). The tab target persists the params, so they survive a reload
+the same way the route's query does. Its identity is plugin, screen, and params, so reopening a
+review focuses its tab.
 
 RPC and subscription contracts validate inputs, outputs, and events in both the app and plugin
 subprocess. `useRpc` returns a typed async function. Use the host-provided `@tanstack/react-query`

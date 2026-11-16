@@ -90,20 +90,33 @@ export function currentPluginScreen(
   return screenId ? { screenId, params: pluginScreenParamsFromRoute(routeParams) } : null;
 }
 
+/** An `openScreen` input past validation; `workspaceId` is set when the screen opens as a tab. */
+export interface PluginOpenScreenRequest extends PluginScreenLocation {
+  workspaceId: string | null;
+}
+
 /** Checks an `openScreen` input against the installation's screens. Throws when it is invalid. */
 export function parsePluginOpenScreenInput(
   plugin: InstalledPlugin,
   input: unknown,
-): PluginScreenLocation {
+): PluginOpenScreenRequest {
   if (typeof input !== "object" || input === null || !("screenId" in input)) {
-    throw new Error("openScreen takes { screenId, params? }");
+    throw new Error("openScreen takes { screenId, params?, workspaceId? }");
   }
   const { screenId } = input;
   if (typeof screenId !== "string" || !plugin.surfaces.some((surface) => surface.id === screenId)) {
     throw new Error(`Plugin screen is unavailable: ${String(screenId)}`);
   }
   const params = "params" in input ? input.params : undefined;
-  return { screenId, params: parsePluginScreenParams(params) };
+  const workspaceId = "workspaceId" in input ? input.workspaceId : undefined;
+  if (workspaceId !== undefined && typeof workspaceId !== "string") {
+    throw new Error("Plugin screen workspaceId must be a string");
+  }
+  return {
+    screenId,
+    params: parsePluginScreenParams(params),
+    workspaceId: workspaceId?.trim() || null,
+  };
 }
 
 export function getPluginSurfaceContributionServerIds(

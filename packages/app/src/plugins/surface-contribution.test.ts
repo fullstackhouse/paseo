@@ -181,17 +181,36 @@ describe("parsePluginOpenScreenInput", () => {
     expect(parsePluginOpenScreenInput(plugin, { screenId: "bot" })).toEqual({
       screenId: "bot",
       params: {},
+      workspaceId: null,
     });
     expect(parsePluginOpenScreenInput(plugin, { screenId: "bot", params: { botId: "2" } })).toEqual(
-      { screenId: "bot", params: { botId: "2" } },
+      { screenId: "bot", params: { botId: "2" }, workspaceId: null },
     );
     expect(
       parsePluginOpenScreenInput(plugin, { screenId: "bot", params: { serverId: "x" } }),
-    ).toEqual({ screenId: "bot", params: { serverId: "x" } });
+    ).toEqual({ screenId: "bot", params: { serverId: "x" }, workspaceId: null });
+  });
+
+  it("takes a workspace to open the screen in as a tab", () => {
+    expect(parsePluginOpenScreenInput(plugin, { screenId: "bot", workspaceId: " ws-1 " })).toEqual({
+      screenId: "bot",
+      params: {},
+      workspaceId: "ws-1",
+    });
+    expect(parsePluginOpenScreenInput(plugin, { screenId: "bot", workspaceId: " " })).toMatchObject(
+      {
+        workspaceId: null,
+      },
+    );
+    expect(() => parsePluginOpenScreenInput(plugin, { screenId: "bot", workspaceId: 1 })).toThrow(
+      "workspaceId must be a string",
+    );
   });
 
   it("throws on a bare id, an unknown screen, or params that are not strings", () => {
-    expect(() => parsePluginOpenScreenInput(plugin, "bot")).toThrow("{ screenId, params? }");
+    expect(() => parsePluginOpenScreenInput(plugin, "bot")).toThrow(
+      "{ screenId, params?, workspaceId? }",
+    );
     expect(() => parsePluginOpenScreenInput(plugin, { screenId: "missing" })).toThrow(
       "unavailable: missing",
     );
