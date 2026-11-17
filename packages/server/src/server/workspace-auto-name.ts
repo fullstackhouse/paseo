@@ -188,12 +188,13 @@ export class WorkspaceAutoName {
   }
 
   /**
-   * The first agent ever created in a worktree or directory workspace names it
-   * with its explicit title, unless someone already named it by hand.
-   * `paseo run --title X --new-workspace worktree --new-branch Y` creates the
-   * workspace without a prompt, so nothing else would ever title it.
-   * Archived agents count: a workspace that has had agents is not new, and a
-   * project's main checkout is never renamed after a passing agent.
+   * An agent with an explicit title names an untitled worktree or directory
+   * workspace that has no other agent records, unless someone already named it
+   * by hand. `paseo run --title X --new-workspace worktree --new-branch Y`
+   * creates the workspace without a prompt, so nothing else would title it.
+   * Archived records count, so a workspace with history keeps its name; a
+   * deleted agent leaves no record. A git project's main checkout
+   * (`local_checkout`) is never renamed.
    */
   async adoptFirstAgentTitle(input: AdoptFirstAgentTitleInput): Promise<void> {
     const records = await this.agentStorage.listByWorkspace(input.workspaceId);
