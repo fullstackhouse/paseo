@@ -3618,6 +3618,33 @@ export class DaemonClient {
     return { snoozedAt: payload.snoozedAt, snoozedUntil: payload.snoozedUntil };
   }
 
+  /**
+   * Tells the host the workspace needs the human. A snoozed workspace treats it like a
+   * permission prompt; `agentId` names the agent whose quiet finished turn waking announces.
+   */
+  async reportWorkspaceAttention(
+    workspaceId: string,
+    options: { agentId?: string; requestId?: string } = {},
+  ): Promise<{ woke: boolean }> {
+    // COMPAT(workspaceAttentionReport): FSH-only, added after v0.15.4, remove gate after 2027-05-17.
+    if (this.lastServerInfoMessage?.features?.workspaceAttentionReport !== true) {
+      throw new Error("Update the host to wake snoozed workspaces that need you.");
+    }
+    const payload = await this.sendCorrelatedSessionRequest({
+      requestId: options.requestId,
+      message: {
+        type: "workspace.attention.report.request",
+        workspaceId,
+        ...(options.agentId ? { agentId: options.agentId } : {}),
+      },
+      responseType: "workspace.attention.report.response",
+    });
+    if (!payload.accepted) {
+      throw new Error(payload.error ?? "reportWorkspaceAttention rejected");
+    }
+    return { woke: payload.woke };
+  }
+
   async inspectWorkspaceRecovery(
     workspaceId: string,
     requestId?: string,

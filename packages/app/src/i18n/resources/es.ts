@@ -3051,8 +3051,8 @@ export const es: TranslationResources = {
       workspaces: {
         unavailable: "Connect to this host to manage workspaces",
         snoozedPermission: {
-          title: "Espacios pospuestos y solicitudes de permiso",
-          hint: "Qué ocurre cuando un agente en un espacio pospuesto pide permiso. Los turnos terminados nunca notifican mientras está pospuesto.",
+          title: "Espacios pospuestos que te necesitan",
+          hint: "Qué ocurre cuando un agente en un espacio pospuesto pide permiso o un plugin indica que te necesita (una petición que te espera, trabajo terminado). Los turnos terminados no notifican por sí solos mientras está pospuesto.",
           updateFailed: "No se pudo actualizar el ajuste de posponer",
           options: {
             wake: "Reactivar y avisar",
