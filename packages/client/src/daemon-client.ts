@@ -496,6 +496,8 @@ export interface SendMessageOptions {
   activeTurnBehavior?: ActiveTurnBehavior;
   images?: Array<{ data: string; mimeType: string }>;
   attachments?: SendAgentMessageRequest["attachments"];
+  /** Leave a snoozed workspace snoozed: the message is sent without the human coming back. */
+  keepSnoozed?: boolean;
 }
 
 export interface AgentAttentionRequiredNotification {
@@ -4471,6 +4473,7 @@ export class DaemonClient {
       activeTurnBehavior: options.activeTurnBehavior,
       images: options.images,
       attachments: options.attachments,
+      keepSnoozed: options.keepSnoozed,
     });
     const payload = await this.sendRequest({
       requestId,
