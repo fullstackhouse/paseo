@@ -188,6 +188,19 @@ export interface PluginWorkspaceSummaryItemContribution<
   id: string;
   workspaceId: string;
   title: Text;
+  /**
+   * Renders one of `entries` in full where the Overview lists it, so the human can act on it there
+   * instead of opening the plugin's panel. Fixed for the item's lifetime. FSH-only.
+   */
+  EntryComponent?: ComponentType<PluginWorkspaceSummaryEntryProps>;
+}
+
+export interface PluginWorkspaceSummaryEntryProps extends PluginNavigableHostProps {
+  workspaceId: string;
+  /** An `entries[].id` of this item. */
+  entryId: string;
+  /** True for the Overview's first move: show it open, with its actions. */
+  defaultExpanded: boolean;
 }
 
 export interface PluginWorkspaceSummaryItemRegistration {

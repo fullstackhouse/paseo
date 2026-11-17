@@ -45,6 +45,7 @@ import {
   useWorkspaceSummaryItems,
   type WorkspaceSummaryItem,
 } from "@/plugins/workspace-summary/store";
+import { WorkspaceSummaryEntryView } from "@/plugins/workspace-summary/entry-view";
 import { navigateToWorkspace } from "@/stores/navigation-active-workspace-store";
 import { useSessionStore, type Agent, type WorkspaceDescriptor } from "@/stores/session-store";
 import { useWorkspaceFields } from "@/stores/session-store-hooks";
@@ -604,17 +605,31 @@ function YourMoveSection({
             : t("panels.overview.nothingNeedsYou")}
         </Text>
       ) : (
-        rows.map((row, index) => (
-          <MoveRow
-            key={row.key}
-            row={row}
-            first={index === 0}
-            serverId={serverId}
-            workspaceKey={workspaceKey}
-            facts={facts}
-            gitActions={gitActions}
-          />
-        ))
+        rows.map((row, index) => {
+          const move = (
+            <MoveRow
+              key={row.key}
+              row={row}
+              first={index === 0}
+              serverId={serverId}
+              workspaceKey={workspaceKey}
+              facts={facts}
+              gitActions={gitActions}
+            />
+          );
+          // A plugin that renders its own entries (Asks) is acted on in place, not in its tab.
+          if (row.kind !== "entry" || !row.item.EntryComponent) return move;
+          return (
+            <WorkspaceSummaryEntryView
+              key={row.key}
+              item={row.item}
+              entryId={row.entry.id}
+              defaultExpanded={index === 0}
+            >
+              {move}
+            </WorkspaceSummaryEntryView>
+          );
+        })
       )}
     </Section>
   );

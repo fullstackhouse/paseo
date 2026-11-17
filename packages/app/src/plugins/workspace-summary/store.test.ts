@@ -101,4 +101,12 @@ describe("WorkspaceSummaryStore", () => {
       { id: "A4", title: "Backoff?", detail: "Decision" },
     ]);
   });
+
+  it("keeps the entry component across updates", () => {
+    const store = new WorkspaceSummaryStore();
+    const EntryComponent = () => null;
+    const item = store.add(owner, { id: "asks", workspaceId: "w", title: "Asks", EntryComponent });
+    item.update({ count: 1, EntryComponent: () => null } as never);
+    expect(store.forWorkspace("s", "w")[0]?.EntryComponent).toBe(EntryComponent);
+  });
 });

@@ -164,6 +164,8 @@ and what's my move. Then come the branch and PR, then plugin facts that fit none
 - **Your move**: the attention items as a list, one row per plugin `entries` item, then failing checks and the header's
   primary git action, from the same `useGitActions` result so the two can't disagree. Only the first row has a button.
   While an agent runs, only blocking items show. Archive is only a move once the PR merged.
+  A summary item with an `EntryComponent` renders its entries itself (`plugins/workspace-summary/entry-view.tsx`), so
+  an ask is answered in place: the first starts open with its actions, the rest expand inline.
 
 Summary items route by shape (`partitionSummaryItems`): `status` → Status, `needsYou` or `entries` → Your move,
 anything else → More. Entering a workspace adds the tab once, first in the rail. Like Files and Changes it has no inline

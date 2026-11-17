@@ -25,6 +25,7 @@ export type {
   PluginWorkspaceWorkState,
   PluginWorkspaceStatus,
   PluginWorkspaceSummaryEntry,
+  PluginWorkspaceSummaryEntryProps,
   PluginIcon,
   PluginPanelLocation,
   PluginOpenPanelOptions,

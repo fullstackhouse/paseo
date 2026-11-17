@@ -6,7 +6,9 @@ import type {
   PluginWorkspaceSummaryItemState,
   PluginWorkspaceStatus,
   PluginWorkspaceSummaryEntry,
+  PluginWorkspaceSummaryEntryProps,
 } from "@getpaseo/plugin/client";
+import type { ComponentType } from "react";
 
 export interface WorkspaceSummaryItem extends PluginWorkspaceSummaryItemState {
   /** Distinguishes two registrations of the same item; never reused. */
@@ -17,6 +19,8 @@ export interface WorkspaceSummaryItem extends PluginWorkspaceSummaryItemState {
   workspaceId: string;
   /** Resolved for the current locale when the item is added. */
   title: string;
+  /** The plugin's renderer for one entry; set once, when the item is added. */
+  EntryComponent?: ComponentType<PluginWorkspaceSummaryEntryProps>;
 }
 
 export interface WorkspaceSummaryOwner {
@@ -132,6 +136,8 @@ export class WorkspaceSummaryStore {
     );
     if (duplicate) throw new Error(`Duplicate workspace summary item: ${itemId} in ${workspaceId}`);
     const entryKey = this.nextKey++;
+    // Static: an update can't swap it, so a mounted entry never remounts as a different component.
+    const EntryComponent = contribution.EntryComponent;
     const build = (state: PluginWorkspaceSummaryItemState): WorkspaceSummaryItem => ({
       ...state,
       entryKey,
@@ -140,6 +146,7 @@ export class WorkspaceSummaryStore {
       itemId,
       workspaceId,
       title,
+      ...(EntryComponent ? { EntryComponent } : {}),
     });
     let current = cleanState(contribution);
     this.replace([...this.entries, build(current)]);

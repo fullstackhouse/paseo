@@ -149,7 +149,9 @@ Approve the storyboard, then `split-prs`: (1) host layout plus the summary-item 
 
 - The Overview ⋯ menu holds **Lineage details** and **Archive workspace**. Open in editor and Copy branch name stay in the
   header ⋯ menu, which already has them.
-- The first Your move row's button says **Open** for plugin entries. The host doesn't know a plugin's verb.
+- Plugin entries render through the plugin's own `EntryComponent` when it has one: Asks shows its full ask card in
+  Your move (first one open, with its buttons and reply box), so answering never leaves the Overview. Without one, the
+  row's button says **Open** and opens the plugin's panel.
 - The outdated marking on the status card is not built: A4 was dropped.
 - The "Started" label has no count, so locales need no plural forms. Child rows show the first 4, then "Show all (N)".
 - The Status card shows at most 4 lines of summary. The full card is one press away in the Status tab.
