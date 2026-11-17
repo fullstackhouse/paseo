@@ -1,13 +1,18 @@
 import type { PluginTheme } from "@getpaseo/plugin";
+import type { PluginScreenRuntimeTitle } from "@getpaseo/plugin/client";
 import { PluginClientStateProvider } from "@getpaseo/plugin/client/host";
 import { AppWindow, CircleAlert } from "lucide-react-native";
-import { useMemo } from "react";
+import { useCallback, useMemo, useRef } from "react";
 import { Text, View } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import invariant from "tiny-invariant";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { usePaneContext } from "@/panels/pane-context";
-import { definePanel, type PanelDescriptor } from "@/panels/panel-registry";
+import {
+  definePanel,
+  type PanelDescriptor,
+  type PanelDescriptorContext,
+} from "@/panels/panel-registry";
 import { useHostRuntimeClient, useHosts } from "@/runtime/host-runtime";
 import type { Theme } from "@/styles/theme";
 import type { PluginScreenWorkspaceTabTarget } from "@/workspace-tabs/model";
@@ -19,6 +24,7 @@ import { useInstalledPlugin } from "../registry";
 import { SurfaceErrorBoundary } from "../surface-error-boundary";
 import { resolvePluginScreenTitle } from "../surface-contribution";
 import { toPluginTheme } from "../theme";
+import { nextPluginScreenTabState, readPluginScreenTabTitle } from "./runtime-title";
 
 const pluginThemeMapping = (theme: Theme) => ({ theme: toPluginTheme(theme) });
 
@@ -30,8 +36,20 @@ function usePluginScreen(serverId: string, target: PluginScreenWorkspaceTabTarge
 
 /** A plugin screen in a workspace tab: the same component and params as its full-screen route. */
 function PluginScreenTabBody({ theme }: { theme: PluginTheme }) {
-  const { serverId, target } = usePaneContext();
+  const { serverId, target, state, setCurrentTabState } = usePaneContext();
   invariant(target.kind === "plugin_screen", "PluginScreenTab requires a plugin screen target");
+  // Stable for the plugin's effects; reads the latest state so repeated titles write nothing.
+  const stateRef = useRef(state);
+  stateRef.current = state;
+  const setTitle = useCallback(
+    (title: PluginScreenRuntimeTitle | null) => {
+      const next = nextPluginScreenTabState(stateRef.current, title);
+      if (next === null) return;
+      stateRef.current = next;
+      setCurrentTabState(next);
+    },
+    [setCurrentTabState],
+  );
   const { plugin, screen } = usePluginScreen(serverId, target);
   const client = useHostRuntimeClient(serverId);
   const compact = useIsCompactFormFactor();
@@ -60,6 +78,7 @@ function PluginScreenTabBody({ theme }: { theme: PluginTheme }) {
               layout={layout}
               navigation={navigation}
               params={target.params}
+              setTitle={setTitle}
             />
           </PluginClientStateProvider>
         </PluginInstallationProvider>
@@ -84,9 +103,10 @@ function Unavailable({ message }: { message: string }) {
 
 function usePluginScreenTabDescriptor(
   target: PluginScreenWorkspaceTabTarget,
-  context: { serverId: string },
+  context: PanelDescriptorContext,
 ): PanelDescriptor {
   const { plugin, screen } = usePluginScreen(context.serverId, target);
+  const runtimeTitle = readPluginScreenTabTitle(context.state);
   const title = useMemo(
     () =>
       plugin && screen
@@ -107,9 +127,9 @@ function usePluginScreenTabDescriptor(
     };
   }
   return {
-    label: title,
+    label: runtimeTitle?.label ?? title,
     subtitle: target.pluginId,
-    tooltip: title,
+    tooltip: runtimeTitle?.tooltip ?? title,
     titleState: "ready",
     icon: AppWindow,
     statusBucket: null,

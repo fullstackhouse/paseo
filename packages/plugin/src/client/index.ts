@@ -41,6 +41,7 @@ export type {
   PluginSurfaceContribution,
   PluginScreenContribution,
   PluginScreenTitle,
+  PluginScreenRuntimeTitle,
   PluginSidebarContribution,
   PluginTimelineTransformerContribution,
   PluginTimelineItemProps,

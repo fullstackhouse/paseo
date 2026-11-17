@@ -384,7 +384,8 @@ keys are stored under a `param.` prefix; plugins never see it and may use any ke
 params. With a `workspaceId`, the screen opens as a `plugin_screen` workspace tab instead
 (`plugins/screen-tab/panel.tsx`). The tab target persists the params, so they survive a reload
 the same way the route's query does. Its identity is plugin, screen, and params, so reopening a
-review focuses its tab.
+review focuses its tab. A screen's `setTitle` writes `{ title }` into the tab's persisted state,
+so the tab strip shows it for tabs that aren't mounted; the full-screen route keeps it in memory.
 
 RPC and subscription contracts validate inputs, outputs, and events in both the app and plugin
 subprocess. `useRpc` returns a typed async function. Use the host-provided `@tanstack/react-query`

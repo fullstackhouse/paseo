@@ -718,6 +718,8 @@ export default function contribute(client: PluginClientContext) {
 
 `addScreen({ id, title, Component })` 注册一个界面。`title` 是界面标题栏的[显示文本](#runtime-translations)，也可以是接收界面参数并返回显示文本的函数。参数或语言变化时，该函数会再次运行。无效标题和空字符串标题会被拒绝。如果标题函数抛出错误或解析为空字符串，会改为显示界面 ID；界面仍然会渲染。
 
+当标题取决于界面加载的数据（例如 `runId` 参数指向的拉取请求）时，在界面中调用 `setTitle({ label, tooltip? })` 属性。它会替换界面标题栏和对应工作区标签页中的注册标题，`tooltip` 在悬停时显示。标签页会在重新加载后保留该标题；`setTitle(null)` 恢复注册标题。旧版主机不提供 `setTitle`，因此请写成 `setTitle?.(…)`。
+
 `openScreen({ screenId, params })` 以参数打开一个界面，例如机器人界面要显示的那个机器人。参数保存在界面 URL 的查询字符串中，因此重新加载、前进后退以及指向该界面的链接都会保留它们。任何字符串键都可以；值必须是字符串，其他类型会抛出错误。用其他参数打开同一个界面会显示新的参数。
 
 ### 侧边栏项 {#sidebar-items}

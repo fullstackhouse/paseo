@@ -932,6 +932,12 @@ display text. The function runs again when params or language change. Invalid or
 titles are rejected. A title function that throws or resolves to an empty string shows the screen
 ID instead; the screen still renders.
 
+When the title depends on data the screen loads, such as a pull request a `runId` param points at,
+call the `setTitle({ label, tooltip? })` prop from the screen. It replaces the registered title in
+the screen header and in its workspace tab, where `tooltip` shows on hover. A tab remembers it
+across reloads; `setTitle(null)` restores the registered title. Older hosts leave `setTitle`
+undefined, so call it as `setTitle?.(…)`.
+
 `openScreen({ screenId, params })` opens a screen with params, such as the bot a bot screen shows.
 Params live in the screen's URL query, so a reload, back and forward, and a link to the screen keep
 them. Any string key works; values must be strings, and anything else throws. Opening the same

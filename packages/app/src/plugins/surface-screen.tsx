@@ -1,8 +1,13 @@
 import { router, useLocalSearchParams } from "expo-router";
-import type { PluginIcon, PluginScreenParams, PluginScreenProps } from "@getpaseo/plugin/client";
+import type {
+  PluginIcon,
+  PluginScreenParams,
+  PluginScreenProps,
+  PluginScreenRuntimeTitle,
+} from "@getpaseo/plugin/client";
 import type { PluginTheme } from "@getpaseo/plugin";
 import { X } from "lucide-react-native";
-import { useCallback, useMemo, type ComponentType } from "react";
+import { useCallback, useMemo, useState, type ComponentType } from "react";
 import { Text, View } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { HeaderIconBadge } from "@/components/headers/header-icon-badge";
@@ -88,6 +93,7 @@ function SurfaceRenderer({
   layout,
   host,
   params,
+  setTitle,
   theme,
 }: {
   Surface: ComponentType<PluginScreenProps>;
@@ -95,12 +101,20 @@ function SurfaceRenderer({
   layout: PluginScreenProps["layout"];
   host: PluginScreenProps["host"];
   params: PluginScreenParams;
+  setTitle: (title: PluginScreenRuntimeTitle | null) => void;
   theme: PluginTheme;
 }) {
   const navigation = usePluginHostNavigation(host.id);
   return (
     <PluginInstallationProvider plugin={plugin}>
-      <Surface theme={theme} host={host} layout={layout} navigation={navigation} params={params} />
+      <Surface
+        theme={theme}
+        host={host}
+        layout={layout}
+        navigation={navigation}
+        params={params}
+        setTitle={setTitle}
+      />
     </PluginInstallationProvider>
   );
 }
@@ -181,7 +195,21 @@ export function PluginSurfaceScreen() {
     const serverIds = getPluginSurfaceContributionServerIds(installations, pluginId, identity);
     return hosts.filter((candidate) => serverIds.includes(candidate.serverId));
   }, [hosts, identity, installations, pluginId]);
-  const title = useMemo(() => {
+  // Keyed to the screen it came from, so another screen or params never shows a stale title.
+  const runtimeKey = `${serverId}/${pluginId}/${identity?.kind}/${contributionId}?${paramsKey}`;
+  const [runtimeTitle, setRuntimeTitle] = useState<{ key: string; label: string } | null>(null);
+  const setTitle = useCallback(
+    (next: PluginScreenRuntimeTitle | null) => {
+      const label = next?.label.trim() ?? "";
+      setRuntimeTitle((previous) => {
+        if (!label) return null;
+        if (previous?.key === runtimeKey && previous.label === label) return previous;
+        return { key: runtimeKey, label };
+      });
+    },
+    [runtimeKey],
+  );
+  const registeredTitle = useMemo(() => {
     if (surface && plugin)
       return resolvePluginScreenTitle(surface, sidebarItem, params, (text) =>
         plugin.i18n.resolve(text, plugin.locale),
@@ -189,6 +217,7 @@ export function PluginSurfaceScreen() {
     if (sidebarItem && plugin) return plugin.i18n.resolve(sidebarItem.title, plugin.locale);
     return pluginId || "Plugin";
   }, [params, plugin, pluginId, sidebarItem, surface]);
+  const title = runtimeTitle?.key === runtimeKey ? runtimeTitle.label : registeredTitle;
   const icon = sidebarItem?.icon ?? null;
   const close = useCallback(() => {
     if (router.canGoBack()) router.back();
@@ -267,6 +296,7 @@ export function PluginSurfaceScreen() {
               host={host}
               layout={layout}
               params={params}
+              setTitle={setTitle}
               uniProps={pluginThemeMapping}
             />
           </SurfaceErrorBoundary>
