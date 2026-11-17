@@ -84,9 +84,21 @@ export interface PluginScreenLocation {
 
 export interface PluginSurfaceProps extends PluginNavigableHostProps {}
 
+/** A title the open screen sets for itself, e.g. once it has loaded what its params point at. */
+export interface PluginScreenRuntimeTitle {
+  label: string;
+  /** Longer text for the tab's tooltip; `label` when omitted. */
+  tooltip?: string;
+}
+
 export interface PluginScreenProps extends PluginSurfaceProps {
   /** The params the screen was opened with; `{}` when none. */
   params: PluginScreenParams;
+  /**
+   * Replaces the registered title in the screen's header and workspace tab; null restores it.
+   * A tab remembers the title across reloads. Undefined on older hosts.
+   */
+  setTitle?: (title: PluginScreenRuntimeTitle | null) => void;
 }
 
 export interface PluginPopoverProps extends PluginHostProps {

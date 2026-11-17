@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import invariant from "tiny-invariant";
 import { getPanelManifest, type PanelManifest } from "@/panels/panel-manifest";
 export type { PaneHost } from "@/panels/panel-manifest";
+import type { JsonValue } from "@getpaseo/protocol/agent-types";
 import type { WorkspaceTabTarget } from "@/workspace-tabs/model";
 import type { SidebarStateBucket } from "@/utils/sidebar-agent-state";
 
@@ -26,6 +27,8 @@ export interface PanelDescriptorContext {
   serverId: string;
   workspaceId: string;
   tabId: string;
+  /** The tab's persisted state, for titles a panel wrote while it was open. */
+  state?: JsonValue;
 }
 
 export interface PanelPresentation {
