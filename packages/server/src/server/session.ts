@@ -8596,8 +8596,8 @@ export class Session {
    * so theirs don't count.
    */
   private async wakeAgentWorkspace(agentId: string): Promise<void> {
-    // Hub sessions connect as `hub:<daemonId>` (executions) or `hub:<daemonId>:<credential>`.
-    if (isPluginClientId(this.clientId) || this.clientId.startsWith("hub:")) return;
+    // Only a Hub attach passes execution agents; the Hub picks its own clientId.
+    if (isPluginClientId(this.clientId) || this.hubExecutionController) return;
     try {
       const workspaceId =
         this.agentManager.getAgent(agentId)?.workspaceId ??

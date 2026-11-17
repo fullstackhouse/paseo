@@ -567,6 +567,7 @@ class CreateAgentTestClient implements AgentClient {
 function createSessionForWorkspaceTests(
   options: {
     clientId?: string;
+    hubExecutionAgents?: SessionOptions["hubExecutionAgents"];
     appVersion?: string | null;
     onMessage?: (message: SessionOutboundMessage) => void;
     onWorkspaceRecovered?: SessionOptions["onWorkspaceRecovered"];
@@ -672,6 +673,7 @@ function createSessionForWorkspaceTests(
       onMessage: options.onMessage ?? vi.fn(),
       onWorkspaceRecovered: options.onWorkspaceRecovered,
       reportWorkspaceAttention: options.reportWorkspaceAttention,
+      hubExecutionAgents: options.hubExecutionAgents,
       logger: asSessionLogger(logger),
       downloadTokenStore: asDownloadTokenStore(),
       pushNotifications: asPushNotifications(),
@@ -10387,7 +10389,7 @@ test("workspace PR status survives session cleanup and reconnect", async () => {
 });
 
 describe("a message to an agent in a snoozed workspace", () => {
-  function setup(clientId?: string) {
+  function setup(clientId?: string, hubExecutionAgents?: SessionOptions["hubExecutionAgents"]) {
     const snoozedAt = "2026-03-01T12:00:00.000Z";
     const workspaces = new Map([
       [
@@ -10408,6 +10410,7 @@ describe("a message to an agent in a snoozed workspace", () => {
     const session = asTestSession(
       createSessionForWorkspaceTests({
         clientId,
+        hubExecutionAgents,
         agentManager: {
           getAgent: (id: string) => (id === "agent-1" ? { id, workspaceId: "ws-1" } : null),
         },
@@ -10478,7 +10481,15 @@ describe("a message to an agent in a snoozed workspace", () => {
   });
 
   test("from a Hub session leaves the snooze alone", async () => {
-    const { session, workspaces } = setup("hub:daemon-1");
+    // session-v1 Hubs pick their own clientId, so the session is told it is a Hub attach.
+    const { session, workspaces } = setup("local-hub", {
+      create: async () => {
+        throw new Error("unused");
+      },
+      control: async () => {},
+      subscribe: () => () => {},
+      invalidateAuthority: async () => {},
+    });
     await session.handleMessage({
       type: "send_agent_message_request",
       requestId: "req-send",

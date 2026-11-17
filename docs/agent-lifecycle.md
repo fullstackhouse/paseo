@@ -232,7 +232,7 @@ The daemon owns both halves so every client and plugin agrees:
   delegated work comes back to you.
 - A message from the human to one of its agents (`send_agent_message_request` without
   `sourceAgentId`, or voice) wakes it. Messages from agents, plugin sessions (paseo-asks and
-  paseo-status nudges) and Hub sessions (`hub:` client ids) leave the snooze alone, and so does a
+  paseo-status nudges) and sessions attached through a Hub leave the snooze alone, and so does a
   request with `keepSnoozed` (the app's **Resume all** after a daemon restart).
 - `setupWorkspaceSnoozeWaker` (`packages/server/src/server/workspace-snooze/`) clears timed snoozes
   when they end, including any that ended while the daemon was down. A snooze past its end counts
