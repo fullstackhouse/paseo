@@ -4684,7 +4684,7 @@ export class Session {
       }
       this.validatePublicAgentWorkspaceIntent(msg);
       const trimmedPrompt = initialPrompt?.trim();
-      const { provisionalTitle } = resolveCreateAgentTitles({
+      const { explicitTitle, provisionalTitle } = resolveCreateAgentTitles({
         configTitle: config.title,
         initialPrompt: trimmedPrompt,
       });
@@ -4749,6 +4749,14 @@ export class Session {
       await this.agentUpdates.forwardLiveAgent(
         this.agentManager.getAgent(snapshot.id) ?? liveSnapshot,
       );
+      if (explicitTitle) {
+        await this.workspaceAutoName.adoptFirstAgentTitle({
+          workspaceId: resolvedIntent.intent.workspaceId,
+          agentId: snapshot.id,
+          title: explicitTitle,
+          promptTitle: workspacePromptTitle,
+        });
+      }
       if (resolvedIntent.createdDirectoryWorkspace && trimmedPrompt) {
         this.workspaceAutoName.scheduleForDirectory(
           {

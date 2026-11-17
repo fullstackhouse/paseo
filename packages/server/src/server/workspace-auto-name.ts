@@ -3,6 +3,7 @@ import type { FirstAgentContext } from "@getpaseo/protocol/messages";
 
 import { resolveFirstAgentPromptTitle } from "./agent/create-agent-title.js";
 import type { AgentManager } from "./agent/agent-manager.js";
+import type { AgentStorage, StoredAgentRecord } from "./agent/agent-storage.js";
 import type { ProviderSnapshotManager } from "./agent/provider-snapshot-manager.js";
 import type { StructuredGenerationDaemonConfig } from "./agent/structured-generation-providers.js";
 import {
@@ -24,6 +25,7 @@ type CurrentSelection = GenerateBranchNameFromFirstAgentContextOptions["currentS
 
 interface WorkspaceAutoNameOptions {
   agentManager: AgentManager;
+  agentStorage: Pick<AgentStorage, "listByWorkspace">;
   workspaceRegistry: Pick<WorkspaceRegistry, "update">;
   workspaceGitService: WorkspaceGitService;
   providerSnapshotManager: ProviderSnapshotManager;
@@ -39,8 +41,16 @@ interface ScheduleContext {
   currentSelection?: CurrentSelection;
 }
 
+export interface AdoptFirstAgentTitleInput {
+  workspaceId: string;
+  agentId: string;
+  title: string;
+  promptTitle: string | null;
+}
+
 export class WorkspaceAutoName {
   private readonly agentManager: AgentManager;
+  private readonly agentStorage: Pick<AgentStorage, "listByWorkspace">;
   private readonly workspaceRegistry: Pick<WorkspaceRegistry, "update">;
   private readonly workspaceGitService: WorkspaceGitService;
   private readonly providerSnapshotManager: ProviderSnapshotManager;
@@ -53,6 +63,7 @@ export class WorkspaceAutoName {
 
   constructor(options: WorkspaceAutoNameOptions) {
     this.agentManager = options.agentManager;
+    this.agentStorage = options.agentStorage;
     this.workspaceRegistry = options.workspaceRegistry;
     this.workspaceGitService = options.workspaceGitService;
     this.providerSnapshotManager = options.providerSnapshotManager;
@@ -176,15 +187,50 @@ export class WorkspaceAutoName {
     await this.emitWorkspaceUpdateForWorkspaceId(input.workspaceId);
   }
 
+  /**
+   * An agent created with an explicit title into a workspace that has no other
+   * agent names that workspace too, unless someone already named it by hand.
+   * `paseo run --title X --new-workspace worktree --new-branch Y` creates the
+   * workspace without a prompt, so nothing else would ever title it.
+   */
+  async adoptFirstAgentTitle(input: AdoptFirstAgentTitleInput): Promise<void> {
+    const agents = await this.listWorkspaceAgents(input.workspaceId);
+    if (agents.some((agent) => agent.id !== input.agentId)) {
+      return;
+    }
+    let changed = false;
+    await this.workspaceRegistry.update(input.workspaceId, (current) => {
+      if (!isReplaceableWorkspaceTitle(current.title, input.promptTitle)) {
+        return current;
+      }
+      changed = current.title !== input.title;
+      return { ...current, title: input.title, updatedAt: new Date().toISOString() };
+    });
+    if (changed) {
+      await this.emitWorkspaceUpdateForWorkspaceId(input.workspaceId);
+    }
+  }
+
+  /**
+   * Writes the generated title and keeps a single-agent workspace and its agent
+   * on one name: an agent that still has its prompt-derived title takes the
+   * workspace's title; an agent named explicitly names the workspace instead.
+   * Titles set by hand are never overwritten.
+   */
   private async applyGeneratedWorkspaceTitle(
     workspaceId: string,
     input: { title: string; branch?: string | null; promptTitle?: string | null },
   ): Promise<void> {
-    await this.workspaceRegistry.update(workspaceId, (current) => {
-      let title = current.title;
-      if (!title || (input.promptTitle && title === input.promptTitle)) {
-        title = input.title;
-      }
+    const promptTitle = input.promptTitle ?? null;
+    const agents = await this.listWorkspaceAgents(workspaceId);
+    const soleAgent = agents.length === 1 ? agents[0] : null;
+    const agentHasOwnTitle = Boolean(soleAgent?.title && soleAgent.title !== promptTitle);
+    const candidateTitle = agentHasOwnTitle && soleAgent?.title ? soleAgent.title : input.title;
+
+    const updated = await this.workspaceRegistry.update(workspaceId, (current) => {
+      const title = isReplaceableWorkspaceTitle(current.title, promptTitle)
+        ? candidateTitle
+        : current.title;
       return {
         ...current,
         title,
@@ -192,6 +238,23 @@ export class WorkspaceAutoName {
         updatedAt: new Date().toISOString(),
       };
     });
+
+    const workspaceTitle = updated?.title ?? null;
+    if (
+      !soleAgent ||
+      agentHasOwnTitle ||
+      !workspaceTitle ||
+      soleAgent.title === workspaceTitle ||
+      !this.agentManager.getAgent(soleAgent.id)
+    ) {
+      return;
+    }
+    await this.agentManager.setTitle(soleAgent.id, workspaceTitle);
+  }
+
+  private async listWorkspaceAgents(workspaceId: string): Promise<StoredAgentRecord[]> {
+    const records = await this.agentStorage.listByWorkspace(workspaceId);
+    return records.filter((record) => !record.internal && !record.archivedAt);
   }
 
   private generateFromContext(input: {
@@ -218,4 +281,11 @@ export class WorkspaceAutoName {
       });
     }, 0);
   }
+}
+
+function isReplaceableWorkspaceTitle(
+  title: string | null | undefined,
+  promptTitle: string | null | undefined,
+): boolean {
+  return !title || (Boolean(promptTitle) && title === promptTitle);
 }
