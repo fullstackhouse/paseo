@@ -4,8 +4,10 @@
 # - Pushes to `fsh`: build and publish it on a GitHub Release (`fsh-android-*`).
 #
 # Variant `fsh` (packages/app/app.config.js): package `house.fullstack.paseo`, so it installs next
-# to the store app. Always the F-Droid flavour: no Google services, no expo-notifications, no
-# camera. So no push notifications and no QR pairing; hosts are added by address.
+# to the store app. Push notifications go through our own Expo project and Firebase
+# (fsh-monorepo infra/paseo-push); the Firebase config comes from the Actions variable
+# FSH_GOOGLE_SERVICES_JSON. The version code is 1_000_000 + this workflow's run number, so it
+# grows with every build and stays above the earlier F-Droid-style builds (~130000).
 #
 # Signed with FSH's own key (plugins/with-fsh-release-signing.js), backed up in GCP Secret
 # Manager as paseo-android-keystore{,-password}. Android only installs an update signed with the
@@ -72,8 +74,18 @@ jobs:
         working-directory: packages/app
         env:
           APP_VARIANT: fsh
-          PASEO_FDROID_BUILD: "1"
-        run: npx expo prebuild --platform android --no-install
+          GOOGLE_SERVICES_JSON: ${{ vars.FSH_GOOGLE_SERVICES_JSON }}
+        run: |
+          set -euo pipefail
+          if [ -z "$GOOGLE_SERVICES_JSON" ]; then
+            echo "::error::Actions variable FSH_GOOGLE_SERVICES_JSON is not set"
+            exit 1
+          fi
+          printf '%s' "$GOOGLE_SERVICES_JSON" > "$RUNNER_TEMP/google-services.json"
+          export GOOGLE_SERVICES_FILE_FSH="$RUNNER_TEMP/google-services.json"
+          export FSH_ANDROID_VERSION_CODE=$((1000000 + GITHUB_RUN_NUMBER))
+          echo "FSH_ANDROID_VERSION_CODE=$FSH_ANDROID_VERSION_CODE" >> "$GITHUB_ENV"
+          npx expo prebuild --platform android --no-install
 
       - name: Decode signing key
         env:
@@ -91,7 +103,6 @@ jobs:
         working-directory: packages/app/android
         env:
           APP_VARIANT: fsh
-          PASEO_FDROID_BUILD: "1"
           PASEO_ANDROID_KEYSTORE_PASSWORD: ${{ secrets.PASEO_ANDROID_KEYSTORE_PASSWORD }}
           PASEO_ANDROID_KEY_PASSWORD: ${{ secrets.PASEO_ANDROID_KEYSTORE_PASSWORD }}
           PASEO_ANDROID_KEY_ALIAS: fsh-paseo
@@ -135,7 +146,7 @@ jobs:
             --target "$GITHUB_SHA" \
             --latest=false \
             --title "Paseo Android ${APK_VERSION} (FSH ${GITHUB_SHA::7})" \
-            --notes "Android APK of \`fsh\` ($(git log -1 --format=%h)), package \`house.fullstack.paseo\`, signed with the FSH key. Install by hand or track with Obtainium. No push notifications."
+            --notes "Android APK of \`fsh\` ($(git log -1 --format=%h)), package \`house.fullstack.paseo\`, signed with the FSH key. Version code ${FSH_ANDROID_VERSION_CODE}. Install by hand or track with Obtainium."
 
       # A link that never changes, for phones: always the newest APK under one name.
       #   https://github.com/fullstackhouse/paseo/releases/download/fsh-android-latest/paseo-fsh-arm64.apk
