@@ -393,6 +393,10 @@ Paseo gives each plugin installation its own query client.
 `usePaseo()` and the handler's `{ paseo }` context expose the same `PaseoApi`: projects,
 workspaces, agents, terminals, providers, and daemon config. They do not expose connection lifecycle.
 
+To message a running agent, check its snapshot's `capabilities.supportsSteering`. When true, send
+now with `activeTurnBehavior: "steer"` and the message joins the turn. When false or absent, a steer
+falls back to interrupting the turn, so wait for `agent.turn_ended` instead.
+
 `usePaseo()` is the plugin's one client: `InstalledPlugin.paseo`, created with the installation in
 `packages/app/src/plugins/registry.ts` over the host's existing connection and passed to setup as
 `client.paseo`. Authors release their subscriptions in their own cleanup, and teardown (disable,

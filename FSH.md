@@ -12,6 +12,8 @@ temporary by design: every patch is meant to go upstream and then drop out of `f
 - FSH-only (upstreamable): a file tab's right-click menu has **Reveal in Finder** (Explorer / Files on other OSes) on desktop with a local daemon, next to **Copy file path**.
 - FSH-only (upstreamable): plugins can render the Explorer pull-request panel through `PullRequestPanel`, using their own checks and activity data without a workspace checkout. Inbox uses it for its read-only GitHub tab.
 
+- FSH-only (upstreamable): agent snapshots carry `capabilities.supportsSteering` (Claude, Codex, OpenCode, Pi, OMP, and provider plugins that negotiate `prompt.steer`), so plugins steer a running agent when it joins the turn and wait for the turn to end when a steer would interrupt it.
+
 - FSH-only: don't automatically show the worktree scripts setup callout; configure scripts in project settings.
 
 - FSH-only (not upstream yet): plugin Markdown supports inline review annotations with source line ranges and advertises `supportsBlockAnnotations`. Inbox and Asks use the shared renderer, including Mermaid diagrams; older hosts show update guidance for annotated documents.
