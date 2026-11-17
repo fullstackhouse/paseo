@@ -146,8 +146,9 @@ DMG if you use voice input.
 ## Install the Android app
 
 Our own build of the mobile app, from `fsh`: package `house.fullstack.paseo`, installs next to
-the store app. It is built without Google services, so it has **no push notifications** and no
-QR pairing.
+the store app. Push notifications go through our own Expo project (`@fullstackhouse/paseo-fsh`)
+and Firebase (`fsh-paseo-push`, managed in fsh-monorepo `infra/paseo-push`): the daemon sends
+the notification text (agent name, message preview) through Expo and Google.
 
 1. On the phone, open **[paseo-fsh-arm64.apk](https://github.com/fullstackhouse/paseo/releases/download/fsh-android-latest/paseo-fsh-arm64.apk)**,
    a link that always serves the newest build, or scan:
@@ -160,7 +161,8 @@ QR pairing.
    The title filter matters: most releases here are desktop DMGs with no APK.
 
 2. Allow installs from that app when Android asks.
-3. Add hosts as a direct connection: e.g. `jaceks-macbook-pro.tailc790a0.ts.net`, port `443`,
+3. Allow notifications when the app asks.
+4. Add hosts as a direct connection: e.g. `jaceks-macbook-pro.tailc790a0.ts.net`, port `443`,
    SSL on, plus the daemon password. Tailscale must be on.
 
 Every build is signed with the FSH key (GCP Secret Manager: `paseo-android-keystore`,
