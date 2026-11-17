@@ -98,11 +98,19 @@ const variants = {
   },
 };
 
-// FSH fork: our own sideloaded Android build, installable next to the store app.
-// No Google services: it is always built with PASEO_FDROID_BUILD=1 (see fsh-android.yml).
+// FSH fork: our own Android build, installable next to the store app (fsh-android.yml).
+// Push goes through our own Expo project and Firebase (fsh-monorepo infra/paseo-push).
+// versionCode comes from CI (FSH_ANDROID_VERSION_CODE, a run counter): Google Play needs
+// it to grow with every upload, and it must stay above the earlier F-Droid-style builds.
 variants.fsh = {
   name: "Paseo FSH",
   packageId: "house.fullstack.paseo",
+  googleServicesFile: process.env.GOOGLE_SERVICES_FILE_FSH,
+  easOwner: "fullstackhouse",
+  easProjectId: "ac3aec7b-d94a-4dde-b810-1d6e63e16aea",
+  versionCode: process.env.FSH_ANDROID_VERSION_CODE
+    ? Number(process.env.FSH_ANDROID_VERSION_CODE)
+    : undefined,
 };
 
 const variant = variants[appVariant] ?? variants.production;
@@ -142,7 +150,7 @@ export default {
       usesCleartextTraffic: true,
       permissions: buildProfile.androidPermissions,
       package: variant.packageId,
-      versionCode: nativeReleaseVersion.androidVersionCode,
+      versionCode: variant.versionCode ?? nativeReleaseVersion.androidVersionCode,
       ...(variant.googleServicesFile ? { googleServicesFile: variant.googleServicesFile } : {}),
     },
     web: {
@@ -210,9 +218,9 @@ export default {
       diagnosticBuildTime: process.env.PASEO_DIAGNOSTIC_BUILD_TIME,
       router: {},
       eas: {
-        projectId: "0e7f65ce-0367-46c8-a238-2b65963d235a",
+        projectId: variant.easProjectId ?? "0e7f65ce-0367-46c8-a238-2b65963d235a",
       },
     },
-    owner: "getpaseo",
+    owner: variant.easOwner ?? "getpaseo",
   },
 };
