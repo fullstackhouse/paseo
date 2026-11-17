@@ -1,6 +1,6 @@
 # Spec: Overview v2: where am I, what's the status, what's my move
 
-Status: draft · 2026-11-17 · storyboard: [`.ai/prototypes/overview-v2/`](../.ai/prototypes/overview-v2/index.html)
+Status: implemented · 2026-11-17 · storyboard: [`.ai/prototypes/overview-v2/`](../.ai/prototypes/overview-v2/index.html)
 
 Supersedes the layout in [spec-explorer-overview.md](spec-explorer-overview.md). The next-step ladder and attention model stay.
 Scope: the Overview tab only. The other Explorer tabs (Files, Changes, PR, Asks, Lineage, Status) stay as they are and act as
@@ -144,3 +144,13 @@ Items with neither `workState` nor `needsYou` (future plugins) render as plain r
 
 Approve the storyboard, then `split-prs`: (1) host layout plus the summary-item fields, (2) paseo-status fields,
 (3) paseo-asks entries and count 0.
+
+## As built
+
+- The Overview ⋯ menu holds **Lineage details** and **Archive workspace**. Open in editor and Copy branch name stay in the
+  header ⋯ menu, which already has them.
+- The first Your move row's button says **Open** for plugin entries. The host doesn't know a plugin's verb.
+- The outdated marking on the status card is not built: A4 was dropped.
+- The "Started" label has no count, so locales need no plural forms. Child rows show the first 4, then "Show all (N)".
+- The Status card shows at most 4 lines of summary. The full card is one press away in the Status tab.
+- Plugin PRs: fullstackhouse/paseo-status#18 (`status`), fullstackhouse/paseo-asks#47 (`entries`, count 0).

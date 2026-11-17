@@ -153,13 +153,22 @@ content also requests timeline data. Inactive consumers read cached data without
 Discovery uses ordinary PR tabs and their existing once-per-workspace close opt-out.
 
 Overview is an Explorer-only singleton tab that summarizes the workspace on desktop
-(`packages/app/src/panels/overview-panel.tsx`): a next step, the focused agent and its lineage, plugin workspace summary
-items, the branch and its changes, and the pull request. Inline lineage reuses the Lineage tab’s
-relative rows and navigation without repeating the focused agent or nesting a scroll view. The next step reuses the attention items above:
-permission, plugin and failed items come first, then a running agent shows no action, then failing checks.
-Otherwise it renders the header's `GitActionsSplitButton` with the same `useGitActions` result, so the two
-can't disagree. Entering a workspace adds the tab once, first in the rail. Like Files and Changes it
-has no inline close; closing it from the tab menu opts that workspace out, as with Lineage. **Always** shows Explorer on it when nothing needs you.
+(`packages/app/src/panels/overview-panel.tsx`). It answers three questions in order: where am I, what's the status,
+and what's my move. Then come the branch and PR, then plugin facts that fit none of these.
+
+- **Where am I**: the workspace name, project and branch, the focused agent, and lineage by workspace: the nearest
+  ancestor's workspace and the workspaces the focused agent started, each with one state word. The word comes from that
+  workspace's status card, else from its agents (`overview/model.ts`). Rare actions (Lineage details, Archive) sit in its
+  ⋯ menu.
+- **Status**: the summary item that carries `status` (paseo-status) renders as a card. Without one, a single muted line.
+- **Your move**: the attention items as a list, one row per plugin `entries` item, then failing checks and the header's
+  primary git action, from the same `useGitActions` result so the two can't disagree. Only the first row has a button.
+  While an agent runs, only blocking items show. Archive is only a move once the PR merged.
+
+Summary items route by shape (`partitionSummaryItems`): `status` → Status, `needsYou` or `entries` → Your move,
+anything else → More. Entering a workspace adds the tab once, first in the rail. Like Files and Changes it has no inline
+close; closing it from the tab menu opts that workspace out, as with Lineage. **Always** shows Explorer on it when nothing
+needs you.
 
 Lineage is an Explorer-only singleton tab that lists the focused agent's parents and the agents it
 started, with the workspace each one runs in (`packages/app/src/panels/lineage-panel.tsx`). The

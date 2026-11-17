@@ -4,7 +4,9 @@ import { useSessionStore, type Agent } from "@/stores/session-store";
 import {
   createLineageSelector,
   deriveLineage,
+  deriveWorkspaceLineage,
   lineageCrossesWorkspace,
+  type LineageNode,
   MAX_LINEAGE_DEPTH,
 } from "./lineage";
 
@@ -279,5 +281,60 @@ describe("createLineageSelector", () => {
       makeAgent({ id: "child", parentAgentId: "focus", workspaceId: "ws-b" }),
     ]);
     expect(select(useSessionStore.getState())).toBe(first);
+  });
+});
+
+describe("deriveWorkspaceLineage", () => {
+  const node = (agentId: string, workspaceId: string | null, extra: Partial<LineageNode> = {}) => ({
+    address: { serverId: SERVER_ID, agentId },
+    workspaceId,
+    archived: false,
+    missing: false,
+    detached: false,
+    ...extra,
+  });
+  const here = { serverId: SERVER_ID, workspaceId: "ws-b" };
+
+  it("takes the nearest ancestor outside this workspace as the parent", () => {
+    const result = deriveWorkspaceLineage(
+      {
+        ancestors: [node("root", "ws-root"), node("mid", "ws-a"), node("near", "ws-b")],
+        children: [],
+      },
+      here,
+    );
+    expect(result.parent).toEqual({ serverId: SERVER_ID, workspaceId: "ws-a" });
+  });
+
+  it("skips missing ancestors", () => {
+    const result = deriveWorkspaceLineage(
+      { ancestors: [node("root", "ws-a"), node("gone", null, { missing: true })], children: [] },
+      here,
+    );
+    expect(result.parent).toEqual({ serverId: SERVER_ID, workspaceId: "ws-a" });
+  });
+
+  it("groups children by workspace and counts the ones here as subagents", () => {
+    const result = deriveWorkspaceLineage(
+      {
+        ancestors: [],
+        children: [
+          node("c1", "ws-c"),
+          node("c2", "ws-b"),
+          node("c3", "ws-c"),
+          node("c4", "ws-d"),
+          node("c5", null, { missing: true }),
+        ],
+      },
+      here,
+    );
+    expect(result).toEqual({
+      parent: null,
+      children: [
+        { serverId: SERVER_ID, workspaceId: "ws-c" },
+        { serverId: SERVER_ID, workspaceId: "ws-d" },
+      ],
+      subagentsHere: 1,
+    });
   });
 });

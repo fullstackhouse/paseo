@@ -38,25 +38,12 @@ function LineagePanel(): ReactElement {
   return <LineageContent serverId={serverId} workspaceId={workspaceId} />;
 }
 
-/** Inline relatives for Overview; its agent section already identifies the focused agent. */
-export function LineageSummary({
-  serverId,
-  workspaceId,
-}: {
-  serverId: string;
-  workspaceId: string;
-}): ReactElement {
-  return <LineageContent serverId={serverId} workspaceId={workspaceId} inline />;
-}
-
 function LineageContent({
   serverId,
   workspaceId,
-  inline = false,
 }: {
   serverId: string;
   workspaceId: string;
-  inline?: boolean;
 }): ReactElement {
   const { t } = useTranslation();
   const focus = useLineageFocus(serverId, workspaceId);
@@ -65,10 +52,10 @@ function LineageContent({
   const workspace = useMemo(() => ({ serverId, workspaceId }), [serverId, workspaceId]);
 
   if (!focus) {
-    return <EmptyState text={t("panels.lineage.noAgent")} inline={inline} />;
+    return <EmptyState text={t("panels.lineage.noAgent")} />;
   }
   if (lineage.ancestors.length === 0 && lineage.children.length === 0) {
-    return <EmptyState text={t("panels.lineage.empty")} inline={inline} />;
+    return <EmptyState text={t("panels.lineage.empty")} />;
   }
 
   // Children elsewhere come first: they are the ones the sidebar doesn't tie to this workspace.
@@ -76,10 +63,7 @@ function LineageContent({
   const here = lineage.children.filter((node) => isInWorkspace(node, workspace));
 
   const content = (
-    <View
-      style={inline ? styles.summary : styles.body}
-      testID={inline ? "lineage-summary" : undefined}
-    >
+    <View style={styles.body}>
       {lineage.ancestors.length > 0 ? (
         <Section title={t("panels.lineage.startedBy")}>
           {lineage.ancestors.map((node) => (
@@ -87,7 +71,7 @@ function LineageContent({
           ))}
         </Section>
       ) : null}
-      {!inline ? <FocusRow address={focus} /> : null}
+      <FocusRow address={focus} />
       {elsewhere.length > 0 ? (
         <Section title={t("panels.lineage.inOtherWorkspaces")}>
           {elsewhere.map((node) => (
@@ -104,7 +88,6 @@ function LineageContent({
       ) : null}
     </View>
   );
-  if (inline) return content;
   // Themed insets sit on a View: contentContainerStyle drops them on web (docs/unistyles.md).
   return <ScrollView testID="lineage-panel">{content}</ScrollView>;
 }
@@ -113,10 +96,10 @@ function nodeKey(node: LineageNode): string {
   return `${node.address.serverId}:${node.address.agentId}`;
 }
 
-function EmptyState({ text, inline = false }: { text: string; inline?: boolean }): ReactElement {
+function EmptyState({ text }: { text: string }): ReactElement {
   return (
-    <View style={inline ? styles.inlineState : styles.centerState} testID="lineage-panel-empty">
-      <Text style={inline ? styles.rowFacts : styles.emptyText}>{text}</Text>
+    <View style={styles.centerState} testID="lineage-panel-empty">
+      <Text style={styles.emptyText}>{text}</Text>
     </View>
   );
 }
@@ -260,13 +243,6 @@ const styles = StyleSheet.create((theme) => {
     body: {
       padding: theme.spacing[2],
       gap: theme.spacing[3],
-    },
-    summary: {
-      gap: theme.spacing[3],
-    },
-    inlineState: {
-      paddingHorizontal: theme.spacing[2],
-      paddingVertical: theme.spacing[1],
     },
     section: {
       gap: theme.spacing[0.5],
