@@ -22,7 +22,7 @@ import {
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { setImmediate as waitForImmediate } from "node:timers/promises";
-import { afterEach, expect, test, vi } from "vitest";
+import { afterEach, describe, expect, test, vi } from "vitest";
 import { z } from "zod";
 
 import { CLIENT_CAPS } from "@getpaseo/protocol/client-capabilities";
@@ -569,6 +569,7 @@ class CreateAgentTestClient implements AgentClient {
 
 function createSessionForWorkspaceTests(
   options: {
+    clientId?: string;
     appVersion?: string | null;
     onMessage?: (message: SessionOutboundMessage) => void;
     onWorkspaceRecovered?: SessionOptions["onWorkspaceRecovered"];
@@ -661,7 +662,7 @@ function createSessionForWorkspaceTests(
       messageReceipts: createMessageReceiptsStub(),
       agentMessages: createAgentMessageDeliveryStub(),
       creationService: createTestCreationService(),
-      clientId: "test-client",
+      clientId: options.clientId ?? "test-client",
       permissions: OWNER_PERMISSIONS,
       appVersion: options.appVersion ?? null,
       onMessage: options.onMessage ?? vi.fn(),
@@ -10524,4 +10525,96 @@ test("path archive of an archived exact child leaves its active parent untouched
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+describe("a message to an agent in a snoozed workspace", () => {
+  function setup(clientId?: string) {
+    const snoozedAt = "2026-03-01T12:00:00.000Z";
+    const workspaces = new Map([
+      [
+        "ws-1",
+        createPersistedWorkspaceRecord({
+          workspaceId: "ws-1",
+          projectId: "proj-1",
+          cwd: REPO_CWD,
+          kind: "local_checkout",
+          displayName: "main",
+          snoozedAt,
+          snoozedUntil: null,
+          createdAt: snoozedAt,
+          updatedAt: snoozedAt,
+        }),
+      ],
+    ]);
+    const session = asTestSession(
+      createSessionForWorkspaceTests({
+        clientId,
+        agentManager: {
+          getAgent: (id: string) => (id === "agent-1" ? { id, workspaceId: "ws-1" } : null),
+        },
+      }),
+    );
+    session.workspaceRegistry.get = async (id) => workspaces.get(id) ?? null;
+    const update = vi.fn(
+      async (
+        id: string,
+        updater: (record: PersistedWorkspaceRecord) => PersistedWorkspaceRecord,
+      ) => {
+        const existing = workspaces.get(id);
+        if (!existing) return null;
+        const updated = updater(existing);
+        workspaces.set(id, updated);
+        return updated;
+      },
+    );
+    session.workspaceRegistry.update = update;
+    return { session, workspaces, update };
+  }
+
+  test("to an awake workspace doesn't touch the registry", async () => {
+    const { session, workspaces, update } = setup();
+    const record = workspaces.get("ws-1");
+    if (record) workspaces.set("ws-1", { ...record, snoozedAt: null });
+    await session.handleMessage({
+      type: "send_agent_message_request",
+      requestId: "req-send",
+      agentId: "agent-1",
+      text: "hello",
+    });
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  test("from the human wakes the workspace", async () => {
+    const { session, workspaces } = setup();
+    await session.handleMessage({
+      type: "send_agent_message_request",
+      requestId: "req-send",
+      agentId: "agent-1",
+      text: "back to this",
+    });
+    expect(workspaces.get("ws-1")).toMatchObject({ snoozedAt: null, snoozedUntil: null });
+  });
+
+  test("from another agent leaves the snooze alone", async () => {
+    const { session, workspaces } = setup();
+    await session.handleMessage({
+      type: "send_agent_message_request",
+      requestId: "req-send",
+      agentId: "agent-1",
+      text: "delegated result",
+      sourceAgentId: "agent-2",
+    });
+    expect(workspaces.get("ws-1")?.snoozedAt).toBe("2026-03-01T12:00:00.000Z");
+  });
+
+  test("from a plugin leaves the snooze alone", async () => {
+    const { session, workspaces } = setup("plugin:paseo-asks");
+    await session.handleMessage({
+      type: "send_agent_message_request",
+      requestId: "req-send",
+      agentId: "agent-1",
+      text: "you have open asks",
+    });
+    expect(workspaces.get("ws-1")?.snoozedAt).toBe("2026-03-01T12:00:00.000Z");
+  });
 });
