@@ -1157,6 +1157,17 @@ export const WorkspaceSnoozeSetRequestSchema = z.object({
   requestId: z.string(),
 });
 
+// COMPAT(workspaceAttentionReport): FSH-only, added after v0.15.4, remove gate after 2027-05-17.
+// A plugin says the workspace needs the human (an ask waits on them, the agent's work is done).
+// A snoozed workspace treats it like a permission prompt; an awake one ignores it.
+// `agentId` names the agent whose finished turn the snooze kept quiet, so waking announces it.
+export const WorkspaceAttentionReportRequestSchema = z.object({
+  type: z.literal("workspace.attention.report.request"),
+  workspaceId: z.string(),
+  agentId: z.string().optional(),
+  requestId: z.string(),
+});
+
 // COMPAT(workspaceBackgroundSet): FSH-only, added after v0.13.0, remove gate after 2027-05-05.
 // Moves an existing workspace into or out of background discovery.
 export const WorkspaceBackgroundSetRequestSchema = z.object({
@@ -2451,6 +2462,20 @@ export const WorkspaceSnoozeSetResponseSchema = z.object({
   payload: WorkspaceSnoozeSetResponsePayloadSchema,
 });
 
+export const WorkspaceAttentionReportResponsePayloadSchema = z.object({
+  requestId: z.string(),
+  workspaceId: z.string(),
+  accepted: z.boolean(),
+  // Whether the report woke a snoozed workspace.
+  woke: z.boolean(),
+  error: z.string().nullable(),
+});
+
+export const WorkspaceAttentionReportResponseSchema = z.object({
+  type: z.literal("workspace.attention.report.response"),
+  payload: WorkspaceAttentionReportResponsePayloadSchema,
+});
+
 export const WorkspacePinSetResponsePayloadSchema = z.object({
   requestId: z.string(),
   workspaceId: z.string(),
@@ -3723,6 +3748,7 @@ export const SessionInboundMessageSchema = z.discriminatedUnion("type", [
   WorkspaceBaseBranchSetRequestSchema,
   WorkspaceBackgroundSetRequestSchema,
   WorkspaceSnoozeSetRequestSchema,
+  WorkspaceAttentionReportRequestSchema,
   WorkspaceLabelListRequestSchema,
   WorkspaceLabelAssignmentSetRequestSchema,
   WorkspaceLabelUpdateRequestSchema,
@@ -4200,6 +4226,8 @@ export const ServerInfoStatusPayloadSchema = z
         workspaceSnooze: z.boolean().optional(),
         // COMPAT(workspaceSnoozeWakePrompt): FSH-only, added after v0.13.0, remove gate after 2027-05-10.
         workspaceSnoozeWakePrompt: z.boolean().optional(),
+        // COMPAT(workspaceAttentionReport): FSH-only, added after v0.15.4, remove gate after 2027-05-17.
+        workspaceAttentionReport: z.boolean().optional(),
         // COMPAT(scheduleRunAttention): FSH-only, added after v0.15.4, remove gate after 2027-05-16.
         scheduleRunAttention: z.boolean().optional(),
         // COMPAT(skillManagement): added in v0.4.0, remove gate after 2027-08-16.
@@ -8012,6 +8040,7 @@ export const SessionOutboundMessageSchema = z.discriminatedUnion("type", [
   WorkspaceBaseBranchSetResponseSchema,
   WorkspaceBackgroundSetResponseSchema,
   WorkspaceSnoozeSetResponseSchema,
+  WorkspaceAttentionReportResponseSchema,
   WorkspaceRecoveryInspectResponseSchema,
   WorkspaceRecoveryRestoreResponseSchema,
   WorkspaceArchiveUndoResponseSchema,
@@ -8236,6 +8265,9 @@ export type WorkspacePinSetResponse = z.infer<typeof WorkspacePinSetResponseSche
 export type WorkspacePinSetResponsePayload = z.infer<typeof WorkspacePinSetResponsePayloadSchema>;
 export type WorkspaceBackgroundSetResponse = z.infer<typeof WorkspaceBackgroundSetResponseSchema>;
 export type WorkspaceSnoozeSetResponse = z.infer<typeof WorkspaceSnoozeSetResponseSchema>;
+export type WorkspaceAttentionReportResponse = z.infer<
+  typeof WorkspaceAttentionReportResponseSchema
+>;
 export type WorkspaceSnoozeSetResponsePayload = z.infer<
   typeof WorkspaceSnoozeSetResponsePayloadSchema
 >;
@@ -8432,6 +8464,7 @@ export type WorkspaceMetadataUpdateResponse = z.infer<typeof WorkspaceMetadataUp
 export type WorkspaceBaseBranchSetRequest = z.infer<typeof WorkspaceBaseBranchSetRequestSchema>;
 export type WorkspaceBackgroundSetRequest = z.infer<typeof WorkspaceBackgroundSetRequestSchema>;
 export type WorkspaceSnoozeSetRequest = z.infer<typeof WorkspaceSnoozeSetRequestSchema>;
+export type WorkspaceAttentionReportRequest = z.infer<typeof WorkspaceAttentionReportRequestSchema>;
 export type WorkspaceRecoveryInspectRequest = z.infer<typeof WorkspaceRecoveryInspectRequestSchema>;
 export type WorkspaceRecoveryRestoreRequest = z.infer<typeof WorkspaceRecoveryRestoreRequestSchema>;
 export type WorkspaceArchiveUndoRequest = z.infer<typeof WorkspaceArchiveUndoRequestSchema>;

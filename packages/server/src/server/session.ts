@@ -513,6 +513,10 @@ export interface SessionOptions {
   publishWorkspaceArchiveUpdates?: (workspaceIds: Iterable<string>) => Promise<void>;
   onWorkspaceRecovered?: (workspace: PersistedWorkspaceRecord) => Promise<void>;
   publishScriptStatusUpdate?: (message: ScriptStatusUpdateMessage) => void;
+  reportWorkspaceAttention?: (input: {
+    workspaceId: string;
+    agentId?: string;
+  }) => Promise<{ woke: boolean }>;
   sendPluginNotification?: (
     pluginId: string,
     notification: import("./plugin-notifications.js").PluginNotificationInput,
@@ -912,6 +916,7 @@ export class Session {
   private readonly messageReceipts: Pick<MessageReceipts, "send">;
   private readonly agentMessages: AgentMessageDelivery;
   private readonly sendPluginNotification: SessionOptions["sendPluginNotification"] | null;
+  private readonly reportWorkspaceAttention: SessionOptions["reportWorkspaceAttention"];
   private readonly createAgentLifecycleDispatch: CreateAgentLifecycleDispatch;
   private readonly creationService: Pick<CreationService, "create" | "subscribe">;
 
@@ -1001,6 +1006,7 @@ export class Session {
     this.messageReceipts = options.messageReceipts;
     this.agentMessages = options.agentMessages;
     this.sendPluginNotification = options.sendPluginNotification ?? null;
+    this.reportWorkspaceAttention = options.reportWorkspaceAttention;
     this.creationService = options.creationService;
     this.projectIcons = new ProjectIconReader(paseoHome);
     this.worktreesRoot = worktreesRoot;
@@ -2796,7 +2802,8 @@ export class Session {
       this.dispatchWorkspaceLabelMessage(msg) ??
       this.dispatchWorkspaceSetupMessage(msg) ??
       this.dispatchMetadataMessage(msg) ??
-      this.dispatchWorkspaceAndProjectMessage(msg)
+      this.dispatchWorkspaceAndProjectMessage(msg) ??
+      this.dispatchWorkspaceSnoozeMessage(msg)
     );
   }
 
@@ -3532,8 +3539,17 @@ export class Session {
         return this.handleWorkspaceBaseBranchSetRequest(msg);
       case "workspace.background.set.request":
         return this.handleWorkspaceBackgroundSetRequest(msg);
+      default:
+        return undefined;
+    }
+  }
+
+  private dispatchWorkspaceSnoozeMessage(msg: SessionInboundMessage): Promise<void> | undefined {
+    switch (msg.type) {
       case "workspace.snooze.set.request":
         return this.handleWorkspaceSnoozeSetRequest(msg);
+      case "workspace.attention.report.request":
+        return this.handleWorkspaceAttentionReportRequest(msg);
       default:
         return undefined;
     }
@@ -4639,6 +4655,38 @@ export class Session {
         snoozedUntil: null,
         error: getErrorMessageOr(error, "Failed to snooze workspace"),
       });
+    }
+  }
+
+  private async handleWorkspaceAttentionReportRequest(
+    request: Extract<SessionInboundMessage, { type: "workspace.attention.report.request" }>,
+  ): Promise<void> {
+    const { workspaceId, agentId, requestId } = request;
+    const emitResponse = (woke: boolean, error: string | null) => {
+      this.emit({
+        type: "workspace.attention.report.response",
+        payload: { requestId, workspaceId, accepted: error === null, woke, error },
+      });
+    };
+    if (!this.reportWorkspaceAttention) {
+      emitResponse(false, "Attention reports are unavailable");
+      return;
+    }
+    try {
+      const { woke } = await this.reportWorkspaceAttention({ workspaceId, agentId });
+      if (woke) {
+        this.sessionLogger.info(
+          { workspaceId, agentId, requestId },
+          "session: needs you woke workspace",
+        );
+      }
+      emitResponse(woke, null);
+    } catch (error) {
+      this.sessionLogger.error(
+        { workspaceId, agentId, requestId, err: error },
+        "session: workspace.attention.report.request error",
+      );
+      emitResponse(false, getErrorMessageOr(error, "Failed to report attention"));
     }
   }
 

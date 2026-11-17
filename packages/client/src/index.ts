@@ -226,6 +226,13 @@ export interface PaseoWorkspaceHandle {
    * branch: base branch, the repo's PR template and the project's PR preferences.
    * `merge` adds steps to get CI green and merge.
    */
+  /**
+   * Tells the host this workspace needs the human: an ask waits on them, or its work is done.
+   * A snoozed workspace treats it like a permission prompt (the host's snoozed-workspace setting,
+   * wake by default); an awake one ignores it. Pass the `agentId` whose finished turn the snooze
+   * kept quiet, so waking notifies for it. Needs `server_info.features.workspaceAttentionReport`.
+   */
+  reportNeedsYou(options?: { agentId?: string; requestId?: string }): Promise<{ woke: boolean }>;
   pullRequestPrompt(options?: { merge?: boolean }): Promise<string>;
   archive(requestId?: string): Promise<PaseoWorkspaceArchiveResult>;
   /**
@@ -1088,6 +1095,7 @@ function createWorkspaceHandleFactory(
         daemonClient.setWorkspaceBackground(id, background, requestId),
       setSnoozed: (snoozed, until, options) =>
         daemonClient.setWorkspaceSnoozed(id, snoozed, until ?? null, options),
+      reportNeedsYou: (options) => daemonClient.reportWorkspaceAttention(id, options),
       pullRequestPrompt: async (options) => {
         // COMPAT(checkoutPrAgentPrompt): added in FSH v0.13.0-beta.1, remove gate after 2027-04-30.
         if (!daemonClient.getLastServerInfoMessage()?.features?.checkoutPrAgentPrompt) {

@@ -67,6 +67,25 @@ describe("resolveSnoozedAttention", () => {
     ).toBe("wake");
   });
 
+  test("wakes when a plugin reports the workspace needs you, like a permission prompt", () => {
+    expect(
+      resolveSnoozedAttention({
+        workspace: snoozed,
+        reason: "needs_you",
+        permissionBehavior: undefined,
+        nowMs: NOW,
+      }),
+    ).toBe("wake");
+    expect(
+      resolveSnoozedAttention({
+        workspace: snoozed,
+        reason: "needs_you",
+        permissionBehavior: "silent",
+        nowMs: NOW,
+      }),
+    ).toBe("quiet");
+  });
+
   test("stays quiet on a permission prompt with badge or silent", () => {
     for (const permissionBehavior of ["badge", "silent"] as const) {
       expect(
