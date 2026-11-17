@@ -10413,15 +10413,35 @@ describe("a message to an agent in a snoozed workspace", () => {
         },
       }),
     );
-    session.workspaceRegistry.update = async (id, updater) => {
-      const existing = workspaces.get(id);
-      if (!existing) return null;
-      const updated = updater(existing);
-      workspaces.set(id, updated);
-      return updated;
-    };
-    return { session, workspaces };
+    session.workspaceRegistry.get = async (id) => workspaces.get(id) ?? null;
+    const update = vi.fn(
+      async (
+        id: string,
+        updater: (record: PersistedWorkspaceRecord) => PersistedWorkspaceRecord,
+      ) => {
+        const existing = workspaces.get(id);
+        if (!existing) return null;
+        const updated = updater(existing);
+        workspaces.set(id, updated);
+        return updated;
+      },
+    );
+    session.workspaceRegistry.update = update;
+    return { session, workspaces, update };
   }
+
+  test("to an awake workspace doesn't touch the registry", async () => {
+    const { session, workspaces, update } = setup();
+    const record = workspaces.get("ws-1");
+    if (record) workspaces.set("ws-1", { ...record, snoozedAt: null });
+    await session.handleMessage({
+      type: "send_agent_message_request",
+      requestId: "req-send",
+      agentId: "agent-1",
+      text: "hello",
+    });
+    expect(update).not.toHaveBeenCalled();
+  });
 
   test("from the human wakes the workspace", async () => {
     const { session, workspaces } = setup();

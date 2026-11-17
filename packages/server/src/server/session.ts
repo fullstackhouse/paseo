@@ -8601,6 +8601,8 @@ export class Session {
         this.agentManager.getAgent(agentId)?.workspaceId ??
         (await this.agentStorage.get(agentId))?.workspaceId;
       if (!workspaceId) return;
+      // The registry announces every update, changed or not; most messages go to awake workspaces.
+      if (!(await this.workspaceRegistry.get(workspaceId))?.snoozedAt) return;
       await wakeWorkspace({
         registry: this.workspaceRegistry,
         workspaceId,
