@@ -1487,6 +1487,8 @@ export const SendAgentMessageRequestSchema = z.object({
   activeTurnBehavior: ActiveTurnBehaviorSchema.optional(),
   images: z.array(ImageAttachmentSchema).optional(),
   attachments: AgentAttachmentsSchema,
+  /** Sent without the human coming back (a bulk resume): a snoozed workspace stays snoozed. */
+  keepSnoozed: z.boolean().optional(),
 });
 
 export const WaitForFinishRequestSchema = z.object({

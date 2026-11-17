@@ -10476,4 +10476,27 @@ describe("a message to an agent in a snoozed workspace", () => {
     });
     expect(workspaces.get("ws-1")?.snoozedAt).toBe("2026-03-01T12:00:00.000Z");
   });
+
+  test("from a Hub session leaves the snooze alone", async () => {
+    const { session, workspaces } = setup("hub:daemon-1");
+    await session.handleMessage({
+      type: "send_agent_message_request",
+      requestId: "req-send",
+      agentId: "agent-1",
+      text: "follow-up",
+    });
+    expect(workspaces.get("ws-1")?.snoozedAt).toBe("2026-03-01T12:00:00.000Z");
+  });
+
+  test("marked keepSnoozed leaves the snooze alone", async () => {
+    const { session, workspaces } = setup();
+    await session.handleMessage({
+      type: "send_agent_message_request",
+      requestId: "req-send",
+      agentId: "agent-1",
+      text: "resume",
+      keepSnoozed: true,
+    });
+    expect(workspaces.get("ws-1")?.snoozedAt).toBe("2026-03-01T12:00:00.000Z");
+  });
 });
