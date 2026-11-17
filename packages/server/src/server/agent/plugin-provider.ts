@@ -2012,6 +2012,7 @@ function agentCapabilities(capabilities: readonly string[]): AgentCapabilityFlag
     supportsNativePaseoTools: false,
     supportsReasoningStream: true,
     supportsToolInvocations: true,
+    supportsSteering: supports("prompt.steer"),
     supportsRewindConversation: supports("session.revert.conversation"),
     supportsRewindFiles: supports("session.revert.files"),
     supportsRewindBoth: supports("session.revert.both"),
