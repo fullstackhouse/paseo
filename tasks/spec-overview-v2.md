@@ -138,8 +138,7 @@ Items with neither `workState` nor `needsYou` (future plugins) render as plain r
 1. **Outdated rule.** Mark the card outdated when (a) any agent turn started after it, (b) the PR state changed after it, or
    (c) both? Recommend (c).
 2. **Child workspace status word.** Decided 2026-11-17: the child's status card when present, else its agent state + PR.
-3. **Archive after merge.** When the PR is merged, Archive is the main step. Should it be the filled button in Your move
-   (recommended), or always live under ⋯?
+3. **Archive after merge.** Decided 2026-11-17: the filled button in Your move once the PR is merged; under ⋯ otherwise.
 
 ## Next step
 
