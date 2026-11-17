@@ -76,6 +76,7 @@ export function SheetPane({ sheet, onClose, onBack, opener = null, isTop }: Shee
     serverId: host.serverId,
     workspaceId: host.workspaceId,
     tabId: tab.tabId,
+    state: tab.state,
   });
 
   const openTabInFront = useWorkspaceLayoutStore((state) => state.openTabInFront);
