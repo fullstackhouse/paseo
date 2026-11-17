@@ -4,7 +4,11 @@ import type {
   PluginWorkspaceSummaryItemContribution,
   PluginWorkspaceSummaryItemRegistration,
   PluginWorkspaceSummaryItemState,
+  PluginWorkspaceStatus,
+  PluginWorkspaceSummaryEntry,
+  PluginWorkspaceSummaryEntryProps,
 } from "@getpaseo/plugin/client";
+import type { ComponentType } from "react";
 
 export interface WorkspaceSummaryItem extends PluginWorkspaceSummaryItemState {
   /** Distinguishes two registrations of the same item; never reused. */
@@ -15,6 +19,8 @@ export interface WorkspaceSummaryItem extends PluginWorkspaceSummaryItemState {
   workspaceId: string;
   /** Resolved for the current locale when the item is added. */
   title: string;
+  /** The plugin's renderer for one entry; set once, when the item is added. */
+  EntryComponent?: ComponentType<PluginWorkspaceSummaryEntryProps>;
 }
 
 export interface WorkspaceSummaryOwner {
@@ -49,7 +55,47 @@ function cleanState(patch: PluginWorkspaceSummaryItemState): PluginWorkspaceSumm
         ? patch.workState
         : undefined;
   }
+  if (patch.status !== undefined) state.status = cleanStatus(patch.status);
+  if (patch.entries !== undefined) state.entries = cleanEntries(patch.entries);
   return state;
+}
+
+const STATUS_STATES = new Set<PluginWorkspaceStatus["state"]>([
+  "working",
+  "waiting_on_you",
+  "blocked",
+  "done",
+]);
+
+/** A malformed status clears the card rather than failing the whole update. */
+function cleanStatus(status: PluginWorkspaceStatus | null): PluginWorkspaceStatus | null {
+  if (!status || !STATUS_STATES.has(status.state)) return null;
+  const summary = typeof status.summary === "string" ? status.summary.trim() : "";
+  if (!summary || !Number.isFinite(status.updatedAt)) return null;
+  const clean: PluginWorkspaceStatus = {
+    state: status.state,
+    summary,
+    updatedAt: status.updatedAt,
+  };
+  if (status.answered === true) clean.answered = true;
+  const now = typeof status.now === "string" ? status.now.trim() : "";
+  if (now) clean.now = now;
+  return clean;
+}
+
+function cleanEntries(
+  entries: readonly PluginWorkspaceSummaryEntry[],
+): PluginWorkspaceSummaryEntry[] {
+  if (!Array.isArray(entries)) return [];
+  const clean: PluginWorkspaceSummaryEntry[] = [];
+  for (const entry of entries) {
+    const id = typeof entry?.id === "string" ? entry.id.trim() : "";
+    const title = typeof entry?.title === "string" ? entry.title.trim() : "";
+    if (!id || !title) continue;
+    const detail = typeof entry.detail === "string" ? entry.detail.trim() : "";
+    clean.push(detail ? { id, title, detail } : { id, title });
+  }
+  return clean;
 }
 
 /** Plugin-reported facts about workspaces, keyed by host and workspace. */
@@ -90,6 +136,8 @@ export class WorkspaceSummaryStore {
     );
     if (duplicate) throw new Error(`Duplicate workspace summary item: ${itemId} in ${workspaceId}`);
     const entryKey = this.nextKey++;
+    // Static: an update can't swap it, so a mounted entry never remounts as a different component.
+    const EntryComponent = contribution.EntryComponent;
     const build = (state: PluginWorkspaceSummaryItemState): WorkspaceSummaryItem => ({
       ...state,
       entryKey,
@@ -98,6 +146,7 @@ export class WorkspaceSummaryStore {
       itemId,
       workspaceId,
       title,
+      ...(EntryComponent ? { EntryComponent } : {}),
     });
     let current = cleanState(contribution);
     this.replace([...this.entries, build(current)]);
