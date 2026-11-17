@@ -104,6 +104,8 @@ import {
   WorkspaceLabelStorageUncertainError,
   type WorkspaceLabelService,
 } from "./workspace-labels/index.js";
+import { wakeWorkspace } from "./workspace-snooze/index.js";
+import { isPluginClientId } from "./plugins/plugin-session-identity.js";
 
 import { AgentManager, AgentRunCancellationError } from "./agent/agent-manager.js";
 import { buildTimelinePromptIndex } from "./agent/timeline-prompt-index.js";
@@ -4292,6 +4294,7 @@ export class Session {
 
     const promptText = options?.spokenInput ? wrapSpokenInput(text) : text;
     const prompt = buildAgentPrompt(promptText, images, attachments);
+    await this.wakeAgentWorkspace(agentId);
 
     try {
       await sendPromptToAgent({
@@ -8587,6 +8590,29 @@ export class Session {
     }
   }
 
+  /**
+   * Writing to an agent means you are back: its workspace's snooze ends, like waking it by hand.
+   * Plugins write to agents on their own (paseo-asks and paseo-status nudges), so theirs don't count.
+   */
+  private async wakeAgentWorkspace(agentId: string): Promise<void> {
+    if (isPluginClientId(this.clientId)) return;
+    try {
+      const workspaceId =
+        this.agentManager.getAgent(agentId)?.workspaceId ??
+        (await this.agentStorage.get(agentId))?.workspaceId;
+      if (!workspaceId) return;
+      // The registry announces every update, changed or not; most messages go to awake workspaces.
+      if (!(await this.workspaceRegistry.get(workspaceId))?.snoozedAt) return;
+      await wakeWorkspace({
+        registry: this.workspaceRegistry,
+        workspaceId,
+        nowIso: new Date().toISOString(),
+      });
+    } catch (error) {
+      this.sessionLogger.warn({ err: error, agentId }, "failed to wake workspace on user message");
+    }
+  }
+
   private async prepareAgentMessage(agentId: string, text: string): Promise<void> {
     await ensureAgentLoaded(agentId, {
       agentManager: this.agentManager,
@@ -8619,6 +8645,7 @@ export class Session {
 
     try {
       const agentId = resolved.agentId;
+      if (!msg.sourceAgentId) await this.wakeAgentWorkspace(agentId);
 
       const prompt = buildAgentPrompt(msg.text, msg.images, msg.attachments);
       this.sessionLogger.trace(
