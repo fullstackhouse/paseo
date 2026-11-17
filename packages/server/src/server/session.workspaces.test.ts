@@ -569,6 +569,7 @@ function createSessionForWorkspaceTests(
     appVersion?: string | null;
     onMessage?: (message: SessionOutboundMessage) => void;
     onWorkspaceRecovered?: SessionOptions["onWorkspaceRecovered"];
+    reportWorkspaceAttention?: SessionOptions["reportWorkspaceAttention"];
     workspaceRuntimeStore?: WorkspaceRuntimeStore;
     workspaceGitService?: ReturnType<typeof createNoopWorkspaceGitService>;
     terminalManager?: TerminalManager | null;
@@ -669,6 +670,7 @@ function createSessionForWorkspaceTests(
       appVersion: options.appVersion ?? null,
       onMessage: options.onMessage ?? vi.fn(),
       onWorkspaceRecovered: options.onWorkspaceRecovered,
+      reportWorkspaceAttention: options.reportWorkspaceAttention,
       logger: asSessionLogger(logger),
       downloadTokenStore: asDownloadTokenStore(),
       pushNotifications: asPushNotifications(),
@@ -8592,6 +8594,36 @@ test("workspace.snooze.set.request snoozes until a time, unpins, and wakes", asy
     snoozedUntil: null,
   });
   expect(workspaces.get("ws-1")).toMatchObject({ snoozedAt: null, snoozedUntil: null });
+});
+
+test("workspace.attention.report.request passes the report to the host and replies", async () => {
+  const emitted: SessionOutboundMessage[] = [];
+  const reportWorkspaceAttention = vi.fn(async () => ({ woke: true }));
+  const session = asTestSession(
+    createSessionForWorkspaceTests({
+      onMessage: (message) => emitted.push(message),
+      reportWorkspaceAttention,
+    }),
+  );
+
+  await session.handleMessage({
+    type: "workspace.attention.report.request",
+    workspaceId: "ws-1",
+    agentId: "agent-1",
+    requestId: "req-report",
+  });
+
+  expect(reportWorkspaceAttention).toHaveBeenCalledWith({
+    workspaceId: "ws-1",
+    agentId: "agent-1",
+  });
+  expect(findByType(emitted, "workspace.attention.report.response")?.payload).toEqual({
+    requestId: "req-report",
+    workspaceId: "ws-1",
+    accepted: true,
+    woke: true,
+    error: null,
+  });
 });
 
 test("workspace.snooze.set.request stores a wake prompt for a timed snooze only", async () => {

@@ -221,6 +221,13 @@ The daemon owns both halves so every client and plugin agrees:
   A permission prompt follows the host's `snoozedPermission` setting (`wake` by default, `badge`,
   `silent`). `wake` clears the snooze before notifying. `badge` and `silent` stay quiet; the app
   counts blocked rows on the Snoozed header only for `badge`. Terminal attention is always quiet.
+- A plugin can report that a workspace needs you (`workspace.attention.report`,
+  `workspaces.ref(id).reportNeedsYou({ agentId })`, gated on `features.workspaceAttentionReport`).
+  It follows the same setting as a permission prompt. Only the daemon knows when a turn ended
+  quietly, so waking re-announces the named agent's finished turn when that agent is idle. A
+  running agent announces its own turn when it ends. paseo-status reports a snoozed workspace
+  whose work turns `waiting` or `done`, so "snooze until I wake it" also ends when a parent's
+  delegated work comes back to you.
 - `setupWorkspaceSnoozeWaker` (`packages/server/src/server/workspace-snooze/`) clears timed snoozes
   when they end, including any that ended while the daemon was down. A snooze past its end counts
   as awake before the waker gets to it.

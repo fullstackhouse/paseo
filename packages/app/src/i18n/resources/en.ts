@@ -3156,8 +3156,8 @@ export const en = {
       workspaces: {
         unavailable: "Connect to this host to manage workspaces",
         snoozedPermission: {
-          title: "Snoozed workspaces and permission prompts",
-          hint: "What happens when an agent in a snoozed workspace asks for permission. Finished turns never notify while snoozed.",
+          title: "Snoozed workspaces that need you",
+          hint: "What happens when an agent in a snoozed workspace asks for permission, or a plugin reports that it needs you (an ask waiting on you, finished work). Finished turns don’t notify on their own while snoozed.",
           updateFailed: "Unable to update snooze setting",
           options: {
             wake: "Wake and notify",

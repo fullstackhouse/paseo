@@ -3059,8 +3059,8 @@ export const ptBR: TranslationResources = {
       workspaces: {
         unavailable: "Conecte-se a este host para gerenciar workspaces",
         snoozedPermission: {
-          title: "Espaços adiados e pedidos de permissão",
-          hint: "O que acontece quando um agente em um espaço adiado pede permissão. Turnos concluídos nunca notificam enquanto adiado.",
+          title: "Espaços adiados que precisam de você",
+          hint: "O que acontece quando um agente em um espaço adiado pede permissão ou um plugin informa que precisa de você (um pedido esperando por você, trabalho concluído). Turnos concluídos não notificam sozinhos enquanto adiado.",
           updateFailed: "Não foi possível atualizar a configuração de adiamento",
           options: {
             wake: "Retomar e avisar",

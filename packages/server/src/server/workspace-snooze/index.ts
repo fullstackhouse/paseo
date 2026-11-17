@@ -11,7 +11,8 @@ export type SnoozedAttention = "notify" | "quiet" | "wake";
 
 export interface ResolveSnoozedAttentionInput {
   workspace: SnoozeFields | null;
-  reason: "finished" | "error" | "permission";
+  /** `needs_you`: a plugin reported the workspace needs the human (an ask waits, the work is done). */
+  reason: "finished" | "error" | "permission" | "needs_you";
   permissionBehavior: SnoozedPermissionBehavior | undefined;
   nowMs: number;
 }
@@ -42,12 +43,13 @@ export function isWorkspaceSnoozed(workspace: SnoozeFields, nowMs: number): bool
 }
 
 /**
- * Snoozed workspaces never notify for finished or failed turns. A permission prompt follows the
- * host's `snoozedPermission` setting: `wake` (default) un-snoozes and notifies, the rest stay quiet.
+ * Snoozed workspaces never notify for finished or failed turns. A permission prompt or a reported
+ * "needs you" follows the host's `snoozedPermission` setting: `wake` (default) un-snoozes and
+ * notifies, the rest stay quiet.
  */
 export function resolveSnoozedAttention(input: ResolveSnoozedAttentionInput): SnoozedAttention {
   if (!input.workspace || !isWorkspaceSnoozed(input.workspace, input.nowMs)) return "notify";
-  if (input.reason !== "permission") return "quiet";
+  if (input.reason === "finished" || input.reason === "error") return "quiet";
   return (input.permissionBehavior ?? "wake") === "wake" ? "wake" : "quiet";
 }
 

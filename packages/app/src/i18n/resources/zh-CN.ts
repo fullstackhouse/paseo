@@ -2984,8 +2984,8 @@ export const zhCN: TranslationResources = {
       workspaces: {
         unavailable: "连接到这个 Host 以管理 Workspace",
         snoozedPermission: {
-          title: "已暂缓的工作区与权限请求",
-          hint: "已暂缓工作区中的智能体请求权限时会怎样。暂缓期间，回合结束不会发送通知。",
+          title: "需要你处理的已暂缓工作区",
+          hint: "已暂缓工作区中的智能体请求权限，或插件报告需要你处理（有等你回复的请求、工作已完成）时会怎样。暂缓期间，仅回合结束不会发送通知。",
           updateFailed: "无法更新暂缓设置",
           options: {
             wake: "恢复并通知",

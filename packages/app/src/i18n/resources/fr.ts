@@ -3081,8 +3081,8 @@ export const fr: TranslationResources = {
       workspaces: {
         unavailable: "Connectez-vous à cet hôte pour gérer les espaces de travail",
         snoozedPermission: {
-          title: "Espaces en veille et demandes d’autorisation",
-          hint: "Ce qui se passe quand un agent d’un espace en veille demande une autorisation. Les tours terminés ne notifient jamais pendant la veille.",
+          title: "Espaces en veille qui ont besoin de vous",
+          hint: "Ce qui se passe quand un agent d’un espace en veille demande une autorisation, ou qu’un plugin signale qu’il a besoin de vous (une demande qui vous attend, un travail terminé). Les tours terminés ne notifient pas d’eux-mêmes pendant la veille.",
           updateFailed: "Impossible de mettre à jour le réglage de veille",
           options: {
             wake: "Réveiller et notifier",

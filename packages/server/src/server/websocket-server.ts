@@ -1668,6 +1668,7 @@ export class VoiceAssistantWebSocketServer {
       publishScriptStatusUpdate: (message) => this.publishScriptStatusUpdate(message),
       sendPluginNotification: (pluginId, notification) =>
         this.sendPluginNotification(pluginId, notification),
+      reportWorkspaceAttention: (input) => this.reportWorkspaceAttention(input),
       downloadTokenStore: this.downloadTokenStore,
       pushNotifications: this.pushNotifications,
       paseoHome: this.paseoHome,
@@ -2095,6 +2096,8 @@ export class VoiceAssistantWebSocketServer {
         workspaceSnooze: true,
         // COMPAT(workspaceSnoozeWakePrompt): FSH-only, added after v0.13.0, remove gate after 2027-05-10.
         workspaceSnoozeWakePrompt: true,
+        // COMPAT(workspaceAttentionReport): FSH-only, added after v0.15.4, remove gate after 2027-05-17.
+        workspaceAttentionReport: true,
         // COMPAT(scheduleRunAttention): FSH-only, added after v0.15.4, remove gate after 2027-05-16.
         scheduleRunAttention: true,
         // COMPAT(skillManagement): added in v0.4.0, remove gate after 2027-08-16.
@@ -2888,6 +2891,43 @@ export class VoiceAssistantWebSocketServer {
       focusedTerminalId: activity.focusedTerminalId,
       lastActivityAtMs: activity.lastActivityAt.getTime(),
     };
+  }
+
+  /**
+   * A plugin reported that the workspace needs the human. A snoozed workspace treats it like a
+   * permission prompt. Waking announces the named agent's finished turn, which the snooze kept
+   * quiet; an agent still running announces its own when the turn ends.
+   */
+  private async reportWorkspaceAttention(input: {
+    workspaceId: string;
+    agentId?: string;
+  }): Promise<{ woke: boolean }> {
+    const workspace = await this.workspaceRegistry.get(input.workspaceId);
+    const attention = resolveSnoozedAttention({
+      workspace,
+      reason: "needs_you",
+      permissionBehavior: this.daemonConfigStore.get().snoozedPermission,
+      nowMs: Date.now(),
+    });
+    if (attention !== "wake") return { woke: false };
+    const snoozed = await wakeWorkspace({
+      registry: this.workspaceRegistry,
+      workspaceId: input.workspaceId,
+      nowIso: new Date().toISOString(),
+    });
+    if (!snoozed) return { woke: false };
+    const agent = input.agentId ? this.agentManager.getAgent(input.agentId) : null;
+    if (
+      agent?.workspaceId === input.workspaceId &&
+      (agent.lifecycle === "idle" || agent.lifecycle === "closed")
+    ) {
+      await this.broadcastAgentAttention({
+        agentId: agent.id,
+        provider: agent.provider,
+        reason: "finished",
+      });
+    }
+    return { woke: true };
   }
 
   private async broadcastAgentAttention(params: {
