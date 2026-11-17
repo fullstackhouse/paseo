@@ -168,6 +168,7 @@ const PI_CAPABILITIES: AgentCapabilityFlags = {
   supportsMcpServers: false,
   supportsReasoningStream: true,
   supportsToolInvocations: true,
+  supportsSteering: true,
   supportsRewindConversation: true,
   supportsRewindFiles: false,
   supportsRewindBoth: false,

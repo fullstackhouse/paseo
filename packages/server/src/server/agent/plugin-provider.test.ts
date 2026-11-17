@@ -1595,6 +1595,7 @@ describe("PluginAgentClientRegistry", () => {
     const client = registry.clients()[harness.registration.id]!;
     const session = await client.createSession({ provider: harness.registration.id, cwd: "/tmp" });
     try {
+      expect(session.capabilities.supportsSteering).toBe(true);
       await expect(
         session.steerActiveTurn!("follow up", {
           expectedTurnId: "turn-1",
@@ -1633,6 +1634,7 @@ describe("PluginAgentClientRegistry", () => {
       cwd: "/workspace",
     });
     try {
+      expect(session.capabilities.supportsSteering).toBe(false);
       const result = await session.steerActiveTurn!("hello", { expectedTurnId: "turn-1" });
       expect(result).toEqual({ status: "unavailable" });
       expect(harness.inputs.filter((input) => input.type === "session.prompt")).toHaveLength(0);

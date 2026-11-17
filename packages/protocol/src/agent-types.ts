@@ -164,6 +164,8 @@ export interface AgentCapabilityFlags {
   supportsMcpServers: boolean;
   supportsReasoningStream: boolean;
   supportsToolInvocations: boolean;
+  /** A message sent mid-turn with `activeTurnBehavior: "steer"` joins the turn. Without it, the turn is interrupted and replaced. */
+  supportsSteering?: boolean;
   supportsRewindConversation?: boolean;
   supportsRewindFiles?: boolean;
   supportsRewindBoth?: boolean;

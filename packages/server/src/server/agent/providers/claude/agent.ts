@@ -378,6 +378,7 @@ const CLAUDE_CAPABILITIES: AgentCapabilityFlags = {
   supportsMcpServers: true,
   supportsReasoningStream: true,
   supportsToolInvocations: true,
+  supportsSteering: true,
   supportsRewindConversation: true,
   supportsRewindFiles: true,
   supportsRewindBoth: true,
