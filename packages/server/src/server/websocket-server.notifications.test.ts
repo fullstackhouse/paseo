@@ -54,6 +54,7 @@ import { VoiceAssistantWebSocketServer } from "./websocket-server.js";
 interface WebSocketServerInternals {
   sessions: Map<unknown, unknown>;
   workspaceRegistry: Pick<WorkspaceRegistry, "get" | "update">;
+  snoozedPermissionGraceMs: number;
   broadcastAgentAttention(params: {
     agentId: string;
     reason: string;
@@ -419,9 +420,17 @@ describe("VoiceAssistantWebSocketServer notification payloads", () => {
       expect(pushNotifications.sent).toEqual([]);
     });
 
+    const pendingPermission = () => ({
+      getAgent: vi.fn(() => ({
+        workspaceId: WORKSPACE_ID,
+        pendingPermissions: new Map([["perm-1", { id: "perm-1" }]]),
+      })),
+    });
+
     it("wakes the workspace and pushes on a permission prompt by default", async () => {
-      const { server, pushNotifications } = createServer();
+      const { server, pushNotifications } = createServer(pendingPermission());
       const current = useSnoozedWorkspace(server);
+      asInternals<WebSocketServerInternals>(server).snoozedPermissionGraceMs = 0;
       connectClient(server, null);
 
       await asInternals<WebSocketServerInternals>(server).broadcastAgentAttention({
@@ -432,6 +441,23 @@ describe("VoiceAssistantWebSocketServer notification payloads", () => {
 
       expect(current().snoozedAt).toBeNull();
       expect(pushNotifications.sent).toHaveLength(1);
+    });
+
+    it("stays snoozed and quiet on a prompt answered within the grace window", async () => {
+      // A plugin auto-allowing its own tool (paseo-status and status_set) answers before the grace ends.
+      const { server, pushNotifications } = createServer();
+      const current = useSnoozedWorkspace(server);
+      asInternals<WebSocketServerInternals>(server).snoozedPermissionGraceMs = 0;
+      connectClient(server, null);
+
+      await asInternals<WebSocketServerInternals>(server).broadcastAgentAttention({
+        agentId: "agent-snoozed",
+        provider: "claude",
+        reason: "permission",
+      });
+
+      expect(current().snoozedAt).toBe("2026-11-09T08:00:00.000Z");
+      expect(pushNotifications.sent).toEqual([]);
     });
 
     it("stays snoozed and quiet on a permission prompt when set to badge", async () => {

@@ -31,7 +31,11 @@ import type { AgentStorage } from "./agent/agent-storage.js";
 import type { DownloadTokenStore } from "./file-download/token-store.js";
 import type { TerminalManager } from "../terminal/terminal-manager.js";
 import type pino from "pino";
-import type { ProjectRegistry, WorkspaceRegistry } from "./workspace-registry.js";
+import type {
+  PersistedWorkspaceRecord,
+  ProjectRegistry,
+  WorkspaceRegistry,
+} from "./workspace-registry.js";
 import type { ProjectUpdate } from "./workspace-reconciliation-service.js";
 import type { ScheduleService } from "./schedule/service.js";
 import type { CheckoutDiffManager, CheckoutDiffMetrics } from "./checkout-diff-manager.js";
@@ -89,8 +93,15 @@ import type { VoiceCallerContext, VoiceSpeakHandler } from "./voice-types.js";
 import {
   isWorkspaceSnoozed,
   resolveSnoozedAttention,
+  type SnoozedAttention,
   wakeWorkspace,
 } from "./workspace-snooze/index.js";
+
+/**
+ * How long a plugin has to answer a permission prompt itself before the prompt wakes a snoozed
+ * workspace. paseo-status allows its own `status_set` this way, and only after the prompt reaches it.
+ */
+const SNOOZED_PERMISSION_GRACE_MS = 1_500;
 import {
   computeNotificationPlan,
   isPushEligibleAttentionReason,
@@ -599,6 +610,7 @@ export class VoiceAssistantWebSocketServer {
   private readonly credentialSource: DaemonAuthConfig | undefined;
   private readonly worktreesRoot: string | undefined;
   private readonly daemonConfigStore: DaemonConfigStore;
+  private snoozedPermissionGraceMs = SNOOZED_PERMISSION_GRACE_MS;
   private readonly pushNotifications: PushNotifications;
   private readonly pluginNotificationThrottle = new PluginNotificationThrottle();
   private readonly pushNotificationSender: PushNotificationSender;
@@ -2930,6 +2942,32 @@ export class VoiceAssistantWebSocketServer {
     return { woke: true };
   }
 
+  /**
+   * How the agent's snoozed workspace takes this attention. A permission prompt that would wake it
+   * waits out the grace window first; `answered` means it closed meanwhile (a plugin answered it),
+   * so the snooze stays and nothing is announced.
+   */
+  private async resolveAgentSnoozedAttention(
+    workspace: PersistedWorkspaceRecord | null,
+    params: { agentId: string; reason: "finished" | "error" | "permission" },
+  ): Promise<SnoozedAttention | "answered"> {
+    const attention = resolveSnoozedAttention({
+      workspace,
+      reason: params.reason,
+      permissionBehavior: this.daemonConfigStore.get().snoozedPermission,
+      nowMs: Date.now(),
+    });
+    if (attention !== "wake" || !workspace) return attention;
+    await new Promise((resolve) => setTimeout(resolve, this.snoozedPermissionGraceMs));
+    if (!this.agentManager.getAgent(params.agentId)?.pendingPermissions.size) return "answered";
+    await wakeWorkspace({
+      registry: this.workspaceRegistry,
+      workspaceId: workspace.workspaceId,
+      nowIso: new Date().toISOString(),
+    });
+    return attention;
+  }
+
   private async broadcastAgentAttention(params: {
     agentId: string;
     provider: AgentProvider;
@@ -2940,19 +2978,8 @@ export class VoiceAssistantWebSocketServer {
       return;
     }
     const workspace = await this.workspaceRegistry.get(agent.workspaceId);
-    const snoozedAttention = resolveSnoozedAttention({
-      workspace,
-      reason: params.reason,
-      permissionBehavior: this.daemonConfigStore.get().snoozedPermission,
-      nowMs: Date.now(),
-    });
-    if (snoozedAttention === "wake") {
-      await wakeWorkspace({
-        registry: this.workspaceRegistry,
-        workspaceId: agent.workspaceId,
-        nowIso: new Date().toISOString(),
-      });
-    }
+    const snoozedAttention = await this.resolveAgentSnoozedAttention(workspace, params);
+    if (snoozedAttention === "answered") return;
     const clientEntries: Array<{
       ws: WebSocketLike;
       state: ClientPresenceState;
