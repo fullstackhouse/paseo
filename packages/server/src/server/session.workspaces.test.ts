@@ -741,6 +741,7 @@ function createSessionForWorkspaceTests(
       workspaceGitService,
       workspaceAutoName: new WorkspaceAutoName({
         agentManager,
+        agentStorage: { listByWorkspace: async () => [] },
         workspaceRegistry,
         workspaceGitService,
         providerSnapshotManager,
@@ -1214,6 +1215,7 @@ test("create_agent_request launches from an exact subdirectory in a created work
       workspaceGitService,
       workspaceAutoName: new WorkspaceAutoName({
         agentManager,
+        agentStorage: { listByWorkspace: async () => [] },
         workspaceRegistry,
         workspaceGitService,
         providerSnapshotManager: createProviderSnapshotManagerStub().manager,
@@ -9629,6 +9631,7 @@ test("workspace auto-name keeps a manual title written before the scheduled titl
   const emittedWorkspaceIds: string[] = [];
   const workspaceAutoName = new WorkspaceAutoName({
     agentManager: asAgentManager({}),
+    agentStorage: { listByWorkspace: async () => [] },
     workspaceRegistry: {
       update: async (workspaceId, updater) => {
         const current = stored.get(workspaceId);
@@ -9685,6 +9688,7 @@ test("workspace auto-name replaces the unchanged prompt title", async () => {
   const stored = new Map([[workspace.workspaceId, workspace]]);
   const workspaceAutoName = new WorkspaceAutoName({
     agentManager: asAgentManager({}),
+    agentStorage: { listByWorkspace: async () => [] },
     workspaceRegistry: {
       update: async (workspaceId, updater) => {
         const current = stored.get(workspaceId);
@@ -9760,6 +9764,7 @@ test("workspace auto-name uses the backing root for a nested worktree", async ()
   const emittedCwds: string[] = [];
   const workspaceAutoName = new WorkspaceAutoName({
     agentManager: asAgentManager({}),
+    agentStorage: { listByWorkspace: async () => [] },
     workspaceRegistry: {
       update: async (workspaceId, updater) => {
         const current = stored.get(workspaceId);
