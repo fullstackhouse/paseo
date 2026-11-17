@@ -257,7 +257,9 @@ The daemon owns both halves so every client and plugin agrees:
 
 - `broadcastAgentAttention` never notifies for a finished or failed turn in a snoozed workspace.
   A permission prompt follows the host's `snoozedPermission` setting (`wake` by default, `badge`,
-  `silent`). `wake` clears the snooze before notifying. `badge` and `silent` stay quiet; the app
+  `silent`). `wake` clears the snooze before notifying, 1.5 s after the prompt and only if it is still
+  open: plugins answer some prompts themselves (paseo-status allows its own `status_set`), and an
+  answered prompt leaves the snooze alone. Awake workspaces notify at once. `badge` and `silent` stay quiet; the app
   counts blocked rows on the Snoozed header only for `badge`. Terminal attention is always quiet.
 - A plugin can report that a workspace needs you (`workspace.attention.report`,
   `workspaces.ref(id).reportNeedsYou({ agentId })`, gated on `features.workspaceAttentionReport`).
