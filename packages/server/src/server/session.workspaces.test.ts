@@ -566,6 +566,7 @@ class CreateAgentTestClient implements AgentClient {
 
 function createSessionForWorkspaceTests(
   options: {
+    clientId?: string;
     appVersion?: string | null;
     onMessage?: (message: SessionOutboundMessage) => void;
     onWorkspaceRecovered?: SessionOptions["onWorkspaceRecovered"];
@@ -665,7 +666,7 @@ function createSessionForWorkspaceTests(
       messageReceipts: createMessageReceiptsStub(),
       agentMessages: createAgentMessageDeliveryStub(),
       creationService: createTestCreationService(),
-      clientId: "test-client",
+      clientId: options.clientId ?? "test-client",
       permissions: OWNER_PERMISSIONS,
       appVersion: options.appVersion ?? null,
       onMessage: options.onMessage ?? vi.fn(),
@@ -10386,7 +10387,7 @@ test("workspace PR status survives session cleanup and reconnect", async () => {
 });
 
 describe("a message to an agent in a snoozed workspace", () => {
-  function setup() {
+  function setup(clientId?: string) {
     const snoozedAt = "2026-03-01T12:00:00.000Z";
     const workspaces = new Map([
       [
@@ -10406,6 +10407,7 @@ describe("a message to an agent in a snoozed workspace", () => {
     ]);
     const session = asTestSession(
       createSessionForWorkspaceTests({
+        clientId,
         agentManager: {
           getAgent: (id: string) => (id === "agent-1" ? { id, workspaceId: "ws-1" } : null),
         },
@@ -10440,6 +10442,17 @@ describe("a message to an agent in a snoozed workspace", () => {
       agentId: "agent-1",
       text: "delegated result",
       sourceAgentId: "agent-2",
+    });
+    expect(workspaces.get("ws-1")?.snoozedAt).toBe("2026-03-01T12:00:00.000Z");
+  });
+
+  test("from a plugin leaves the snooze alone", async () => {
+    const { session, workspaces } = setup("plugin:paseo-asks");
+    await session.handleMessage({
+      type: "send_agent_message_request",
+      requestId: "req-send",
+      agentId: "agent-1",
+      text: "you have open asks",
     });
     expect(workspaces.get("ws-1")?.snoozedAt).toBe("2026-03-01T12:00:00.000Z");
   });

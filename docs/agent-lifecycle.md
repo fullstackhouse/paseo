@@ -231,7 +231,8 @@ The daemon owns both halves so every client and plugin agrees:
   whose work turns `waiting` or `done`, so "snooze until I wake it" also ends when a parent's
   delegated work comes back to you.
 - A message from the human to one of its agents (`send_agent_message_request` without
-  `sourceAgentId`, or voice) wakes it. Agent-to-agent messages leave the snooze alone.
+  `sourceAgentId`, or voice) wakes it. Messages from agents or from plugin sessions (paseo-asks and
+  paseo-status nudges) leave the snooze alone.
 - `setupWorkspaceSnoozeWaker` (`packages/server/src/server/workspace-snooze/`) clears timed snoozes
   when they end, including any that ended while the daemon was down. A snooze past its end counts
   as awake before the waker gets to it.

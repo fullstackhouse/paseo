@@ -105,6 +105,7 @@ import {
   type WorkspaceLabelService,
 } from "./workspace-labels/index.js";
 import { wakeWorkspace } from "./workspace-snooze/index.js";
+import { isPluginClientId } from "./plugins/plugin-session-identity.js";
 
 import { AgentManager, AgentRunCancellationError } from "./agent/agent-manager.js";
 import { buildTimelinePromptIndex } from "./agent/timeline-prompt-index.js";
@@ -8589,8 +8590,12 @@ export class Session {
     }
   }
 
-  /** Writing to an agent means you are back: its workspace's snooze ends, like waking it by hand. */
+  /**
+   * Writing to an agent means you are back: its workspace's snooze ends, like waking it by hand.
+   * Plugins write to agents on their own (paseo-asks and paseo-status nudges), so theirs don't count.
+   */
   private async wakeAgentWorkspace(agentId: string): Promise<void> {
+    if (isPluginClientId(this.clientId)) return;
     try {
       const workspaceId =
         this.agentManager.getAgent(agentId)?.workspaceId ??
