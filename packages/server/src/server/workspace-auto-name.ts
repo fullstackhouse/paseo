@@ -188,19 +188,24 @@ export class WorkspaceAutoName {
   }
 
   /**
-   * An agent created with an explicit title into a workspace that has no other
-   * agent names that workspace too, unless someone already named it by hand.
+   * The first agent ever created in a worktree or directory workspace names it
+   * with its explicit title, unless someone already named it by hand.
    * `paseo run --title X --new-workspace worktree --new-branch Y` creates the
    * workspace without a prompt, so nothing else would ever title it.
+   * Archived agents count: a workspace that has had agents is not new, and a
+   * project's main checkout is never renamed after a passing agent.
    */
   async adoptFirstAgentTitle(input: AdoptFirstAgentTitleInput): Promise<void> {
-    const agents = await this.listWorkspaceAgents(input.workspaceId);
-    if (agents.some((agent) => agent.id !== input.agentId)) {
+    const records = await this.agentStorage.listByWorkspace(input.workspaceId);
+    if (records.some((record) => !record.internal && record.id !== input.agentId)) {
       return;
     }
     let changed = false;
     await this.workspaceRegistry.update(input.workspaceId, (current) => {
-      if (!isReplaceableWorkspaceTitle(current.title, input.promptTitle)) {
+      if (
+        current.kind === "local_checkout" ||
+        !isReplaceableWorkspaceTitle(current.title, input.promptTitle)
+      ) {
         return current;
       }
       changed = current.title !== input.title;

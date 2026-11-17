@@ -71,14 +71,19 @@ interface TitleHarnessAgent {
   id: string;
   title: string | null;
   internal?: boolean;
+  archivedAt?: string;
 }
 
-function createTitleHarness(input: { workspaceTitle: string | null; agents: TitleHarnessAgent[] }) {
+function createTitleHarness(input: {
+  workspaceTitle: string | null;
+  agents: TitleHarnessAgent[];
+  kind?: "directory" | "worktree" | "local_checkout";
+}) {
   let workspace = createPersistedWorkspaceRecord({
     workspaceId: "workspace-title-sync",
     projectId: "project-title-sync",
     cwd: "/workspace",
-    kind: "directory",
+    kind: input.kind ?? "directory",
     displayName: "workspace",
     title: input.workspaceTitle,
     createdAt: "2026-08-08T00:00:00.000Z",
@@ -102,6 +107,7 @@ function createTitleHarness(input: { workspaceTitle: string | null; agents: Titl
               id: agent.id,
               title: agentTitles.get(agent.id) ?? null,
               internal: agent.internal,
+              archivedAt: agent.archivedAt ?? null,
             }) as StoredAgentRecord,
         ),
     },
@@ -268,6 +274,57 @@ describe("single-agent workspaces share one name with their agent", () => {
       workspaceId: harness.workspaceId,
       agentId: "agent-1",
       title: "Fix: login redirect",
+      promptTitle: null,
+    });
+
+    expect(harness.workspaceTitle()).toBeNull();
+  });
+
+  test("an archived agent doesn't stop the remaining agent from following the workspace", async () => {
+    const harness = createTitleHarness({
+      workspaceTitle: PROMPT,
+      agents: [
+        { id: "agent-old", title: "Earlier run", archivedAt: "2026-08-07T00:00:00.000Z" },
+        { id: "agent-1", title: PROMPT },
+      ],
+    });
+
+    await harness.generate(PROMPT);
+
+    expect(harness.agentTitle("agent-1")).toBe("Summarize release status");
+  });
+
+  test("a workspace that has had agents before is not renamed by a new one", async () => {
+    const harness = createTitleHarness({
+      workspaceTitle: null,
+      kind: "worktree",
+      agents: [
+        { id: "agent-old", title: "Earlier run", archivedAt: "2026-08-07T00:00:00.000Z" },
+        { id: "agent-1", title: "lint sweep" },
+      ],
+    });
+
+    await harness.autoName.adoptFirstAgentTitle({
+      workspaceId: harness.workspaceId,
+      agentId: "agent-1",
+      title: "lint sweep",
+      promptTitle: null,
+    });
+
+    expect(harness.workspaceTitle()).toBeNull();
+  });
+
+  test("a project's main checkout is never renamed after an agent", async () => {
+    const harness = createTitleHarness({
+      workspaceTitle: null,
+      kind: "local_checkout",
+      agents: [{ id: "agent-1", title: "lint sweep" }],
+    });
+
+    await harness.autoName.adoptFirstAgentTitle({
+      workspaceId: harness.workspaceId,
+      agentId: "agent-1",
+      title: "lint sweep",
       promptTitle: null,
     });
 

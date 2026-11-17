@@ -4750,12 +4750,21 @@ export class Session {
         this.agentManager.getAgent(snapshot.id) ?? liveSnapshot,
       );
       if (explicitTitle) {
-        await this.workspaceAutoName.adoptFirstAgentTitle({
-          workspaceId: resolvedIntent.intent.workspaceId,
-          agentId: snapshot.id,
-          title: explicitTitle,
-          promptTitle: workspacePromptTitle,
-        });
+        // Naming is cosmetic: the agent already exists, so a failure here must
+        // not turn a successful create into an error.
+        await this.workspaceAutoName
+          .adoptFirstAgentTitle({
+            workspaceId: resolvedIntent.intent.workspaceId,
+            agentId: snapshot.id,
+            title: explicitTitle,
+            promptTitle: workspacePromptTitle,
+          })
+          .catch((error: unknown) => {
+            this.sessionLogger.warn(
+              { err: error, agentId: snapshot.id },
+              "Failed to name workspace after its first agent",
+            );
+          });
       }
       if (resolvedIntent.createdDirectoryWorkspace && trimmedPrompt) {
         this.workspaceAutoName.scheduleForDirectory(
