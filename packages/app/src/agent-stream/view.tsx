@@ -970,7 +970,12 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
 
           case "plugin":
             return (
-              <PluginTimelineItemView agentId={agentId} item={item} serverId={resolvedServerId} />
+              <PluginTimelineItemView
+                agentId={agentId}
+                workspaceId={context.workspaceId}
+                item={item}
+                serverId={resolvedServerId}
+              />
             );
 
           default:
@@ -985,6 +990,7 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
         getCollapsedTurn,
         setTurnExpanded,
         resolvedServerId,
+        context.workspaceId,
       ],
     );
 
