@@ -1487,6 +1487,8 @@ export const SendAgentMessageRequestSchema = z.object({
   activeTurnBehavior: ActiveTurnBehaviorSchema.optional(),
   images: z.array(ImageAttachmentSchema).optional(),
   attachments: AgentAttachmentsSchema,
+  /** The caller asks not to end a snooze: the human isn't back (a bulk resume). Older daemons ignore it. */
+  keepSnoozed: z.boolean().optional(),
 });
 
 export const WaitForFinishRequestSchema = z.object({

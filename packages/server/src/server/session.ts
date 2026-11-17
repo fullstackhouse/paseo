@@ -8592,10 +8592,12 @@ export class Session {
 
   /**
    * Writing to an agent means you are back: its workspace's snooze ends, like waking it by hand.
-   * Plugins write to agents on their own (paseo-asks and paseo-status nudges), so theirs don't count.
+   * Plugins (paseo-asks and paseo-status nudges) and Hub sessions write to agents on their own,
+   * so theirs don't count.
    */
   private async wakeAgentWorkspace(agentId: string): Promise<void> {
-    if (isPluginClientId(this.clientId)) return;
+    // Only a Hub attach passes execution agents; the Hub picks its own clientId.
+    if (isPluginClientId(this.clientId) || this.hubExecutionController) return;
     try {
       const workspaceId =
         this.agentManager.getAgent(agentId)?.workspaceId ??
@@ -8645,7 +8647,7 @@ export class Session {
 
     try {
       const agentId = resolved.agentId;
-      if (!msg.sourceAgentId) await this.wakeAgentWorkspace(agentId);
+      if (!msg.sourceAgentId && !msg.keepSnoozed) await this.wakeAgentWorkspace(agentId);
 
       const prompt = buildAgentPrompt(msg.text, msg.images, msg.attachments);
       this.sessionLogger.trace(

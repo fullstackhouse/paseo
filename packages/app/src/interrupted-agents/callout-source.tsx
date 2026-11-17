@@ -23,7 +23,8 @@ async function resumeOnServer(serverId: string, agents: readonly Agent[]): Promi
     .catch(() => DEFAULT_RESUME_PROMPT);
   await Promise.all(
     agents.map((agent) =>
-      client.sendAgentMessage(agent.id, prompt).catch((error) => {
+      // Resuming isn't coming back to a snoozed workspace.
+      client.sendAgentMessage(agent.id, prompt, { keepSnoozed: true }).catch((error) => {
         console.error("[InterruptedAgents] Failed to resume agent", agent.id, error);
       }),
     ),
