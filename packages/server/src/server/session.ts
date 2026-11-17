@@ -104,6 +104,7 @@ import {
   WorkspaceLabelStorageUncertainError,
   type WorkspaceLabelService,
 } from "./workspace-labels/index.js";
+import { wakeWorkspace } from "./workspace-snooze/index.js";
 
 import { AgentManager, AgentRunCancellationError } from "./agent/agent-manager.js";
 import { buildTimelinePromptIndex } from "./agent/timeline-prompt-index.js";
@@ -4292,6 +4293,7 @@ export class Session {
 
     const promptText = options?.spokenInput ? wrapSpokenInput(text) : text;
     const prompt = buildAgentPrompt(promptText, images, attachments);
+    await this.wakeAgentWorkspace(agentId);
 
     try {
       await sendPromptToAgent({
@@ -8587,6 +8589,23 @@ export class Session {
     }
   }
 
+  /** Writing to an agent means you are back: its workspace's snooze ends, like waking it by hand. */
+  private async wakeAgentWorkspace(agentId: string): Promise<void> {
+    try {
+      const workspaceId =
+        this.agentManager.getAgent(agentId)?.workspaceId ??
+        (await this.agentStorage.get(agentId))?.workspaceId;
+      if (!workspaceId) return;
+      await wakeWorkspace({
+        registry: this.workspaceRegistry,
+        workspaceId,
+        nowIso: new Date().toISOString(),
+      });
+    } catch (error) {
+      this.sessionLogger.warn({ err: error, agentId }, "failed to wake workspace on user message");
+    }
+  }
+
   private async prepareAgentMessage(agentId: string, text: string): Promise<void> {
     await ensureAgentLoaded(agentId, {
       agentManager: this.agentManager,
@@ -8619,6 +8638,7 @@ export class Session {
 
     try {
       const agentId = resolved.agentId;
+      if (!msg.sourceAgentId) await this.wakeAgentWorkspace(agentId);
 
       const prompt = buildAgentPrompt(msg.text, msg.images, msg.attachments);
       this.sessionLogger.trace(

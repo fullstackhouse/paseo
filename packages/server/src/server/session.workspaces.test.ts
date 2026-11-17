@@ -20,7 +20,7 @@ import {
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { setImmediate as waitForImmediate } from "node:timers/promises";
-import { afterEach, expect, test, vi } from "vitest";
+import { afterEach, describe, expect, test, vi } from "vitest";
 import { z } from "zod";
 
 import { CLIENT_CAPS } from "@getpaseo/protocol/client-capabilities";
@@ -10383,4 +10383,64 @@ test("workspace PR status survives session cleanup and reconnect", async () => {
     await session2.cleanup();
     await gitService.dispose();
   }
+});
+
+describe("a message to an agent in a snoozed workspace", () => {
+  function setup() {
+    const snoozedAt = "2026-03-01T12:00:00.000Z";
+    const workspaces = new Map([
+      [
+        "ws-1",
+        createPersistedWorkspaceRecord({
+          workspaceId: "ws-1",
+          projectId: "proj-1",
+          cwd: REPO_CWD,
+          kind: "local_checkout",
+          displayName: "main",
+          snoozedAt,
+          snoozedUntil: null,
+          createdAt: snoozedAt,
+          updatedAt: snoozedAt,
+        }),
+      ],
+    ]);
+    const session = asTestSession(
+      createSessionForWorkspaceTests({
+        agentManager: {
+          getAgent: (id: string) => (id === "agent-1" ? { id, workspaceId: "ws-1" } : null),
+        },
+      }),
+    );
+    session.workspaceRegistry.update = async (id, updater) => {
+      const existing = workspaces.get(id);
+      if (!existing) return null;
+      const updated = updater(existing);
+      workspaces.set(id, updated);
+      return updated;
+    };
+    return { session, workspaces };
+  }
+
+  test("from the human wakes the workspace", async () => {
+    const { session, workspaces } = setup();
+    await session.handleMessage({
+      type: "send_agent_message_request",
+      requestId: "req-send",
+      agentId: "agent-1",
+      text: "back to this",
+    });
+    expect(workspaces.get("ws-1")).toMatchObject({ snoozedAt: null, snoozedUntil: null });
+  });
+
+  test("from another agent leaves the snooze alone", async () => {
+    const { session, workspaces } = setup();
+    await session.handleMessage({
+      type: "send_agent_message_request",
+      requestId: "req-send",
+      agentId: "agent-1",
+      text: "delegated result",
+      sourceAgentId: "agent-2",
+    });
+    expect(workspaces.get("ws-1")?.snoozedAt).toBe("2026-03-01T12:00:00.000Z");
+  });
 });
