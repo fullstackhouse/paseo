@@ -2,51 +2,98 @@ import { useCallback, useMemo, useState, type ReactElement, type ReactNode } fro
 import { Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import {
+  Archive,
   ChevronRight,
-  FileDiff,
+  CircleAlert,
+  CornerDownRight,
+  CornerLeftUp,
+  Ellipsis,
   GitBranch,
+  GitFork,
   GitPullRequest,
   LayoutDashboard,
+  MessageCircleQuestion,
+  ShieldQuestion,
 } from "lucide-react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import invariant from "tiny-invariant";
 import { useShallow } from "zustand/shallow";
 import { useAgentDescriptor } from "@/agent-presentation";
 import { SettingsSection } from "@/components/settings/headings/settings-section";
-import { LineageSummary } from "./lineage-panel";
 import { StatusIcon } from "@/components/status-icon";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { iconButtonChromeStyle } from "@/components/ui/icon-button-chrome";
 import { PressHighlight } from "@/components/ui/press-highlight";
 import { ScrollView } from "@/components/ui/scroll-view";
 import { GIT_ACTION_ICONS } from "@/git/action-icons";
-import { GitActionsSplitButton } from "@/git/actions-split-button";
-import { useGitActions } from "@/git/use-actions";
+import {
+  useGitActionRunner,
+  useGitActions,
+  type GitAction,
+  type GitActions,
+} from "@/git/use-actions";
 import { usePaneContext } from "@/panels/pane-context";
 import { definePanel, type PanelDescriptor, type PanelPresentation } from "@/panels/panel-registry";
 import {
   useWorkspaceSummaryItems,
   type WorkspaceSummaryItem,
 } from "@/plugins/workspace-summary/store";
-import { useSessionStore, type WorkspaceDescriptor } from "@/stores/session-store";
+import { WorkspaceSummaryEntryView } from "@/plugins/workspace-summary/entry-view";
+import { navigateToWorkspace } from "@/stores/navigation-active-workspace-store";
+import { useSessionStore, type Agent, type WorkspaceDescriptor } from "@/stores/session-store";
 import { useWorkspaceFields } from "@/stores/session-store-hooks";
 import type { Theme } from "@/styles/theme";
+import {
+  createLineageSelector,
+  deriveWorkspaceLineage,
+  type WorkspaceRef,
+} from "@/subagents/lineage";
 import { useLineageFocus } from "@/subagents/lineage-focus";
 import { navigateToAgent } from "@/utils/navigate-to-agent";
+import { formatTimeAgo } from "@/utils/time";
+import { normalizeWorkspaceOpaqueId } from "@/utils/workspace-identity";
 import { useWorkspaceAttention } from "@/workspace-attention/attention";
 import { showExplorerForAttention } from "@/workspace-attention/auto-show";
-import type { AttentionItem } from "@/workspace-attention/model";
 import { openExplorerSidebarView } from "@/workspace-tabs/explorer-sidebar";
 import { buildWorkspaceTabPersistenceKey } from "@/workspace-tabs/model";
-import { deriveOverviewNextStep } from "./overview/next-step";
+import {
+  deriveWorkspaceStateWord,
+  deriveYourMove,
+  partitionSummaryItems,
+  type WorkspaceStateWord,
+  type YourMoveRow,
+} from "./overview/model";
 
 const ThemedLayoutDashboard = withUnistyles(LayoutDashboard);
 const ThemedChevronRight = withUnistyles(ChevronRight);
-const ThemedFileDiff = withUnistyles(FileDiff);
 const ThemedGitBranch = withUnistyles(GitBranch);
+const ThemedGitFork = withUnistyles(GitFork);
 const ThemedGitPullRequest = withUnistyles(GitPullRequest);
+const ThemedCornerLeftUp = withUnistyles(CornerLeftUp);
+const ThemedCornerDownRight = withUnistyles(CornerDownRight);
+const ThemedEllipsis = withUnistyles(Ellipsis);
+const ThemedArchive = withUnistyles(Archive);
+const ThemedAsk = withUnistyles(MessageCircleQuestion);
+const ThemedShield = withUnistyles(ShieldQuestion);
+const ThemedAlert = withUnistyles(CircleAlert);
 const mutedColorMapping = (theme: Theme) => ({ color: theme.colors.foregroundMuted });
-const ICON_SIZE = 16;
+const extraMutedColorMapping = (theme: Theme) => ({ color: theme.colors.foregroundExtraMuted });
+const warningColorMapping = (theme: Theme) => ({ color: theme.colors.statusWarning });
+const dangerColorMapping = (theme: Theme) => ({ color: theme.colors.statusDanger });
 const foregroundColorMapping = (theme: Theme) => ({ color: theme.colors.foreground });
+const ICON_SIZE = 16;
+const SMALL_ICON_SIZE = 14;
+const MENU_LINEAGE_ICON = <ThemedGitFork size={ICON_SIZE} uniProps={mutedColorMapping} />;
+const MENU_ARCHIVE_ICON = <ThemedArchive size={ICON_SIZE} uniProps={mutedColorMapping} />;
+/** Child workspaces listed before "Show all". */
+const VISIBLE_CHILDREN = 4;
 
 export const overviewPanelPresentation = {
   label: (t) => t("panels.overview.label"),
@@ -56,9 +103,12 @@ export const overviewPanelPresentation = {
 } satisfies PanelPresentation;
 
 type PullRequest = NonNullable<NonNullable<WorkspaceDescriptor["githubRuntime"]>["pullRequest"]>;
+type Translate = (key: string, options?: Record<string, unknown>) => string;
 
 function selectWorkspaceFacts(workspace: WorkspaceDescriptor) {
   return {
+    name: workspace.name,
+    project: workspace.projectCustomName || workspace.projectDisplayName,
     cwd: workspace.workspaceDirectory,
     // A plain folder has nothing to ship; checkouts and worktrees do, even before git status loads.
     isGitWorkspace: workspace.workspaceKind !== "directory",
@@ -70,248 +120,157 @@ function selectWorkspaceFacts(workspace: WorkspaceDescriptor) {
     pullRequest: workspace.githubRuntime?.pullRequest ?? null,
   };
 }
+type WorkspaceFacts = ReturnType<typeof selectWorkspaceFacts>;
 
 function OverviewPanel(): ReactElement {
-  const { t } = useTranslation();
   const { serverId, workspaceId, target } = usePaneContext();
   invariant(target.kind === "overview", "OverviewPanel requires overview target");
   const workspaceKey = buildWorkspaceTabPersistenceKey({ serverId, workspaceId });
   const facts = useWorkspaceFields(serverId, workspaceId, selectWorkspaceFacts);
   const summaryItems = useWorkspaceSummaryItems(serverId, workspaceId);
-  const showGit = Boolean(facts?.isGitWorkspace);
+  const { status, more } = useMemo(() => partitionSummaryItems(summaryItems), [summaryItems]);
+  const agentRunning = useSessionStore((state) =>
+    hasRunningAgent(state.sessions[serverId]?.agents, workspaceId),
+  );
+  const isGitWorkspace = Boolean(facts?.isGitWorkspace);
+  const { gitActions, isGit: gitStatusLoaded } = useGitActions({
+    serverId,
+    cwd: facts?.cwd ?? "",
+    icons: GIT_ACTION_ICONS,
+  });
+  const git = isGitWorkspace && gitStatusLoaded ? gitActions : null;
 
   return (
     // Themed insets sit on a View: contentContainerStyle drops them on web (docs/unistyles.md).
     <ScrollView testID="overview-panel">
       <View style={styles.body}>
-        <NextStepSection
+        <View style={styles.where}>
+          <WorkspaceHeader facts={facts} workspaceKey={workspaceKey} gitActions={git} />
+          <AgentRow serverId={serverId} workspaceId={workspaceId} />
+          <WorkspaceLineageBlock serverId={serverId} workspaceId={workspaceId} />
+        </View>
+        <StatusSection item={status} agentRunning={agentRunning} workspaceKey={workspaceKey} />
+        <YourMoveSection
           serverId={serverId}
           workspaceId={workspaceId}
           workspaceKey={workspaceKey}
-          cwd={facts?.cwd ?? ""}
-          isGitWorkspace={showGit}
+          agentRunning={agentRunning}
+          facts={facts}
+          gitActions={git}
         />
-        <Section title={t("panels.overview.agent")}>
-          <AgentRow serverId={serverId} workspaceId={workspaceId} />
-        </Section>
-        <Section title={t("panels.lineage.label")}>
-          <LineageSummary serverId={serverId} workspaceId={workspaceId} />
-        </Section>
-        {summaryItems.length > 0 && workspaceKey ? (
-          <Section title={t("panels.overview.plugins")}>
-            {summaryItems.map((item) => (
+        {isGitWorkspace && facts && workspaceKey ? (
+          <CodeSection facts={facts} workspaceKey={workspaceKey} />
+        ) : null}
+        {more.length > 0 && workspaceKey ? (
+          <Section title="panels.overview.more">
+            {more.map((item) => (
               <PluginSummaryRow key={item.entryKey} item={item} workspaceKey={workspaceKey} />
             ))}
           </Section>
-        ) : null}
-        {showGit && facts && workspaceKey ? (
-          <GitSections facts={facts} workspaceKey={workspaceKey} />
         ) : null}
       </View>
     </ScrollView>
   );
 }
 
-function NextStepSection({
-  serverId,
-  workspaceId,
+function hasRunningAgent(agents: Map<string, Agent> | undefined, workspaceId: string): boolean {
+  if (!agents) return false;
+  for (const agent of agents.values()) {
+    if (agent.workspaceId === workspaceId && !agent.archivedAt && agent.status === "running") {
+      return true;
+    }
+  }
+  return false;
+}
+
+// ── Where am I ───────────────────────────────────────────────────────────
+
+function findGitAction(actions: GitActions | null, id: GitAction["id"]): GitAction | null {
+  if (!actions) return null;
+  const all = [actions.primary, ...actions.secondary, ...actions.menu];
+  return all.find((action) => action?.id === id) ?? null;
+}
+
+function WorkspaceHeader({
+  facts,
   workspaceKey,
-  cwd,
-  isGitWorkspace,
+  gitActions,
 }: {
-  serverId: string;
-  workspaceId: string;
+  facts: WorkspaceFacts | null;
   workspaceKey: string | null;
-  cwd: string;
-  isGitWorkspace: boolean;
+  gitActions: GitActions | null;
 }): ReactElement {
   const { t } = useTranslation();
-  const items = useWorkspaceAttention(serverId, workspaceId);
-  const agentRunning = useSessionStore((state) => {
-    const session = state.sessions[serverId];
-    if (!session) return false;
-    for (const agent of session.agents.values()) {
-      if (agent.workspaceId === workspaceId && !agent.archivedAt && agent.status === "running") {
-        return true;
-      }
-    }
-    return false;
-  });
-  const { gitActions, isGit: gitStatusLoaded } = useGitActions({
-    serverId,
-    cwd,
-    icons: GIT_ACTION_ICONS,
-  });
-  const nextStep = deriveOverviewNextStep({ items, agentRunning });
-  let content: ReactElement = <Text style={styles.muted}>{t("workspace.tabs.loading")}</Text>;
-  if (nextStep.kind === "working") {
-    content = <Text style={styles.muted}>{t("panels.overview.working")}</Text>;
-  } else if (nextStep.kind === "attention" && workspaceKey) {
-    content = (
-      <AttentionStep item={nextStep.item} serverId={serverId} workspaceKey={workspaceKey} />
-    );
-  } else if (nextStep.kind === "git" && !isGitWorkspace) {
-    content = <Text style={styles.muted}>{t("panels.overview.notGit")}</Text>;
-  } else if (nextStep.kind === "git" && gitStatusLoaded) {
-    content = <GitActionsSplitButton gitActions={gitActions} />;
-  }
+  const subtitle = [facts?.project, facts?.branch].filter(Boolean).join(" · ");
   return (
-    <View style={styles.nextStepSurface}>
-      <Section title={t("panels.overview.nextStep")}>
-        <View style={styles.nextStep} testID="overview-next-step">
-          {content}
-        </View>
-      </Section>
+    <View style={styles.header} testID="overview-workspace">
+      <View style={styles.rowText}>
+        <Text style={styles.workspaceName} numberOfLines={2}>
+          {facts?.name ?? t("workspace.tabs.loading")}
+        </Text>
+        {subtitle ? (
+          <Text style={styles.rowFacts} numberOfLines={1}>
+            {subtitle}
+          </Text>
+        ) : null}
+      </View>
+      <WorkspaceMenu workspaceKey={workspaceKey} gitActions={gitActions} />
     </View>
   );
 }
 
-function PluginSummaryRow({
-  item,
-  workspaceKey,
-}: {
-  item: WorkspaceSummaryItem;
-  workspaceKey: string;
-}): ReactElement {
-  const open = useCallback(
-    () => showExplorerForAttention(workspaceKey, { kind: "plugin", key: item.key ?? "", item }),
-    [item, workspaceKey],
-  );
-  return (
-    <Row
-      title={item.title}
-      facts={item.label}
-      onPress={item.panelId ? open : undefined}
-      testID={`overview-plugin-${item.pluginId}-${item.itemId}`}
-    />
-  );
+function menuTriggerStyle(state: { hovered: boolean; pressed: boolean; open: boolean }) {
+  return iconButtonChromeStyle({ size: "small", state });
 }
 
-function GitSections({
-  facts,
+/** Rare workspace actions: kept out of the main area so the next step stays the only button. */
+function WorkspaceMenu({
   workspaceKey,
+  gitActions,
 }: {
-  facts: ReturnType<typeof selectWorkspaceFacts>;
-  workspaceKey: string;
+  workspaceKey: string | null;
+  gitActions: GitActions | null;
 }): ReactElement {
   const { t } = useTranslation();
-  const openChanges = useCallback(
-    () => openExplorerSidebarView({ isCompact: false, workspaceKey, view: "changes" }),
+  const runGitAction = useGitActionRunner();
+  const archive = findGitAction(gitActions, "archive-workspace");
+  const openLineage = useCallback(
+    () => openExplorerSidebarView({ isCompact: false, workspaceKey, view: "lineage" }),
     [workspaceKey],
   );
-  const openPullRequest = useCallback(
-    () => openExplorerSidebarView({ isCompact: false, workspaceKey, view: "pr" }),
-    [workspaceKey],
-  );
+  const runArchive = useCallback(() => {
+    if (archive) runGitAction(archive);
+  }, [archive, runGitAction]);
   return (
-    <>
-      <Section title={t("panels.overview.changes")}>
-        <Row
-          icon={ThemedGitBranch}
-          title={facts.branch ?? t("panels.overview.noBranch")}
-          facts={syncFacts(facts.ahead, facts.behind, t("panels.overview.inSync"))}
-          testID="overview-branch"
-        />
-        <Row
-          icon={ThemedFileDiff}
-          title={diffFacts(facts.diffStat) || t("panels.overview.noChanges")}
-          facts={facts.isDirty ? t("panels.overview.uncommitted") : undefined}
-          onPress={openChanges}
-          testID="overview-changes"
-        />
-      </Section>
-      <Section title={t("panels.overview.pullRequest")}>
-        {facts.pullRequest ? (
-          <Row
-            icon={ThemedGitPullRequest}
-            title={pullRequestTitle(facts.pullRequest)}
-            facts={pullRequestFacts(facts.pullRequest, t)}
-            warning={
-              facts.pullRequest.checksStatus === "failure" ||
-              facts.pullRequest.reviewDecision === "changes_requested"
-            }
-            onPress={openPullRequest}
-            testID="overview-pull-request"
-          />
-        ) : (
-          <Row title={t("panels.overview.noPullRequest")} testID="overview-pull-request" />
-        )}
-      </Section>
-    </>
-  );
-}
-
-function syncFacts(ahead: number | null, behind: number | null, inSync: string): string {
-  const parts = [ahead ? `↑${ahead}` : "", behind ? `↓${behind}` : ""].filter(Boolean);
-  return parts.length > 0 ? parts.join(" ") : inSync;
-}
-
-function diffFacts(diffStat: { additions: number; deletions: number } | null): string {
-  if (!diffStat || (diffStat.additions === 0 && diffStat.deletions === 0)) return "";
-  return `+${diffStat.additions} −${diffStat.deletions}`;
-}
-
-function pullRequestTitle(pr: PullRequest): string {
-  return pr.number ? `#${pr.number} ${pr.title}` : pr.title;
-}
-
-function pullRequestFacts(pr: PullRequest, t: (key: string) => string): string {
-  if (pr.isMerged) return t("panels.overview.merged");
-  const parts: string[] = [];
-  if (pr.checksStatus === "failure") parts.push(t("panels.overview.checksFailing"));
-  else if (pr.checksStatus === "pending") parts.push(t("panels.overview.checksRunning"));
-  else if (pr.checksStatus === "success") parts.push(t("panels.overview.checksPassed"));
-  if (pr.reviewDecision === "approved") parts.push(t("panels.overview.approved"));
-  else if (pr.reviewDecision === "changes_requested")
-    parts.push(t("panels.overview.changesRequested"));
-  else if (pr.reviewDecision === "pending") parts.push(t("panels.overview.reviewRequired"));
-  return parts.join(" · ");
-}
-
-function AttentionStep({
-  item,
-  serverId,
-  workspaceKey,
-}: {
-  item: AttentionItem;
-  serverId: string;
-  workspaceKey: string;
-}): ReactElement {
-  const { t } = useTranslation();
-  const press = useCallback(() => {
-    if (item.kind === "permission" || item.kind === "failed") {
-      navigateToAgent({ serverId, agentId: item.agentId });
-      return;
-    }
-    showExplorerForAttention(workspaceKey, item);
-  }, [item, serverId, workspaceKey]);
-  const { label, reason } = useMemo(() => {
-    switch (item.kind) {
-      case "permission":
-        return {
-          label: t("panels.overview.reviewPermission"),
-          reason: t("panels.overview.permissionReason"),
-        };
-      case "failed":
-        return { label: t("panels.overview.openAgent"), reason: t("panels.overview.failedReason") };
-      case "plugin":
-        return { label: item.item.title, reason: item.item.label ?? "" };
-      default:
-        return {
-          label: t("panels.overview.openPullRequest"),
-          reason: t("panels.overview.checksFailedReason"),
-        };
-    }
-  }, [item, t]);
-  return (
-    <>
-      {reason ? <Text style={styles.stepReason}>{reason}</Text> : null}
-      <View style={styles.stepButton}>
-        <Button variant="default" onPress={press} testID="overview-next-step-button">
-          {label}
-        </Button>
-      </View>
-    </>
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        testID="overview-workspace-menu"
+        style={menuTriggerStyle}
+        accessibilityRole="button"
+        accessibilityLabel={t("workspace.header.actions.workspaceActions")}
+      >
+        <ThemedEllipsis size={SMALL_ICON_SIZE} uniProps={mutedColorMapping} />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" width={220}>
+        <DropdownMenuItem leading={MENU_LINEAGE_ICON} onSelect={openLineage}>
+          {t("panels.overview.lineageDetails")}
+        </DropdownMenuItem>
+        {archive ? (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              leading={MENU_ARCHIVE_ICON}
+              disabled={archive.disabled}
+              status={archive.status === "pending" ? "pending" : "idle"}
+              pendingLabel={archive.pendingLabel}
+              onSelect={runArchive}
+            >
+              {archive.label}
+            </DropdownMenuItem>
+          </>
+        ) : null}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
@@ -371,6 +330,574 @@ function formatTokens(tokens: number): string {
   return String(tokens);
 }
 
+/** Lineage by workspace: where this work came from, and the workspaces it handed off to. */
+function WorkspaceLineageBlock({
+  serverId,
+  workspaceId,
+}: {
+  serverId: string;
+  workspaceId: string;
+}): ReactElement | null {
+  const { t } = useTranslation();
+  const [showAll, setShowAll] = useState(false);
+  const focus = useLineageFocus(serverId, workspaceId);
+  const selectLineage = useMemo(() => createLineageSelector(focus), [focus]);
+  const lineage = useSessionStore(selectLineage);
+  const { parent, children, subagentsHere } = useMemo(
+    () => deriveWorkspaceLineage(lineage, { serverId, workspaceId }),
+    [lineage, serverId, workspaceId],
+  );
+  const expand = useCallback(() => setShowAll(true), []);
+  if (!parent && children.length === 0 && subagentsHere === 0) return null;
+  const visible = showAll ? children : children.slice(0, VISIBLE_CHILDREN);
+  return (
+    <View style={styles.lineage} testID="overview-lineage">
+      {parent ? (
+        <>
+          <Text style={styles.lineageLabel}>{t("panels.overview.from")}</Text>
+          <LineageWorkspaceRow workspace={parent} direction="up" />
+        </>
+      ) : null}
+      {children.length > 0 ? (
+        <>
+          <Text style={styles.lineageLabel}>{t("panels.overview.started")}</Text>
+          {visible.map((child) => (
+            <LineageWorkspaceRow
+              key={`${child.serverId}:${child.workspaceId}`}
+              workspace={child}
+              direction="down"
+            />
+          ))}
+          {visible.length < children.length ? (
+            <PressHighlight
+              accessibilityRole="button"
+              onPress={expand}
+              style={styles.showAll}
+              highlightStyle={styles.rowPressed}
+              testID="overview-lineage-show-all"
+            >
+              <Text style={styles.showAllText}>
+                {t("panels.overview.showAll", { count: children.length })}
+              </Text>
+            </PressHighlight>
+          ) : null}
+        </>
+      ) : null}
+      {subagentsHere > 0 ? (
+        <View style={styles.subagentsHere}>
+          <ThemedGitFork size={SMALL_ICON_SIZE} uniProps={extraMutedColorMapping} />
+          <Text style={styles.rowFacts}>
+            {t("panels.overview.subagentsHere", { count: subagentsHere })}
+          </Text>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+function selectLineageWorkspace(workspace: WorkspaceDescriptor) {
+  return {
+    name: workspace.name,
+    prMerged: Boolean(workspace.githubRuntime?.pullRequest?.isMerged),
+  };
+}
+
+function useWorkspaceStateWord(workspace: WorkspaceRef): WorkspaceStateWord {
+  const items = useWorkspaceSummaryItems(workspace.serverId, workspace.workspaceId);
+  const status = useMemo(() => partitionSummaryItems(items).status?.status ?? null, [items]);
+  return useSessionStore((state) => {
+    const agents = state.sessions[workspace.serverId]?.agents;
+    const target = normalizeWorkspaceOpaqueId(workspace.workspaceId);
+    const inWorkspace = agents
+      ? [...agents.values()].filter(
+          (agent) => normalizeWorkspaceOpaqueId(agent.workspaceId) === target,
+        )
+      : [];
+    return deriveWorkspaceStateWord({ status, agents: inWorkspace });
+  });
+}
+
+function LineageWorkspaceRow({
+  workspace,
+  direction,
+}: {
+  workspace: WorkspaceRef;
+  direction: "up" | "down";
+}): ReactElement {
+  const { t } = useTranslation();
+  const fields = useWorkspaceFields(
+    workspace.serverId,
+    workspace.workspaceId,
+    selectLineageWorkspace,
+  );
+  const word = useWorkspaceStateWord(workspace);
+  const open = useCallback(
+    () => navigateToWorkspace({ serverId: workspace.serverId, workspaceId: workspace.workspaceId }),
+    [workspace.serverId, workspace.workspaceId],
+  );
+  const name = fields?.name ?? t("panels.lineage.notLoaded");
+  const wordText = fields?.prMerged
+    ? `${t(`panels.overview.word.${word}`)} · ${t("panels.overview.prMerged")}`
+    : t(`panels.overview.word.${word}`);
+  const Icon = direction === "up" ? ThemedCornerLeftUp : ThemedCornerDownRight;
+  return (
+    <PressHighlight
+      accessibilityRole="button"
+      accessibilityLabel={`${name}, ${wordText}`}
+      disabled={!fields}
+      onPress={open}
+      style={styles.lineageRow}
+      highlightStyle={styles.rowPressed}
+      testID={`overview-lineage-${direction}-${workspace.workspaceId}`}
+    >
+      <Icon size={SMALL_ICON_SIZE} uniProps={extraMutedColorMapping} />
+      <Text style={styles.lineageName} numberOfLines={1}>
+        {name}
+      </Text>
+      <Text style={wordStyle(word)} numberOfLines={1}>
+        {wordText}
+      </Text>
+      {fields ? <ThemedChevronRight size={SMALL_ICON_SIZE} uniProps={mutedColorMapping} /> : null}
+    </PressHighlight>
+  );
+}
+
+function wordStyle(word: WorkspaceStateWord) {
+  switch (word) {
+    case "working":
+      return styles.wordWorking;
+    case "waiting":
+      return styles.wordWaiting;
+    case "blocked":
+    case "failed":
+      return styles.wordDanger;
+    case "done":
+      return styles.wordDone;
+    default:
+      return styles.word;
+  }
+}
+
+// ── Status ───────────────────────────────────────────────────────────────
+
+function StatusSection({
+  item,
+  agentRunning,
+  workspaceKey,
+}: {
+  item: WorkspaceSummaryItem | null;
+  agentRunning: boolean;
+  workspaceKey: string | null;
+}): ReactElement {
+  const { t } = useTranslation();
+  const status = item?.status;
+  const open = useCallback(() => {
+    if (item && workspaceKey) {
+      showExplorerForAttention(workspaceKey, { kind: "plugin", key: item.key ?? "", item });
+    }
+  }, [item, workspaceKey]);
+  if (!status) {
+    return (
+      <Section title="panels.overview.status">
+        <Text style={styles.quiet} testID="overview-status-empty">
+          {agentRunning
+            ? t("panels.overview.statusFallbackWorking")
+            : t("panels.overview.statusFallbackIdle")}
+        </Text>
+      </Section>
+    );
+  }
+  const badge = status.answered ? "answered" : status.state;
+  const content = (
+    <>
+      <View style={styles.cardHead}>
+        <View style={badgeStyle(badge)}>
+          <Text style={badgeTextStyle(badge)}>{t(`panels.overview.state.${badge}`)}</Text>
+        </View>
+        <Text style={styles.age} numberOfLines={1}>
+          {t("panels.overview.updated", { time: formatTimeAgo(new Date(status.updatedAt)) })}
+        </Text>
+        {item?.panelId ? (
+          <ThemedChevronRight size={SMALL_ICON_SIZE} uniProps={mutedColorMapping} />
+        ) : null}
+      </View>
+      <Text style={styles.summary} numberOfLines={4}>
+        {status.summary}
+      </Text>
+      {status.now ? (
+        <Text style={styles.rowFacts}>
+          <Text style={styles.nowLabel}>{t("panels.overview.now")} </Text>
+          {status.now}
+        </Text>
+      ) : null}
+    </>
+  );
+  return (
+    <Section title="panels.overview.status">
+      {item?.panelId ? (
+        <PressHighlight
+          accessibilityRole="button"
+          accessibilityLabel={status.summary}
+          onPress={open}
+          style={styles.card}
+          highlightStyle={styles.rowPressed}
+          testID="overview-status"
+        >
+          {content}
+        </PressHighlight>
+      ) : (
+        <View style={styles.card} testID="overview-status">
+          {content}
+        </View>
+      )}
+    </Section>
+  );
+}
+
+type BadgeState = "working" | "waiting_on_you" | "blocked" | "done" | "answered";
+
+function badgeStyle(state: BadgeState) {
+  if (state === "waiting_on_you") return styles.badgeWarning;
+  if (state === "blocked") return styles.badgeDanger;
+  if (state === "done") return styles.badgeSuccess;
+  return styles.badgeNeutral;
+}
+
+function badgeTextStyle(state: BadgeState) {
+  if (state === "waiting_on_you") return styles.badgeTextWarning;
+  if (state === "blocked") return styles.badgeTextDanger;
+  if (state === "done") return styles.badgeTextSuccess;
+  if (state === "working") return styles.badgeTextWorking;
+  return styles.badgeTextMuted;
+}
+
+// ── Your move ────────────────────────────────────────────────────────────
+
+function YourMoveSection({
+  serverId,
+  workspaceId,
+  workspaceKey,
+  agentRunning,
+  facts,
+  gitActions,
+}: {
+  serverId: string;
+  workspaceId: string;
+  workspaceKey: string | null;
+  agentRunning: boolean;
+  facts: WorkspaceFacts | null;
+  gitActions: GitActions | null;
+}): ReactElement {
+  const { t } = useTranslation();
+  const items = useWorkspaceAttention(serverId, workspaceId);
+  const rows = deriveYourMove({
+    items,
+    agentRunning,
+    gitPrimaryId: gitActions?.primary?.id ?? null,
+    prMerged: Boolean(facts?.pullRequest?.isMerged),
+  });
+  return (
+    <Section title="panels.overview.yourMove" count={rows.length > 1 ? rows.length : undefined}>
+      {rows.length === 0 ? (
+        <Text style={styles.quiet} testID="overview-your-move-empty">
+          {agentRunning
+            ? t("panels.overview.nothingWhileWorking")
+            : t("panels.overview.nothingNeedsYou")}
+        </Text>
+      ) : (
+        rows.map((row, index) => {
+          const move = (
+            <MoveRow
+              key={row.key}
+              row={row}
+              first={index === 0}
+              serverId={serverId}
+              workspaceKey={workspaceKey}
+              facts={facts}
+              gitActions={gitActions}
+            />
+          );
+          // A plugin that renders its own entries (Asks) is acted on in place, not in its tab.
+          if (row.kind !== "entry" || !row.item.EntryComponent) return move;
+          return (
+            <WorkspaceSummaryEntryView
+              key={row.key}
+              item={row.item}
+              entryId={row.entry.id}
+              defaultExpanded={index === 0}
+            >
+              {move}
+            </WorkspaceSummaryEntryView>
+          );
+        })
+      )}
+    </Section>
+  );
+}
+
+interface MoveView {
+  icon: ReactNode;
+  title: string;
+  facts?: string;
+  action: string;
+  run: () => void;
+}
+
+function MoveRow({
+  row,
+  first,
+  serverId,
+  workspaceKey,
+  facts,
+  gitActions,
+}: {
+  row: YourMoveRow;
+  first: boolean;
+  serverId: string;
+  workspaceKey: string | null;
+  facts: WorkspaceFacts | null;
+  gitActions: GitActions | null;
+}): ReactElement | null {
+  const view = useMoveView(row, { serverId, workspaceKey, facts, gitActions });
+  const [hovered, setHovered] = useState(false);
+  const handleHoverIn = useCallback(() => setHovered(true), []);
+  const handleHoverOut = useCallback(() => setHovered(false), []);
+  if (!view) return null;
+  const text = (
+    <View style={styles.rowText}>
+      <Text style={styles.rowTitle} numberOfLines={2}>
+        {view.title}
+      </Text>
+      {view.facts ? (
+        <Text style={styles.rowFacts} numberOfLines={2}>
+          {view.facts}
+        </Text>
+      ) : null}
+    </View>
+  );
+  if (first) {
+    return (
+      <View style={styles.firstMove} testID={`overview-move-${row.kind}`}>
+        <View style={styles.moveIcon}>{view.icon}</View>
+        <View style={styles.firstMoveBody}>
+          {text}
+          <View style={styles.moveButton}>
+            <Button variant="default" onPress={view.run} testID="overview-next-step-button">
+              {view.action}
+            </Button>
+          </View>
+        </View>
+      </View>
+    );
+  }
+  return (
+    <PressHighlight
+      accessibilityRole="button"
+      accessibilityLabel={`${view.action}: ${view.title}`}
+      onPress={view.run}
+      onHoverIn={handleHoverIn}
+      onHoverOut={handleHoverOut}
+      style={hovered ? styles.moveActive : styles.move}
+      highlightStyle={styles.rowPressed}
+      testID={`overview-move-${row.kind}`}
+    >
+      <View style={styles.moveIcon}>{view.icon}</View>
+      {text}
+      <ThemedChevronRight size={ICON_SIZE} uniProps={mutedColorMapping} />
+    </PressHighlight>
+  );
+}
+
+function useMoveView(
+  row: YourMoveRow,
+  context: {
+    serverId: string;
+    workspaceKey: string | null;
+    facts: WorkspaceFacts | null;
+    gitActions: GitActions | null;
+  },
+): MoveView | null {
+  const { t } = useTranslation();
+  const runGitAction = useGitActionRunner();
+  const agentId = row.kind === "permission" || row.kind === "failed" ? row.agentId : "";
+  const agent = useAgentDescriptor({ kind: "agent", agentId }, { serverId: context.serverId });
+  const { serverId, workspaceKey, facts, gitActions } = context;
+  return useMemo(() => {
+    switch (row.kind) {
+      case "permission":
+        return {
+          icon: <ThemedShield size={ICON_SIZE} uniProps={warningColorMapping} />,
+          title: t("panels.overview.permissionTitle"),
+          facts: agent.label || undefined,
+          action: t("panels.overview.reviewPermission"),
+          run: () => navigateToAgent({ serverId, agentId: row.agentId }),
+        };
+      case "failed":
+        return {
+          icon: <ThemedAlert size={ICON_SIZE} uniProps={dangerColorMapping} />,
+          title: t("panels.overview.failedReason"),
+          facts: agent.label || undefined,
+          action: t("panels.overview.openAgent"),
+          run: () => navigateToAgent({ serverId, agentId: row.agentId }),
+        };
+      case "entry":
+      case "plugin": {
+        const openPanel = () => {
+          if (workspaceKey) {
+            showExplorerForAttention(workspaceKey, {
+              kind: "plugin",
+              key: row.item.key ?? "",
+              item: row.item,
+            });
+          }
+        };
+        return {
+          icon: <ThemedAsk size={ICON_SIZE} uniProps={warningColorMapping} />,
+          title: row.kind === "entry" ? `${row.entry.id} · ${row.entry.title}` : row.item.title,
+          facts: row.kind === "entry" ? row.entry.detail : row.item.label,
+          action: t("panels.overview.open"),
+          run: openPanel,
+        };
+      }
+      case "checks": {
+        const failing = (facts?.pullRequest?.checks ?? [])
+          .filter((check) => check.status === "failure")
+          .map((check) => check.name);
+        return {
+          icon: <ThemedAlert size={ICON_SIZE} uniProps={dangerColorMapping} />,
+          title: t("panels.overview.checksFailedReason"),
+          facts: failing.join(", ") || undefined,
+          action: t("panels.overview.openPullRequest"),
+          run: () => openExplorerSidebarView({ isCompact: false, workspaceKey, view: "pr" }),
+        };
+      }
+      case "git": {
+        const primary = gitActions?.primary;
+        if (!primary) return null;
+        return {
+          icon: primary.icon ?? <ThemedGitBranch size={ICON_SIZE} uniProps={mutedColorMapping} />,
+          title: gitMoveTitle(facts, t),
+          facts: gitMoveFacts(facts, t),
+          action: primary.label,
+          run: () => runGitAction(primary),
+        };
+      }
+    }
+  }, [agent.label, facts, gitActions, row, runGitAction, serverId, t, workspaceKey]);
+}
+
+function gitMoveTitle(facts: WorkspaceFacts | null, t: Translate): string {
+  const pr = facts?.pullRequest;
+  if (pr?.isMerged && pr.number) return t("panels.overview.prMergedTitle", { number: pr.number });
+  if (pr) return pullRequestTitle(pr);
+  return facts?.branch ?? t("panels.overview.noBranch");
+}
+
+function gitMoveFacts(facts: WorkspaceFacts | null, t: Translate): string {
+  if (!facts) return "";
+  const parts = [syncFacts(facts.ahead, facts.behind, t("panels.overview.inSync"))];
+  const diff = diffFacts(facts.diffStat);
+  if (diff) parts.push(diff);
+  if (facts.isDirty) parts.push(t("panels.overview.uncommitted"));
+  return parts.join(" · ");
+}
+
+// ── Code ─────────────────────────────────────────────────────────────────
+
+function CodeSection({
+  facts,
+  workspaceKey,
+}: {
+  facts: WorkspaceFacts;
+  workspaceKey: string;
+}): ReactElement {
+  const { t } = useTranslation();
+  const openChanges = useCallback(
+    () => openExplorerSidebarView({ isCompact: false, workspaceKey, view: "changes" }),
+    [workspaceKey],
+  );
+  const openPullRequest = useCallback(
+    () => openExplorerSidebarView({ isCompact: false, workspaceKey, view: "pr" }),
+    [workspaceKey],
+  );
+  return (
+    <Section title="panels.overview.code">
+      <Row
+        icon={ThemedGitBranch}
+        title={facts.branch ?? t("panels.overview.noBranch")}
+        facts={gitMoveFacts(facts, t)}
+        onPress={openChanges}
+        testID="overview-branch"
+      />
+      {facts.pullRequest ? (
+        <Row
+          icon={ThemedGitPullRequest}
+          title={pullRequestTitle(facts.pullRequest)}
+          facts={pullRequestFacts(facts.pullRequest, t)}
+          warning={
+            facts.pullRequest.checksStatus === "failure" ||
+            facts.pullRequest.reviewDecision === "changes_requested"
+          }
+          onPress={openPullRequest}
+          testID="overview-pull-request"
+        />
+      ) : null}
+    </Section>
+  );
+}
+
+function syncFacts(ahead: number | null, behind: number | null, inSync: string): string {
+  const parts = [ahead ? `↑${ahead}` : "", behind ? `↓${behind}` : ""].filter(Boolean);
+  return parts.length > 0 ? parts.join(" ") : inSync;
+}
+
+function diffFacts(diffStat: { additions: number; deletions: number } | null): string {
+  if (!diffStat || (diffStat.additions === 0 && diffStat.deletions === 0)) return "";
+  return `+${diffStat.additions} −${diffStat.deletions}`;
+}
+
+function pullRequestTitle(pr: PullRequest): string {
+  return pr.number ? `#${pr.number} ${pr.title}` : pr.title;
+}
+
+function pullRequestFacts(pr: PullRequest, t: Translate): string {
+  if (pr.isMerged) return t("panels.overview.merged");
+  const parts: string[] = [];
+  if (pr.checksStatus === "failure") parts.push(t("panels.overview.checksFailing"));
+  else if (pr.checksStatus === "pending") parts.push(t("panels.overview.checksRunning"));
+  else if (pr.checksStatus === "success") parts.push(t("panels.overview.checksPassed"));
+  if (pr.reviewDecision === "approved") parts.push(t("panels.overview.approved"));
+  else if (pr.reviewDecision === "changes_requested")
+    parts.push(t("panels.overview.changesRequested"));
+  else if (pr.reviewDecision === "pending") parts.push(t("panels.overview.reviewRequired"));
+  return parts.join(" · ");
+}
+
+// ── More ─────────────────────────────────────────────────────────────────
+
+function PluginSummaryRow({
+  item,
+  workspaceKey,
+}: {
+  item: WorkspaceSummaryItem;
+  workspaceKey: string;
+}): ReactElement {
+  const open = useCallback(
+    () => showExplorerForAttention(workspaceKey, { kind: "plugin", key: item.key ?? "", item }),
+    [item, workspaceKey],
+  );
+  return (
+    <Row
+      title={item.title}
+      facts={item.label}
+      onPress={item.panelId ? open : undefined}
+      testID={`overview-plugin-${item.pluginId}-${item.itemId}`}
+    />
+  );
+}
+
+// ── Shared rows ──────────────────────────────────────────────────────────
+
 function AgentStatusIcon({ descriptor }: { descriptor: PanelDescriptor }): ReactElement {
   return (
     <StatusIcon statusBucket={descriptor.statusBucket} size={ICON_SIZE} backdrop="surface1">
@@ -390,9 +917,20 @@ function AgentIcon({
 }
 const ThemedIcon = withUnistyles(AgentIcon);
 
-function Section({ title, children }: { title: string; children: ReactNode }): ReactElement {
+/** `title` is an i18n key: section titles never come from data. */
+function Section({
+  title,
+  count,
+  children,
+}: {
+  title: string;
+  count?: number;
+  children: ReactNode;
+}): ReactElement {
+  const { t } = useTranslation();
+  const label = count ? `${t(title)} · ${count}` : t(title);
   return (
-    <SettingsSection title={title} flush>
+    <SettingsSection title={label} flush>
       <View style={styles.sectionRows}>{children}</View>
     </SettingsSection>
   );
@@ -473,35 +1011,143 @@ const styles = StyleSheet.create((theme) => {
     paddingVertical: theme.spacing[2],
     borderRadius: theme.borderRadius.md,
   } as const;
+  const move = { ...row, alignItems: "flex-start" } as const;
+  const badge = {
+    paddingHorizontal: theme.spacing[2],
+    paddingVertical: 2,
+    borderRadius: theme.borderRadius.full,
+  } as const;
+  const badgeText = { fontSize: theme.fontSize.sm, fontWeight: theme.fontWeight.medium } as const;
+  const word = { fontSize: theme.fontSize.sm, flexShrink: 0 } as const;
   return {
     body: {
       padding: theme.spacing[4],
       gap: theme.spacing[6],
     },
-    sectionRows: {
+    where: {
       gap: theme.spacing[1],
     },
-    nextStepSurface: {
-      padding: theme.spacing[3],
-      backgroundColor: theme.colors.surface1,
-      borderRadius: theme.borderRadius.lg,
+    header: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      gap: theme.spacing[2],
+      paddingHorizontal: theme.spacing[2],
+      paddingBottom: theme.spacing[1],
     },
-    stepReason: {
+    workspaceName: {
+      fontSize: theme.fontSize.lg,
+      fontWeight: theme.fontWeight.semibold,
+      color: theme.colors.foreground,
+    },
+    lineage: {
+      marginLeft: theme.spacing[4],
+      paddingLeft: theme.spacing[2],
+      borderLeftWidth: 1,
+      borderLeftColor: theme.colors.border,
+    },
+    lineageLabel: {
+      fontSize: theme.fontSize.sm,
+      color: theme.colors.foregroundExtraMuted,
+      paddingHorizontal: theme.spacing[2],
+      paddingTop: theme.spacing[2],
+      paddingBottom: theme.spacing[0.5],
+    },
+    lineageRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: theme.spacing[2],
+      minHeight: 32,
+      paddingHorizontal: theme.spacing[2],
+      borderRadius: theme.borderRadius.md,
+    },
+    lineageName: {
+      flex: 1,
+      minWidth: 0,
       fontSize: theme.fontSize.base,
       color: theme.colors.foreground,
     },
-    nextStep: {
-      gap: theme.spacing[2],
+    word: { ...word, color: theme.colors.foregroundMuted },
+    wordWorking: { ...word, color: theme.colors.accentBright },
+    wordWaiting: { ...word, color: theme.colors.statusWarning },
+    wordDanger: { ...word, color: theme.colors.statusDanger },
+    wordDone: { ...word, color: theme.colors.statusSuccess },
+    showAll: {
       paddingHorizontal: theme.spacing[2],
-      paddingVertical: theme.spacing[2],
-      alignItems: "flex-start",
+      paddingVertical: theme.spacing[1],
+      borderRadius: theme.borderRadius.md,
     },
-    stepButton: {
-      flexDirection: "row",
-    },
-    muted: {
+    showAllText: {
       fontSize: theme.fontSize.sm,
       color: theme.colors.foregroundMuted,
+      textDecorationLine: "underline",
+    },
+    subagentsHere: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: theme.spacing[2],
+      paddingHorizontal: theme.spacing[2],
+      paddingVertical: theme.spacing[1],
+    },
+    sectionRows: {
+      gap: theme.spacing[1],
+    },
+    quiet: {
+      fontSize: theme.fontSize.sm,
+      color: theme.colors.foregroundMuted,
+      paddingHorizontal: theme.spacing[2],
+      paddingVertical: theme.spacing[1],
+    },
+    card: {
+      gap: theme.spacing[1.5],
+      padding: theme.spacing[3],
+      borderRadius: theme.borderRadius.lg,
+      backgroundColor: theme.colors.surface1,
+    },
+    cardHead: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: theme.spacing[2],
+    },
+    age: {
+      flex: 1,
+      minWidth: 0,
+      fontSize: theme.fontSize.sm,
+      color: theme.colors.foregroundExtraMuted,
+    },
+    summary: {
+      fontSize: theme.fontSize.base,
+      color: theme.colors.foreground,
+    },
+    nowLabel: {
+      fontWeight: theme.fontWeight.medium,
+      color: theme.colors.foreground,
+    },
+    badgeNeutral: { ...badge, backgroundColor: theme.colors.surface2 },
+    badgeWarning: { ...badge, backgroundColor: theme.colors.statusWarningTint },
+    badgeDanger: { ...badge, backgroundColor: theme.colors.statusDangerTint },
+    badgeSuccess: { ...badge, backgroundColor: theme.colors.statusSuccessTint },
+    badgeTextMuted: { ...badgeText, color: theme.colors.foregroundMuted },
+    badgeTextWorking: { ...badgeText, color: theme.colors.accentBright },
+    badgeTextWarning: { ...badgeText, color: theme.colors.statusWarning },
+    badgeTextDanger: { ...badgeText, color: theme.colors.statusDanger },
+    badgeTextSuccess: { ...badgeText, color: theme.colors.statusSuccess },
+    firstMove: {
+      ...move,
+      padding: theme.spacing[3],
+      backgroundColor: theme.colors.surface1,
+    },
+    firstMoveBody: {
+      flex: 1,
+      minWidth: 0,
+      gap: theme.spacing[2],
+    },
+    move,
+    moveActive: { ...move, backgroundColor: theme.colors.interactionHighlight },
+    moveIcon: {
+      paddingTop: 2,
+    },
+    moveButton: {
+      flexDirection: "row",
     },
     row,
     rowActive: { ...row, backgroundColor: theme.colors.interactionHighlight },

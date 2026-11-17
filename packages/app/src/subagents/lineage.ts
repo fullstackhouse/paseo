@@ -144,3 +144,54 @@ export function lineageCrossesWorkspace(
     (node) => !node.missing && !isInWorkspace(node, workspace),
   );
 }
+
+export interface WorkspaceRef {
+  serverId: string;
+  workspaceId: string;
+}
+
+/** Lineage seen from a workspace: where its work came from and which workspaces it handed off to. */
+export interface WorkspaceLineage {
+  /** The nearest ancestor agent's workspace that isn't this one. */
+  parent: WorkspaceRef | null;
+  /** Workspaces other than this one that the focus agent started, oldest first, each once. */
+  children: WorkspaceRef[];
+  /** Children of the focus agent that run in this same workspace. */
+  subagentsHere: number;
+}
+
+function workspaceOf(node: LineageNode): WorkspaceRef | null {
+  if (node.missing || !node.workspaceId) return null;
+  return { serverId: node.address.serverId, workspaceId: node.workspaceId };
+}
+
+export function deriveWorkspaceLineage(
+  lineage: Lineage,
+  workspace: WorkspaceRef,
+): WorkspaceLineage {
+  let parent: WorkspaceRef | null = null;
+  for (let index = lineage.ancestors.length - 1; index >= 0; index -= 1) {
+    const node = lineage.ancestors[index]!;
+    const ref = workspaceOf(node);
+    if (ref && !isInWorkspace(node, workspace)) {
+      parent = ref;
+      break;
+    }
+  }
+  const children: WorkspaceRef[] = [];
+  const seen = new Set<string>();
+  let subagentsHere = 0;
+  for (const node of lineage.children) {
+    if (isInWorkspace(node, workspace)) {
+      subagentsHere += 1;
+      continue;
+    }
+    const ref = workspaceOf(node);
+    if (!ref) continue;
+    const key = `${ref.serverId}:${normalizeWorkspaceOpaqueId(ref.workspaceId)}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    children.push(ref);
+  }
+  return { parent, children, subagentsHere };
+}

@@ -65,4 +65,48 @@ describe("WorkspaceSummaryStore", () => {
     item.update({ workState: "bogus" as never });
     expect(store.forWorkspace("s", "w")[0]?.workState).toBeUndefined();
   });
+
+  it("keeps a well-formed status and clears a malformed one", () => {
+    const store = new WorkspaceSummaryStore();
+    const item = store.add(owner, {
+      id: "status",
+      workspaceId: "w",
+      title: "Status",
+      status: { state: "blocked", summary: " Needs approval ", now: "", updatedAt: 5 },
+    });
+    expect(store.forWorkspace("s", "w")[0]?.status).toEqual({
+      state: "blocked",
+      summary: "Needs approval",
+      updatedAt: 5,
+    });
+    item.update({ status: { state: "bogus", summary: "x", updatedAt: 1 } as never });
+    expect(store.forWorkspace("s", "w")[0]?.status).toBeNull();
+    item.update({ status: { state: "done", summary: "", updatedAt: 1 } });
+    expect(store.forWorkspace("s", "w")[0]?.status).toBeNull();
+  });
+
+  it("drops entries without an id or title", () => {
+    const store = new WorkspaceSummaryStore();
+    store.add(owner, {
+      id: "asks",
+      workspaceId: "w",
+      title: "Asks",
+      entries: [
+        { id: "A4", title: "Backoff?", detail: " Decision " },
+        { id: "", title: "No id" },
+        { id: "A5", title: " " },
+      ],
+    });
+    expect(store.forWorkspace("s", "w")[0]?.entries).toEqual([
+      { id: "A4", title: "Backoff?", detail: "Decision" },
+    ]);
+  });
+
+  it("keeps the entry component across updates", () => {
+    const store = new WorkspaceSummaryStore();
+    const EntryComponent = () => null;
+    const item = store.add(owner, { id: "asks", workspaceId: "w", title: "Asks", EntryComponent });
+    item.update({ count: 1, EntryComponent: () => null } as never);
+    expect(store.forWorkspace("s", "w")[0]?.EntryComponent).toBe(EntryComponent);
+  });
 });

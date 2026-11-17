@@ -1,0 +1,923 @@
+<!doctype html>
+<html lang="en" class="dark" data-prototype-id="overview-v2">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Overview V2 — storyboard</title>
+<link rel="stylesheet" href="tokens.css" />
+<link rel="stylesheet" href="components.css" />
+<link rel="stylesheet" href="screens.css" />
+<link rel="stylesheet" href="prototype.css" />
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs><symbol id="ic-chevron-right" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></symbol><symbol id="ic-more" viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="5" cy="12" r="1.75"/><circle cx="12" cy="12" r="1.75"/><circle cx="19" cy="12" r="1.75"/></symbol><symbol id="ic-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></symbol><symbol id="ic-dash" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></symbol><symbol id="ic-files" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></symbol><symbol id="ic-diff" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M9 10h6"/><path d="M12 13V7"/><path d="M9 17h6"/></symbol><symbol id="ic-branch" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" x2="6" y1="3" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></symbol><symbol id="ic-pr" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 0 1 2 2v7"/><line x1="6" x2="6" y1="9" y2="21"/></symbol><symbol id="ic-merge" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 21V9a9 9 0 0 0 9 9"/></symbol><symbol id="ic-ask" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></symbol><symbol id="ic-fork" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><circle cx="18" cy="6" r="3"/><path d="M18 9v2c0 .6-.4 1-1 1H7c-.6 0-1-.4-1-1V9"/><path d="M12 12v3"/></symbol><symbol id="ic-up" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 9 9 4 4 9"/><path d="M20 20h-7a4 4 0 0 1-4-4V4"/></symbol><symbol id="ic-down" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 10 5 5-5 5"/><path d="M4 4v7a4 4 0 0 0 4 4h12"/></symbol><symbol id="ic-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></symbol><symbol id="ic-alert" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></symbol><symbol id="ic-archive" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="5" x="2" y="3" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/><path d="M10 12h4"/></symbol><symbol id="ic-agent" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v16"/><path d="M18.9 8 5.1 16"/><path d="m5.1 8 13.8 8"/></symbol><symbol id="ic-code" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></symbol><symbol id="ic-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></symbol><symbol id="ic-commit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><line x1="3" x2="9" y1="12" y2="12"/><line x1="15" x2="21" y1="12" y2="12"/></symbol><symbol id="ic-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></symbol><symbol id="ic-panel" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M15 3v18"/></symbol><symbol id="ic-folder" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></symbol><symbol id="ic-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></symbol><symbol id="ic-gauge" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/></symbol></defs></svg>
+<div class="doc-toolbar">
+  <strong style="font-size:0.875rem">Overview V2 — storyboard</strong>
+  <nav class="screen-nav" aria-label="Screens"><a href="#s1">1 Merged</a><a href="#s2">2 Asks waiting</a><a href="#s3">3 Working</a><a href="#s4">4 No status</a><a href="#s5">5 Child, ready</a><a href="#s6">6 Several</a><a href="#s7">7 ⋯ menu</a><a href="#s8">8 Folder</a></nav>
+  <button class="btn btn-outline btn-sm" id="theme-toggle" type="button"><svg aria-hidden="true"><use href="#ic-sun"/></svg> Theme</button>
+</div>
+<div class="doc">
+<header class="doc-head">
+  <h1>Overview V2 — every state, both widths</h1>
+  <p class="muted" style="max-width:70ch;margin:0">Storyboard for <code class="t-mono">tasks/spec-overview-v2.md</code>. Each section is one state, rendered at desktop (1280) and mobile (390) from one fixture set. All data is fictional. Read top to bottom; nothing needs clicking.</p>
+</header>
+
+<section class="screen" id="s1">
+  <div class="screen-meta">
+    <h2>1. PR merged, nothing waiting (the case from the screenshot)</h2>
+    <p>Jacek comes back to a spec workspace whose PR merged overnight and wants to know if anything is left before archiving it.</p>
+    <div class="screen-refs"><span class="ref">S1</span><span class="ref">S2</span><span class="ref">S3</span><span class="ref">F1</span><span class="ref">F3</span><span class="ref">F8</span></div>
+  </div>
+  <div class="sb-pair"><div class="frame sb-frame-desktop">
+    <div class="frame-bar"><div class="frame-dots"><i></i><i></i><i></i></div><span class="frame-url">Paseo</span><span class="sb-frame-label">desktop · 1280 · Explorer</span></div>
+    <div class="px-app">
+    <div class="px-nav"><div class="px-nav-p">orbit</div><div class="px-nav-w"></div><div class="px-nav-w w70"></div><div class="px-nav-p">atlas</div><div class="px-nav-w"></div><div class="px-nav-w w70"></div><div class="px-nav-p">notes</div><div class="px-nav-w"></div><div class="px-nav-w w70"></div></div>
+    <div class="px-chat"><div class="px-chat-head">Billing spec: invoices own numbering</div>
+    <div class="px-bubble px-bubble-me"></div><div class="px-bubble w80"></div><div class="px-bubble w60"></div><div class="px-bubble w70"></div>
+    <div class="px-composer"></div></div>
+    <aside class="px-explorer"><div class="px-tabs"><div class="px-tab is-on"><svg aria-hidden="true"><use href="#ic-dash"/></svg><span>Overview</span></div><div class="px-tab "><svg aria-hidden="true"><use href="#ic-files"/></svg><span>Files</span></div><div class="px-tab "><svg aria-hidden="true"><use href="#ic-diff"/></svg><span>Changes</span></div><div class="px-tab "><svg aria-hidden="true"><use href="#ic-pr"/></svg><span>PR</span></div><div class="px-tab "><svg aria-hidden="true"><use href="#ic-ask"/></svg><span>Asks</span></div><div class="px-tab "><svg aria-hidden="true"><use href="#ic-fork"/></svg><span>Lineage</span></div>
+    <span class="px-tabs-end"><svg aria-hidden="true"><use href="#ic-plus"/></svg><svg aria-hidden="true"><use href="#ic-panel"/></svg></span></div><div class="px-scroll"><div class="px-ov"><div class="px-where">
+    <div class="px-ws">
+      <div class="px-text"><div class="px-ws-name">Billing spec: invoices own numbering</div><div class="px-ws-sub">orbit · <svg aria-hidden="true"><use href="#ic-branch"/></svg> docs/spec-invoice-numbering</div></div>
+      <button class="px-iconbtn " aria-label="Workspace actions"><svg aria-hidden="true"><use href="#ic-more"/></svg></button>
+      
+    </div>
+    <div class="px-row">
+      <span class="px-aicon"><svg aria-hidden="true"><use href="#ic-agent"/></svg><i class="px-dot px-t-ok"></i></span>
+      <div class="px-text"><div class="px-title">Should invoices number per tenant or per series?</div><div class="px-facts">Claude · 64k / 200k</div></div><span class="px-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span>
+    </div>
+    <div class="px-lineage">
+      
+      <div class="px-lin-label">Started 4 workspaces</div><div class="px-row px-row-tight">
+    <span class="px-lin-icon"><svg aria-hidden="true"><use href="#ic-down"/></svg></span>
+    <div class="px-text"><div class="px-title px-1line">Billing 0a: tenant owns the sequence</div></div>
+    <span class="px-word px-t-ok">done · PR merged</span><span class="px-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span>
+  </div><div class="px-row px-row-tight">
+    <span class="px-lin-icon"><svg aria-hidden="true"><use href="#ic-down"/></svg></span>
+    <div class="px-text"><div class="px-title px-1line">Billing 3: series picker</div></div>
+    <span class="px-word px-t-run">working</span><span class="px-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span>
+  </div><div class="px-row px-row-tight">
+    <span class="px-lin-icon"><svg aria-hidden="true"><use href="#ic-down"/></svg></span>
+    <div class="px-text"><div class="px-title px-1line">Billing 1+2: preview and prefill</div></div>
+    <span class="px-word px-t-warn">waiting on you</span><span class="px-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span>
+  </div><div class="px-row px-row-tight">
+    <span class="px-lin-icon"><svg aria-hidden="true"><use href="#ic-down"/></svg></span>
+    <div class="px-text"><div class="px-title px-1line">Billing: Issue button + spec docs</div></div>
+    <span class="px-word px-t-ok">done · PR merged</span><span class="px-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span>
+  </div>
+      
+      
+    </div>
+  </div><section class="px-sec"><div class="px-sec-title">Status</div><div class="px-card px-press">
+    <div class="px-card-head">
+      <span class="px-badge px-b-muted">Waiting on you</span>
+      <span class="px-age px-outdated">outdated · written 19h ago, PR merged since</span>
+      <span class="px-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span>
+    </div>
+    <div class="px-summary px-dim">Spec written and PR #817 opened. Four implementation workspaces started from it.</div>
+    <div class="px-now px-dim"><b>Now</b> Waiting for review of the spec PR</div>
+  </div></section><section class="px-sec"><div class="px-sec-title">Your move</div><div class="px-moves"><div class="px-move px-move-first">
+      <span class="px-micon px-t-merged"><svg aria-hidden="true"><use href="#ic-merge"/></svg></span>
+      <div class="px-text"><div class="px-title">PR #817 merged</div><div class="px-facts">Branch in sync · nothing uncommitted</div>
+        <div class="px-move-btn"><button class="px-btn">Archive workspace</button></div>
+      </div>
+      
+    </div></div></section><section class="px-sec"><div class="px-sec-title">Code</div><div class="px-row px-press">
+      <span class="px-plain"><svg aria-hidden="true"><use href="#ic-branch"/></svg></span>
+      <div class="px-text"><div class="px-title px-1line t-mono-ish">docs/spec-invoice-numbering</div></div>
+      <span class="px-word">in sync · +309 −0</span><span class="px-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span>
+    </div>
+    <div class="px-row px-press">
+      <span class="px-plain px-t-merged"><svg aria-hidden="true"><use href="#ic-merge"/></svg></span>
+      <div class="px-text"><div class="px-title px-1line">#817 docs(specs): invoices own their numbering</div></div>
+      <span class="px-badge px-b-merged">Merged</span><span class="px-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span>
+    </div></section></div></div></aside>
+  </div>
+  </div><div class="frame sb-frame-mobile">
+    <div class="frame-bar"><div class="frame-dots"><i></i><i></i><i></i></div><span class="frame-url">Paseo</span><span class="sb-frame-label">mobile · 390 · sheet</span></div>
+    <div class="px-mobile"><div class="px-mobile-behind"><div class="px-chat"><div class="px-chat-head">Billing spec: invoices own numbering</div>
+    <div class="px-bubble px-bubble-me"></div><div class="px-bubble w80"></div><div class="px-bubble w60"></div><div class="px-bubble w70"></div>
+    <div class="px-composer"></div></div></div>
+      <div class="px-sheet"><div class="px-handle"></div><div class="px-sheet-title"><svg aria-hidden="true"><use href="#ic-dash"/></svg> Overview</div><div class="px-ov"><div class="px-where">
+    <div class="px-ws">
+      <div class="px-text"><div class="px-ws-name">Billing spec: invoices own numbering</div><div class="px-ws-sub">orbit · <svg aria-hidden="true"><use href="#ic-branch"/></svg> docs/spec-invoice-numbering</div></div>
+      <button class="px-iconbtn " aria-label="Workspace actions"><svg aria-hidden="true"><use href="#ic-more"/></svg></button>
+      
+    </div>
+    <div class="px-row">
+      <span class="px-aicon"><svg aria-hidden="true"><use href="#ic-agent"/></svg><i class="px-dot px-t-ok"></i></span>
+      <div class="px-text"><div class="px-title">Should invoices number per tenant or per series?</div><div class="px-facts">Claude · 64k / 200k</div></div><span class="px-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span>
+    </div>
+    <div class="px-lineage">
+      
+      <div class="px-lin-label">Started 4 workspaces</div><div class="px-row px-row-tight">
+    <span class="px-lin-icon"><svg aria-hidden="true"><use href="#ic-down"/></svg></span>
+    <div class="px-text"><div class="px-title px-1line">Billing 0a: tenant owns the sequence</div></div>
+    <span class="px-word px-t-ok">done · PR merged</span><span class="px-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span>
+  </div><div class="px-row px-row-tight">
+    <span class="px-lin-icon"><svg aria-hidden="true"><use href="#ic-down"/></svg></span>
+    <div class="px-text"><div class="px-title px-1line">Billing 3: series picker</div></div>
+    <span class="px-word px-t-run">working</span><span class="px-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span>
+  </div><div class="px-row px-row-tight">
+    <span class="px-lin-icon"><svg aria-hidden="true"><use href="#ic-down"/></svg></span>
+    <div class="px-text"><div class="px-title px-1line">Billing 1+2: preview and prefill</div></div>
+    <span class="px-word px-t-warn">waiting on you</span><span class="px-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span>
+  </div><div class="px-row px-row-tight">
+    <span class="px-lin-icon"><svg aria-hidden="true"><use href="#ic-down"/></svg></span>
+    <div class="px-text"><div class="px-title px-1line">Billing: Issue button + spec docs</div></div>
+    <span class="px-word px-t-ok">done · PR merged</span><span class="px-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span>
+  </div>
+      
+      
+    </div>
+  </div><section class="px-sec"><div class="px-sec-title">Status</div><div class="px-card px-press">
+    <div class="px-card-head">
+      <span class="px-badge px-b-muted">Waiting on you</span>
+      <span class="px-age px-outdated">outdated · written 19h ago, PR merged since</span>
+      <span class="px-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span>
+    </div>
+    <div class="px-summary px-dim">Spec written and PR #817 opened. Four implementation workspaces started from it.</div>
+    <div class="px-now px-dim"><b>Now</b> Waiting for review of the spec PR</div>
+  </div></section><section class="px-sec"><div class="px-sec-title">Your move</div><div class="px-moves"><div class="px-move px-move-first">
+      <span class="px-micon px-t-merged"><svg aria-hidden="true"><use href="#ic-merge"/></svg></span>
+      <div class="px-text"><div class="px-title">PR #817 merged</div><div class="px-facts">Branch in sync · nothing uncommitted</div>
+        <div class="px-move-btn"><button class="px-btn">Archive workspace</button></div>
+      </div>
+      
+    </div></div></section><section class="px-sec"><div class="px-sec-title">Code</div><div class="px-row px-press">
+      <span class="px-plain"><svg aria-hidden="true"><use href="#ic-branch"/></svg></span>
+      <div class="px-text"><div class="px-title px-1line t-mono-ish">docs/spec-invoice-numbering</div></div>
+      <span class="px-word">in sync · +309 −0</span><span class="px-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span>
+    </div>
+    <div class="px-row px-press">
+      <span class="px-plain px-t-merged"><svg aria-hidden="true"><use href="#ic-merge"/></svg></span>
+      <div class="px-text"><div class="px-title px-1line">#817 docs(specs): invoices own their numbering</div></div>
+      <span class="px-badge px-b-merged">Merged</span><span class="px-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span>
+    </div></section></div></div></div>
+  </div></div>
+  <div class="notes"><div class="note"><b>1</b><span>The header answers "where am I": the workspace name and branch, the agent, and the 4 workspaces it started. Each row is a <b>workspace</b> with one status word. Pressing a row opens that workspace.</span></div><div class="note"><b>2</b><span>The status card was written before the PR merged, so it is shown as <b>outdated</b>: the badge is muted, the text dimmed, and the reason is spelled out.</span></div><div class="note"><b>3</b><span>Your move has one item. Archive becomes the filled button only once the PR is merged (open question 3). Before that, Archive lives in ⋯ (s7).</span></div></div>
+</section>
+
+<section class="screen" id="s2">
+  <div class="screen-meta">
+    <h2>2. Asks waiting on you</h2>
+    <p>The agent finished its part and left two decisions; Jacek answers the first without opening the Asks tab.</p>
+    <div class="screen-refs"><span class="ref">S3</span><span class="ref">F5</span><span class="ref">F6</span><span class="ref">F7</span></div>
+  </div>
+  <div class="sb-pair"><div class="frame sb-frame-desktop">
+    <div class="frame-bar"><div class="frame-dots"><i></i><i></i><i></i></div><span class="frame-url">Paseo</span><span class="sb-frame-label">desktop · 1280 · Explorer</span></div>
+    <div class="px-app">
+    <div class="px-nav"><div class="px-nav-p">orbit</div><div class="px-nav-w"></div><div class="px-nav-w w70"></div><div class="px-nav-p">atlas</div><div class="px-nav-w"></div><div class="px-nav-w w70"></div><div class="px-nav-p">notes</div><div class="px-nav-w"></div><div class="px-nav-w w70"></div></div>
+    <div class="px-chat"><div class="px-chat-head">Payments: retry failed webhooks</div>
+    <div class="px-bubble px-bubble-me"></div><div class="px-bubble w80"></div><div class="px-bubble w60"></div><div class="px-bubble w70"></div>
+    <div class="px-composer"></div></div>
+    <aside class="px-explorer"><div class="px-tabs"><div class="px-tab is-on"><svg aria-hidden="true"><use href="#ic-dash"/></svg><span>Overview</span></div><div class="px-tab "><svg aria-hidden="true"><use href="#ic-files"/></svg><span>Files</span></div><div class="px-tab "><svg aria-hidden="true"><use href="#ic-diff"/></svg><span>Changes</span></div><div class="px-tab "><svg aria-hidden="true"><use href="#ic-pr"/></svg><span>PR</span></div><div class="px-tab "><svg aria-hidden="true"><use href="#ic-ask"/></svg><span>Asks</span></div><div class="px-tab "><svg aria-hidden="true"><use href="#ic-fork"/></svg><span>Lineage</span></div>
+    <span class="px-tabs-end"><svg aria-hidden="true"><use href="#ic-plus"/></svg><svg aria-hidden="true"><use href="#ic-panel"/></svg></span></div><div class="px-scroll"><div class="px-ov"><div class="px-where">
+    <div class="px-ws">
+      <div class="px-text"><div class="px-ws-name">Payments: retry failed webhooks</div><div class="px-ws-sub">orbit · <svg aria-hidden="true"><use href="#ic-branch"/></svg> feat/webhook-retry</div></div>
+      <button class="px-iconbtn " aria-label="Workspace actions"><svg aria-hidden="true"><use href="#ic-more"/></svg></button>
+      
+    </div>
+    <div class="px-row">
+      <span class="px-aicon"><svg aria-hidden="true"><use href="#ic-agent"/></svg><i class="px-dot px-t-warn"></i></span>
+      <div class="px-text"><div class="px-title">Retry failed webhooks with backoff</div><div class="px-facts">Claude · 121k / 200k</div></div><span class="px-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span>
+    </div>
+    <div class="px-lineage">
+      <div class="px-lin-label">From</div><div class="px-row px-row-tight">
+    <span class="px-lin-icon"><svg aria-hidden="true"><use href="#ic-up"/></svg></span>
+    <div class="px-text"><div class="px-title px-1line">Payments roadmap Q4</div></div>
+    <span class="px-word px-t-run">working</span><span class="px-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span>
+  </div>
+      
+      
+      <div class="px-lin-foot"><svg aria-hidden="true"><use href="#ic-fork"/></svg> 2 subagents in this workspace</div>
+    </div>
+  </div><section class="px-sec"><div class="px-sec-title">Status</div><div class="px-card px-press">
+    <div class="px-card-head">
+      <span class="px-badge px-b-warn">Waiting on you</span>
+      <span class="px-age ">updated 4 min ago</span>
+      <span class="px-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span>
+    </div>
+    <div class="px-summary ">Retry queue built and tested (48/48). Two decisions left before the PR.</div>
+    <div class="px-now "><b>Now</b> Waiting on A4 and A5</div>
+  </div></section><section class="px-sec"><div class="px-sec-title">Your move<span class="px-count">3</span></div><div class="px-moves"><div class="px-move px-move-first">
+      <span class="px-micon px-t-warn"><svg aria-hidden="true"><use href="#ic-ask"/></svg></span>
+      <div class="px-text"><div class="px-title">A4 · Backoff: exponential up to 1 h, or fixed 5 min?</div><div class="px-facts">Decision · 2 options · recommended: exponential</div>
+        <div class="px-move-btn"><button class="px-btn">Answer</button></div>
+      </div>
+      
+    </div><div class="px-move px-press">
+      <span class="px-micon px-t-warn"><svg aria-hidden="true"><use href="#ic-ask"/></svg></span>
+      <div class="px-text"><div class="px-title">A5 · Open the PR against main or release/3.2?</div><div class="px-facts">Decision · 2 options</div>
+        
+      </div>
+      <span class="px-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span>
+    </div><div class="px-move px-press">
+      <span class="px-micon px-t-muted"><svg aria-hidden="true"><use href="#ic-commit"/></svg></span>
+      <div class="px-text"><div class="px-title">Commit 6 files</div><div class="px-facts">After the asks · +412 −37 uncommitted</div>
+        
+      </div>
+      <span class="px-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span>
+    </div></div></section><section class="px-sec"><div class="px-sec-title">Code</div><div class="px-row px-press">
+      <span class="px-plain"><svg aria-hidden="true"><use href="#ic-branch"/></svg></span>
+      <div class="px-text"><div class="px-title px-1line t-mono-ish">feat/webhook-retry</div></div>
+      <span class="px-word">↑3 · +412 −37 uncommitted</span><span class="px-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span>
+    </div>
+    </section></div></div></aside>
+  </div>
+  </div><div class="frame sb-frame-mobile">
+    <div class="frame-bar"><div class="frame-dots"><i></i><i></i><i></i></div><span class="frame-url">Paseo</span><span class="sb-frame-label">mobile · 390 · sheet</span></div>
+    <div class="px-mobile"><div class="px-mobile-behind"><div class="px-chat"><div class="px-chat-head">Payments: retry failed webhooks</div>
+    <div class="px-bubble px-bubble-me"></div><div class="px-bubble w80"></div><div class="px-bubble w60"></div><div class="px-bubble w70"></div>
+    <div class="px-composer"></div></div></div>
+      <div class="px-sheet"><div class="px-handle"></div><div class="px-sheet-title"><svg aria-hidden="true"><use href="#ic-dash"/></svg> Overview</div><div class="px-ov"><div class="px-where">
+    <div class="px-ws">
+      <div class="px-text"><div class="px-ws-name">Payments: retry failed webhooks</div><div class="px-ws-sub">orbit · <svg aria-hidden="true"><use href="#ic-branch"/></svg> feat/webhook-retry</div></div>
+      <button class="px-iconbtn " aria-label="Workspace actions"><svg aria-hidden="true"><use href="#ic-more"/></svg></button>
+      
+    </div>
+    <div class="px-row">
+      <span class="px-aicon"><svg aria-hidden="true"><use href="#ic-agent"/></svg><i class="px-dot px-t-warn"></i></span>
+      <div class="px-text"><div class="px-title">Retry failed webhooks with backoff</div><div class="px-facts">Claude · 121k / 200k</div></div><span class="px-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span>
+    </div>
+    <div class="px-lineage">
+      <div class="px-lin-label">From</div><div class="px-row px-row-tight">
+    <span class="px-lin-icon"><svg aria-hidden="true"><use href="#ic-up"/></svg></span>
+    <div class="px-text"><div class="px-title px-1line">Payments roadmap Q4</div></div>
+    <span class="px-word px-t-run">working</span><span class="px-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span>
+  </div>
+      
+      
+      <div class="px-lin-foot"><svg aria-hidden="true"><use href="#ic-fork"/></svg> 2 subagents in this workspace</div>
+    </div>
+  </div><section class="px-sec"><div class="px-sec-title">Status</div><div class="px-card px-press">
+    <div class="px-card-head">
+      <span class="px-badge px-b-warn">Waiting on you</span>
+      <span class="px-age ">updated 4 min ago</span>
+      <span class="px-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span>
+    </div>
+    <div class="px-summary ">Retry queue built and tested (48/48). Two decisions left before the PR.</div>
+    <div class="px-now "><b>Now</b> Waiting on A4 and A5</div>
+  </div></section><section class="px-sec"><div class="px-sec-title">Your move<span class="px-count">3</span></div><div class="px-moves"><div class="px-move px-move-first">
+      <span class="px-micon px-t-warn"><svg aria-hidden="true"><use href="#ic-ask"/></svg></span>
+      <div class="px-text"><div class="px-title">A4 · Backoff: exponential up to 1 h, or fixed 5 min?</div><div class="px-facts">Decision · 2 options · recommended: exponential</div>
+        <div class="px-move-btn"><button class="px-btn">Answer</button></div>
+      </div>
+      
+    </div><div class="px-move px-press">
+      <span class="px-micon px-t-warn"><svg aria-hidden="true"><use href="#ic-ask"/></svg></span>
+      <div class="px-text"><div class="px-title">A5 · Open the PR against main or release/3.2?</div><div class="px-facts">Decision · 2 options</div>
+        
+      </div>
+      <span class="px-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span>
+    </div><div class="px-move px-press">
+      <span class="px-micon px-t-muted"><svg aria-hidden="true"><use href="#ic-commit"/></svg></span>
+      <div class="px-text"><div class="px-title">Commit 6 files</div><div class="px-facts">After the asks · +412 −37 uncommitted</div>
+        
+      </div>
+      <span class="px-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span>
+    </div></div></section><section class="px-sec"><div class="px-sec-title">Code</div><div class="px-row px-press">
+      <span class="px-plain"><svg aria-hidden="true"><use href="#ic-branch"/></svg></span>
+      <div class="px-text"><div class="px-title px-1line t-mono-ish">feat/webhook-retry</div></div>
+      <span class="px-word">↑3 · +412 −37 uncommitted</span><span class="px-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span>
+    </div>
+    </section></div></div></div>
+  </div></div>
+  <div class="notes"><div class="note"><b>1</b><span>Each ask is its own row with its id and title (new <code>entries</code> field on the summary item). <b>Answer</b> opens that ask in the Asks tab, with its options.</span></div><div class="note"><b>2</b><span>Only the first row has a button. The git step (Commit) is listed after the asks, because the ladder puts it last.</span></div><div class="note"><b>3</b><span>The parent is one row under <b>From</b>. Subagents in this same workspace collapse to one line.</span></div></div>
+</section>
+
+<section class="screen" id="s3">
+  <div class="screen-meta">
+    <h2>3. Agent working</h2>
+    <p>Jacek glances at a running workspace to see progress and that nothing is blocked on him.</p>
+    <div class="screen-refs"><span class="ref">S2</span><span class="ref">F2</span></div>
+  </div>
+  <div class="sb-pair"><div class="frame sb-frame-desktop">
+    <div class="frame-bar"><div class="frame-dots"><i></i><i></i><i></i></div><span class="frame-url">Paseo</span><span class="sb-frame-label">desktop · 1280 · Explorer</span></div>
+    <div class="px-app">
+    <div class="px-nav"><div class="px-nav-p">orbit</div><div class="px-nav-w"></div><div class="px-nav-w w70"></div><div class="px-nav-p">atlas</div><div class="px-nav-w"></div><div class="px-nav-w w70"></div><div class="px-nav-p">notes</div><div class="px-nav-w"></div><div class="px-nav-w w70"></div></div>
+    <div class="px-chat"><div class="px-chat-head">Search: trigram index for SKUs</div>
+    <div class="px-bubble px-bubble-me"></div><div class="px-bubble w80"></div><div class="px-bubble w60"></div><div class="px-bubble w70"></div>
+    <div class="px-composer"></div></div>
+    <aside class="px-explorer"><div class="px-tabs"><div class="px-tab is-on"><svg aria-hidden="true"><use href="#ic-dash"/></svg><span>Overview</span></div><div class="px-tab "><svg aria-hidden="true"><use href="#ic-files"/></svg><span>Files</span></div><div class="px-tab "><svg aria-hidden="true"><use href="#ic-diff"/></svg><span>Changes</span></div><div class="px-tab "><svg aria-hidden="true"><use href="#ic-pr"/></svg><span>PR</span></div><div class="px-tab "><svg aria-hidden="true"><use href="#ic-ask"/></svg><span>Asks</span></div><div class="px-tab "><svg aria-hidden="true"><use href="#ic-fork"/></svg><span>Lineage</span></div>
+    <span class="px-tabs-end"><svg aria-hidden="true"><use href="#ic-plus"/></svg><svg aria-hidden="true"><use href="#ic-panel"/></svg></span></div><div class="px-scroll"><div class="px-ov"><div class="px-where">
+    <div class="px-ws">
+      <div class="px-text"><div class="px-ws-name">Search: trigram index for SKUs</div><div class="px-ws-sub">orbit · <svg aria-hidden="true"><use href="#ic-branch"/></svg> feat/sku-trigram</div></div>
+      <button class="px-iconbtn " aria-label="Workspace actions"><svg aria-hidden="true"><use href="#ic-more"/></svg></button>
+      
+    </div>
+    <div class="px-row">
+      <span class="px-aicon"><svg aria-hidden="true"><use href="#ic-agent"/></svg><i class="px-dot px-t-run"></i></span>
+      <div class="px-text"><div class="px-title">Speed up SKU search with a trigram index</div><div class="px-facts">Codex · 88k / 272k</div></div><span class="px-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span>
+    </div>
+    <div class="px-lineage">
+      <div class="px-lin-label">From</div><div class="px-row px-row-tight">
+    <span class="px-lin-icon"><svg aria-hidden="true"><use href="#ic-up"/></svg></span>
+    <div class="px-text"><div class="px-title px-1line">Catalog search revamp</div></div>
+    <span class="px-word px-t-warn">waiting on you</span><span class="px-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span>
+  </div>
+      
+      
+      
+    </div>
+  </div><section class="px-sec"><div class="px-sec-title">Status</div><div class="px-card px-press">
+    <div class="px-card-head">
+      <span class="px-badge px-b-run">Working</span>
+      <span class="px-age ">updated 1 min ago</span>
+      <span class="px-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span>
+    </div>
+    <div class="px-summary ">Index migration done. Rewriting the query planner to use it.</div>
+    <div class="px-now "><b>Now</b> Running the integration tests (3 of 7 suites)</div>
+  </div></section><section class="px-sec"><div class="px-sec-title">Your move</div><div class="px-quiet"><svg aria-hidden="true"><use href="#ic-check"/></svg> Nothing needs you · agent is working</div></section><section class="px-sec"><div class="px-sec-title">Code</div><div class="px-row px-press">
+      <span class="px-plain"><svg aria-hidden="true"><use href="#ic-branch"/></svg></span>
+      <div class="px-text"><div class="px-title px-1line t-mono-ish">feat/sku-trigram</div></div>
+      <span class="px-word">↑1 · +188 −22 uncommitted</span><span class="px-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span>
+    </div>
+    <div class="px-row px-press">
+      <span class="px-plain px-t-muted"><svg aria-hidden="true"><use href="#ic-pr"/></svg></span>
+      <div class="px-text"><div class="px-title px-1line">#902 feat(search): trigram index for SKUs</div></div>
+      <span class="px-badge px-b-muted">Draft · checks running</span><span class="px-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span>
+    </div></section></div></div></aside>
+  </div>
+  </div><div class="frame sb-frame-mobile">
+    <div class="frame-bar"><div class="frame-dots"><i></i><i></i><i></i></div><span class="frame-url">Paseo</span><span class="sb-frame-label">mobile · 390 · sheet</span></div>
+    <div class="px-mobile"><div class="px-mobile-behind"><div class="px-chat"><div class="px-chat-head">Search: trigram index for SKUs</div>
+    <div class="px-bubble px-bubble-me"></div><div class="px-bubble w80"></div><div class="px-bubble w60"></div><div class="px-bubble w70"></div>
+    <div class="px-composer"></div></div></div>
+      <div class="px-sheet"><div class="px-handle"></div><div class="px-sheet-title"><svg aria-hidden="true"><use href="#ic-dash"/></svg> Overview</div><div class="px-ov"><div class="px-where">
+    <div class="px-ws">
+      <div class="px-text"><div class="px-ws-name">Search: trigram index for SKUs</div><div class="px-ws-sub">orbit · <svg aria-hidden="true"><use href="#ic-branch"/></svg> feat/sku-trigram</div></div>
+      <button class="px-iconbtn " aria-label="Workspace actions"><svg aria-hidden="true"><use href="#ic-more"/></svg></button>
+      
+    </div>
+    <div class="px-row">
+      <span class="px-aicon"><svg aria-hidden="true"><use href="#ic-agent"/></svg><i class="px-dot px-t-run"></i></span>
+      <div class="px-text"><div class="px-title">Speed up SKU search with a trigram index</div><div class="px-facts">Codex · 88k / 272k</div></div><span class="px-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span>
+    </div>
+    <div class="px-lineage">
+      <div class="px-lin-label">From</div><div class="px-row px-row-tight">
+    <span class="px-lin-icon"><svg aria-hidden="true"><use href="#ic-up"/></svg></span>
+    <div class="px-text"><div class="px-title px-1line">Catalog search revamp</div></div>
+    <span class="px-word px-t-warn">waiting on you</span><span class="px-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span>
+  </div>
+      
+      
+      
+    </div>
+  </div><section class="px-sec"><div class="px-sec-title">Status</div><div class="px-card px-press">
+    <div class="px-card-head">
+      <span class="px-badge px-b-run">Working</span>
+      <span class="px-age ">updated 1 min ago</span>
+      <span class="px-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span>
+    </div>
+    <div class="px-summary ">Index migration done. Rewriting the query planner to use it.</div>
+    <div class="px-now "><b>Now</b> Running the integration tests (3 of 7 suites)</div>
+  </div></section><section class="px-sec"><div class="px-sec-title">Your move</div><div class="px-quiet"><svg aria-hidden="true"><use href="#ic-check"/></svg> Nothing needs you · agent is working</div></section><section class="px-sec"><div class="px-sec-title">Code</div><div class="px-row px-press">
+      <span class="px-plain"><svg aria-hidden="true"><use href="#ic-branch"/></svg></span>
+      <div class="px-text"><div class="px-title px-1line t-mono-ish">feat/sku-trigram</div></div>
+      <span class="px-word">↑1 · +188 −22 uncommitted</span><span class="px-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span>
+    </div>
+    <div class="px-row px-press">
+      <span class="px-plain px-t-muted"><svg aria-hidden="true"><use href="#ic-pr"/></svg></span>
+      <div class="px-text"><div class="px-title px-1line">#902 feat(search): trigram index for SKUs</div></div>
+      <span class="px-badge px-b-muted">Draft · checks running</span><span class="px-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span>
+    </div></section></div></div></div>
+  </div></div>
+  <div class="notes"><div class="note"><b>1</b><span>Status shows the agent's own <b>Now</b> line, refreshed whenever the plugin polls.</span></div><div class="note"><b>2</b><span>Your move is a single quiet line. While an agent runs there is no git button (it would race the agent), as in the current ladder.</span></div></div>
+</section>
+
+<section class="screen" id="s4">
+  <div class="screen-meta">
+    <h2>4. Root workspace: no lineage, no status card, no PR</h2>
+    <p>A quick fix workspace that never reported a status; Jacek wants to ship it.</p>
+    <div class="screen-refs"><span class="ref">S2</span><span class="ref">S3</span><span class="ref">empty-states</span></div>
+  </div>
+  <div class="sb-pair"><div class="frame sb-frame-desktop">
+    <div class="frame-bar"><div class="frame-dots"><i></i><i></i><i></i></div><span class="frame-url">Paseo</span><span class="sb-frame-label">desktop · 1280 · Explorer</span></div>
+    <div class="px-app">
+    <div class="px-nav"><div class="px-nav-p">orbit</div><div class="px-nav-w"></div><div class="px-nav-w w70"></div><div class="px-nav-p">atlas</div><div class="px-nav-w"></div><div class="px-nav-w w70"></div><div class="px-nav-p">notes</div><div class="px-nav-w"></div><div class="px-nav-w w70"></div></div>
+    <div class="px-chat"><div class="px-chat-head">Fix flaky login e2e</div>
+    <div class="px-bubble px-bubble-me"></div><div class="px-bubble w80"></div><div class="px-bubble w60"></div><div class="px-bubble w70"></div>
+    <div class="px-composer"></div></div>
+    <aside class="px-explorer"><div class="px-tabs"><div class="px-tab is-on"><svg aria-hidden="true"><use href="#ic-dash"/></svg><span>Overview</span></div><div class="px-tab "><svg aria-hidden="true"><use href="#ic-files"/></svg><span>Files</span></div><div class="px-tab "><svg aria-hidden="true"><use href="#ic-diff"/></svg><span>Changes</span></div><div class="px-tab "><svg aria-hidden="true"><use href="#ic-pr"/></svg><span>PR</span></div><div class="px-tab "><svg aria-hidden="true"><use href="#ic-ask"/></svg><span>Asks</span></div><div class="px-tab "><svg aria-hidden="true"><use href="#ic-fork"/></svg><span>Lineage</span></div>
+    <span class="px-tabs-end"><svg aria-hidden="true"><use href="#ic-plus"/></svg><svg aria-hidden="true"><use href="#ic-panel"/></svg></span></div><div class="px-scroll"><div class="px-ov"><div class="px-where">
+    <div class="px-ws">
+      <div class="px-text"><div class="px-ws-name">Fix flaky login e2e</div><div class="px-ws-sub">orbit · <svg aria-hidden="true"><use href="#ic-branch"/></svg> fix/login-e2e</div></div>
+      <button class="px-iconbtn " aria-label="Workspace actions"><svg aria-hidden="true"><use href="#ic-more"/></svg></button>
+      
+    </div>
+    <div class="px-row">
+      <span class="px-aicon"><svg aria-hidden="true"><use href="#ic-agent"/></svg><i class="px-dot px-t-ok"></i></span>
+      <div class="px-text"><div class="px-title">Fix the flaky login e2e test</div><div class="px-facts">Claude · 31k / 200k</div></div><span class="px-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span>
+    </div>
+    
+  </div><section class="px-sec"><div class="px-sec-title">Status</div><div class="px-quiet">Agent finished 3 min ago · no status reported</div></section><section class="px-sec"><div class="px-sec-title">Your move</div><div class="px-moves"><div class="px-move px-move-first">
+      <span class="px-micon px-t-muted"><svg aria-hidden="true"><use href="#ic-pr"/></svg></span>
+      <div class="px-text"><div class="px-title">3 commits ready</div><div class="px-facts">Pushed · no pull request yet</div>
+        <div class="px-move-btn"><button class="px-btn">Create PR</button></div>
+      </div>
+      
+    </div></div></section><section class="px-sec"><div class="px-sec-title">Code</div><div class="px-row px-press">
+      <span class="px-plain"><svg aria-hidden="true"><use href="#ic-branch"/></svg></span>
+      <div class="px-text"><div class="px-title px-1line t-mono-ish">fix/login-e2e</div></div>
+      <span class="px-word">in sync · +54 −12</span><span class="px-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span>
+    </div>
+    </section></div></div></aside>
+  </div>
+  </div><div class="frame sb-frame-mobile">
+    <div class="frame-bar"><div class="frame-dots"><i></i><i></i><i></i></div><span class="frame-url">Paseo</span><span class="sb-frame-label">mobile · 390 · sheet</span></div>
+    <div class="px-mobile"><div class="px-mobile-behind"><div class="px-chat"><div class="px-chat-head">Fix flaky login e2e</div>
+    <div class="px-bubble px-bubble-me"></div><div class="px-bubble w80"></div><div class="px-bubble w60"></div><div class="px-bubble w70"></div>
+    <div class="px-composer"></div></div></div>
+      <div class="px-sheet"><div class="px-handle"></div><div class="px-sheet-title"><svg aria-hidden="true"><use href="#ic-dash"/></svg> Overview</div><div class="px-ov"><div class="px-where">
+    <div class="px-ws">
+      <div class="px-text"><div class="px-ws-name">Fix flaky login e2e</div><div class="px-ws-sub">orbit · <svg aria-hidden="true"><use href="#ic-branch"/></svg> fix/login-e2e</div></div>
+      <button class="px-iconbtn " aria-label="Workspace actions"><svg aria-hidden="true"><use href="#ic-more"/></svg></button>
+      
+    </div>
+    <div class="px-row">
+      <span class="px-aicon"><svg aria-hidden="true"><use href="#ic-agent"/></svg><i class="px-dot px-t-ok"></i></span>
+      <div class="px-text"><div class="px-title">Fix the flaky login e2e test</div><div class="px-facts">Claude · 31k / 200k</div></div><span class="px-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span>
+    </div>
+    
+  </div><section class="px-sec"><div class="px-sec-title">Status</div><div class="px-quiet">Agent finished 3 min ago · no status reported</div></section><section class="px-sec"><div class="px-sec-title">Your move</div><div class="px-moves"><div class="px-move px-move-first">
+      <span class="px-micon px-t-muted"><svg aria-hidden="true"><use href="#ic-pr"/></svg></span>
+      <div class="px-text"><div class="px-title">3 commits ready</div><div class="px-facts">Pushed · no pull request yet</div>
+        <div class="px-move-btn"><button class="px-btn">Create PR</button></div>
+      </div>
+      
+    </div></div></section><section class="px-sec"><div class="px-sec-title">Code</div><div class="px-row px-press">
+      <span class="px-plain"><svg aria-hidden="true"><use href="#ic-branch"/></svg></span>
+      <div class="px-text"><div class="px-title px-1line t-mono-ish">fix/login-e2e</div></div>
+      <span class="px-word">in sync · +54 −12</span><span class="px-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span>
+    </div>
+    </section></div></div></div>
+  </div></div>
+  <div class="notes"><div class="note"><b>1</b><span>With no parent or children, the lineage part is left out entirely.</span></div><div class="note"><b>2</b><span>With no status card, Status falls back to Paseo's own state in one muted line.</span></div><div class="note"><b>3</b><span>With no PR, the Code block keeps only the branch row.</span></div></div>
+</section>
+
+<section class="screen" id="s5">
+  <div class="screen-meta">
+    <h2>5. Child workspace with a PR ready to merge</h2>
+    <p>Jacek opens one of the spec's implementation workspaces to merge it.</p>
+    <div class="screen-refs"><span class="ref">S1</span><span class="ref">S3</span></div>
+  </div>
+  <div class="sb-pair"><div class="frame sb-frame-desktop">
+    <div class="frame-bar"><div class="frame-dots"><i></i><i></i><i></i></div><span class="frame-url">Paseo</span><span class="sb-frame-label">desktop · 1280 · Explorer</span></div>
+    <div class="px-app">
+    <div class="px-nav"><div class="px-nav-p">orbit</div><div class="px-nav-w"></div><div class="px-nav-w w70"></div><div class="px-nav-p">atlas</div><div class="px-nav-w"></div><div class="px-nav-w w70"></div><div class="px-nav-p">notes</div><div class="px-nav-w"></div><div class="px-nav-w w70"></div></div>
+    <div class="px-chat"><div class="px-chat-head">Billing 3: series picker</div>
+    <div class="px-bubble px-bubble-me"></div><div class="px-bubble w80"></div><div class="px-bubble w60"></div><div class="px-bubble w70"></div>
+    <div class="px-composer"></div></div>
+    <aside class="px-explorer"><div class="px-tabs"><div class="px-tab is-on"><svg aria-hidden="true"><use href="#ic-dash"/></svg><span>Overview</span></div><div class="px-tab "><svg aria-hidden="true"><use href="#ic-files"/></svg><span>Files</span></div><div class="px-tab "><svg aria-hidden="true"><use href="#ic-diff"/></svg><span>Changes</span></div><div class="px-tab "><svg aria-hidden="true"><use href="#ic-pr"/></svg><span>PR</span></div><div class="px-tab "><svg aria-hidden="true"><use href="#ic-ask"/></svg><span>Asks</span></div><div class="px-tab "><svg aria-hidden="true"><use href="#ic-fork"/></svg><span>Lineage</span></div>
+    <span class="px-tabs-end"><svg aria-hidden="true"><use href="#ic-plus"/></svg><svg aria-hidden="true"><use href="#ic-panel"/></svg></span></div><div class="px-scroll"><div class="px-ov"><div class="px-where">
+    <div class="px-ws">
+      <div class="px-text"><div class="px-ws-name">Billing 3: series picker</div><div class="px-ws-sub">orbit · <svg aria-hidden="true"><use href="#ic-branch"/></svg> feat/invoice-series-picker</div></div>
+      <button class="px-iconbtn " aria-label="Workspace actions"><svg aria-hidden="true"><use href="#ic-more"/></svg></button>
+      
+    </div>
+    <div class="px-row">
+      <span class="px-aicon"><svg aria-hidden="true"><use href="#ic-agent"/></svg><i class="px-dot px-t-ok"></i></span>
+      <div class="px-text"><div class="px-title">Billing 3: series picker</div><div class="px-facts">Claude · 143k / 200k</div></div><span class="px-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span>
+    </div>
+    <div class="px-lineage">
+      <div class="px-lin-label">From</div><div class="px-row px-row-tight">
+    <span class="px-lin-icon"><svg aria-hidden="true"><use href="#ic-up"/></svg></span>
+    <div class="px-text"><div class="px-title px-1line">Billing spec: invoices own numbering</div></div>
+    <span class="px-word px-t-ok">done · PR merged</span><span class="px-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span>
+  </div>
+      
+      
+      
+    </div>
+  </div><section class="px-sec"><div class="px-sec-title">Status</div><div class="px-card px-press">
+    <div class="px-card-head">
+      <span class="px-badge px-b-ok">Done</span>
+      <span class="px-age ">updated 2h ago</span>
+      <span class="px-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span>
+    </div>
+    <div class="px-summary ">Series picker shipped behind the invoice-series flag. Tests 112/112, QA screenshots in the PR.</div>
+    
+  </div></section><section class="px-sec"><div class="px-sec-title">Your move</div><div class="px-moves"><div class="px-move px-move-first">
+      <span class="px-micon px-t-ok"><svg aria-hidden="true"><use href="#ic-pr"/></svg></span>
+      <div class="px-text"><div class="px-title">PR #831 ready to merge</div><div class="px-facts">Checks passed · approved</div>
+        <div class="px-move-btn"><button class="px-btn">Merge PR</button></div>
+      </div>
+      
+    </div></div></section><section class="px-sec"><div class="px-sec-title">Code</div><div class="px-row px-press">
+      <span class="px-plain"><svg aria-hidden="true"><use href="#ic-branch"/></svg></span>
+      <div class="px-text"><div class="px-title px-1line t-mono-ish">feat/invoice-series-picker</div></div>
+      <span class="px-word">in sync · +1,204 −88</span><span class="px-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span>
+    </div>
+    <div class="px-row px-press">
+      <span class="px-plain px-t-ok"><svg aria-hidden="true"><use href="#ic-pr"/></svg></span>
+      <div class="px-text"><div class="px-title px-1line">#831 feat(billing): pick the invoice series</div></div>
+      <span class="px-badge px-b-ok">Ready</span><span class="px-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span>
+    </div></section></div></div></aside>
+  </div>
+  </div><div class="frame sb-frame-mobile">
+    <div class="frame-bar"><div class="frame-dots"><i></i><i></i><i></i></div><span class="frame-url">Paseo</span><span class="sb-frame-label">mobile · 390 · sheet</span></div>
+    <div class="px-mobile"><div class="px-mobile-behind"><div class="px-chat"><div class="px-chat-head">Billing 3: series picker</div>
+    <div class="px-bubble px-bubble-me"></div><div class="px-bubble w80"></div><div class="px-bubble w60"></div><div class="px-bubble w70"></div>
+    <div class="px-composer"></div></div></div>
+      <div class="px-sheet"><div class="px-handle"></div><div class="px-sheet-title"><svg aria-hidden="true"><use href="#ic-dash"/></svg> Overview</div><div class="px-ov"><div class="px-where">
+    <div class="px-ws">
+      <div class="px-text"><div class="px-ws-name">Billing 3: series picker</div><div class="px-ws-sub">orbit · <svg aria-hidden="true"><use href="#ic-branch"/></svg> feat/invoice-series-picker</div></div>
+      <button class="px-iconbtn " aria-label="Workspace actions"><svg aria-hidden="true"><use href="#ic-more"/></svg></button>
+      
+    </div>
+    <div class="px-row">
+      <span class="px-aicon"><svg aria-hidden="true"><use href="#ic-agent"/></svg><i class="px-dot px-t-ok"></i></span>
+      <div class="px-text"><div class="px-title">Billing 3: series picker</div><div class="px-facts">Claude · 143k / 200k</div></div><span class="px-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span>
+    </div>
+    <div class="px-lineage">
+      <div class="px-lin-label">From</div><div class="px-row px-row-tight">
+    <span class="px-lin-icon"><svg aria-hidden="true"><use href="#ic-up"/></svg></span>
+    <div class="px-text"><div class="px-title px-1line">Billing spec: invoices own numbering</div></div>
+    <span class="px-word px-t-ok">done · PR merged</span><span class="px-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span>
+  </div>
+      
+      
+      
+    </div>
+  </div><section class="px-sec"><div class="px-sec-title">Status</div><div class="px-card px-press">
+    <div class="px-card-head">
+      <span class="px-badge px-b-ok">Done</span>
+      <span class="px-age ">updated 2h ago</span>
+      <span class="px-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span>
+    </div>
+    <div class="px-summary ">Series picker shipped behind the invoice-series flag. Tests 112/112, QA screenshots in the PR.</div>
+    
+  </div></section><section class="px-sec"><div class="px-sec-title">Your move</div><div class="px-moves"><div class="px-move px-move-first">
+      <span class="px-micon px-t-ok"><svg aria-hidden="true"><use href="#ic-pr"/></svg></span>
+      <div class="px-text"><div class="px-title">PR #831 ready to merge</div><div class="px-facts">Checks passed · approved</div>
+        <div class="px-move-btn"><button class="px-btn">Merge PR</button></div>
+      </div>
+      
+    </div></div></section><section class="px-sec"><div class="px-sec-title">Code</div><div class="px-row px-press">
+      <span class="px-plain"><svg aria-hidden="true"><use href="#ic-branch"/></svg></span>
+      <div class="px-text"><div class="px-title px-1line t-mono-ish">feat/invoice-series-picker</div></div>
+      <span class="px-word">in sync · +1,204 −88</span><span class="px-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span>
+    </div>
+    <div class="px-row px-press">
+      <span class="px-plain px-t-ok"><svg aria-hidden="true"><use href="#ic-pr"/></svg></span>
+      <div class="px-text"><div class="px-title px-1line">#831 feat(billing): pick the invoice series</div></div>
+      <span class="px-badge px-b-ok">Ready</span><span class="px-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span>
+    </div></section></div></div></div>
+  </div></div>
+  <div class="notes"><div class="note"><b>1</b><span>The parent row uses the parent's status word, so you can see the spec is already merged.</span></div><div class="note"><b>2</b><span>Merge PR is the first and only move. Its confirmation dialog stays as it is today.</span></div></div>
+</section>
+
+<section class="screen" id="s6">
+  <div class="screen-meta">
+    <h2>6. Several things need you: permission and failing checks</h2>
+    <p>A blocked agent and a red PR at once; Jacek handles them in priority order.</p>
+    <div class="screen-refs"><span class="ref">S3</span><span class="ref">ladder</span></div>
+  </div>
+  <div class="sb-pair"><div class="frame sb-frame-desktop">
+    <div class="frame-bar"><div class="frame-dots"><i></i><i></i><i></i></div><span class="frame-url">Paseo</span><span class="sb-frame-label">desktop · 1280 · Explorer</span></div>
+    <div class="px-app">
+    <div class="px-nav"><div class="px-nav-p">orbit</div><div class="px-nav-w"></div><div class="px-nav-w w70"></div><div class="px-nav-p">atlas</div><div class="px-nav-w"></div><div class="px-nav-w w70"></div><div class="px-nav-p">notes</div><div class="px-nav-w"></div><div class="px-nav-w w70"></div></div>
+    <div class="px-chat"><div class="px-chat-head">Imports: CSV mapping wizard</div>
+    <div class="px-bubble px-bubble-me"></div><div class="px-bubble w80"></div><div class="px-bubble w60"></div><div class="px-bubble w70"></div>
+    <div class="px-composer"></div></div>
+    <aside class="px-explorer"><div class="px-tabs"><div class="px-tab is-on"><svg aria-hidden="true"><use href="#ic-dash"/></svg><span>Overview</span></div><div class="px-tab "><svg aria-hidden="true"><use href="#ic-files"/></svg><span>Files</span></div><div class="px-tab "><svg aria-hidden="true"><use href="#ic-diff"/></svg><span>Changes</span></div><div class="px-tab "><svg aria-hidden="true"><use href="#ic-pr"/></svg><span>PR</span></div><div class="px-tab "><svg aria-hidden="true"><use href="#ic-ask"/></svg><span>Asks</span></div><div class="px-tab "><svg aria-hidden="true"><use href="#ic-fork"/></svg><span>Lineage</span></div>
+    <span class="px-tabs-end"><svg aria-hidden="true"><use href="#ic-plus"/></svg><svg aria-hidden="true"><use href="#ic-panel"/></svg></span></div><div class="px-scroll"><div class="px-ov"><div class="px-where">
+    <div class="px-ws">
+      <div class="px-text"><div class="px-ws-name">Imports: CSV mapping wizard</div><div class="px-ws-sub">orbit · <svg aria-hidden="true"><use href="#ic-branch"/></svg> feat/csv-mapping</div></div>
+      <button class="px-iconbtn " aria-label="Workspace actions"><svg aria-hidden="true"><use href="#ic-more"/></svg></button>
+      
+    </div>
+    <div class="px-row">
+      <span class="px-aicon"><svg aria-hidden="true"><use href="#ic-agent"/></svg><i class="px-dot px-t-warn"></i></span>
+      <div class="px-text"><div class="px-title">CSV import with a column mapping step</div><div class="px-facts">Claude · 176k / 200k</div></div><span class="px-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span>
+    </div>
+    <div class="px-lineage">
+      
+      <div class="px-lin-label">Started 2 workspaces</div><div class="px-row px-row-tight">
+    <span class="px-lin-icon"><svg aria-hidden="true"><use href="#ic-down"/></svg></span>
+    <div class="px-text"><div class="px-title px-1line">Imports: fixture generator</div></div>
+    <span class="px-word px-t-danger">failed</span><span class="px-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span>
+  </div><div class="px-row px-row-tight">
+    <span class="px-lin-icon"><svg aria-hidden="true"><use href="#ic-down"/></svg></span>
+    <div class="px-text"><div class="px-title px-1line">Imports: mapping presets</div></div>
+    <span class="px-word px-t-run">working</span><span class="px-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span>
+  </div>
+      
+      <div class="px-lin-foot"><svg aria-hidden="true"><use href="#ic-fork"/></svg> 1 subagent in this workspace</div>
+    </div>
+  </div><section class="px-sec"><div class="px-sec-title">Status</div><div class="px-card px-press">
+    <div class="px-card-head">
+      <span class="px-badge px-b-danger">Blocked</span>
+      <span class="px-age ">updated 6 min ago</span>
+      <span class="px-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span>
+    </div>
+    <div class="px-summary ">Wizard and preview done. The migration for saved mappings needs approval to run.</div>
+    <div class="px-now "><b>Now</b> Waiting for permission to run db:migrate</div>
+  </div></section><section class="px-sec"><div class="px-sec-title">Your move<span class="px-count">2</span></div><div class="px-moves"><div class="px-move px-move-first">
+      <span class="px-micon px-t-warn"><svg aria-hidden="true"><use href="#ic-shield"/></svg></span>
+      <div class="px-text"><div class="px-title">Allow “npm run db:migrate”?</div><div class="px-facts">Permission · CSV import agent</div>
+        <div class="px-move-btn"><button class="px-btn">Review permission</button></div>
+      </div>
+      
+    </div><div class="px-move px-press">
+      <span class="px-micon px-t-danger"><svg aria-hidden="true"><use href="#ic-alert"/></svg></span>
+      <div class="px-text"><div class="px-title">PR #915 checks failing</div><div class="px-facts">lint, e2e-chromium</div>
+        
+      </div>
+      <span class="px-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span>
+    </div></div></section><section class="px-sec"><div class="px-sec-title">Code</div><div class="px-row px-press">
+      <span class="px-plain"><svg aria-hidden="true"><use href="#ic-branch"/></svg></span>
+      <div class="px-text"><div class="px-title px-1line t-mono-ish">feat/csv-mapping</div></div>
+      <span class="px-word">↑2 · +2,031 −140</span><span class="px-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span>
+    </div>
+    <div class="px-row px-press">
+      <span class="px-plain px-t-danger"><svg aria-hidden="true"><use href="#ic-pr"/></svg></span>
+      <div class="px-text"><div class="px-title px-1line">#915 feat(imports): CSV mapping wizard</div></div>
+      <span class="px-badge px-b-danger">Checks failing</span><span class="px-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span>
+    </div></section></div></div></aside>
+  </div>
+  </div><div class="frame sb-frame-mobile">
+    <div class="frame-bar"><div class="frame-dots"><i></i><i></i><i></i></div><span class="frame-url">Paseo</span><span class="sb-frame-label">mobile · 390 · sheet</span></div>
+    <div class="px-mobile"><div class="px-mobile-behind"><div class="px-chat"><div class="px-chat-head">Imports: CSV mapping wizard</div>
+    <div class="px-bubble px-bubble-me"></div><div class="px-bubble w80"></div><div class="px-bubble w60"></div><div class="px-bubble w70"></div>
+    <div class="px-composer"></div></div></div>
+      <div class="px-sheet"><div class="px-handle"></div><div class="px-sheet-title"><svg aria-hidden="true"><use href="#ic-dash"/></svg> Overview</div><div class="px-ov"><div class="px-where">
+    <div class="px-ws">
+      <div class="px-text"><div class="px-ws-name">Imports: CSV mapping wizard</div><div class="px-ws-sub">orbit · <svg aria-hidden="true"><use href="#ic-branch"/></svg> feat/csv-mapping</div></div>
+      <button class="px-iconbtn " aria-label="Workspace actions"><svg aria-hidden="true"><use href="#ic-more"/></svg></button>
+      
+    </div>
+    <div class="px-row">
+      <span class="px-aicon"><svg aria-hidden="true"><use href="#ic-agent"/></svg><i class="px-dot px-t-warn"></i></span>
+      <div class="px-text"><div class="px-title">CSV import with a column mapping step</div><div class="px-facts">Claude · 176k / 200k</div></div><span class="px-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span>
+    </div>
+    <div class="px-lineage">
+      
+      <div class="px-lin-label">Started 2 workspaces</div><div class="px-row px-row-tight">
+    <span class="px-lin-icon"><svg aria-hidden="true"><use href="#ic-down"/></svg></span>
+    <div class="px-text"><div class="px-title px-1line">Imports: fixture generator</div></div>
+    <span class="px-word px-t-danger">failed</span><span class="px-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span>
+  </div><div class="px-row px-row-tight">
+    <span class="px-lin-icon"><svg aria-hidden="true"><use href="#ic-down"/></svg></span>
+    <div class="px-text"><div class="px-title px-1line">Imports: mapping presets</div></div>
+    <span class="px-word px-t-run">working</span><span class="px-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span>
+  </div>
+      
+      <div class="px-lin-foot"><svg aria-hidden="true"><use href="#ic-fork"/></svg> 1 subagent in this workspace</div>
+    </div>
+  </div><section class="px-sec"><div class="px-sec-title">Status</div><div class="px-card px-press">
+    <div class="px-card-head">
+      <span class="px-badge px-b-danger">Blocked</span>
+      <span class="px-age ">updated 6 min ago</span>
+      <span class="px-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span>
+    </div>
+    <div class="px-summary ">Wizard and preview done. The migration for saved mappings needs approval to run.</div>
+    <div class="px-now "><b>Now</b> Waiting for permission to run db:migrate</div>
+  </div></section><section class="px-sec"><div class="px-sec-title">Your move<span class="px-count">2</span></div><div class="px-moves"><div class="px-move px-move-first">
+      <span class="px-micon px-t-warn"><svg aria-hidden="true"><use href="#ic-shield"/></svg></span>
+      <div class="px-text"><div class="px-title">Allow “npm run db:migrate”?</div><div class="px-facts">Permission · CSV import agent</div>
+        <div class="px-move-btn"><button class="px-btn">Review permission</button></div>
+      </div>
+      
+    </div><div class="px-move px-press">
+      <span class="px-micon px-t-danger"><svg aria-hidden="true"><use href="#ic-alert"/></svg></span>
+      <div class="px-text"><div class="px-title">PR #915 checks failing</div><div class="px-facts">lint, e2e-chromium</div>
+        
+      </div>
+      <span class="px-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span>
+    </div></div></section><section class="px-sec"><div class="px-sec-title">Code</div><div class="px-row px-press">
+      <span class="px-plain"><svg aria-hidden="true"><use href="#ic-branch"/></svg></span>
+      <div class="px-text"><div class="px-title px-1line t-mono-ish">feat/csv-mapping</div></div>
+      <span class="px-word">↑2 · +2,031 −140</span><span class="px-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span>
+    </div>
+    <div class="px-row px-press">
+      <span class="px-plain px-t-danger"><svg aria-hidden="true"><use href="#ic-pr"/></svg></span>
+      <div class="px-text"><div class="px-title px-1line">#915 feat(imports): CSV mapping wizard</div></div>
+      <span class="px-badge px-b-danger">Checks failing</span><span class="px-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span>
+    </div></section></div></div></div>
+  </div></div>
+  <div class="notes"><div class="note"><b>1</b><span>Order follows the ladder: permission, then asks, then failed agent, then failing checks, then git.</span></div><div class="note"><b>2</b><span>A failed child workspace shows <b>failed</b> in red in the lineage. Its failure belongs to that workspace, so it isn't listed in this one's Your move.</span></div><div class="note"><b>3</b><span>The count next to <b>Your move</b> appears only when there are 2 or more items.</span></div></div>
+</section>
+
+<section class="screen" id="s7">
+  <div class="screen-meta">
+    <h2>7. Workspace ⋯ menu open</h2>
+    <p>Jacek wants to archive a workspace whose PR isn't merged, or to open it in his editor.</p>
+    <div class="screen-refs"><span class="ref">F2</span><span class="ref">main-scenario</span></div>
+  </div>
+  <div class="sb-pair"><div class="frame sb-frame-desktop">
+    <div class="frame-bar"><div class="frame-dots"><i></i><i></i><i></i></div><span class="frame-url">Paseo</span><span class="sb-frame-label">desktop · 1280 · Explorer</span></div>
+    <div class="px-app">
+    <div class="px-nav"><div class="px-nav-p">orbit</div><div class="px-nav-w"></div><div class="px-nav-w w70"></div><div class="px-nav-p">atlas</div><div class="px-nav-w"></div><div class="px-nav-w w70"></div><div class="px-nav-p">notes</div><div class="px-nav-w"></div><div class="px-nav-w w70"></div></div>
+    <div class="px-chat"><div class="px-chat-head">Billing spec: invoices own numbering</div>
+    <div class="px-bubble px-bubble-me"></div><div class="px-bubble w80"></div><div class="px-bubble w60"></div><div class="px-bubble w70"></div>
+    <div class="px-composer"></div></div>
+    <aside class="px-explorer"><div class="px-tabs"><div class="px-tab is-on"><svg aria-hidden="true"><use href="#ic-dash"/></svg><span>Overview</span></div><div class="px-tab "><svg aria-hidden="true"><use href="#ic-files"/></svg><span>Files</span></div><div class="px-tab "><svg aria-hidden="true"><use href="#ic-diff"/></svg><span>Changes</span></div><div class="px-tab "><svg aria-hidden="true"><use href="#ic-pr"/></svg><span>PR</span></div><div class="px-tab "><svg aria-hidden="true"><use href="#ic-ask"/></svg><span>Asks</span></div><div class="px-tab "><svg aria-hidden="true"><use href="#ic-fork"/></svg><span>Lineage</span></div>
+    <span class="px-tabs-end"><svg aria-hidden="true"><use href="#ic-plus"/></svg><svg aria-hidden="true"><use href="#ic-panel"/></svg></span></div><div class="px-scroll"><div class="px-ov"><div class="px-where">
+    <div class="px-ws">
+      <div class="px-text"><div class="px-ws-name">Billing spec: invoices own numbering</div><div class="px-ws-sub">orbit · <svg aria-hidden="true"><use href="#ic-branch"/></svg> docs/spec-invoice-numbering</div></div>
+      <button class="px-iconbtn is-on" aria-label="Workspace actions"><svg aria-hidden="true"><use href="#ic-more"/></svg></button>
+      <div class="px-menu" role="menu">
+    <div class="px-menu-item"><svg aria-hidden="true"><use href="#ic-code"/></svg> Open in editor</div>
+    <div class="px-menu-item"><svg aria-hidden="true"><use href="#ic-copy"/></svg> Copy branch name</div>
+    <div class="px-menu-item"><svg aria-hidden="true"><use href="#ic-fork"/></svg> Lineage details</div>
+    <div class="px-menu-sep"></div>
+    <div class="px-menu-item"><svg aria-hidden="true"><use href="#ic-archive"/></svg> Archive workspace…</div>
+  </div>
+    </div>
+    <div class="px-row">
+      <span class="px-aicon"><svg aria-hidden="true"><use href="#ic-agent"/></svg><i class="px-dot px-t-ok"></i></span>
+      <div class="px-text"><div class="px-title">Should invoices number per tenant or per series?</div><div class="px-facts">Claude · 64k / 200k</div></div><span class="px-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span>
+    </div>
+    <div class="px-lineage">
+      
+      <div class="px-lin-label">Started 4 workspaces</div><div class="px-row px-row-tight">
+    <span class="px-lin-icon"><svg aria-hidden="true"><use href="#ic-down"/></svg></span>
+    <div class="px-text"><div class="px-title px-1line">Billing 0a: tenant owns the sequence</div></div>
+    <span class="px-word px-t-ok">done · PR merged</span><span class="px-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span>
+  </div><div class="px-row px-row-tight">
+    <span class="px-lin-icon"><svg aria-hidden="true"><use href="#ic-down"/></svg></span>
+    <div class="px-text"><div class="px-title px-1line">Billing 3: series picker</div></div>
+    <span class="px-word px-t-run">working</span><span class="px-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span>
+  </div><div class="px-row px-row-tight">
+    <span class="px-lin-icon"><svg aria-hidden="true"><use href="#ic-down"/></svg></span>
+    <div class="px-text"><div class="px-title px-1line">Billing 1+2: preview and prefill</div></div>
+    <span class="px-word px-t-warn">waiting on you</span><span class="px-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span>
+  </div><div class="px-row px-row-tight">
+    <span class="px-lin-icon"><svg aria-hidden="true"><use href="#ic-down"/></svg></span>
+    <div class="px-text"><div class="px-title px-1line">Billing: Issue button + spec docs</div></div>
+    <span class="px-word px-t-ok">done · PR merged</span><span class="px-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span>
+  </div>
+      
+      
+    </div>
+  </div><section class="px-sec"><div class="px-sec-title">Status</div><div class="px-card px-press">
+    <div class="px-card-head">
+      <span class="px-badge px-b-muted">Waiting on you</span>
+      <span class="px-age px-outdated">outdated · written 19h ago, PR merged since</span>
+      <span class="px-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span>
+    </div>
+    <div class="px-summary px-dim">Spec written and PR #817 opened. Four implementation workspaces started from it.</div>
+    <div class="px-now px-dim"><b>Now</b> Waiting for review of the spec PR</div>
+  </div></section><section class="px-sec"><div class="px-sec-title">Your move</div><div class="px-moves"><div class="px-move px-move-first">
+      <span class="px-micon px-t-merged"><svg aria-hidden="true"><use href="#ic-merge"/></svg></span>
+      <div class="px-text"><div class="px-title">PR #817 merged</div><div class="px-facts">Branch in sync · nothing uncommitted</div>
+        <div class="px-move-btn"><button class="px-btn">Archive workspace</button></div>
+      </div>
+      
+    </div></div></section><section class="px-sec"><div class="px-sec-title">Code</div><div class="px-row px-press">
+      <span class="px-plain"><svg aria-hidden="true"><use href="#ic-branch"/></svg></span>
+      <div class="px-text"><div class="px-title px-1line t-mono-ish">docs/spec-invoice-numbering</div></div>
+      <span class="px-word">in sync · +309 −0</span><span class="px-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span>
+    </div>
+    <div class="px-row px-press">
+      <span class="px-plain px-t-merged"><svg aria-hidden="true"><use href="#ic-merge"/></svg></span>
+      <div class="px-text"><div class="px-title px-1line">#817 docs(specs): invoices own their numbering</div></div>
+      <span class="px-badge px-b-merged">Merged</span><span class="px-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span>
+    </div></section></div></div></aside>
+  </div>
+  </div><div class="frame sb-frame-mobile">
+    <div class="frame-bar"><div class="frame-dots"><i></i><i></i><i></i></div><span class="frame-url">Paseo</span><span class="sb-frame-label">mobile · 390 · sheet</span></div>
+    <div class="px-mobile"><div class="px-mobile-behind"><div class="px-chat"><div class="px-chat-head">Billing spec: invoices own numbering</div>
+    <div class="px-bubble px-bubble-me"></div><div class="px-bubble w80"></div><div class="px-bubble w60"></div><div class="px-bubble w70"></div>
+    <div class="px-composer"></div></div></div>
+      <div class="px-sheet"><div class="px-handle"></div><div class="px-sheet-title"><svg aria-hidden="true"><use href="#ic-dash"/></svg> Overview</div><div class="px-ov"><div class="px-where">
+    <div class="px-ws">
+      <div class="px-text"><div class="px-ws-name">Billing spec: invoices own numbering</div><div class="px-ws-sub">orbit · <svg aria-hidden="true"><use href="#ic-branch"/></svg> docs/spec-invoice-numbering</div></div>
+      <button class="px-iconbtn is-on" aria-label="Workspace actions"><svg aria-hidden="true"><use href="#ic-more"/></svg></button>
+      <div class="px-menu" role="menu">
+    <div class="px-menu-item"><svg aria-hidden="true"><use href="#ic-code"/></svg> Open in editor</div>
+    <div class="px-menu-item"><svg aria-hidden="true"><use href="#ic-copy"/></svg> Copy branch name</div>
+    <div class="px-menu-item"><svg aria-hidden="true"><use href="#ic-fork"/></svg> Lineage details</div>
+    <div class="px-menu-sep"></div>
+    <div class="px-menu-item"><svg aria-hidden="true"><use href="#ic-archive"/></svg> Archive workspace…</div>
+  </div>
+    </div>
+    <div class="px-row">
+      <span class="px-aicon"><svg aria-hidden="true"><use href="#ic-agent"/></svg><i class="px-dot px-t-ok"></i></span>
+      <div class="px-text"><div class="px-title">Should invoices number per tenant or per series?</div><div class="px-facts">Claude · 64k / 200k</div></div><span class="px-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span>
+    </div>
+    <div class="px-lineage">
+      
+      <div class="px-lin-label">Started 4 workspaces</div><div class="px-row px-row-tight">
+    <span class="px-lin-icon"><svg aria-hidden="true"><use href="#ic-down"/></svg></span>
+    <div class="px-text"><div class="px-title px-1line">Billing 0a: tenant owns the sequence</div></div>
+    <span class="px-word px-t-ok">done · PR merged</span><span class="px-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span>
+  </div><div class="px-row px-row-tight">
+    <span class="px-lin-icon"><svg aria-hidden="true"><use href="#ic-down"/></svg></span>
+    <div class="px-text"><div class="px-title px-1line">Billing 3: series picker</div></div>
+    <span class="px-word px-t-run">working</span><span class="px-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span>
+  </div><div class="px-row px-row-tight">
+    <span class="px-lin-icon"><svg aria-hidden="true"><use href="#ic-down"/></svg></span>
+    <div class="px-text"><div class="px-title px-1line">Billing 1+2: preview and prefill</div></div>
+    <span class="px-word px-t-warn">waiting on you</span><span class="px-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span>
+  </div><div class="px-row px-row-tight">
+    <span class="px-lin-icon"><svg aria-hidden="true"><use href="#ic-down"/></svg></span>
+    <div class="px-text"><div class="px-title px-1line">Billing: Issue button + spec docs</div></div>
+    <span class="px-word px-t-ok">done · PR merged</span><span class="px-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span>
+  </div>
+      
+      
+    </div>
+  </div><section class="px-sec"><div class="px-sec-title">Status</div><div class="px-card px-press">
+    <div class="px-card-head">
+      <span class="px-badge px-b-muted">Waiting on you</span>
+      <span class="px-age px-outdated">outdated · written 19h ago, PR merged since</span>
+      <span class="px-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span>
+    </div>
+    <div class="px-summary px-dim">Spec written and PR #817 opened. Four implementation workspaces started from it.</div>
+    <div class="px-now px-dim"><b>Now</b> Waiting for review of the spec PR</div>
+  </div></section><section class="px-sec"><div class="px-sec-title">Your move</div><div class="px-moves"><div class="px-move px-move-first">
+      <span class="px-micon px-t-merged"><svg aria-hidden="true"><use href="#ic-merge"/></svg></span>
+      <div class="px-text"><div class="px-title">PR #817 merged</div><div class="px-facts">Branch in sync · nothing uncommitted</div>
+        <div class="px-move-btn"><button class="px-btn">Archive workspace</button></div>
+      </div>
+      
+    </div></div></section><section class="px-sec"><div class="px-sec-title">Code</div><div class="px-row px-press">
+      <span class="px-plain"><svg aria-hidden="true"><use href="#ic-branch"/></svg></span>
+      <div class="px-text"><div class="px-title px-1line t-mono-ish">docs/spec-invoice-numbering</div></div>
+      <span class="px-word">in sync · +309 −0</span><span class="px-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span>
+    </div>
+    <div class="px-row px-press">
+      <span class="px-plain px-t-merged"><svg aria-hidden="true"><use href="#ic-merge"/></svg></span>
+      <div class="px-text"><div class="px-title px-1line">#817 docs(specs): invoices own their numbering</div></div>
+      <span class="px-badge px-b-merged">Merged</span><span class="px-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span>
+    </div></section></div></div></div>
+  </div></div>
+  <div class="notes"><div class="note"><b>1</b><span>Rare lifecycle actions live here, not in the main area. Archive keeps today's confirmation dialog and risk warnings.</span></div><div class="note"><b>2</b><span><b>Lineage details</b> opens the agent-level Lineage tab (detached links, other hosts).</span></div></div>
+</section>
+
+<section class="screen" id="s8">
+  <div class="screen-meta">
+    <h2>8. Plain folder workspace with another plugin's item</h2>
+    <p>A non-git notes folder; a third plugin (Limits) reports a fact that isn't a status or an ask.</p>
+    <div class="screen-refs"><span class="ref">F5</span><span class="ref">More</span></div>
+  </div>
+  <div class="sb-pair"><div class="frame sb-frame-desktop">
+    <div class="frame-bar"><div class="frame-dots"><i></i><i></i><i></i></div><span class="frame-url">Paseo</span><span class="sb-frame-label">desktop · 1280 · Explorer</span></div>
+    <div class="px-app">
+    <div class="px-nav"><div class="px-nav-p">orbit</div><div class="px-nav-w"></div><div class="px-nav-w w70"></div><div class="px-nav-p">atlas</div><div class="px-nav-w"></div><div class="px-nav-w w70"></div><div class="px-nav-p">notes</div><div class="px-nav-w"></div><div class="px-nav-w w70"></div></div>
+    <div class="px-chat"><div class="px-chat-head">notes</div>
+    <div class="px-bubble px-bubble-me"></div><div class="px-bubble w80"></div><div class="px-bubble w60"></div><div class="px-bubble w70"></div>
+    <div class="px-composer"></div></div>
+    <aside class="px-explorer"><div class="px-tabs"><div class="px-tab is-on"><svg aria-hidden="true"><use href="#ic-dash"/></svg><span>Overview</span></div><div class="px-tab "><svg aria-hidden="true"><use href="#ic-files"/></svg><span>Files</span></div><div class="px-tab "><svg aria-hidden="true"><use href="#ic-diff"/></svg><span>Changes</span></div><div class="px-tab "><svg aria-hidden="true"><use href="#ic-pr"/></svg><span>PR</span></div><div class="px-tab "><svg aria-hidden="true"><use href="#ic-ask"/></svg><span>Asks</span></div><div class="px-tab "><svg aria-hidden="true"><use href="#ic-fork"/></svg><span>Lineage</span></div>
+    <span class="px-tabs-end"><svg aria-hidden="true"><use href="#ic-plus"/></svg><svg aria-hidden="true"><use href="#ic-panel"/></svg></span></div><div class="px-scroll"><div class="px-ov"><div class="px-where">
+    <div class="px-ws">
+      <div class="px-text"><div class="px-ws-name">notes</div><div class="px-ws-sub"><svg aria-hidden="true"><use href="#ic-folder"/></svg> ~/notes</div></div>
+      <button class="px-iconbtn " aria-label="Workspace actions"><svg aria-hidden="true"><use href="#ic-more"/></svg></button>
+      
+    </div>
+    <div class="px-row">
+      <span class="px-aicon"><svg aria-hidden="true"><use href="#ic-agent"/></svg><i class="px-dot px-t-ok"></i></span>
+      <div class="px-text"><div class="px-title">Tidy up the meeting notes</div><div class="px-facts">Claude · 12k / 200k</div></div><span class="px-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span>
+    </div>
+    
+  </div><section class="px-sec"><div class="px-sec-title">Status</div><div class="px-card px-press">
+    <div class="px-card-head">
+      <span class="px-badge px-b-ok">Done</span>
+      <span class="px-age ">updated 1d ago</span>
+      <span class="px-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span>
+    </div>
+    <div class="px-summary ">Merged 14 notes into three topic files.</div>
+    
+  </div></section><section class="px-sec"><div class="px-sec-title">Your move</div><div class="px-quiet"><svg aria-hidden="true"><use href="#ic-check"/></svg> Nothing needs you</div></section><section class="px-sec"><div class="px-sec-title">More</div><div class="px-row px-press"><span class="px-plain"><svg aria-hidden="true"><use href="#ic-gauge"/></svg></span>
+    <div class="px-text"><div class="px-title">Limits</div></div><span class="px-word">62% of weekly limit used</span><span class="px-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span></div></section></div></div></aside>
+  </div>
+  </div><div class="frame sb-frame-mobile">
+    <div class="frame-bar"><div class="frame-dots"><i></i><i></i><i></i></div><span class="frame-url">Paseo</span><span class="sb-frame-label">mobile · 390 · sheet</span></div>
+    <div class="px-mobile"><div class="px-mobile-behind"><div class="px-chat"><div class="px-chat-head">notes</div>
+    <div class="px-bubble px-bubble-me"></div><div class="px-bubble w80"></div><div class="px-bubble w60"></div><div class="px-bubble w70"></div>
+    <div class="px-composer"></div></div></div>
+      <div class="px-sheet"><div class="px-handle"></div><div class="px-sheet-title"><svg aria-hidden="true"><use href="#ic-dash"/></svg> Overview</div><div class="px-ov"><div class="px-where">
+    <div class="px-ws">
+      <div class="px-text"><div class="px-ws-name">notes</div><div class="px-ws-sub"><svg aria-hidden="true"><use href="#ic-folder"/></svg> ~/notes</div></div>
+      <button class="px-iconbtn " aria-label="Workspace actions"><svg aria-hidden="true"><use href="#ic-more"/></svg></button>
+      
+    </div>
+    <div class="px-row">
+      <span class="px-aicon"><svg aria-hidden="true"><use href="#ic-agent"/></svg><i class="px-dot px-t-ok"></i></span>
+      <div class="px-text"><div class="px-title">Tidy up the meeting notes</div><div class="px-facts">Claude · 12k / 200k</div></div><span class="px-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span>
+    </div>
+    
+  </div><section class="px-sec"><div class="px-sec-title">Status</div><div class="px-card px-press">
+    <div class="px-card-head">
+      <span class="px-badge px-b-ok">Done</span>
+      <span class="px-age ">updated 1d ago</span>
+      <span class="px-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span>
+    </div>
+    <div class="px-summary ">Merged 14 notes into three topic files.</div>
+    
+  </div></section><section class="px-sec"><div class="px-sec-title">Your move</div><div class="px-quiet"><svg aria-hidden="true"><use href="#ic-check"/></svg> Nothing needs you</div></section><section class="px-sec"><div class="px-sec-title">More</div><div class="px-row px-press"><span class="px-plain"><svg aria-hidden="true"><use href="#ic-gauge"/></svg></span>
+    <div class="px-text"><div class="px-title">Limits</div></div><span class="px-word">62% of weekly limit used</span><span class="px-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span></div></section></div></div></div>
+  </div></div>
+  <div class="notes"><div class="note"><b>1</b><span>A folder has no Code block. The header shows the path instead of a branch.</span></div><div class="note"><b>2</b><span>A summary item with neither <code>workState</code> nor <code>needsYou</code> lands under <b>More</b>, with its own title. No section is called "Plugins".</span></div></div>
+</section>
+</div>
+<script>
+(function () { var btn = document.getElementById('theme-toggle'); btn.addEventListener('click', function () { document.documentElement.classList.toggle('dark'); }); })();
+</script>
+<script src="comments.js"></script>
+<script src="prototype.js"></script>
+</body>
+</html>

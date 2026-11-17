@@ -145,9 +145,38 @@ export interface PluginWorkspaceSummaryItemState {
    * `needsYou`) instead of by whether its last turn was read. `null` clears it.
    */
   workState?: PluginWorkspaceWorkState | null;
+  /**
+   * The workspace's status as its agent reported it, shown as the Overview's Status card.
+   * FSH-only. `null` clears it.
+   */
+  status?: PluginWorkspaceStatus | null;
+  /**
+   * The things in this workspace that wait on the human, one Overview row each; the host shows up
+   * to five. FSH-only. An empty list says this plugin has nothing waiting here.
+   */
+  entries?: PluginWorkspaceSummaryEntry[];
 }
 
 export type PluginWorkspaceWorkState = "waiting" | "working" | "done";
+
+export interface PluginWorkspaceStatus {
+  state: "working" | "waiting_on_you" | "blocked" | "done";
+  /** True once an agent turn started after the status was written: the human already replied. */
+  answered?: boolean;
+  summary: string;
+  /** What the agent is doing right now. */
+  now?: string;
+  /** When the status was last written, in epoch milliseconds. */
+  updatedAt: number;
+}
+
+export interface PluginWorkspaceSummaryEntry {
+  /** Stable id the user can name, such as "A4". */
+  id: string;
+  title: string;
+  /** A short facts line, such as "Decision · 2 options". */
+  detail?: string;
+}
 
 /**
  * One fact about a workspace, set per workspace. The host uses `needsYou` to decide whether entering
@@ -159,6 +188,19 @@ export interface PluginWorkspaceSummaryItemContribution<
   id: string;
   workspaceId: string;
   title: Text;
+  /**
+   * Renders one of `entries` in full where the Overview lists it, so the human can act on it there
+   * instead of opening the plugin's panel. Fixed for the item's lifetime. FSH-only.
+   */
+  EntryComponent?: ComponentType<PluginWorkspaceSummaryEntryProps>;
+}
+
+export interface PluginWorkspaceSummaryEntryProps extends PluginNavigableHostProps {
+  workspaceId: string;
+  /** An `entries[].id` of this item. */
+  entryId: string;
+  /** True for the Overview's first move: show it open, with its actions. */
+  defaultExpanded: boolean;
 }
 
 export interface PluginWorkspaceSummaryItemRegistration {
