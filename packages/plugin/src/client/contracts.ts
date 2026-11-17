@@ -411,6 +411,8 @@ export type PluginTimelineTransformerContribution<
 
 export interface PluginTimelineItemProps<Data = unknown> extends PluginNavigableHostProps {
   agentId: string;
+  /** The agent's workspace, when the host knows it. Pass it to `openPluginScreen` to open a tab there. */
+  workspaceId?: string;
   item: {
     type: "plugin";
     kind: string;

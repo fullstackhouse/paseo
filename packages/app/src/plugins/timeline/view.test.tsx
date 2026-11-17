@@ -114,6 +114,22 @@ const navigatingBundle = `(function(require) {
   } };
 })`;
 
+const workspaceBundle = `(function(require) {
+  const React = require("react");
+  return { default: function(plugin) {
+    function Card(props) {
+      return React.createElement("span", null, "workspace:" + (props.workspaceId || "none"));
+    }
+    plugin.addTimelineRenderer({
+      kind: "test-report",
+      version: 1,
+      schema: { safeParse(value) { return { success: true, data: value }; } },
+      Component: Card,
+    });
+    return function() {};
+  } };
+})`;
+
 const timelineItem = {
   kind: "plugin" as const,
   id: "item-1",
@@ -191,6 +207,35 @@ describe("PluginTimelineItemView", () => {
 
     act(() => container.querySelector("button")!.click());
     expect(openAgent).toHaveBeenCalledWith({ serverId: "host-1", agentId: "side-chat" });
+  });
+
+  it("tells the renderer which workspace the agent is in", async () => {
+    pluginRegistry.installCatalog(
+      "host-1",
+      [
+        {
+          id: "reports",
+          requirements: { paseo: `>=${appPackage.version}` },
+          clientBundle: workspaceBundle,
+        },
+      ],
+      { client: daemonClient, audio },
+    );
+    const container = document.createElement("div");
+    containers.push(container);
+    const root = createRoot(container);
+    roots.push(root);
+    await act(async () =>
+      root.render(
+        <PluginTimelineItemView
+          serverId="host-1"
+          agentId="agent-1"
+          workspaceId="ws-1"
+          item={timelineItem}
+        />,
+      ),
+    );
+    expect(container.textContent).toBe("workspace:ws-1");
   });
 
   it("contains renderer crashes to one timeline item", async () => {

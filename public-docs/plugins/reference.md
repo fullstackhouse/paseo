@@ -1544,7 +1544,8 @@ return `undefined` until recognizable if the first text is insufficient to ident
 Each replacement may set an optional plugin-local `id`; otherwise Paseo uses its index within that
 source item's output.
 
-Renderers receive `agentId`, `item`, `timestamp`, `theme`, `host`, and `layout`. Paseo validates
+Renderers receive `agentId`, `item`, `timestamp`, `theme`, `host`, and `layout`, plus the
+agent's `workspaceId` when the host knows it; pass it to `openPluginScreen` to open a tab there. Paseo validates
 `item.data` with the registered schema before rendering. Keep transformers synchronous and
 deterministic. Paseo memoizes results by source-item reference and derives replacement identity from
 the source row, so updates to one streaming item do not remount its renderer. Render `<StreamedText text={item.data.text} phase={item.data.phase} />` from

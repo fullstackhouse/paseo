@@ -38,11 +38,13 @@ function parseRendererData(
 
 function PluginTimelineItemBody({
   agentId,
+  workspaceId,
   item,
   serverId,
   theme,
 }: {
   agentId: string;
+  workspaceId: string | undefined;
   item: PluginTimelineStreamItem;
   serverId: string;
   theme: PluginTheme;
@@ -67,6 +69,7 @@ function PluginTimelineItemBody({
   const Component = renderer.Component as ComponentType<PluginTimelineItemProps>;
   const props: PluginTimelineItemProps = {
     agentId,
+    ...(workspaceId ? { workspaceId } : {}),
     theme,
     host,
     layout,
@@ -92,6 +95,7 @@ const ThemedPluginTimelineItemBody = withUnistyles(PluginTimelineItemBody);
 
 export function PluginTimelineItemView(props: {
   agentId: string;
+  workspaceId?: string;
   item: PluginTimelineStreamItem;
   serverId: string;
 }) {
