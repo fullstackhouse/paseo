@@ -161,6 +161,24 @@ function buildRunWorkspaceSource(options: AgentRunOptions, cwd: string) {
   });
 }
 
+/**
+ * The workspace `paseo run` creates for its agent carries the agent's
+ * `--title`, so the workspace and its only agent share one name instead of the
+ * sidebar showing the branch.
+ */
+export function buildRunWorkspaceCreateInput(
+  options: AgentRunOptions,
+  cwd: string,
+  callerAgentId: string | undefined,
+) {
+  const title = (options.title ?? options.name)?.trim();
+  return {
+    source: buildRunWorkspaceSource(options, cwd),
+    ...(title ? { title } : {}),
+    ...(callerAgentId ? { callerAgentId } : {}),
+  };
+}
+
 function toRunResult(
   agent: AgentSnapshotPayload,
   statusOverride?: AgentRunResult["status"],
@@ -566,11 +584,9 @@ async function resolveRunWorkspace(
 
   // TODO: thread the run `prompt` as firstAgentContext so workspace-level
   // title/branch generation picks up the task description (U8/U6 deferred).
-  const source = buildRunWorkspaceSource(options, cwd);
-  const result = await client.createWorkspace({
-    source,
-    ...(callerAgentId ? { callerAgentId } : {}),
-  });
+  const result = await client.createWorkspace(
+    buildRunWorkspaceCreateInput(options, cwd, callerAgentId),
+  );
 
   if (!result.workspace) {
     throw {

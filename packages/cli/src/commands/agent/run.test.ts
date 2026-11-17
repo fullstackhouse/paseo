@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DaemonConnectionError } from "@getpaseo/client/internal/daemon-client";
 import { resolveCallerAgentId as resolveRunCallerAgentId } from "../../utils/caller-agent.js";
 import {
+  buildRunWorkspaceCreateInput,
   resolveExistingRunWorkspace,
   runRunCommand,
   waitsForFinish,
@@ -167,5 +168,30 @@ describe("runRunCommand option validation", () => {
       { newWorkspace: "worktree", worktreeMode: "container" },
       /Unsupported worktree mode/,
     );
+  });
+});
+
+describe("workspace created for a run", () => {
+  it("carries the agent's --title so the workspace and agent share one name", () => {
+    const input = buildRunWorkspaceCreateInput(
+      { newWorkspace: "worktree", newBranch: "fix/login-redirect", title: " Fix: login redirect " },
+      "/repo",
+      undefined,
+    );
+
+    expect(input.title).toBe("Fix: login redirect");
+  });
+
+  it("uses the legacy --name when no --title is given", () => {
+    const input = buildRunWorkspaceCreateInput({ name: "Release notes" }, "/repo", undefined);
+
+    expect(input.title).toBe("Release notes");
+  });
+
+  it("leaves the title to the daemon when the agent has none", () => {
+    const input = buildRunWorkspaceCreateInput({ newWorkspace: "worktree" }, "/repo", "parent");
+
+    expect(input).not.toHaveProperty("title");
+    expect(input.callerAgentId).toBe("parent");
   });
 });
