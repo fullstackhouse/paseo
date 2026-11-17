@@ -41,13 +41,6 @@ interface ScheduleContext {
   currentSelection?: CurrentSelection;
 }
 
-export interface AdoptFirstAgentTitleInput {
-  workspaceId: string;
-  agentId: string;
-  title: string;
-  promptTitle: string | null;
-}
-
 export class WorkspaceAutoName {
   private readonly agentManager: AgentManager;
   private readonly agentStorage: Pick<AgentStorage, "listByWorkspace">;
@@ -185,36 +178,6 @@ export class WorkspaceAutoName {
       promptTitle: resolveFirstAgentPromptTitle(input.firstAgentContext),
     });
     await this.emitWorkspaceUpdateForWorkspaceId(input.workspaceId);
-  }
-
-  /**
-   * An agent with an explicit title names an untitled worktree or directory
-   * workspace that has no other agent records, unless someone already named it
-   * by hand. `paseo run --title X --new-workspace worktree --new-branch Y`
-   * creates the workspace without a prompt, so nothing else would title it.
-   * Archived records count, so a workspace with history keeps its name; a
-   * deleted agent leaves no record. A git project's main checkout
-   * (`local_checkout`) is never renamed.
-   */
-  async adoptFirstAgentTitle(input: AdoptFirstAgentTitleInput): Promise<void> {
-    const records = await this.agentStorage.listByWorkspace(input.workspaceId);
-    if (records.some((record) => !record.internal && record.id !== input.agentId)) {
-      return;
-    }
-    let changed = false;
-    await this.workspaceRegistry.update(input.workspaceId, (current) => {
-      if (
-        current.kind === "local_checkout" ||
-        !isReplaceableWorkspaceTitle(current.title, input.promptTitle)
-      ) {
-        return current;
-      }
-      changed = current.title !== input.title;
-      return { ...current, title: input.title, updatedAt: new Date().toISOString() };
-    });
-    if (changed) {
-      await this.emitWorkspaceUpdateForWorkspaceId(input.workspaceId);
-    }
   }
 
   /**

@@ -213,73 +213,6 @@ describe("single-agent workspaces share one name with their agent", () => {
     expect(harness.agentTitle("agent-1")).toBe("Summarize release status");
   });
 
-  test("an untitled workspace adopts its first agent's explicit title", async () => {
-    const harness = createTitleHarness({
-      workspaceTitle: null,
-      agents: [{ id: "agent-1", title: "Fix: login redirect" }],
-    });
-
-    await harness.autoName.adoptFirstAgentTitle({
-      workspaceId: harness.workspaceId,
-      agentId: "agent-1",
-      title: "Fix: login redirect",
-      promptTitle: null,
-    });
-
-    expect(harness.workspaceTitle()).toBe("Fix: login redirect");
-  });
-
-  test("a workspace still named after the prompt adopts the explicit agent title", async () => {
-    const harness = createTitleHarness({
-      workspaceTitle: PROMPT,
-      agents: [{ id: "agent-1", title: "Fix: login redirect" }],
-    });
-
-    await harness.autoName.adoptFirstAgentTitle({
-      workspaceId: harness.workspaceId,
-      agentId: "agent-1",
-      title: "Fix: login redirect",
-      promptTitle: PROMPT,
-    });
-
-    expect(harness.workspaceTitle()).toBe("Fix: login redirect");
-  });
-
-  test("adopting never overwrites a workspace title set by hand", async () => {
-    const harness = createTitleHarness({
-      workspaceTitle: "Release",
-      agents: [{ id: "agent-1", title: "Fix: login redirect" }],
-    });
-
-    await harness.autoName.adoptFirstAgentTitle({
-      workspaceId: harness.workspaceId,
-      agentId: "agent-1",
-      title: "Fix: login redirect",
-      promptTitle: PROMPT,
-    });
-
-    expect(harness.workspaceTitle()).toBe("Release");
-  });
-
-  test("a workspace that already has another agent keeps its title", async () => {
-    const harness = createTitleHarness({
-      workspaceTitle: null,
-      agents: [
-        { id: "agent-0", title: "Planner" },
-        { id: "agent-1", title: "Fix: login redirect" },
-      ],
-    });
-
-    await harness.autoName.adoptFirstAgentTitle({
-      workspaceId: harness.workspaceId,
-      agentId: "agent-1",
-      title: "Fix: login redirect",
-      promptTitle: null,
-    });
-
-    expect(harness.workspaceTitle()).toBeNull();
-  });
-
   test("an archived agent doesn't stop the remaining agent from following the workspace", async () => {
     const harness = createTitleHarness({
       workspaceTitle: PROMPT,
@@ -292,42 +225,5 @@ describe("single-agent workspaces share one name with their agent", () => {
     await harness.generate(PROMPT);
 
     expect(harness.agentTitle("agent-1")).toBe("Summarize release status");
-  });
-
-  test("a workspace that has had agents before is not renamed by a new one", async () => {
-    const harness = createTitleHarness({
-      workspaceTitle: null,
-      kind: "worktree",
-      agents: [
-        { id: "agent-old", title: "Earlier run", archivedAt: "2026-08-07T00:00:00.000Z" },
-        { id: "agent-1", title: "lint sweep" },
-      ],
-    });
-
-    await harness.autoName.adoptFirstAgentTitle({
-      workspaceId: harness.workspaceId,
-      agentId: "agent-1",
-      title: "lint sweep",
-      promptTitle: null,
-    });
-
-    expect(harness.workspaceTitle()).toBeNull();
-  });
-
-  test("a project's main checkout is never renamed after an agent", async () => {
-    const harness = createTitleHarness({
-      workspaceTitle: null,
-      kind: "local_checkout",
-      agents: [{ id: "agent-1", title: "lint sweep" }],
-    });
-
-    await harness.autoName.adoptFirstAgentTitle({
-      workspaceId: harness.workspaceId,
-      agentId: "agent-1",
-      title: "lint sweep",
-      promptTitle: null,
-    });
-
-    expect(harness.workspaceTitle()).toBeNull();
   });
 });
