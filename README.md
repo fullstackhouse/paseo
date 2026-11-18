@@ -1,5 +1,5 @@
 > **FSH fork.** This is the Full Stack House fork of Paseo. Install, patches and plugins: [FSH.md](./FSH.md).
-> Android app: [**paseo-fsh-arm64.apk**](https://github.com/fullstackhouse/paseo/releases/download/fsh-android-latest/paseo-fsh-arm64.apk) (always the newest build), or scan:
+> Android app, FSH people: [**join the Google Play internal test**](https://play.google.com/apps/internaltest/4701430887974252619) (auto-updates). Everyone else: [**paseo-fsh-arm64.apk**](https://github.com/fullstackhouse/paseo/releases/download/fsh-android-latest/paseo-fsh-arm64.apk) (always the newest build), or scan:
 >
 > <img src="docs/fsh/android-apk-qr.png" width="160" alt="QR code: Paseo FSH Android APK">
 
