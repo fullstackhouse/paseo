@@ -8,6 +8,7 @@ export function buildAgentPrompt(
   text: string,
   images?: Array<{ data: string; mimeType: string }>,
   attachments?: AgentAttachment[],
+  historyImages?: Array<{ data: string; mimeType: string }>,
 ): AgentPromptInput {
   const normalized = text.trim();
   const hasImages = (images?.length ?? 0) > 0;
@@ -27,6 +28,12 @@ export function buildAgentPrompt(
   }
 
   const blocks: AgentPromptContentBlock[] = [...chatHistoryAttachments];
+  if (chatHistoryAttachments.length > 0 && historyImages && historyImages.length > 0) {
+    blocks.push({ type: "text", text: "Images from the chat history above, oldest first:" });
+    for (const image of historyImages) {
+      blocks.push({ type: "image", data: image.data, mimeType: image.mimeType });
+    }
+  }
   if (normalized.length > 0) {
     blocks.push({ type: "text", text: normalized });
   }

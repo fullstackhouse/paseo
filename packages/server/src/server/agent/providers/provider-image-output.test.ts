@@ -1,5 +1,7 @@
-import { existsSync, rmSync, statSync, readFileSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync, statSync, readFileSync, writeFileSync } from "node:fs";
+import os from "node:os";
 import path from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import MarkdownIt from "markdown-it";
 import { projectTimelineRows } from "../timeline-projection.js";
 import { describe, expect, test } from "vitest";
@@ -7,6 +9,7 @@ import { describe, expect, test } from "vitest";
 import {
   MAX_PROVIDER_IMAGE_BYTES,
   isProviderImageMarkdown,
+  loadChatHistoryImages,
   materializeProviderImage,
   renderProviderImageOutputAsAssistantMarkdown,
 } from "./provider-image-output.js";
@@ -246,4 +249,54 @@ test("simultaneous requests for the same content share the published file", asyn
   ]);
   expect(results[0]).toEqual(results[1]);
   expect(readFileSync(results[0].path).toString()).toBe("concurrent dedupe fixture");
+});
+
+describe("loadChatHistoryImages", () => {
+  function chatHistory(text: string) {
+    return {
+      type: "text" as const,
+      mimeType: "text/plain",
+      contextKind: "chat_history" as const,
+      title: "Chat history",
+      text: `<chat-history-summary>\n${text}\n</chat-history-summary>`,
+    };
+  }
+
+  test("loads images the forked agent showed, so the new agent sees them", async () => {
+    const item = await renderProviderImageOutputAsAssistantMarkdown(
+      { data: "c2hlZXQtcHJldmlldw==", mimeType: "image/png" },
+      { materialize: materializeProviderImage },
+    );
+    if (!item || item.type !== "assistant_message") throw new Error("Expected image markdown.");
+    const imagePath = fileURLToPath(/\]\((file:[^)]+)\)/.exec(item.text)![1]!);
+
+    try {
+      const images = await loadChatHistoryImages([
+        chatHistory(`[User] Print that sheet\n[Assistant] ${item.text.trim()}\n[Assistant] Done.`),
+      ]);
+      expect(images).toEqual([{ data: "c2hlZXQtcHJldmlldw==", mimeType: "image/png" }]);
+    } finally {
+      rmSync(path.dirname(imagePath), { recursive: true, force: true });
+    }
+  });
+
+  test("ignores files outside Paseo's attachment dirs, missing files and other attachments", async () => {
+    const outsideDir = mkdtempSync(path.join(os.tmpdir(), "not-paseo-"));
+    const outside = path.join(outsideDir, `${HASH}.png`);
+    writeFileSync(outside, "secret");
+    try {
+      const missing = path.join(os.tmpdir(), "paseo-attachments-gone", `${HASH}.png`);
+      expect(
+        await loadChatHistoryImages([
+          chatHistory(`![Image](${pathToFileURL(missing).href})`),
+          {
+            ...chatHistory(`![Image](${pathToFileURL(outside).href})`),
+            contextKind: undefined,
+          },
+        ]),
+      ).toEqual([]);
+    } finally {
+      rmSync(outsideDir, { recursive: true, force: true });
+    }
+  });
 });
