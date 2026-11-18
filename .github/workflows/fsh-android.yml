@@ -144,7 +144,8 @@ jobs:
         run: |
           set -euo pipefail
           aab=packages/app/android/app/build/outputs/bundle/release/app-release.aab
-          jarsigner -verify -certs "$aab" > "$RUNNER_TEMP/aab-certs.txt"
+          jarsigner -verify "$aab"
+          keytool -printcert -jarfile "$aab" | tee "$RUNNER_TEMP/aab-certs.txt"
           if ! grep -q "CN=Full Stack House" "$RUNNER_TEMP/aab-certs.txt"; then
             echo "::error::Play bundle is not signed with the FSH key"
             exit 1
