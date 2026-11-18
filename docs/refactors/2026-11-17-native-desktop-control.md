@@ -160,7 +160,7 @@ Persist the accepted Continue outcome keyed by caller, task, attention ID, and e
 
 Attention state is durable independently of notification delivery. Identify it by `(serverId, desktopId, taskId, attentionId, revision)`; duplicate delivery or taps cannot resume twice. A delivery failure leaves the card actionable. Push payloads carry routing IDs and generic wording, not passwords, typed text, screenshots, or full URLs.
 
-FSH Android push exists in current fsh: [PR #119](https://github.com/fullstackhouse/paseo/pull/119), merged November 17, enables Expo/Firebase. This branch predates that change. The separate attention spec covers the remaining desktop-present routing and actual-device evidence; this feature must not add another push transport or assume mobile receipt from a notification API acknowledgement.
+FSH Android push exists in current fsh: [PR #119](https://github.com/fullstackhouse/paseo/pull/119), merged November 17, enables Expo/Firebase. The checkout used for the original inspection predated that change. The separate attention spec covers the remaining desktop-present routing and actual-device evidence; this feature must not add another push transport or assume mobile receipt from a notification API acknowledgement.
 
 ## Failure Scenarios and recovery
 

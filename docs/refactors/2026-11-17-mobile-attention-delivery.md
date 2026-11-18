@@ -1,6 +1,6 @@
 # Mobile attention delivery for browser handoffs
 
-Status: proposed design. Scope approved. Current-policy background delivery and tap succeeded by user report on November 18. Desktop-present and cold-start checks remain outstanding. Phone escalation is not implemented.
+Status: proposed design. Scope approved. Current-policy background delivery and tap succeeded by user report on November 18. The user waived additional desktop-present and cold-start checks for this research scope; those paths are not verified here. Phone escalation is not implemented.
 
 ## Scope
 
@@ -10,7 +10,7 @@ Push is best-effort. This feature must not promise that the phone displayed a no
 
 ## Evidence
 
-Inspected remote `fsh` at `90498ae764b366af27a4ddabde151ec9210d9214` on November 17. This checkout, `fd8411d` from November 8, predates these Android changes.
+Inspected remote `fsh` at `90498ae764b366af27a4ddabde151ec9210d9214` on November 17. The checkout used for that inspection, `fd8411d` from November 8, predated these Android changes.
 
 | Finding                                                                    | Evidence                                                                                                                                                                                                                                                                                                | Verification                                                                                 |
 | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
@@ -66,7 +66,7 @@ Add policy coverage to existing attention-policy and plugin-notification suites.
 
 ## Verification
 
-Except for the user-observed background baseline above, the following remains outstanding. Begin with an isolated test daemon and a disposable handoff task. Confirm the installed APK version and notification permission on a connected physical phone. Obtain a normal Expo subscription through the app; never print its token. Do not treat `adb force-stop` as an ordinary cold start: Android force-stop can prevent delivery until the app is opened again.
+The following is the production acceptance matrix, not remaining work for this research PR. The user accepted the observed background baseline and waived further baseline experiments. Begin with an isolated test daemon and a disposable handoff task. Confirm the installed APK version and notification permission on a connected physical phone. Obtain a normal Expo subscription through the app; never print its token. Do not treat `adb force-stop` as an ordinary cold start: Android force-stop can prevent delivery until the app is opened again.
 
 | Scenario                                                                           | Expected result                                                                         | Proof required                                                  |
 | ---------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
@@ -82,17 +82,17 @@ Except for the user-observed background baseline above, the following remains ou
 
 Follow [native notification QA](../notifications.md#startup-and-verification) for payload shape, replay, and startup checks. Test a real Expo/FCM delivery for Android; synthetic navigation events only prove routing. iOS validation needs a separately configured signed build and device; Android evidence does not prove APNs delivery.
 
-Manual background delivery and navigation succeeded. Complete desktop-present and cold-start checks, then verify real executor handoffs before calling phone handoff delivery complete.
+Manual background delivery and navigation succeeded. Production phone handoff delivery still requires the acceptance matrix and real executor handoffs; this research PR makes no claim that those checks passed.
 
 ## Phasing
 
-1. Establish the current release's physical-phone baseline; static policy findings do not replace this.
+1. During production qualification, establish the current release's physical-phone baseline; waived research checks are not evidence that these paths passed.
 2. Add explicit phone targeting and durable send-attempt accounting behind capability negotiation.
 3. Verify real handoff taps and resume against the owning Chrome/native executor once available.
 
 ## Implementation Plan
 
-1. Record installed app/daemon versions, permissions, and the existing default-policy baseline on a physical device. Exercise background, cold-start, and desktop-present cases without printing push tokens.
+1. At production qualification, record installed app/daemon versions, permissions, and the existing default-policy baseline on a physical device. Exercise background, cold-start, and desktop-present cases without printing push tokens.
 2. Propose optional `server_info.features.attentionPhonePush` and optional `delivery: "presence" | "presence_and_phone"` plus optional structured `attentionRef` on the existing plugin notification request; omission preserves current behavior. Require a valid attention reference for `presence_and_phone`; verify it through the executor-owned dispatch entry point described above. Gate the option once in the SDK/client. Core task senders use the same daemon policy. Preserve older message parsing and existing notification fields.
 3. Store a bounded send-attempt record keyed by `(source, taskId, attentionId, revision, attemptId)` before delivery. Use serialized compare-and-insert, deterministic `auto` attempt identity, and a distinct validated manual-resend ID. Record pending/attempted/accepted/failed/unknown, with no receipt claim beyond the actual transport result. Use the daemon's existing atomic store conventions. Persist deduplication across restart; prune terminal-task attempt records after seven days. Enforce authorization and existing mute/rate limits on resend.
 4. Add the handoff-alert preference to existing notification settings, default off until the user enables it. A durable task card remains available with either preference. Test presence and phone routing independently in existing attention-policy suites.
