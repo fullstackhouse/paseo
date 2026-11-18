@@ -176,9 +176,11 @@ import { resolveWorkspaceIdForPath } from "./resolve-workspace-id-for-path.js";
 import {
   archiveByScope,
   archivePersistedWorkspaceRecord,
+  archiveWorkspaceContents,
   killTerminalsForWorkspace,
   type ActiveWorkspaceRef,
 } from "./workspace-archive-service.js";
+import { resolvePaseoWorktreesBaseRoot } from "../utils/worktree.js";
 import { setupAutoArchiveOnMerge } from "./auto-archive-on-merge/index.js";
 import { setupWorkspaceSnoozeWaker } from "./workspace-snooze/index.js";
 import { continueSnoozedWorkspace } from "./workspace-snooze/continue.js";
@@ -1099,7 +1101,31 @@ export async function createPaseoDaemon(
     logger,
     workspaceGitService,
     onProjectUpdate: (update) => wsServer?.publishProjectUpdate(update),
-    onWorkspaceArchived: teardownArchivedWorkspaceRuntime,
+    worktreesRoot: resolvePaseoWorktreesBaseRoot({
+      paseoHome: config.paseoHome,
+      worktreesRoot: config.worktreesRoot,
+    }),
+    isWorkspaceBusy: (workspaceId) =>
+      agentManager
+        .listAgents({ includeInternal: true })
+        .some(
+          (agent) => agent.workspaceId === workspaceId && agentManager.hasInFlightRun(agent.id),
+        ),
+    // The directory is gone, so its agents can't run again: archive them with it, so plugins and
+    // clients see them archived instead of idle agents every message to which fails.
+    onWorkspaceArchived: async (workspaceId) => {
+      teardownArchivedWorkspaceRuntime(workspaceId);
+      await archiveWorkspaceContents(
+        {
+          agentManager,
+          agentStorage,
+          killTerminalsForWorkspace: (id) =>
+            killTerminalsForWorkspace({ terminalManager, sessionLogger: logger }, id),
+          sessionLogger: logger,
+        },
+        workspaceId,
+      );
+    },
     onWorkspacesChanged: async (workspaceIds) => {
       await fanOutReconciledWorkspaceUpdates({
         sessions: wsServer?.listSessions() ?? [],
