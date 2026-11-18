@@ -1173,6 +1173,141 @@ describe("WorkspaceReconciliationService", () => {
     expect(workspaces.get("w1")?.archivedAt).toBeNull();
   });
 
+  describe("a missing directory inside Paseo's worktrees root", () => {
+    function seedSelfRootedWorkspace(worktreesRoot: string) {
+      // A workspace registered as its own project: its project root is the deleted worktree.
+      const worktree = path.join(worktreesRoot, "abc123", "deleted-worktree");
+      const registries = createTestRegistries();
+      registries.projects.set(
+        "p1",
+        createPersistedProjectRecord({
+          projectId: "p1",
+          rootPath: worktree,
+          kind: "non_git",
+          displayName: "deleted-worktree",
+          createdAt: timestamp,
+          updatedAt: timestamp,
+        }),
+      );
+      registries.workspaces.set(
+        "w1",
+        createPersistedWorkspaceRecord({
+          workspaceId: "w1",
+          projectId: "p1",
+          cwd: worktree,
+          kind: "directory",
+          displayName: "deleted-worktree",
+          createdAt: timestamp,
+          updatedAt: timestamp,
+        }),
+      );
+      return { ...registries, worktree };
+    }
+
+    test("archives the workspace even when its project root is that directory", async () => {
+      const worktreesRoot = realpathSync(mkdtempSync(path.join(tmpdir(), "reconcile-owned-")));
+      tempDirs.push(worktreesRoot);
+      const { workspaces, projectRegistry, workspaceRegistry, worktree } =
+        seedSelfRootedWorkspace(worktreesRoot);
+      const archivedWorkspaceIds: string[] = [];
+
+      const service = new WorkspaceReconciliationService({
+        projectRegistry,
+        workspaceRegistry,
+        logger: createTestLogger(),
+        worktreesRoot,
+        onWorkspaceArchived: (workspaceId) => {
+          archivedWorkspaceIds.push(workspaceId);
+        },
+      });
+
+      const result = await service.runOnce();
+
+      expect(result.changesApplied).toEqual([
+        {
+          kind: "workspace_archived",
+          workspaceId: "w1",
+          directory: worktree,
+          reason: "directory_missing",
+        },
+      ]);
+      expect(archivedWorkspaceIds).toEqual(["w1"]);
+      expect(workspaces.get("w1")?.archivedAt).toEqual(expect.any(String));
+    });
+
+    test("keeps the workspace when the worktrees root itself is unreachable", async () => {
+      const parent = realpathSync(mkdtempSync(path.join(tmpdir(), "reconcile-owned-gone-")));
+      tempDirs.push(parent);
+      const worktreesRoot = path.join(parent, "unmounted", "worktrees");
+      const { workspaces, projectRegistry, workspaceRegistry } =
+        seedSelfRootedWorkspace(worktreesRoot);
+
+      const service = new WorkspaceReconciliationService({
+        projectRegistry,
+        workspaceRegistry,
+        logger: createTestLogger(),
+        worktreesRoot,
+      });
+
+      const result = await service.runOnce();
+
+      expect(result.changesApplied).toEqual([]);
+      expect(workspaces.get("w1")?.archivedAt).toBeNull();
+    });
+  });
+
+  test("waits for a workspace's running agents before archiving its missing directory", async () => {
+    const projectRoot = realpathSync(mkdtempSync(path.join(tmpdir(), "reconcile-busy-")));
+    tempDirs.push(projectRoot);
+    const missingWorkspace = path.join(projectRoot, "removed-by-its-agent");
+    const { projects, workspaces, projectRegistry, workspaceRegistry } = createTestRegistries();
+    projects.set(
+      "p1",
+      createPersistedProjectRecord({
+        projectId: "p1",
+        rootPath: projectRoot,
+        projectKey: canonicalLocalProjectKey(projectRoot),
+        kind: "non_git",
+        displayName: "repo",
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      }),
+    );
+    workspaces.set(
+      "w1",
+      createPersistedWorkspaceRecord({
+        workspaceId: "w1",
+        projectId: "p1",
+        cwd: missingWorkspace,
+        kind: "directory",
+        displayName: "removed-by-its-agent",
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      }),
+    );
+    let agentRunning = true;
+
+    const service = new WorkspaceReconciliationService({
+      projectRegistry,
+      workspaceRegistry,
+      logger: createTestLogger(),
+      isWorkspaceBusy: (workspaceId) => workspaceId === "w1" && agentRunning,
+    });
+
+    expect((await service.runOnce()).changesApplied).toEqual([]);
+    expect(workspaces.get("w1")?.archivedAt).toBeNull();
+
+    agentRunning = false;
+    expect((await service.runOnce()).changesApplied).toEqual([
+      {
+        kind: "workspace_archived",
+        workspaceId: "w1",
+        directory: missingWorkspace,
+        reason: "directory_missing",
+      },
+    ]);
+  });
+
   test("keeps a project active after all its workspaces are archived", async () => {
     const projectRoot = realpathSync(mkdtempSync(path.join(tmpdir(), "reconcile-orphan-project-")));
     const missingWorkspace = path.join(projectRoot, "missing-workspace");

@@ -30,6 +30,10 @@ An explicit base selection is stored in the checkout's Git-directory Paseo metad
 mirrored to `baseBranch` in every workspace record sharing that checkout. The record keeps
 recovery possible after the checkout metadata is deleted. A newly opened workspace inherits
 the checkout's selected base; separate worktrees keep separate bases.
+Reconciliation archives a workspace, with its agents and terminals, once its `cwd` is gone: when
+the project root is reachable, or when the `cwd` is inside Paseo's worktrees root. A missing root
+anywhere else may be an unmounted volume, so its workspaces stay. A workspace with a running agent
+waits for the next pass, since archiving would kill the run.
 Workspace archive runs lifecycle teardown from the exact `cwd` but removes only the backing
 `worktreeRoot` after its last active reference disappears. Worktree recovery recreates that backing
 checkout from `mainRepoRoot`, then restores the relative path from `worktreeRoot` to `cwd`.
