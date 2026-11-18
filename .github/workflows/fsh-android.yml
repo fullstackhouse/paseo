@@ -9,6 +9,9 @@
 # FSH_GOOGLE_SERVICES_JSON. The version code is 1_000_000 + this workflow's run number, so it
 # grows with every build and stays above the earlier F-Droid-style builds (~130000).
 #
+# Google Play: every build also makes an AAB (artifact paseo-fsh-aab); with the Actions variable
+# PLAY_UPLOAD_ENABLED=true, pushes to `fsh` upload it to the internal testing track.
+#
 # Signed with FSH's own key (plugins/with-fsh-release-signing.js), backed up in GCP Secret
 # Manager as paseo-android-keystore{,-password}. Android only installs an update signed with the
 # same key, so losing it means every phone uninstalls and reinstalls.
@@ -108,7 +111,7 @@ jobs:
           PASEO_ANDROID_KEY_ALIAS: fsh-paseo
         # arm64 only: every phone we use is 64-bit ARM, and one ABI halves the build.
         run: |
-          ./gradlew assembleRelease --no-daemon --max-workers=4 \
+          ./gradlew assembleRelease bundleRelease --no-daemon --max-workers=4 \
             -PreactNativeArchitectures=arm64-v8a
 
       - name: Verify signature
@@ -134,6 +137,38 @@ jobs:
           name: paseo-fsh-apk
           path: ${{ env.APK_PATH }}
           retention-days: 7
+
+      # The Google Play bundle, signed with the same FSH key (Play App Signing was set up to sign
+      # with this key too, so Play installs and the GitHub APK update each other).
+      - name: Verify and keep the Play bundle
+        run: |
+          set -euo pipefail
+          aab=packages/app/android/app/build/outputs/bundle/release/app-release.aab
+          jarsigner -verify -certs "$aab" > "$RUNNER_TEMP/aab-certs.txt"
+          if ! grep -q "CN=Full Stack House" "$RUNNER_TEMP/aab-certs.txt"; then
+            echo "::error::Play bundle is not signed with the FSH key"
+            exit 1
+          fi
+          echo "AAB_PATH=$aab" >> "$GITHUB_ENV"
+
+      - name: Upload Play bundle artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: paseo-fsh-aab
+          path: ${{ env.AAB_PATH }}
+          retention-days: 14
+
+      # Off until Play Console has the app's first release and the play-publisher service account
+      # (fsh-monorepo infra/paseo-push) is invited: set the Actions variable PLAY_UPLOAD_ENABLED=true.
+      - name: Upload to Google Play (internal testing)
+        if: github.event_name != 'pull_request' && vars.PLAY_UPLOAD_ENABLED == 'true'
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: house.fullstack.paseo
+          releaseFiles: ${{ env.AAB_PATH }}
+          track: internal
+          status: completed
 
       - name: Publish release
         if: github.event_name != 'pull_request'
