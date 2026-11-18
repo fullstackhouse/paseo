@@ -1430,6 +1430,52 @@ test("Claude waking up after a helper finishes gets an autonomous turn that its 
   await session.close();
 });
 
+test("a turn Claude ends on a usage limit fails with the limit text, which stays in the chat", async () => {
+  const session = await createSession();
+  const internal: SessionStateInternals = asInternals(session);
+  const queryMock = createPendingQueryMock();
+  const events: AgentStreamEvent[] = [];
+  session.subscribe((event) => events.push(event));
+  const limitText = "You've hit your weekly limit · resets Nov 20 at 12pm (Europe/Warsaw)";
+
+  // Frames Claude Code 2.1.322 sends when a wake-up turn hits a usage limit: a synthetic assistant
+  // reply flagged with `error`, then a result that says success but carries is_error.
+  await internal.routeSdkMessageFromPump(claudeTurnInit(), queryMock);
+  await internal.routeSdkMessageFromPump(
+    {
+      type: "assistant",
+      parent_tool_use_id: null,
+      error: "rate_limit",
+      uuid: "uuid-limit",
+      session_id: "sess-1",
+      message: {
+        id: "msg-limit",
+        model: "<synthetic>",
+        role: "assistant",
+        content: [{ type: "text", text: limitText }],
+      },
+    },
+    queryMock,
+  );
+  await internal.routeSdkMessageFromPump(
+    { ...successResult(), is_error: true, result: limitText },
+    queryMock,
+  );
+
+  expect(internal.turnState).toBe("idle");
+  expect(events.filter((event) => event.type === "turn_completed")).toHaveLength(0);
+  expect(events.find((event) => event.type === "turn_failed")).toMatchObject({
+    error: limitText,
+  });
+  expect(
+    events.flatMap((event) =>
+      event.type === "timeline" && event.item.type === "assistant_message" ? [event.item.text] : [],
+    ),
+  ).toEqual([limitText]);
+
+  await session.close();
+});
+
 test("a steer folded into a turn keeps one turn, and a turn Claude starts after it gets its own", async () => {
   sdkQueryFactory.mockImplementation(() => createPendingQueryMock());
   const session = await createSession();
