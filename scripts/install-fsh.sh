@@ -53,7 +53,7 @@ linux_app_pids() {
   for exe in /proc/[0-9]*/exe; do
     [[ "$(readlink "$exe" 2>/dev/null)" == "$APP/Paseo.bin"* ]] || continue
     pid="${exe#/proc/}" pid="${pid%/exe}"
-    tr '\0' '\n' <"/proc/$pid/environ" 2>/dev/null | grep -q '^ELECTRON_RUN_AS_NODE=' && continue
+    grep -qz '^ELECTRON_RUN_AS_NODE=' "/proc/$pid/environ" 2>/dev/null && continue
     echo "$pid"
   done
 }
@@ -64,7 +64,7 @@ linux_app_pids() {
 linux_main_pids() {
   local pid
   for pid in $(linux_app_pids); do
-    tr '\0' ' ' <"/proc/$pid/cmdline" 2>/dev/null | grep -q -- ' --type=' && continue
+    grep -qaF -- ' --type=' "/proc/$pid/cmdline" 2>/dev/null && continue
     echo "$pid"
   done
 }
