@@ -153,6 +153,15 @@ the store app. Push notifications go through our own Expo project (`@fullstackho
 and Firebase (`fsh-paseo-push`, managed in fsh-monorepo `infra/paseo-push`): the daemon sends
 the notification text (agent name, message preview) through Expo and Google.
 
+**FSH people: install it from Google Play.** Open
+**[the internal test invite](https://play.google.com/apps/internaltest/4701430887974252619)** on the
+phone, accept it, then install "Paseo FSH" from the Play Store. It updates itself. You must be on
+the "FSH" tester list in Play Console (ask Jacek) and signed in to Play with that
+`@fullstack.house` Google account. Every push to `fsh` uploads a new build to that track
+(`fsh-android.yml`). Then continue at step 3 below.
+
+**Everyone else, or without Play:**
+
 1. On the phone, open **[paseo-fsh-arm64.apk](https://github.com/fullstackhouse/paseo/releases/download/fsh-android-latest/paseo-fsh-arm64.apk)**,
    a link that always serves the newest build, or scan:
 
@@ -168,7 +177,8 @@ the notification text (agent name, message preview) through Expo and Google.
 4. Add hosts as a direct connection: e.g. `jaceks-macbook-pro.tailc790a0.ts.net`, port `443`,
    SSL on, plus the daemon password. Tailscale must be on.
 
-Every build is signed with the FSH key (GCP Secret Manager: `paseo-android-keystore`,
+Play installs and APK installs are the same app signed with the same key (Play App Signing uses
+our key), so either can update the other. Every build is signed with the FSH key (GCP Secret Manager: `paseo-android-keystore`,
 `paseo-android-keystore-password`; GitHub secrets `PASEO_ANDROID_KEYSTORE_BASE64`,
 `PASEO_ANDROID_KEYSTORE_PASSWORD`). Android only accepts updates signed with the same key, so
 never rotate it casually.
