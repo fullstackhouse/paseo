@@ -9,7 +9,8 @@
 // (both verified against the Chromium this app ships against). So a hostile page
 // can still reach a server by navigating, carrying data available inside the
 // preview. The opaque origin is what bounds the damage: the frame has no storage,
-// no parent access, and no way to read any file but itself. Native narrows it
+// no parent access, and no files beyond the stylesheets and scripts
+// html-preview-assets.ts inlines from its own folder. Native narrows it
 // further in html-preview.tsx, because a WebView can refuse navigation outside CSP — see the
 // caveat there on why that is a mitigation rather than a guarantee.
 const POLICY = [
