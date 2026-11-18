@@ -158,6 +158,7 @@ import {
 import { parsePluginClientId } from "./plugins/plugin-session-identity.js";
 import { buildAgentForkContextAttachment } from "./agent/activity-curator.js";
 import { buildAgentPrompt } from "./agent/prompt-attachments.js";
+import { loadChatHistoryImages } from "./agent/providers/provider-image-output.js";
 import type { StructuredGenerationDaemonConfig } from "./agent/structured-generation-providers.js";
 import {
   getAgentStreamEventTurnId,
@@ -4810,7 +4811,12 @@ export class Session {
     );
 
     const promptText = options?.spokenInput ? wrapSpokenInput(text) : text;
-    const prompt = buildAgentPrompt(promptText, images, attachments);
+    const prompt = buildAgentPrompt(
+      promptText,
+      images,
+      attachments,
+      await loadChatHistoryImages(attachments),
+    );
     await this.wakeAgentWorkspace(agentId);
 
     try {
@@ -9409,7 +9415,12 @@ export class Session {
       const agentId = resolved.agentId;
       if (!msg.sourceAgentId && !msg.keepSnoozed) await this.wakeAgentWorkspace(agentId);
 
-      const prompt = buildAgentPrompt(msg.text, msg.images, msg.attachments);
+      const prompt = buildAgentPrompt(
+        msg.text,
+        msg.images,
+        msg.attachments,
+        await loadChatHistoryImages(msg.attachments),
+      );
       this.sessionLogger.trace(
         {
           agentId,

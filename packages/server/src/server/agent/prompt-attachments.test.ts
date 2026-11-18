@@ -37,6 +37,30 @@ describe("prompt attachments", () => {
     ]);
   });
 
+  it("places images from the fork history right after the history", () => {
+    const chatHistory = {
+      type: "text" as const,
+      mimeType: "text/plain",
+      contextKind: "chat_history" as const,
+      title: "Chat history",
+      text: "<chat-history-summary>\n[Assistant] ![Image](file:///tmp/x.png)\n</chat-history-summary>",
+    };
+
+    expect(
+      buildAgentPrompt(
+        "Why no image?",
+        undefined,
+        [chatHistory],
+        [{ data: "history-image", mimeType: "image/png" }],
+      ),
+    ).toEqual([
+      chatHistory,
+      { type: "text", text: "Images from the chat history above, oldest first:" },
+      { type: "image", data: "history-image", mimeType: "image/png" },
+      { type: "text", text: "Why no image?" },
+    ]);
+  });
+
   it("renders github_pr attachments as readable text", () => {
     expect(
       renderPromptAttachmentAsText({

@@ -3,6 +3,9 @@ import * as fs from "node:fs/promises";
 import { setImmediate } from "node:timers/promises";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+import type { AgentAttachment } from "@getpaseo/protocol/messages";
 
 import type { AgentTimelineItem } from "../agent-sdk-types.js";
 
@@ -317,4 +320,95 @@ export async function renderProviderImageOutputAsAssistantMarkdown(
     type: "assistant_message",
     text: `\n\n![${altText}](${escapeMarkdownImageSource(materialized.path)})\n\n`,
   };
+}
+
+// Images the agent saw in a forked chat. Kept under provider per-image limits (Claude rejects
+// images over 5 MB) and capped in count so a long history doesn't flood the first prompt.
+const MAX_HISTORY_IMAGES = 10;
+const MAX_HISTORY_IMAGE_BYTES = 5 * 1024 * 1024;
+const MARKDOWN_IMAGE = /!\[(?:[^\]\\]|\\.)*\]\(((?:[^)\\]|\\.)+)\)/g;
+const MATERIALIZED_IMAGE_NAME = /^[0-9a-f]{64}\.(png|jpg|webp|gif)$/;
+const HISTORY_IMAGE_MIME_TYPES: Record<string, string> = {
+  png: "image/png",
+  jpg: "image/jpeg",
+  webp: "image/webp",
+  gif: "image/gif",
+};
+
+function markdownSourceToPath(source: string): string | null {
+  const unescaped = source.replace(/\\([\\)])/g, "$1");
+  if (!unescaped.toLowerCase().startsWith("file:")) return unescaped;
+  try {
+    return fileURLToPath(unescaped);
+  } catch {
+    return null;
+  }
+}
+
+/** Paths of materialized provider images referenced in text, oldest first, without repeats. */
+export function findProviderImagePaths(text: string): string[] {
+  const paths: string[] = [];
+  for (const match of text.matchAll(MARKDOWN_IMAGE)) {
+    if (!isProviderImageMarkdown(match[0])) continue;
+    const filePath = markdownSourceToPath(match[1]!);
+    if (!filePath) continue;
+    const existing = paths.indexOf(filePath);
+    if (existing >= 0) paths.splice(existing, 1);
+    paths.push(filePath);
+  }
+  return paths;
+}
+
+async function readHistoryImage(
+  filePath: string,
+  tmpDir: string,
+): Promise<{ data: string; mimeType: string } | null> {
+  const name = MATERIALIZED_IMAGE_NAME.exec(path.basename(filePath));
+  if (!name) return null;
+  try {
+    // Only read files Paseo materialized itself: <tmpdir>/paseo-attachments-*/<sha256>.<ext>.
+    const realPath = await fs.realpath(filePath);
+    const dir = path.dirname(realPath);
+    if (
+      path.dirname(dir) !== tmpDir ||
+      !path.basename(dir).startsWith(PROVIDER_IMAGE_ATTACHMENT_DIR_PREFIX)
+    ) {
+      return null;
+    }
+    const stats = await fs.lstat(realPath);
+    if (!stats.isFile() || stats.size > MAX_HISTORY_IMAGE_BYTES) return null;
+    const bytes = await fs.readFile(realPath);
+    return { data: bytes.toString("base64"), mimeType: HISTORY_IMAGE_MIME_TYPES[name[1]!]! };
+  } catch {
+    // Temp storage is cleared by the OS; a missing image stays a link in the history text.
+    return null;
+  }
+}
+
+/**
+ * Loads the images a chat history attachment refers to, so a forked agent sees them instead of
+ * a file link. Keeps the most recent ones when the history holds more than the cap.
+ */
+export async function loadChatHistoryImages(
+  attachments: readonly AgentAttachment[] | undefined,
+): Promise<Array<{ data: string; mimeType: string }>> {
+  const paths = (attachments ?? []).flatMap((attachment) =>
+    attachment.type === "text" && attachment.contextKind === "chat_history"
+      ? findProviderImagePaths(attachment.text)
+      : [],
+  );
+  if (paths.length === 0) return [];
+  let tmpDir: string;
+  try {
+    tmpDir = await fs.realpath(os.tmpdir());
+  } catch {
+    return [];
+  }
+  const images: Array<{ data: string; mimeType: string }> = [];
+  for (const filePath of paths.toReversed()) {
+    if (images.length >= MAX_HISTORY_IMAGES) break;
+    const image = await readHistoryImage(filePath, tmpDir);
+    if (image) images.push(image);
+  }
+  return images.toReversed();
 }
