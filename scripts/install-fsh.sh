@@ -42,16 +42,29 @@ case "$(uname -s)/$(uname -m)" in
   *) die "macOS on Apple Silicon or x86_64 Linux with dnf only." ;;
 esac
 
-# Every process running the Electron binary, minus the daemon and CLI: those run the same binary as
-# Node (ELECTRON_RUN_AS_NODE) through node-entrypoint-runner. /opt/Paseo/Paseo is a shell launcher
-# (packages/desktop/scripts/linux-sandbox/launcher.sh) that execs /opt/Paseo/Paseo.bin, so exe links
-# point at Paseo.bin. An upgraded RPM leaves them as "Paseo.bin (deleted)", hence the prefix match.
+# The desktop app's processes: the main process and its Chromium helpers (renderer, GPU, zygote,
+# utility), which carry --type=. The daemon, supervisor, terminal worker and plugin processes run the
+# same binary as Node with ELECTRON_RUN_AS_NODE set, so they are left out. /opt/Paseo/Paseo is a shell
+# launcher (packages/desktop/scripts/linux-sandbox/launcher.sh) that execs /opt/Paseo/Paseo.bin, so
+# exe links point at Paseo.bin. An upgraded RPM leaves them as "Paseo.bin (deleted)", hence the
+# prefix match.
 linux_app_pids() {
   local exe pid
   for exe in /proc/[0-9]*/exe; do
     [[ "$(readlink "$exe" 2>/dev/null)" == "$APP/Paseo.bin"* ]] || continue
     pid="${exe#/proc/}" pid="${pid%/exe}"
-    tr '\0' ' ' <"/proc/$pid/cmdline" 2>/dev/null | grep -q node-entrypoint-runner && continue
+    grep -qz '^ELECTRON_RUN_AS_NODE=' "/proc/$pid/environ" 2>/dev/null && continue
+    echo "$pid"
+  done
+}
+
+# The main process alone: the one without --type=. It quits on SIGTERM and shuts its helpers down.
+# Sending SIGTERM to the helpers as well killed them under it, and the main process aborted (SIGTRAP)
+# on its way out, which the desktop reported as a crash after every update.
+linux_main_pids() {
+  local pid
+  for pid in $(linux_app_pids); do
+    grep -qaF -- ' --type=' "/proc/$pid/cmdline" 2>/dev/null && continue
     echo "$pid"
   done
 }
@@ -68,7 +81,7 @@ quit_app() {
   if [[ $OS == mac ]]; then
     osascript -e 'quit app "Paseo"' 2>/dev/null || true
   else
-    linux_app_pids | xargs -r kill -TERM 2>/dev/null || true
+    linux_main_pids | xargs -r kill -TERM 2>/dev/null || true
   fi
   for _ in {1..30}; do app_running || break; sleep 1; done
 }
