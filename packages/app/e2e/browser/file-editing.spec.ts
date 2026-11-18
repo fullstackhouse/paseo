@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, symlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { Locator } from "@playwright/test";
 import { expect, test, type Page } from "../support/fixtures";
@@ -1165,6 +1165,65 @@ window.addEventListener('contextmenu', modifiedClick);
     await expect(preview.document.getByText("Parent DOM blocked", { exact: true })).toBeVisible();
     await expect(preview.document.getByText("Storage blocked", { exact: true })).toBeVisible();
     await expect(preview.document.getByText("Cookies blocked", { exact: true })).toBeVisible();
+  });
+
+  test("inlines an HTML page's own stylesheets and scripts, and nothing from outside its folder", async ({
+    page,
+    withWorkspace,
+  }) => {
+    test.setTimeout(90_000);
+    const workspace = await withWorkspace({ prefix: "file-editing-html-assets-" });
+    const planDir = path.join(workspace.repoPath, "storyboard");
+    await mkdir(path.join(planDir, "css"), { recursive: true });
+    await writeFile(
+      path.join(workspace.repoPath, "outside.css"),
+      "#outside { color: rgb(255, 0, 0); }",
+      "utf8",
+    );
+    await writeFile(
+      path.join(planDir, "css", "tokens.css"),
+      ":root { --accent: rgb(0, 128, 0); }",
+      "utf8",
+    );
+    await writeFile(
+      path.join(planDir, "screens.css"),
+      "#styled { color: var(--accent); } #outside { color: rgb(0, 0, 255); }",
+      "utf8",
+    );
+    await symlink(
+      path.join(workspace.repoPath, "outside.css"),
+      path.join(planDir, "linked-outside.css"),
+    );
+    await writeFile(
+      path.join(planDir, "app.js"),
+      'document.getElementById("scripted").textContent = "Linked script ran";',
+      "utf8",
+    );
+    await writeFile(
+      path.join(planDir, "index.html"),
+      `<!doctype html><html><head>
+<link rel="stylesheet" href="./css/tokens.css">
+<link rel="stylesheet" href="screens.css">
+<link rel="stylesheet" href="../outside.css">
+<link rel="stylesheet" href="linked-outside.css">
+</head><body>
+<h1 id="styled">Styled heading</h1>
+<p id="outside">Outside stylesheet probe</p>
+<p id="scripted">Linked script did not run</p>
+<script src="app.js"></script>
+</body></html>`,
+      "utf8",
+    );
+    await workspace.navigateTo();
+    await openFileExplorer(page);
+    await expandFolder(page, "storyboard");
+    await openFileFromExplorer(page, "index.html");
+    await expectFileTabOpen(page, "storyboard/index.html");
+
+    const preview = htmlPreview(page);
+    await expect(preview.document.getByText("Linked script ran", { exact: true })).toBeVisible();
+    await expect(preview.document.locator("#styled")).toHaveCSS("color", "rgb(0, 128, 0)");
+    await expect(preview.document.locator("#outside")).toHaveCSS("color", "rgb(0, 0, 255)");
   });
 
   test("persists Vim keybindings and reports Vim mode with cursor position", async ({

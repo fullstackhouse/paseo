@@ -1,10 +1,12 @@
 import { useWorkspace, useFileUrl, type PluginFilePanelProps } from "@getpaseo/plugin/client";
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { ScrollView, Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { ZoomableImage } from "@/components/zoomable-viewport/image";
 import { useSessionStore } from "@/stores/session-store";
+import { resolveFilePreviewReadTarget } from "@/file-explorer/preview-target";
 import { FileHtmlPreview } from "./html-preview";
+import { useHtmlPreviewDocument } from "./html-preview-document";
 import { FilePanelLoading } from "./loading";
 import { FileMarkdownPreview } from "./markdown-preview";
 import { TextFilePanel, type TextFilePreviewProps } from "./source/panel";
@@ -50,10 +52,21 @@ function MarkdownPreview({ text, params, workspaceId, host }: TextFilePreviewPro
 }
 
 /** The page owns its scrolling, so there is no ScrollView around it. */
-function HtmlPreview({ text }: TextFilePreviewProps) {
+function HtmlPreview({ text, params, workspaceId, host }: TextFilePreviewProps) {
+  const client = useSessionStore((state) => state.sessions[host.id]?.client ?? null);
+  const workspaceRoot = useWorkspace(workspaceId, (workspace) => workspace.directory);
+  const target = useMemo(
+    () => resolveFilePreviewReadTarget({ path: params.path, workspaceRoot: workspaceRoot ?? "" }),
+    [params.path, workspaceRoot],
+  );
+  const document = useHtmlPreviewDocument({ html: text, target, client });
   return (
     <View style={styles.container}>
-      <FileHtmlPreview html={text} testID="file-html-preview" />
+      {document === null ? (
+        <FilePanelLoading />
+      ) : (
+        <FileHtmlPreview html={document} testID="file-html-preview" />
+      )}
     </View>
   );
 }
