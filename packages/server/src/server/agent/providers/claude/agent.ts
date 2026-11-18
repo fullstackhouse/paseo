@@ -5042,6 +5042,13 @@ class ClaudeAgentSession implements AgentSession {
     events: AgentStreamEvent[],
   ): void {
     const usage = this.convertUsage(message);
+    // A usage limit or API error ends the turn with subtype "success" and is_error set; the
+    // result text is the error Claude already showed in the chat.
+    if (message.subtype === "success" && message.is_error) {
+      events.push(...this.sidechainTracker.finishAll("failed"));
+      events.push(this.buildTurnFailedEvent(message.result));
+      return;
+    }
     if (message.subtype === "success") {
       events.push(...this.sidechainTracker.finishAll("completed"));
       // Built-in slash commands (e.g. /voice, /usage, "Unknown command: …")
