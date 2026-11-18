@@ -1,6 +1,6 @@
 # Mobile attention delivery for browser handoffs
 
-Status: proposed design. Scope approved. Source verification complete; real-phone verification blocked by no connected device. No implementation or push test performed.
+Status: proposed design. Scope approved. Current-policy background delivery and tap succeeded by user report on November 18. Desktop-present and cold-start checks remain outstanding. Phone escalation is not implemented.
 
 ## Scope
 
@@ -22,7 +22,13 @@ Inspected remote `fsh` at `90498ae764b366af27a4ddabde151ec9210d9214` on November
 
 The old claim that the FSH Android build has no push support is obsolete. PR #119 explicitly leaves actual phone delivery unverified; its successful build does not close that test.
 
-Device check: `adb devices -l` returned no devices. `xcrun xctrace list devices` could not run because `xctrace` is unavailable. No phone was installed, restarted, notified, or inspected; no token or credential was read.
+Initial device check found no attached Android device; `xctrace` was unavailable. The user subsequently made an updated phone available for manual observation. Installed phone version and process state remain unverified.
+
+### Observed current-policy baseline
+
+On November 18, the user confirmed that `A3-BG-20261117-230055Z` arrived while the phone app was backgrounded and tapping opened the requesting conversation. The test used this agent’s ordinary completion notification on the installed Mac daemon (0.15.3), after more than four minutes without intended client interaction. One unexpired push subscription was present at 23:01:07 UTC on November 17. No notification policy was changed and no daemon restart was performed by the test.
+
+The expected completion was after 23:05:29 UTC. Inspection of the daemon log from the recorded byte offset found no push entry in the 23:00:55–23:15:55 UTC window. Later send entries at 23:27:22.605 and 23:45:00.738 UTC each named one token but no task identifier; they cannot be attributed to this marker. Record delivery and correct navigation as user-observed success, with send timing and latency unconfirmed. This does not prove cold-start handling, desktop suppression, or browser/native handoff delivery.
 
 ## Delivery and acknowledgement
 
@@ -60,7 +66,7 @@ Add policy coverage to existing attention-policy and plugin-notification suites.
 
 ## Verification
 
-The following is outstanding, not a record of passed tests. Begin with an isolated test daemon and a disposable handoff task. Confirm the installed APK version and notification permission on a connected physical phone. Obtain a normal Expo subscription through the app; never print its token. Do not treat `adb force-stop` as an ordinary cold start: Android force-stop can prevent delivery until the app is opened again.
+Except for the user-observed background baseline above, the following remains outstanding. Begin with an isolated test daemon and a disposable handoff task. Confirm the installed APK version and notification permission on a connected physical phone. Obtain a normal Expo subscription through the app; never print its token. Do not treat `adb force-stop` as an ordinary cold start: Android force-stop can prevent delivery until the app is opened again.
 
 | Scenario                                                                           | Expected result                                                                         | Proof required                                                  |
 | ---------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
@@ -76,7 +82,7 @@ The following is outstanding, not a record of passed tests. Begin with an isolat
 
 Follow [native notification QA](../notifications.md#startup-and-verification) for payload shape, replay, and startup checks. Test a real Expo/FCM delivery for Android; synthetic navigation events only prove routing. iOS validation needs a separately configured signed build and device; Android evidence does not prove APNs delivery.
 
-The device blocker leaves background and cold-start delivery unproved. Once a physical phone is connected and a safe test build/task is ready, run this matrix before calling phone handoff delivery complete.
+Manual background delivery and navigation succeeded. Complete desktop-present and cold-start checks, then verify real executor handoffs before calling phone handoff delivery complete.
 
 ## Phasing
 
@@ -97,6 +103,6 @@ The device blocker leaves background and cold-start delivery unproved. Once a ph
 
 Explicit phone targeting increases interruption frequency; opt-in, existing mute controls, one automatic attempt per revision, and bounded resend prevent a new global notification default. A corrupt or unavailable attempt store must leave attention waiting and report send uncertainty, not silently regenerate alerts. Rollback removes the new option while preserving default routing and pending task state.
 
-Source and document review support the proposed delta. Neither the new delivery option nor the future task senders exist in this checkout. Real-phone verification of both current delivery and the proposed treatment remains outstanding; no delivery guarantee is inferred from a successful build or Expo acceptance.
+Source and document review support the proposed delta. Neither the new delivery option nor the future task senders exist in this checkout. Current delivery has one user-observed background success; the remaining baseline cases and proposed treatment are unverified. No delivery guarantee is inferred from a successful build or Expo acceptance.
 
 Architectural review required explicit executor-validated attention identity and atomic attempt admission. Both are included above; navigation params and the existing in-memory notification dedupe are not used as authority or durable send accounting.
