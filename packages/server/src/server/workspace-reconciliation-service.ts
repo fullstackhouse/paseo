@@ -10,7 +10,7 @@ import type {
   PersistedWorkspaceRecord,
 } from "./workspace-registry.js";
 import type { WorkspaceGitService } from "./workspace-git-service.js";
-import { areEquivalentPaths } from "../utils/path.js";
+import { areEquivalentPaths, getRelativePathInsideRoot } from "../utils/path.js";
 import {
   deriveProjectKind,
   reconcileWorkspacePlacement,
@@ -95,6 +95,13 @@ export interface WorkspaceReconciliationServiceOptions {
   onProjectUpdate?: (update: ProjectUpdate) => void;
   onWorkspaceArchived?: (workspaceId: string) => void | Promise<void>;
   onWorkspacesChanged?: (workspaceIds: string[]) => Promise<void>;
+  /**
+   * Paseo's worktrees root. Paseo owns this location, so while it is reachable a missing
+   * workspace inside it was deleted, even when its project root is missing too.
+   */
+  worktreesRoot?: string;
+  /** A busy workspace keeps its record until its agents stop: archiving would kill their runs. */
+  isWorkspaceBusy?: (workspaceId: string) => boolean;
   watchProjectRoot?: ProjectRootWatch;
   clock?: ReconciliationClock;
   rescanIntervalMs?: number;
@@ -136,6 +143,8 @@ export class WorkspaceReconciliationService {
   private readonly onProjectUpdate: ((update: ProjectUpdate) => void) | null;
   private readonly onWorkspaceArchived: ((workspaceId: string) => void | Promise<void>) | null;
   private readonly onWorkspacesChanged: ((workspaceIds: string[]) => Promise<void>) | null;
+  private readonly worktreesRoot: string | null;
+  private readonly isWorkspaceBusy: (workspaceId: string) => boolean;
   private readonly watchProjectRoot: ProjectRootWatch;
   private readonly clock: ReconciliationClock;
   private readonly rescanIntervalMs: number;
@@ -163,6 +172,8 @@ export class WorkspaceReconciliationService {
     this.onProjectUpdate = options.onProjectUpdate ?? null;
     this.onWorkspaceArchived = options.onWorkspaceArchived ?? null;
     this.onWorkspacesChanged = options.onWorkspacesChanged ?? null;
+    this.worktreesRoot = options.worktreesRoot ?? null;
+    this.isWorkspaceBusy = options.isWorkspaceBusy ?? (() => false);
     this.watchProjectRoot = options.watchProjectRoot ?? watchProjectRoot;
     this.clock = options.clock ?? systemClock;
     this.rescanIntervalMs = options.rescanIntervalMs ?? DEFAULT_RESCAN_INTERVAL_MS;
@@ -267,6 +278,9 @@ export class WorkspaceReconciliationService {
         .filter(({ state }) => state === "directory")
         .map(({ project }) => project.projectId),
     );
+    const worktreesRoot = this.worktreesRoot;
+    const worktreesRootReachable =
+      worktreesRoot !== null && (await this.inspectDirectory(worktreesRoot)) === "directory";
 
     const workspacesByProject = new Map<string, PersistedWorkspaceRecord[]>();
     for (const { workspace, state } of workspaceDirectoryStates) {
@@ -282,10 +296,15 @@ export class WorkspaceReconciliationService {
     //    whole location is unavailable - an unmounted volume, an offline share, a disk
     //    that has not appeared yet - and absence there proves nothing about the
     //    workspace. Projects already persist through that; their workspaces do too.
+    //    Paseo's worktrees root vouches for the location itself: an agent that deletes
+    //    its own worktree leaves a workspace whose project may be rooted there too.
     const missingWorkspaces = workspaceDirectoryStates
       .filter(
         ({ workspace, state }) =>
-          state === "missing" && reachableProjectIds.has(workspace.projectId),
+          state === "missing" &&
+          (reachableProjectIds.has(workspace.projectId) ||
+            (worktreesRootReachable && isStrictlyInside(worktreesRoot, workspace.cwd))) &&
+          !this.isWorkspaceBusy(workspace.workspaceId),
       )
       .map(({ workspace }) => workspace);
     await mapBounded(missingWorkspaces, async (workspace) => {
@@ -677,4 +696,10 @@ async function mapBounded<T, R>(items: T[], visit: (item: T) => Promise<R>): Pro
     }),
   );
   return results;
+}
+
+function isStrictlyInside(root: string | null, candidate: string): boolean {
+  if (root === null) return false;
+  const relative = getRelativePathInsideRoot(root, candidate);
+  return relative !== null && relative !== "";
 }

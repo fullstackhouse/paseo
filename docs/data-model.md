@@ -26,6 +26,10 @@ checkout root. They intentionally differ for an exact subproject inside a worktr
 restore, branch auto-name, and descriptor flows consume those persisted facts rather than
 rediscovering ownership from a directory that may already be gone. Reconciliation may refresh
 mutable placement facts, but never changes `projectId`, `cwd`, `displayName`, or `baseBranch`.
+It archives a workspace, with its agents and terminals, once its `cwd` is gone: when the project
+root is reachable, or when the `cwd` is inside Paseo's worktrees root. A missing root anywhere else
+may be an unmounted volume, so its workspaces stay. A workspace with a running agent waits for the
+next pass, since archiving would kill the run.
 Workspace archive runs lifecycle teardown from the exact `cwd` but removes only the backing
 `worktreeRoot` after its last active reference disappears. Worktree recovery recreates that backing
 checkout from `mainRepoRoot`, then restores the relative path from `worktreeRoot` to `cwd`.
