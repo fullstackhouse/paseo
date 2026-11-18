@@ -1,6 +1,6 @@
 # Chrome browser host for Paseo
 
-Status: proposed implementation contract, updated November 17, 2026. Scope split approved (A1); isolated integration proof authorized (A2). No Chrome adapter or live authentication test completed.
+Status: proposed implementation contract, updated November 18, 2026. Scope split approved (A1). A2 passed a two-local-daemon fixture proof with real Claude/Codex and Chrome; real remote-network and 1Password authentication remain unverified. The opt-in prototype is not a production adapter.
 
 ## TLDR
 
@@ -91,7 +91,7 @@ The user completes 1Password/passkey authentication on the Mac, then chooses Con
 
 Show owner, queue position, connection state, and Stop/Take control locally; expose the requesting daemon's tasks and aggregate foreign queue counts remotely, not another daemon's task contents. The shared native arbiter owns emergency takeover even when the daemon is unreachable.
 
-Persist attention before delivery. Reuse Paseo notification routing and the mobile follow-up's explicit phone policy. Current FSH Android includes Expo/Firebase push via [PR #119](https://github.com/fullstackhouse/paseo/pull/119), merged November 17; this checkout predates it. Desktop-present routing and actual phone receipt still need validation. A send acknowledgement never resumes a task or proves phone delivery.
+Persist attention before delivery. Reuse Paseo notification routing and the mobile follow-up's explicit phone policy. Current FSH Android includes Expo/Firebase push via [PR #119](https://github.com/fullstackhouse/paseo/pull/119), merged November 17; this checkout predates it. Existing delivery is accepted for this spec; see the mobile proposal for the user-observed background receipt and verification limits. A send acknowledgement never resumes a task or proves phone delivery.
 
 ## API Contracts
 
@@ -134,8 +134,31 @@ Add provider-neutral tools through Paseo's existing catalog/MCP adapter. Reuse s
 4. **Add human surfaces:** task/queue observation, local takeover, actionable attention, Continue/Cancel, and notification integration. Validate stale actions, access revocation, absent host, and secret-free metadata.
 5. **Acceptance and rollout:** run the matrix above with real Claude/Codex remote tasks and local Chrome/native contention, targeted tests, actual-window UI/console checks, typecheck/lint/format, and CI for broad suites. Ship disabled by default after backend drain qualification. Disabling closes admission and drains; rollback retains inert recovery records and never closes the user's browser.
 
+## A2 feasibility evidence
+
+On November 18, both real providers passed the disposable-profile proof: Claude `claude-opus-5-5` and Codex `gpt-6-astra`, with agent-browser `0.43.0` and Google Chrome `157.0.8103.79`. Each provider ran through its own isolated, loopback Paseo daemon and the existing source-owned browser-host transport. One shared prototype adapter admitted tasks sequentially. Each agent opened the fixture, took a snapshot, clicked its button, and verified a fresh snapshot. The fixture server recorded exactly one nonce receipt per provider. Foreign source/agent requests, a competing owner, and requests after release were rejected without dispatch.
+
+Saved desktop connections contained only this Mac. This proves separate-daemon routing on one machine, not a remote network connection. The profile was disposable and headless; this does not establish extension or passkey behavior. The proof daemons and disposable Chrome were stopped afterward; the main daemon was not restarted or reconfigured.
+
+The experiment lives in [`chrome-proof/harness.ts`](../../packages/server/src/server/browser-tools/chrome-proof/harness.ts), with its narrowly allowed adapter beside it. It is not wired into the product. Pin agent-browser under `.dev/chrome-proof-tools`, start a separate Chrome with a disposable user-data directory and loopback debugging, then run:
+
+```sh
+PASEO_CHROME_PROOF=1 \
+A2_AGENT_BROWSER_PATH="$PWD/.dev/chrome-proof-tools/node_modules/.bin/agent-browser" \
+A2_CDP_ENDPOINT="<disposable Chrome CDP port>" \
+A2_CLAUDE_MODEL="<available Claude model>" \
+A2_CODEX_MODEL="<available Codex model>" \
+npx tsx packages/server/src/server/browser-tools/chrome-proof/harness.ts
+```
+
+Each run writes local proof evidence under `.dev/chrome-proof/run-*/proof.json`. Retain the distinction between fixture receipts, agent assertions, and human authentication evidence. Never point fixture mode at a personal profile. The live variant requires its explicit opt-in, a user-wide lock, and local human controls; it allows page observation but delegates all authentication to the user. Its journal fails closed after unknown execution or a persisted human hold. These prototype controls do not implement the production screen arbiter, queue, or enrollment model.
+
+For the human-login phase, use the same explicit environment variables with `PASEO_CHROME_LIVE_PROOF=1` and run [`chrome-proof/live.ts`](../../packages/server/src/server/browser-tools/chrome-proof/live.ts). Supply the loopback endpoint of the intended normal Chrome profile, not the disposable fixture profile. The script prints a local control page, opens WebAuthn.io through each provider, and pauses without further observation. The user performs registration/authentication in 1Password and explicitly returns control. A fresh post-return snapshot must show the demo’s logged-in heading at `/profile`; the password manager used is recorded as human confirmation, not inferred from the page. The control page’s Stop remains available during agent execution. Unknown execution and held-state shutdown retain the lock at `~/.cache/paseo-chrome-proof-owner`; do not remove it without checking the old executor and returning human control.
+
+Live preflight found installed 1Password extension files, but no debugging endpoint for the normal Chrome profile. Native computer-use operations returned `cgWindowNotFound`; the only running Chrome process after fixture cleanup belonged to another headless automation profile and was left alone. No normal profile was copied, relaunched, or enabled for debugging. The next live step requires opening the intended Chrome profile and its remote-debugging connection. Until that succeeds, the prepared live harness has unit/control-test coverage only; no passkey login or resume is claimed.
+
 ## Sources and review limits
 
 Existing evidence: [browser contract](../../public-docs/browser.md), [mobile browser placeholder](../../packages/app/src/desktop/browser/pane/index.tsx), [owned host registration](../../packages/server/src/server/session.ts), [broker](../../packages/server/src/server/browser-tools/broker.ts), [desktop handler](../../packages/app/src/desktop/browser/automation/handler.ts), [connected-host authority](../connected-hosts.md), [plugin boundaries](../plugins.md), and [protocol compatibility](../protocol-compatibility.md).
 
-External evidence: [agent-browser existing Chrome/tab pinning](https://agent-browser.dev/cdp-mode), [sessions](https://agent-browser.dev/sessions), [1Password browser passkeys](https://support.1password.com/save-use-passkeys/), [Paseo Claude Chrome issue #8913](https://github.com/getpaseo/paseo/issues/8913), and [Claude shared browser-selection issue #88057](https://github.com/anthropics/claude-code/issues/88057). These establish component behavior and reported limitations, not an end-to-end test. No live profile, authentication, queue, cancellation, or phone-delivery result is claimed.
+External evidence: [agent-browser existing Chrome/tab pinning](https://agent-browser.dev/cdp-mode), [sessions](https://agent-browser.dev/sessions), [1Password browser passkeys](https://support.1password.com/save-use-passkeys/), [Paseo Claude Chrome issue #8913](https://github.com/getpaseo/paseo/issues/8913), and [Claude shared browser-selection issue #88057](https://github.com/anthropics/claude-code/issues/88057). These establish component behavior and reported limitations, not an end-to-end test. The fixture evidence above does not establish live-profile authentication, production queuing, native cancellation, or phone handoff delivery.
