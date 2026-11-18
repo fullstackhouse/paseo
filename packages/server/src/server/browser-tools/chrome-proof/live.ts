@@ -289,8 +289,16 @@ async function providerTurn(daemon: PaseoDaemon, agentId: string, prompt: string
   }
 }
 
+function requestedProviders(): readonly Provider[] {
+  const selectedProvider = process.env.A2_PROVIDER;
+  if (!selectedProvider) return ["claude", "codex"];
+  if (selectedProvider === "claude" || selectedProvider === "codex") return [selectedProvider];
+  throw new Error("A2_PROVIDER must be claude or codex");
+}
+
 export async function runLiveChromeProof() {
   if (process.env.PASEO_CHROME_LIVE_PROOF !== "1") throw new Error("Set PASEO_CHROME_LIVE_PROOF=1");
+  const providers = requestedProviders();
   const base = path.resolve(process.env.A2_PROOF_ROOT ?? ".dev/chrome-proof");
   await mkdir(base, { recursive: true, mode: 0o700 });
   const root = await mkdtemp(path.join(base, "live-"));
@@ -319,7 +327,7 @@ export async function runLiveChromeProof() {
     }),
   );
   try {
-    for (const provider of ["claude", "codex"] as const) {
+    for (const provider of providers) {
       const { daemon, cwd } = await createProviderDaemon(provider, root, logger);
       daemons.push(daemon);
       await daemon.start();
@@ -418,7 +426,8 @@ export async function runLiveChromeProof() {
       path.join(root, "proof.json"),
       JSON.stringify(
         {
-          kind: "two-local-daemons-human-passkey-proof",
+          kind: "local-daemon-human-passkey-proof",
+          requestedProviders: providers,
           completed: completed && cleanupErrors.length === 0,
           cleanupErrors,
           realRemoteNetworkVerified: false,
