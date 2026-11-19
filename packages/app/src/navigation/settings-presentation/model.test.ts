@@ -142,6 +142,36 @@ describe("Settings search query", () => {
     settings.enterRoute({ key: "workspace", pathname: "/h/host/workspace/workspace" }, "host");
     expect(settings.store.getState().searchQuery).toBe("");
   });
+
+  it("puts the highlight back on the top result when the query changes", () => {
+    const settings = createSettingsPresentation();
+    settings.setSearchQuery("font");
+    settings.setSearchCursor(2);
+    settings.setSearchQuery("font");
+    expect(settings.store.getState().searchCursor).toBe(2);
+    settings.setSearchQuery("fonts");
+    expect(settings.store.getState().searchCursor).toBe(0);
+  });
+
+  it("opens each highlighted result once, again after leaving Settings", () => {
+    const settings = createSettingsPresentation();
+    expect(settings.markResultOpened("appearance:code-font")).toBe(true);
+    expect(settings.markResultOpened("appearance:code-font")).toBe(false);
+    expect(settings.markResultOpened("appearance:fonts")).toBe(true);
+    settings.setSearchQuery("x");
+    settings.setSearchQuery("");
+    expect(settings.markResultOpened("appearance:fonts")).toBe(true);
+    settings.enterRoute({ key: "workspace", pathname: "/h/host/workspace/workspace" }, "host");
+    expect(settings.markResultOpened("appearance:fonts")).toBe(true);
+  });
+
+  it("hands search focus to the next field once", () => {
+    const settings = createSettingsPresentation();
+    expect(settings.takeSearchFocus()).toBe(false);
+    settings.handOffSearchFocus();
+    expect(settings.takeSearchFocus()).toBe(true);
+    expect(settings.takeSearchFocus()).toBe(false);
+  });
 });
 
 describe("Settings row reveal", () => {

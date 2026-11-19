@@ -20,6 +20,8 @@ interface SettingsSelectionState {
   selectedServerId: string | null;
   /** The settings search query; kept across sections so results survive a pick and Back. */
   searchQuery: string;
+  /** The highlighted search result; back to the top result whenever the query changes. */
+  searchCursor: number;
   reveal: SettingsRevealRequest | null;
 }
 
@@ -27,12 +29,17 @@ export function createSettingsPresentation() {
   const store = createStore<SettingsSelectionState>(() => ({
     selectedServerId: null,
     searchQuery: "",
+    searchCursor: 0,
     reveal: null,
   }));
   const enteredRoutes = new Map<string, string>();
   let inSettings = false;
   let sidebarOffset = 0;
   let sidebarOwner: object | null = null;
+  // Opening a section remounts the wide sidebar and its search field. These carry
+  // the last result opened and the field's focus across that remount.
+  let openedResultId: string | null = null;
+  let searchFocusHandoff = false;
 
   function attachSidebar() {
     const owner = {};
@@ -60,7 +67,9 @@ export function createSettingsPresentation() {
       sidebarOwner = null;
       inSettings = false;
       enteredRoutes.clear();
-      store.setState({ searchQuery: "", reveal: null });
+      openedResultId = null;
+      searchFocusHandoff = false;
+      store.setState({ searchQuery: "", searchCursor: 0, reveal: null });
       return;
     }
     // A retained route returning through Back must not replay its old host intent.
@@ -82,7 +91,31 @@ export function createSettingsPresentation() {
   }
 
   function setSearchQuery(searchQuery: string): void {
-    store.setState({ searchQuery });
+    if (searchQuery === store.getState().searchQuery) return;
+    if (!searchQuery.trim()) openedResultId = null;
+    store.setState({ searchQuery, searchCursor: 0 });
+  }
+
+  function setSearchCursor(searchCursor: number): void {
+    store.setState({ searchCursor });
+  }
+
+  /** True when `id` differs from the result opened last, so each result opens once per highlight. */
+  function markResultOpened(id: string): boolean {
+    if (openedResultId === id) return false;
+    openedResultId = id;
+    return true;
+  }
+
+  function handOffSearchFocus(): void {
+    searchFocusHandoff = true;
+  }
+
+  /** True once after `handOffSearchFocus`, for the search field that mounts next. */
+  function takeSearchFocus(): boolean {
+    const handoff = searchFocusHandoff;
+    searchFocusHandoff = false;
+    return handoff;
   }
 
   let revealToken = 0;
@@ -106,6 +139,10 @@ export function createSettingsPresentation() {
     enterRoute,
     selectHost,
     setSearchQuery,
+    setSearchCursor,
+    markResultOpened,
+    handOffSearchFocus,
+    takeSearchFocus,
     requestReveal,
     claimReveal,
     attachSidebar,

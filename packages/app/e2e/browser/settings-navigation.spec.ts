@@ -183,6 +183,22 @@ test.describe("Settings search", () => {
     await expectSettingsRowRevealed(page, "Code size");
   });
 
+  test("typing opens the highlighted result and arrows move it, keeping focus", async ({
+    page,
+  }) => {
+    await gotoAppShell(page);
+    await openSettings(page);
+    const input = page.getByTestId("settings-search-input");
+    await input.click();
+    await input.pressSequentially("code");
+    await expectAppRoute(page, buildSettingsSectionRoute("appearance"));
+    await expect(input).toBeFocused();
+    await expect(input).toHaveValue("code");
+    await page.keyboard.press("ArrowDown");
+    await expectSettingsRowRevealed(page, "Code size");
+    await expect(input).toBeFocused();
+  });
+
   test("Cmd/Ctrl+F focuses the search and Escape clears, then leaves it", async ({ page }) => {
     await gotoAppShell(page);
     await openSettings(page);

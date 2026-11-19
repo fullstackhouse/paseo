@@ -38,6 +38,15 @@ export function useSettingsSearchQuery(): string {
 
 export const setSettingsSearchQuery = selection.setSearchQuery;
 
+export function useSettingsSearchCursor(): number {
+  return useStore(selection.store, (state) => state.searchCursor);
+}
+
+export const setSettingsSearchCursor = selection.setSearchCursor;
+export const markSettingsSearchResultOpened = selection.markResultOpened;
+export const handOffSettingsSearchFocus = selection.handOffSearchFocus;
+export const takeSettingsSearchFocus = selection.takeSearchFocus;
+
 // Sibling routes remount the wide sidebar. Only the current mount owns its
 // offset: RN Web can deliver its final scroll callback after unmount.
 export function useSettingsSidebarScroll(enabled: boolean) {

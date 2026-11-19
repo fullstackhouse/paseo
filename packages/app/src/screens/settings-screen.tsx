@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { ComponentType, ReactNode } from "react";
 import {
   Alert,
@@ -143,7 +143,12 @@ import {
 import {
   selectSettingsHost,
   requestSettingsReveal,
+  handOffSettingsSearchFocus,
+  markSettingsSearchResultOpened,
+  setSettingsSearchCursor,
   setSettingsSearchQuery,
+  takeSettingsSearchFocus,
+  useSettingsSearchCursor,
   useSettingsHostSelection,
   useSettingsSearchQuery,
   useSettingsSidebarScroll,
@@ -965,6 +970,17 @@ function SidebarGroup({ label, children }: { label?: string; children: ReactNode
 
 type SettingsSearchStep = 1 | -1;
 
+// Lets a burst of keystrokes settle before the section under the results changes.
+const SEARCH_AUTO_OPEN_DELAY_MS = 200;
+
+function isSettingsSearchTargetShown(
+  target: SettingsSearchDoc["target"],
+  view: SettingsView,
+): boolean {
+  if (target.kind === "section") return view.kind === "section" && view.section === target.section;
+  return view.kind === "host" && view.section === target.section;
+}
+
 function SettingsSearchBar({
   onStep,
   onSubmit,
@@ -975,6 +991,10 @@ function SettingsSearchBar({
   const { t } = useTranslation();
   const query = useSettingsSearchQuery();
   const fieldRef = useRef<SearchFieldHandle>(null);
+  // Opening a result remounts the wide sidebar; keep typing where it left off.
+  useLayoutEffect(() => {
+    if (takeSettingsSearchFocus()) fieldRef.current?.focus({ select: false });
+  }, []);
   useFocusEffect(
     useCallback(() => {
       if (!isWeb) return undefined;
@@ -1143,7 +1163,7 @@ function SettingsSidebar({
     [searchDocs, searchQuery],
   );
   const isSearching = searchQuery.trim().length > 0;
-  const handleSelectSearchResult = useCallback(
+  const openSearchResult = useCallback(
     (doc: SettingsSearchDoc) => {
       if (doc.revealsRow) requestSettingsReveal(doc.title);
       if (doc.target.kind === "section") onSelectSection(doc.target.section);
@@ -1151,16 +1171,25 @@ function SettingsSidebar({
     },
     [onSelectHostSection, onSelectSection],
   );
-  // Keyed by query so typing puts the highlight back on the top result without an effect.
-  const [cursor, setCursor] = useState({ query: searchQuery, index: 0 });
-  const activeResultIndex = cursor.query === searchQuery ? cursor.index : 0;
+  // A picked result becomes the highlighted one, so auto-open doesn't move off it.
+  const handleSelectSearchResult = useCallback(
+    (doc: SettingsSearchDoc) => {
+      markSettingsSearchResultOpened(doc.id);
+      setSettingsSearchCursor(Math.max(0, searchResults.indexOf(doc)));
+      openSearchResult(doc);
+    },
+    [openSearchResult, searchResults],
+  );
+  const searchCursor = useSettingsSearchCursor();
+  const activeResultIndex = searchCursor < searchResults.length ? searchCursor : 0;
   const handleSearchStep = useCallback(
     (step: SettingsSearchStep) => {
       if (searchResults.length === 0) return;
-      const index = (activeResultIndex + step + searchResults.length) % searchResults.length;
-      setCursor({ query: searchQuery, index });
+      setSettingsSearchCursor(
+        (activeResultIndex + step + searchResults.length) % searchResults.length,
+      );
     },
-    [activeResultIndex, searchQuery, searchResults.length],
+    [activeResultIndex, searchResults.length],
   );
   const handleSearchSubmit = useCallback(() => {
     const doc = searchResults[activeResultIndex];
@@ -1169,6 +1198,19 @@ function SettingsSidebar({
   const searchBar = <SettingsSearchBar onStep={handleSearchStep} onSubmit={handleSearchSubmit} />;
   const insets = useSafeAreaInsets();
   const isDesktop = layout === "desktop";
+  // On desktop the section sits beside the results, so the highlighted result opens
+  // as you type or move the highlight. On mobile opening it would hide the results.
+  const activeResult = isSearching ? searchResults[activeResultIndex] : undefined;
+  useEffect(() => {
+    if (!isDesktop || !activeResult) return undefined;
+    const timer = setTimeout(() => {
+      if (!markSettingsSearchResultOpened(activeResult.id)) return;
+      // Only a section change remounts the field; a stale handoff would steal focus later.
+      if (!isSettingsSearchTargetShown(activeResult.target, view)) handOffSettingsSearchFocus();
+      openSearchResult(activeResult);
+    }, SEARCH_AUTO_OPEN_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [activeResult, isDesktop, openSearchResult, view]);
   const sidebarScroll = useSettingsSidebarScroll(isDesktop);
   const outerContainerStyle = useMemo(
     () => [isDesktop ? sidebarStyles.desktopContainer : sidebarStyles.mobileContainer],

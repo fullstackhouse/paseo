@@ -40,8 +40,11 @@ export interface SearchFieldProps {
 }
 
 export interface SearchFieldHandle {
-  /** Focuses the field and selects its text, so typing replaces the last query. */
-  focus(): void;
+  /**
+   * Focuses the field. By default selects its text so typing replaces the last
+   * query; `{ select: false }` puts the caret at the end instead.
+   */
+  focus(options?: { select?: boolean }): void;
 }
 
 /**
@@ -78,11 +81,12 @@ export const SearchField = forwardRef<SearchFieldHandle, SearchFieldProps>(funct
   useImperativeHandle(
     ref,
     () => ({
-      focus: () => {
+      focus: (options) => {
         const input = inputRef.current;
         if (!input) return;
         input.focus();
-        input.setSelection({ start: 0, end: input.getText().length });
+        const end = input.getText().length;
+        input.setSelection({ start: options?.select === false ? end : 0, end });
       },
     }),
     [],
