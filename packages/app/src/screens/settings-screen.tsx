@@ -1202,6 +1202,7 @@ function SettingsSidebar({
           <ScrollView
             style={sidebarStyles.scrollBody}
             showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
             testID="settings-sidebar-scroll-body"
             {...sidebarScroll}
           >
@@ -1559,7 +1560,11 @@ export default function SettingsScreen({ view, openAddHostIntent = null }: Setti
     return (
       <View style={styles.container}>
         <BackHeader title={t("settings.title")} onBack={handleBackToWorkspace} />
-        <ScrollView style={styles.scrollView} contentContainerStyle={insetBottomStyle}>
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={insetBottomStyle}
+          keyboardShouldPersistTaps="handled"
+        >
           <SettingsSidebar
             view={view}
             onSelectSection={handleSelectSection}
