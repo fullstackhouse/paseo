@@ -1,4 +1,7 @@
-import type { ExplorerOnWorkspaceEnter } from "@/hooks/use-settings/storage";
+import type {
+  ExplorerOnWorkspaceEnter,
+  ExplorerOnWorkspaceEnterTab,
+} from "@/hooks/use-settings/storage";
 import type { Agent, WorkspaceDescriptor } from "@/stores/session-store";
 import type { ExplorerAttentionRecord } from "@/stores/workspace-layout-store";
 import type { WorkspaceSummaryItem } from "@/plugins/workspace-summary/store";
@@ -86,4 +89,43 @@ export function decideExplorerAutoShow(input: {
   if (unseen) return { kind: "item", item: unseen };
   if (input.setting === "always" && !input.record?.hidden) return { kind: "show" };
   return { kind: "none" };
+}
+
+/** Whether a non-archived agent in the workspace is running. */
+export function hasRunningAgent(
+  agents: ReadonlyMap<string, Pick<Agent, "workspaceId" | "archivedAt" | "status">> | undefined,
+  workspaceId: string,
+): boolean {
+  if (!agents) return false;
+  for (const agent of agents.values()) {
+    if (agent.workspaceId === workspaceId && !agent.archivedAt && agent.status === "running") {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * The tab an attention item opens Explorer on. Overview only when its Your move lists the item
+ * as a row (`deriveYourMove`): PR readiness and merges never get one, and failing checks hide
+ * while an agent runs, so those open the PR tab.
+ */
+export function pickAttentionTab(input: {
+  tabSetting: ExplorerOnWorkspaceEnterTab;
+  item: AttentionItem;
+  hasOverview: boolean;
+  agentRunning: boolean;
+}): "overview" | "item" {
+  if (input.tabSetting !== "overview" || !input.hasOverview) return "item";
+  switch (input.item.kind) {
+    case "permission":
+    case "failed":
+    case "plugin":
+      return "overview";
+    case "pr-checks-failed":
+      return input.agentRunning ? "item" : "overview";
+    case "pr-ready":
+    case "pr-merged":
+      return "item";
+  }
 }

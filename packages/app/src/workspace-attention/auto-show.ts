@@ -7,7 +7,13 @@ import {
 import { collectAllTabs } from "@/stores/workspace-layout-actions";
 import { openExplorerSidebarView, showExplorerSidebar } from "@/workspace-tabs/explorer-sidebar";
 import { useWorkspaceAttention } from "./attention";
-import { decideExplorerAutoShow, type AttentionItem } from "./model";
+import { useSessionStore } from "@/stores/session-store";
+import {
+  decideExplorerAutoShow,
+  hasRunningAgent,
+  pickAttentionTab,
+  type AttentionItem,
+} from "./model";
 
 /** Shows Explorer on the tab that belongs to an attention item. */
 export function showExplorerForAttention(workspaceKey: string, item: AttentionItem): void {
@@ -46,10 +52,10 @@ function hasOverviewTab(workspaceKey: string): boolean {
 }
 
 /** Shows Explorer on its Overview tab when the workspace still has one; closing it is respected. */
-function showExplorerOnOverview(workspaceKey: string): void {
+function showExplorerOnOverview(workspaceKey: string, hasOverview: boolean): void {
   const paneId = showExplorerSidebar({ isCompact: false, workspaceKey });
   const store = useWorkspaceLayoutStore.getState();
-  if (!paneId || !hasOverviewTab(workspaceKey)) return;
+  if (!paneId || !hasOverview) return;
   store.openTab({
     workspaceKey,
     target: { kind: "overview" },
@@ -92,21 +98,36 @@ export function useExplorerAutoShow(input: {
       items: itemsRef.current,
       record: store.explorerAttentionByWorkspace[workspaceKey] ?? null,
     });
+    const hasOverview = hasOverviewTab(workspaceKey);
     if (decision.kind === "show") {
-      showExplorerOnOverview(workspaceKey);
+      showExplorerOnOverview(workspaceKey, hasOverview);
     } else if (decision.kind === "item") {
-      // Overview lists the item under "Your move"; without an Overview tab, go to the item's tab.
-      if (tabSetting === "overview" && hasOverviewTab(workspaceKey)) {
-        showExplorerOnOverview(workspaceKey);
-      } else {
-        showExplorerForAttention(workspaceKey, decision.item);
-      }
+      const tab = pickAttentionTab({
+        tabSetting,
+        item: decision.item,
+        hasOverview,
+        agentRunning: hasRunningAgent(
+          useSessionStore.getState().sessions[serverId]?.agents,
+          workspaceId,
+        ),
+      });
+      if (tab === "overview") showExplorerOnOverview(workspaceKey, hasOverview);
+      else showExplorerForAttention(workspaceKey, decision.item);
       store.setExplorerAttention(workspaceKey, {
         hidden: false,
         seenKeys: itemsRef.current.map((item) => item.key),
       });
     }
-  }, [hydrated, isCompact, setting, tabSetting, workspaceActive, workspaceKey]);
+  }, [
+    hydrated,
+    isCompact,
+    serverId,
+    setting,
+    tabSetting,
+    workspaceActive,
+    workspaceId,
+    workspaceKey,
+  ]);
 
   const onExplorerToggled = useCallback(
     (nowOpen: boolean) => {

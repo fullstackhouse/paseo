@@ -47,7 +47,7 @@ import {
 } from "@/plugins/workspace-summary/store";
 import { WorkspaceSummaryEntryView } from "@/plugins/workspace-summary/entry-view";
 import { navigateToWorkspace } from "@/stores/navigation-active-workspace-store";
-import { useSessionStore, type Agent, type WorkspaceDescriptor } from "@/stores/session-store";
+import { useSessionStore, type WorkspaceDescriptor } from "@/stores/session-store";
 import { useWorkspaceFields } from "@/stores/session-store-hooks";
 import type { Theme } from "@/styles/theme";
 import {
@@ -60,6 +60,7 @@ import { navigateToAgent } from "@/utils/navigate-to-agent";
 import { formatTimeAgo } from "@/utils/time";
 import { normalizeWorkspaceOpaqueId } from "@/utils/workspace-identity";
 import { useWorkspaceAttention } from "@/workspace-attention/attention";
+import { hasRunningAgent } from "@/workspace-attention/model";
 import { showExplorerForAttention } from "@/workspace-attention/auto-show";
 import { openExplorerSidebarView } from "@/workspace-tabs/explorer-sidebar";
 import { buildWorkspaceTabPersistenceKey } from "@/workspace-tabs/model";
@@ -171,16 +172,6 @@ function OverviewPanel(): ReactElement {
       </View>
     </ScrollView>
   );
-}
-
-function hasRunningAgent(agents: Map<string, Agent> | undefined, workspaceId: string): boolean {
-  if (!agents) return false;
-  for (const agent of agents.values()) {
-    if (agent.workspaceId === workspaceId && !agent.archivedAt && agent.status === "running") {
-      return true;
-    }
-  }
-  return false;
 }
 
 // ── Where am I ───────────────────────────────────────────────────────────
