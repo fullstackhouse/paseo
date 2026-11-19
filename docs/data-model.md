@@ -339,6 +339,11 @@ the number of Git processes that have started but not exited. Every Git command 
 including initial workspace reads, filesystem-triggered refreshes, background checks, and explicit
 requests.
 
+Work a client is waiting on goes first. A snapshot request (`checkout_status`, PR status) takes the
+next workspace-refresh slot ahead of background refreshes, and runs its Git commands at high
+priority. Without that, a daemon observing a hundred workspaces queued a status request behind
+every startup and watcher refresh for minutes.
+
 Environment variables override `config.json`:
 
 | Environment variable                 | Setting                  |
