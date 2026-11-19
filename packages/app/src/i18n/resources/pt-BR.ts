@@ -1452,6 +1452,7 @@ export const ptBR: TranslationResources = {
     title: "Novo workspace",
     recentProjects: "Projetos recentes",
     create: "Criar",
+    startAnother: "Criar outro",
     isolation: {
       local: "Local",
       worktree: "Novo worktree",

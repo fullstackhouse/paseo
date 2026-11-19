@@ -1444,6 +1444,7 @@ export const ru: TranslationResources = {
     title: "Новое рабочее пространство",
     recentProjects: "Недавние проекты",
     create: "Создать",
+    startAnother: "Создать ещё один",
     isolation: {
       local: "Локально",
       worktree: "Новый worktree",
