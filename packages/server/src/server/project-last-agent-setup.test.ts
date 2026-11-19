@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
@@ -78,6 +78,18 @@ describe("setupProjectLastAgentSetupRecorder", () => {
         updatedAt: CREATED,
       }),
     );
+    await workspaceRegistry.upsert(
+      createPersistedWorkspaceRecord({
+        workspaceId: "ws-background",
+        projectId,
+        cwd: "/repo",
+        kind: "directory",
+        displayName: "heartbeat",
+        background: true,
+        createdAt: CREATED,
+        updatedAt: CREATED,
+      }),
+    );
     updates = [];
     projectMutations = 0;
     projectRegistry.subscribeToMutations(() => {
@@ -122,6 +134,11 @@ describe("setupProjectLastAgentSetupRecorder", () => {
       promptedAt: "2026-11-19T09:00:00.000Z",
     });
     expect(updates).toHaveLength(1);
+    const reloaded = new FileBackedProjectRegistry(
+      path.join(dir, "projects.json"),
+      createTestLogger(),
+    );
+    expect((await reloaded.get(projectId))?.lastAgentSetup?.model).toBe("claude-opus-5-5");
     // Mutation listeners re-describe every workspace of the project; a prompt must not wake them.
     expect(projectMutations).toBe(0);
     expect(updates[0]).toMatchObject({
@@ -163,7 +180,7 @@ describe("setupProjectLastAgentSetupRecorder", () => {
     expect(updates).toHaveLength(2);
   });
 
-  test("ignores subagents, internal agents, unprompted agents and unknown workspaces", async () => {
+  test("ignores subagents, internal and unprompted agents, unknown and background workspaces", async () => {
     const promptedAt = "2026-11-19T09:00:00Z";
     emit({
       type: "agent_state",
@@ -174,6 +191,10 @@ describe("setupProjectLastAgentSetupRecorder", () => {
     emit({
       type: "agent_state",
       agent: makeAgent({ id: "lost", promptedAt, workspaceId: "nope" }),
+    });
+    emit({
+      type: "agent_state",
+      agent: makeAgent({ id: "heartbeat", promptedAt, workspaceId: "ws-background" }),
     });
 
     expect(await lastSetup()).toBeNull();
@@ -189,5 +210,17 @@ describe("setupProjectLastAgentSetupRecorder", () => {
 
     expect(await lastSetup()).toBeNull();
     expect(updates).toHaveLength(0);
+  });
+
+  test("reads an unreadable saved setup as none instead of dropping the project", async () => {
+    const file = path.join(dir, "projects.json");
+    const [record] = JSON.parse(await readFile(file, "utf8"));
+    record.lastAgentSetup = { provider: "future", featureValues: { level: 3 } };
+    await writeFile(file, JSON.stringify([record]));
+    const reloaded = new FileBackedProjectRegistry(file, createTestLogger());
+
+    expect(await reloaded.list()).toEqual([
+      expect.objectContaining({ projectId, lastAgentSetup: null }),
+    ]);
   });
 });

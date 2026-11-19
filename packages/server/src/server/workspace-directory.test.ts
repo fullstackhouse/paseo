@@ -705,6 +705,25 @@ describe("WorkspaceDirectory empty projects", () => {
     } satisfies PersistedProjectRecord;
   }
 
+  test("carries a project's saved agent setup on its empty-project descriptor", async () => {
+    const lastAgentSetup = {
+      provider: "claude",
+      model: "claude-opus-5-5",
+      modeId: "auto",
+      thinkingOptionId: null,
+      featureValues: {},
+      promptedAt: NOW,
+    };
+    const directory = makeDirectory({
+      projects: [project({ projectId: "empty", lastAgentSetup })],
+      workspaces: [],
+    });
+
+    const [emptyProject] = await directory.listEmptyProjects();
+
+    expect(emptyProject?.projectLastAgentSetup).toEqual(lastAgentSetup);
+  });
+
   test("surfaces a project with no active workspaces through the compatibility projection", async () => {
     const directory = makeDirectory({
       projects: [project({ projectId: "empty", customName: "Renamed" })],

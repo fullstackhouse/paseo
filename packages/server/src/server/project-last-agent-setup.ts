@@ -46,7 +46,8 @@ export function setupProjectLastAgentSetupRecorder(
 
   async function record(workspaceId: string, setup: ProjectLastAgentSetup): Promise<void> {
     const workspace = await workspaceRegistry.get(workspaceId);
-    if (!workspace) return;
+    // Background workspaces (heartbeats, workers) are hidden from Recent projects.
+    if (!workspace || workspace.background) return;
     const project = await projectRegistry.recordLastAgentSetup(workspace.projectId, setup);
     if (project) options.onProjectUpdate({ kind: "upsert", project });
   }

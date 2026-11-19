@@ -48,9 +48,11 @@ const PersistedProjectRecordSchema = z.object({
     .optional()
     .transform((value) => value ?? null),
   // The setup of the project's most recently prompted top-level agent. Kept here so it survives
-  // archiving that agent; null until one is prompted.
+  // archiving that agent; null until one is prompted. An unreadable value (say, written by a newer
+  // build) reads as null: failing the parse would fail the whole file and drop every project.
   lastAgentSetup: ProjectLastAgentSetupSchema.nullable()
     .optional()
+    .catch(null)
     .transform((value) => value ?? null),
   createdAt: z.string(),
   updatedAt: z.string(),
