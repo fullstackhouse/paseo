@@ -2204,6 +2204,7 @@ export const ar: TranslationResources = {
         idle: "خامل",
       },
       status: "الحالة",
+      goal: "الهدف",
       statusFallbackWorking: "الوكيل يعمل · لم يُبلَّغ عن حالة",
       statusFallbackIdle: "لم يُبلَّغ عن حالة",
       state: {

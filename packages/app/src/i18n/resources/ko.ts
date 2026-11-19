@@ -2216,6 +2216,7 @@ export const ko: TranslationResources = {
         idle: "유휴",
       },
       status: "상태",
+      goal: "목표",
       statusFallbackWorking: "에이전트 작업 중 · 보고된 상태 없음",
       statusFallbackIdle: "보고된 상태 없음",
       state: {

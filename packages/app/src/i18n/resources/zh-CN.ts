@@ -2181,6 +2181,7 @@ export const zhCN: TranslationResources = {
         idle: "空闲",
       },
       status: "状态",
+      goal: "目标",
       statusFallbackWorking: "代理正在工作 · 未报告状态",
       statusFallbackIdle: "未报告状态",
       state: {

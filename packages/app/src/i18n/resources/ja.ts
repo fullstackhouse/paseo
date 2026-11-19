@@ -2229,6 +2229,7 @@ export const ja: TranslationResources = {
         idle: "待機中",
       },
       status: "ステータス",
+      goal: "目標",
       statusFallbackWorking: "エージェントが作業中 · ステータス未報告",
       statusFallbackIdle: "ステータス未報告",
       state: {

@@ -150,6 +150,13 @@ function OverviewPanel(): ReactElement {
           <AgentRow serverId={serverId} workspaceId={workspaceId} />
           <WorkspaceLineageBlock serverId={serverId} workspaceId={workspaceId} />
         </View>
+        {status?.status?.goal ? (
+          <Section title="panels.overview.goal">
+            <Text style={styles.goal} testID="overview-goal">
+              {status.status.goal}
+            </Text>
+          </Section>
+        ) : null}
         <StatusSection item={status} agentRunning={agentRunning} workspaceKey={workspaceKey} />
         <YourMoveSection
           serverId={serverId}
@@ -1108,6 +1115,12 @@ const styles = StyleSheet.create((theme) => {
     summary: {
       fontSize: theme.fontSize.base,
       color: theme.colors.foreground,
+    },
+    goal: {
+      fontSize: theme.fontSize.base,
+      color: theme.colors.foreground,
+      paddingHorizontal: theme.spacing[2],
+      paddingVertical: theme.spacing[1],
     },
     nowLabel: {
       fontWeight: theme.fontWeight.medium,

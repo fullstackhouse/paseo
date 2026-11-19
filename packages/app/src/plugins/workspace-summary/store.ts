@@ -78,6 +78,8 @@ function cleanStatus(status: PluginWorkspaceStatus | null): PluginWorkspaceStatu
     updatedAt: status.updatedAt,
   };
   if (status.answered === true) clean.answered = true;
+  const goal = typeof status.goal === "string" ? status.goal.trim() : "";
+  if (goal) clean.goal = goal;
   const now = typeof status.now === "string" ? status.now.trim() : "";
   if (now) clean.now = now;
   return clean;
