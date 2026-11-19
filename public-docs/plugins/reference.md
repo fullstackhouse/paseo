@@ -922,7 +922,7 @@ On desktop, entering a workspace opens Explorer for an item with `needsYou` whos
 hasn't seen there, on `panelId`, when **Open Explorer when entering a workspace** allows it. A `key`
 that was present when the user hid Explorer doesn't open it again; a new `key` does.
 
-With **Grouping > Agent-reported status (beta)** on in the sidebar's display menu, an idle workspace
+An idle workspace
 is grouped by its summary items instead of by whether its last turn was read: any `needsYou`
 or `workState: "waiting"` puts it in Ready to review, otherwise any `workState: "working"` in Working, otherwise `"done"` in Done. A
 running agent, a failure or a permission prompt still wins. Workspaces with no `needsYou` and no

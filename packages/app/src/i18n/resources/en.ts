@@ -1235,7 +1235,6 @@ export const en = {
         project: "Project",
         status: "Status",
         labels: "Labels",
-        agentReportedStatus: "Agent-reported status (beta)",
       },
       titleSource: {
         label: "Title",
