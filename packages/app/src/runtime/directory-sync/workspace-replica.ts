@@ -163,7 +163,8 @@ export class WorkspaceDirectoryReplica {
     ];
     for (const workspaceId of this.workspaceIdsByProject.get(project.projectId) ?? []) {
       const workspace = this.workspaces.get(workspaceId);
-      if (!workspace) continue;
+      // A prompt updates the project's last agent setup; that must not rewrite every workspace.
+      if (!workspace || !workspaceProjectFieldsChanged(workspace, project)) continue;
       const next = {
         ...workspace,
         projectDisplayName: project.projectDisplayName,
@@ -261,4 +262,17 @@ export class WorkspaceDirectoryReplica {
       this.workspaceIdsByProject.set(workspace.projectId, workspaceIds);
     }
   }
+}
+
+function workspaceProjectFieldsChanged(
+  workspace: WorkspaceDescriptor,
+  project: ProjectDescriptor,
+): boolean {
+  return (
+    workspace.projectDisplayName !== project.projectDisplayName ||
+    (workspace.projectCustomName ?? null) !== (project.projectCustomName ?? null) ||
+    (workspace.projectCustomIconRevision ?? null) !== (project.projectCustomIconRevision ?? null) ||
+    workspace.projectRootPath !== project.projectRootPath ||
+    workspace.projectKind !== project.projectKind
+  );
 }

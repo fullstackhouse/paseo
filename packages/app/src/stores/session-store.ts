@@ -42,6 +42,7 @@ import type {
   ServerCapabilities,
   WorkspaceDescriptorPayload,
   WorkspaceProjectDescriptorPayload,
+  ProjectLastAgentSetup,
 } from "@getpaseo/protocol/messages";
 import {
   normalizeWorkspaceOpaqueId,
@@ -213,6 +214,8 @@ export interface ProjectDescriptor {
   projectIconRevision?: string;
   projectRootPath: string;
   projectKind: WorkspaceDescriptorPayload["projectKind"];
+  /** The setup of the project's latest prompted top-level agent, archived or not. */
+  projectLastAgentSetup?: ProjectLastAgentSetup | null;
 }
 
 export function normalizeProjectDescriptor(
@@ -227,6 +230,8 @@ export function normalizeProjectDescriptor(
     projectIconRevision: payload.projectIconRevision,
     projectRootPath: payload.projectRootPath,
     projectKind: payload.projectKind,
+    // COMPAT(projectLastAgentSetup): FSH-only, added after v0.15.4; older hosts omit it. Remove gate after 2027-05-19.
+    projectLastAgentSetup: payload.projectLastAgentSetup ?? null,
   };
 }
 

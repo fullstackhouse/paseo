@@ -621,6 +621,8 @@ export class WorkspaceDirectory {
         projectCustomIconRevision: project.customIconRevision ?? null,
         projectRootPath: project.rootPath,
         projectKind: project.kind,
+        // The app replaces its project with this descriptor; omitting it would clear the setup.
+        projectLastAgentSetup: project.lastAgentSetup ?? undefined,
       }));
   }
 

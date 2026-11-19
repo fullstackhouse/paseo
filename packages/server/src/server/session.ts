@@ -6763,6 +6763,7 @@ export class Session {
       projectIconRevision: icon.revision,
       projectRootPath: project.rootPath,
       projectKind: project.kind,
+      ...(project.lastAgentSetup ? { projectLastAgentSetup: project.lastAgentSetup } : {}),
     };
   }
 

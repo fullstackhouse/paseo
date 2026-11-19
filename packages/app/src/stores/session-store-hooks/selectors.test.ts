@@ -682,6 +682,88 @@ describe("selectRecentProjects", () => {
     ]);
   });
 
+  function saveSetup(projectId: string, setup: ProjectDescriptor["projectLastAgentSetup"]): void {
+    const state = useSessionStore.getState();
+    const projects = state.sessions[SERVER_ID]?.projects ?? new Map<string, ProjectDescriptor>();
+    const project =
+      projects.get(projectId) ??
+      projectDescriptorFromTestWorkspace(createWorkspace({ id: "unused", projectId }));
+    state.setProjects(SERVER_ID, [
+      ...[...projects.values()].filter((item) => item.projectId !== projectId),
+      { ...project, projectLastAgentSetup: setup },
+    ]);
+  }
+
+  const opusSetup = {
+    provider: "claude",
+    model: "opus",
+    modeId: "auto",
+    thinkingOptionId: null,
+    featureValues: { fast: true },
+    promptedAt: "2026-01-05T00:00:00.000Z",
+  };
+
+  it("prefers the host's saved setup over an older agent that is still open", () => {
+    initializeWorkspaces([
+      { ...createWorkspace({ id: "ws-a", projectId: "alpha" }), createdAt: at("2026-01-01") },
+    ]);
+    setAgents([
+      agent({
+        id: "open-codex",
+        workspaceId: "ws-a",
+        provider: "codex",
+        model: "gpt-6-astra",
+        lastUserMessageAt: at("2026-01-02"),
+      }),
+    ]);
+    saveSetup("alpha", opusSetup);
+
+    expect(selectRecentProjects(useSessionStore.getState(), SERVER_ID)).toEqual([
+      {
+        projectId: "alpha",
+        lastUsedAt: at("2026-01-05").getTime(),
+        agentSetup: {
+          provider: "claude",
+          modelId: "opus",
+          modeId: "auto",
+          thinkingOptionId: "",
+          featureValues: { fast: true },
+        },
+      },
+    ]);
+  });
+
+  it("prefers an open agent prompted after the saved setup", () => {
+    initializeWorkspaces([
+      { ...createWorkspace({ id: "ws-a", projectId: "alpha" }), createdAt: at("2026-01-01") },
+    ]);
+    setAgents([
+      agent({
+        id: "open-codex",
+        workspaceId: "ws-a",
+        provider: "codex",
+        model: "gpt-6-astra",
+        lastUserMessageAt: at("2026-01-07"),
+      }),
+    ]);
+    saveSetup("alpha", opusSetup);
+
+    expect(
+      selectRecentProjects(useSessionStore.getState(), SERVER_ID)[0]?.agentSetup,
+    ).toMatchObject({ provider: "codex", modelId: "gpt-6-astra" });
+  });
+
+  it("lists a project whose workspaces are all archived when the host saved its setup", () => {
+    initializeWorkspaces([
+      { ...createWorkspace({ id: "ws-a", projectId: "alpha" }), createdAt: at("2026-01-01") },
+    ]);
+    saveSetup("beta", opusSetup);
+
+    expect(
+      selectRecentProjects(useSessionStore.getState(), SERVER_ID).map((item) => item.projectId),
+    ).toEqual(["beta", "alpha"]);
+  });
+
   it("is empty without a host", () => {
     expect(selectRecentProjects(useSessionStore.getState(), null)).toEqual([]);
   });

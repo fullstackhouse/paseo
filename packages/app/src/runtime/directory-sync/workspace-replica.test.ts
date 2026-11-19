@@ -202,6 +202,46 @@ it("preserves unchanged project identity when another project changes", () => {
   store.clearSession(serverId);
 });
 
+it("updates only the project when a prompt changes its last agent setup", () => {
+  const serverId = "project-last-agent-setup";
+  const store = useSessionStore.getState();
+  store.initializeSession(serverId, null as unknown as DaemonClient);
+  const replica = new WorkspaceDirectoryReplica(serverId);
+  const main = normalizeWorkspaceDescriptor(workspace("main"));
+  const projectPayload = {
+    projectId: "project",
+    projectDisplayName: "project",
+    projectRootPath: "/repo/project",
+    projectKind: "git" as const,
+  };
+  replica.commitSnapshot(
+    {
+      workspaces: new Map([[main.id, main]]),
+      projects: new Map([["project", normalizeProjectDescriptor(projectPayload)]]),
+    },
+    [],
+  );
+  const lastAgentSetup = {
+    provider: "claude",
+    model: "claude-opus-5-5",
+    modeId: "auto",
+    thinkingOptionId: null,
+    featureValues: {},
+    promptedAt: "2026-11-19T09:00:00.000Z",
+  };
+
+  const mutations = replica.applyDelta({
+    kind: "upsert",
+    project: { ...projectPayload, projectLastAgentSetup: lastAgentSetup },
+  });
+
+  expect(mutations.map((mutation) => mutation.kind)).toEqual(["project"]);
+  const session = useSessionStore.getState().sessions[serverId];
+  expect(session?.projects.get("project")?.projectLastAgentSetup).toEqual(lastAgentSetup);
+  expect(session?.workspaces.get(main.id)).toBe(main);
+  store.clearSession(serverId);
+});
+
 it("does not invent a null-key project from a workspace update", () => {
   const serverId = "workspace-before-project-update";
   const store = useSessionStore.getState();
