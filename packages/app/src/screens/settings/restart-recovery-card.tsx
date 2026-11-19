@@ -12,6 +12,7 @@ import { useDaemonConfig } from "@/hooks/use-daemon-config";
 import { useHostFeature } from "@/runtime/host-features";
 import { useHostRuntimeIsConnected } from "@/runtime/host-runtime";
 import { settingsStyles } from "@/styles/settings";
+import { SettingsRevealText } from "@/components/settings/reveal-text";
 
 export const DEFAULT_RESUME_PROMPT = "Resume working.";
 
@@ -67,9 +68,9 @@ export function RestartRecoveryCard({ serverId }: { serverId: string }) {
         <View style={settingsStyles.row}>
           <View style={settingsStyles.rowContent}>
             <View style={styles.titleRow}>
-              <Text style={settingsStyles.rowTitle}>
+              <SettingsRevealText style={settingsStyles.rowTitle}>
                 {t("settings.host.agents.resumeOnStartup.title")}
-              </Text>
+              </SettingsRevealText>
               <SettingsInfoTip
                 title={t("settings.host.agents.resumeOnStartup.title")}
                 info={t("settings.host.agents.resumeOnStartup.info")}

@@ -8,6 +8,7 @@ import { SettingsSection } from "@/components/settings/headings/settings-section
 import { useBrowserStore } from "@/desktop/browser/store";
 import { settingsStyles } from "@/styles/settings";
 import { confirmDialog } from "@/utils/confirm-dialog";
+import { SettingsRevealText } from "@/components/settings/reveal-text";
 
 export function BrowserDataSection() {
   const { t } = useTranslation();
@@ -57,9 +58,9 @@ export function BrowserDataSection() {
       <View style={settingsStyles.card}>
         <View style={settingsStyles.row}>
           <View style={settingsStyles.rowContent}>
-            <Text style={settingsStyles.rowTitle}>
+            <SettingsRevealText style={settingsStyles.rowTitle}>
               {t("settings.general.browserData.siteData")}
-            </Text>
+            </SettingsRevealText>
             <Text style={settingsStyles.rowHint}>
               {t("settings.general.browserData.description")}
             </Text>

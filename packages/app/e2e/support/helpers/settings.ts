@@ -902,3 +902,22 @@ export async function openSettingsFromCompactSidebar(page: Page) {
   await expectAppRoute(page, buildSettingsRoute());
   await expectCompactSettingsList(page);
 }
+
+export async function searchSettings(page: Page, query: string): Promise<void> {
+  await page.getByTestId("settings-search-input").fill(query);
+}
+
+/** Picks the search result whose title is `title` (its label reads "<title>, <location>"). */
+export async function pickSettingsSearchResult(page: Page, title: string): Promise<void> {
+  await page
+    .getByTestId("settings-sidebar")
+    .getByRole("button", { name: new RegExp(`^${title}, `) })
+    .click();
+}
+
+/** The page scrolled away from the top and the row titled `title` is on screen. */
+export async function expectSettingsRowRevealed(page: Page, title: string): Promise<void> {
+  const scrollBody = page.getByTestId("settings-detail-scroll-body");
+  await expect.poll(() => scrollBody.evaluate((node) => node.scrollTop)).toBeGreaterThan(0);
+  await expect(scrollBody.getByText(title, { exact: true })).toBeInViewport();
+}

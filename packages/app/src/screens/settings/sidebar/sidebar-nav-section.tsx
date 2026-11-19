@@ -1,6 +1,6 @@
 import { SidebarViewPicker } from "@/plugins/sidebar-view";
 import { useCallback, useMemo, type ComponentType, type ReactElement } from "react";
-import { Text, View } from "react-native";
+import { View } from "react-native";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import {
@@ -31,6 +31,7 @@ import { pluginIconComponent } from "@/plugins/icons";
 import { useSidebarNavItems } from "@/sidebar-nav/use-sidebar-nav-items";
 import { settingsStyles } from "@/styles/settings";
 import { ICON_SIZE, type Theme } from "@/styles/theme";
+import { SettingsRevealText } from "@/components/settings/reveal-text";
 
 const mutedColorMapping = (theme: Theme) => ({ color: theme.colors.foregroundMuted });
 
@@ -110,9 +111,9 @@ function SidebarNavRow({
     <View style={rowStyle} testID={`sidebar-nav-item-${item.key}`}>
       <View style={styles.rowMain}>
         <ThemedNavIcon Icon={navItemIcon(item)} uniProps={mutedColorMapping} />
-        <Text style={settingsStyles.rowTitle} numberOfLines={1}>
+        <SettingsRevealText style={settingsStyles.rowTitle} numberOfLines={1}>
           {label}
-        </Text>
+        </SettingsRevealText>
         <NavItemShortcut item={item} />
       </View>
       <View style={styles.rowActions}>

@@ -14,6 +14,8 @@ import {
 } from "@/stores/navigation-active-workspace-store";
 import { settingsPresentation as selection } from "./session";
 
+export { claimSettingsReveal, requestSettingsReveal, useIsSettingsRevealTarget } from "./selection";
+
 // Mount once above the sibling Settings routes so replacements and Back share
 // one visit, and leaving Settings gives the next workspace entry a fresh default.
 export function useSettingsRouteEntry(): void {
@@ -67,6 +69,21 @@ export function useSettingsContentPresented() {
 }
 
 export const selectSettingsHost = selection.selectHost;
+
+export function useSettingsSearchQuery(): string {
+  return useStore(selection.store, (state) => state.searchQuery);
+}
+
+export const setSettingsSearchQuery = selection.setSearchQuery;
+
+export function useSettingsSearchCursor(): number {
+  return useStore(selection.store, (state) => state.searchCursor);
+}
+
+export const setSettingsSearchCursor = selection.setSearchCursor;
+export const markSettingsSearchResultOpened = selection.markResultOpened;
+export const handOffSettingsSearchFocus = selection.handOffSearchFocus;
+export const takeSettingsSearchFocus = selection.takeSearchFocus;
 
 // Sibling routes remount the wide sidebar. Only the current mount owns its
 // offset: RN Web can deliver its final scroll callback after unmount.

@@ -166,3 +166,71 @@ describe("Settings sidebar return", () => {
     expect(createSettingsPresentation().store.getState().sidebarReturn).toBeNull();
   });
 });
+
+describe("Settings search query", () => {
+  it("survives moving between sections and clears on leaving Settings", () => {
+    const settings = createSettingsPresentation();
+    settings.enterRoute({ key: "root", pathname: "/settings" }, "host");
+    settings.setSearchQuery("font");
+    settings.enterRoute({ key: "app", pathname: "/settings/appearance" }, "host");
+    settings.enterRoute({ key: "root", pathname: "/settings" }, "host");
+    expect(settings.store.getState().searchQuery).toBe("font");
+    settings.enterRoute({ key: "workspace", pathname: "/h/host/workspace/workspace" }, "host");
+    expect(settings.store.getState().searchQuery).toBe("");
+  });
+
+  it("puts the highlight back on the top result when the query changes", () => {
+    const settings = createSettingsPresentation();
+    settings.setSearchQuery("font");
+    settings.setSearchCursor(2);
+    settings.setSearchQuery("font");
+    expect(settings.store.getState().searchCursor).toBe(2);
+    settings.setSearchQuery("fonts");
+    expect(settings.store.getState().searchCursor).toBe(0);
+  });
+
+  it("opens each highlighted result once, again after leaving Settings", () => {
+    const settings = createSettingsPresentation();
+    expect(settings.markResultOpened("appearance:code-font")).toBe(true);
+    expect(settings.markResultOpened("appearance:code-font")).toBe(false);
+    expect(settings.markResultOpened("appearance:fonts")).toBe(true);
+    settings.setSearchQuery("x");
+    settings.setSearchQuery("");
+    expect(settings.markResultOpened("appearance:fonts")).toBe(true);
+    settings.enterRoute({ key: "workspace", pathname: "/h/host/workspace/workspace" }, "host");
+    expect(settings.markResultOpened("appearance:fonts")).toBe(true);
+  });
+
+  it("hands search focus to the next field once", () => {
+    const settings = createSettingsPresentation();
+    expect(settings.takeSearchFocus()).toBe(false);
+    settings.handOffSearchFocus();
+    expect(settings.takeSearchFocus()).toBe(true);
+    expect(settings.takeSearchFocus()).toBe(false);
+  });
+});
+
+describe("Settings row reveal", () => {
+  it("is claimed once, by the matching title, before it expires", () => {
+    const settings = createSettingsPresentation();
+    settings.requestReveal("Code font", 1000);
+    expect(settings.claimReveal("Theme", 1001)).toBe(false);
+    expect(settings.claimReveal("Code font", 1001)).toBe(true);
+    expect(settings.claimReveal("Code font", 1002)).toBe(false);
+  });
+
+  it("does not fire for a row that renders after the request expired", () => {
+    const settings = createSettingsPresentation();
+    settings.requestReveal("Update daemon", 1000);
+    expect(settings.claimReveal("Update daemon", 1000 + 3001)).toBe(false);
+    expect(settings.store.getState().reveal).toBeNull();
+  });
+
+  it("is dropped on leaving Settings", () => {
+    const settings = createSettingsPresentation();
+    settings.enterRoute({ key: "app", pathname: "/settings/appearance" }, "host");
+    settings.requestReveal("Code font");
+    settings.enterRoute({ key: "workspace", pathname: "/h/host/workspace/workspace" }, "host");
+    expect(settings.store.getState().reveal).toBeNull();
+  });
+});

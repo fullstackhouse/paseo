@@ -9,6 +9,7 @@ import { useDaemonConfig } from "@/hooks/use-daemon-config";
 import { useHostFeature } from "@/runtime/host-features";
 import { useHostRuntimeIsConnected } from "@/runtime/host-runtime";
 import { settingsStyles } from "@/styles/settings";
+import { SettingsRevealText } from "@/components/settings/reveal-text";
 
 // Host-wide, persisted, and applied live by the daemon.
 export function IdleRuntimeCleanupCard({ serverId }: { serverId: string }) {
@@ -40,9 +41,9 @@ export function IdleRuntimeCleanupCard({ serverId }: { serverId: string }) {
       <View style={settingsStyles.row}>
         <View style={settingsStyles.rowContent}>
           <View style={styles.titleRow}>
-            <Text style={settingsStyles.rowTitle}>
+            <SettingsRevealText style={settingsStyles.rowTitle}>
               {t("settings.host.agents.idleRuntimeCleanup.title")}
-            </Text>
+            </SettingsRevealText>
             <SettingsInfoTip
               title={t("settings.host.agents.idleRuntimeCleanup.title")}
               info={t("settings.host.agents.idleRuntimeCleanup.info")}

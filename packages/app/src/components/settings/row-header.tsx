@@ -11,6 +11,7 @@ import { SkeletonPulse, useSkeletonPulse } from "@/components/ui/skeleton";
 import { settingsStyles } from "@/styles/settings";
 import { ICON_SIZE, type Theme } from "@/styles/theme";
 import { useSettingsRowLayout, type SettingsRowLayout } from "./row-density";
+import { SettingsRevealText } from "./reveal-text";
 
 const ThemedChevron = withUnistyles(ChevronRight);
 const ThemedLoadingSpinner = withUnistyles(LoadingSpinner);
@@ -115,7 +116,7 @@ export function SettingsRowHeader({
       ) : null}
       <View style={[settingsStyles.rowContent, styles.passThrough]}>
         <View style={labelAccessory ? styles.labelRow : undefined} {...HIDDEN_FROM_ASSISTIVE_TECH}>
-          <Text style={layout.title}>{label}</Text>
+          <SettingsRevealText style={layout.title}>{label}</SettingsRevealText>
           {labelAccessory}
         </View>
         {hintStatus ? (

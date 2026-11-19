@@ -11,6 +11,7 @@ import {
   getBrowserToolsCardState,
   getBrowserToolsMutationViewState,
 } from "./browser-tools-config";
+import { SettingsRevealText } from "@/components/settings/reveal-text";
 
 export function BrowserToolsOptInCard({ serverId }: { serverId: string }) {
   const { t } = useTranslation();
@@ -44,7 +45,7 @@ export function BrowserToolsOptInCard({ serverId }: { serverId: string }) {
     <View style={settingsStyles.card} testID="host-page-browser-tools-card">
       <View style={settingsStyles.row}>
         <View style={settingsStyles.rowContent}>
-          <Text style={settingsStyles.rowTitle}>{state.title}</Text>
+          <SettingsRevealText style={settingsStyles.rowTitle}>{state.title}</SettingsRevealText>
           <Text style={settingsStyles.rowHint}>{state.warning}</Text>
           {mutationView.loadingText ? (
             <Text style={settingsStyles.rowHint} testID="host-page-browser-tools-loading">

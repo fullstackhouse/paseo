@@ -2543,6 +2543,11 @@ export const ar: TranslationResources = {
       switchHost: "تبديل المضيف",
       local: "محلي",
     },
+    search: {
+      placeholder: "البحث في الإعدادات",
+      clear: "مسح البحث",
+      noResults: "لا توجد إعدادات تطابق بحثك.",
+    },
     backToWorkspace: "خلف",
     addHost: "أضف مضيفًا",
     enableBuiltInDaemon: "تفعيل البرنامج الخفي المدمج",

@@ -2519,6 +2519,11 @@ export const ko: TranslationResources = {
       switchHost: "호스트 전환",
       local: "로컬",
     },
+    search: {
+      placeholder: "설정 검색",
+      clear: "검색 지우기",
+      noResults: "검색과 일치하는 설정이 없습니다.",
+    },
     backToWorkspace: "뒤로",
     addHost: "호스트 추가",
     enableBuiltInDaemon: "내장 데몬 활성화",

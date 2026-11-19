@@ -11,6 +11,7 @@ import { useProvidersSnapshot } from "@/hooks/use-providers-snapshot";
 import { buildSelectableProviderSelectorProviders } from "@/provider-selection/provider-selection";
 import { SettingsSection } from "@/components/settings/headings/settings-section";
 import { settingsStyles } from "@/styles/settings";
+import { SettingsRevealText } from "@/components/settings/reveal-text";
 
 const METADATA_GENERATION_DOCS_URL = "https://paseo.sh/docs/metadata-generation";
 type SelectionMode = "automatic" | "preferred";
@@ -114,9 +115,9 @@ export function MetadataGenerationPage({ serverId }: { serverId: string }) {
       <View style={settingsStyles.card}>
         <View style={settingsStyles.row}>
           <View style={settingsStyles.rowContent}>
-            <Text style={settingsStyles.rowTitle}>
+            <SettingsRevealText style={settingsStyles.rowTitle}>
               {t("settings.metadataGeneration.selection")}
-            </Text>
+            </SettingsRevealText>
             <Text style={settingsStyles.rowHint}>
               {mode === "automatic"
                 ? t("settings.metadataGeneration.automaticHint")
@@ -133,7 +134,9 @@ export function MetadataGenerationPage({ serverId }: { serverId: string }) {
         {mode === "preferred" ? (
           <View style={[settingsStyles.row, settingsStyles.rowBorder]}>
             <View style={settingsStyles.rowContent}>
-              <Text style={settingsStyles.rowTitle}>{t("settings.metadataGeneration.model")}</Text>
+              <SettingsRevealText style={settingsStyles.rowTitle}>
+                {t("settings.metadataGeneration.model")}
+              </SettingsRevealText>
               <Text style={settingsStyles.rowHint}>
                 {t("settings.metadataGeneration.modelHint")}
               </Text>

@@ -2560,6 +2560,11 @@ export const fr: TranslationResources = {
       switchHost: "Changer d’hôte",
       local: "Local",
     },
+    search: {
+      placeholder: "Rechercher dans les paramètres",
+      clear: "Effacer la recherche",
+      noResults: "Aucun paramètre ne correspond à votre recherche.",
+    },
     backToWorkspace: "Retour",
     addHost: "Ajouter un hôte",
     enableBuiltInDaemon: "Activer le daemon intégré",
