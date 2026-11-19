@@ -126,8 +126,10 @@ Desktop can also show Explorer when you enter a workspace: Settings → Open loc
 workspace opens the Explorer sidebar** (Never / When something needs you, the default / Always).
 `packages/app/src/workspace-attention/` owns it. Attention items are pending permissions, plugin
 workspace summary items with `needsYou`, failed agents, and the PR's failed checks, readiness to
-merge, or merge. Each item has a key, and the first unseen one picks the tab: the plugin's panel, the PR
-tab, or the current tab for agent items, whose tab lives in the main pane. The decision runs once per
+merge, or merge. Each item has a key. **Explorer sidebar opens on** picks the tab: Overview, the default, which
+lists the item under Your move, or **The tab that needs you**, where the first unseen item picks it: the plugin's
+panel, the PR tab, or the current tab for agent items, whose tab lives in the main pane. A workspace whose Overview
+tab was closed falls back to the item's tab. The decision runs once per
 entry, never while you stay. Hiding Explorer with the toggle records the keys present then
 (`explorerAttentionByWorkspace`), so it stays hidden until a new key appears; under Always it otherwise
 reopens on every entry.

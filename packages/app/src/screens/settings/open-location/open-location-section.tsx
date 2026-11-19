@@ -4,6 +4,7 @@ import { SettingsSection, SettingsCard, SettingsSelect } from "@/components/sett
 import {
   useAppSettings,
   type ExplorerOnWorkspaceEnter,
+  type ExplorerOnWorkspaceEnterTab,
   type OpenInSidePanePreferences,
   type PullRequestOpenLocation,
   type ServiceUrlBehavior,
@@ -114,6 +115,37 @@ function ExplorerOnWorkspaceEnterRow() {
   );
 }
 
+const EXPLORER_ON_ENTER_TAB_VALUES: readonly ExplorerOnWorkspaceEnterTab[] = ["overview", "needed"];
+
+function ExplorerOnWorkspaceEnterTabRow() {
+  const { t } = useTranslation();
+  const { settings, updateSettings } = useAppSettings();
+  const options = useMemo(
+    () =>
+      EXPLORER_ON_ENTER_TAB_VALUES.map((value) => ({
+        value,
+        label: t(
+          `settings.layout.openInSidePane.sources.explorerOnWorkspaceEnterTab.options.${value}`,
+        ),
+      })),
+    [t],
+  );
+  const change = useCallback(
+    (explorerOnWorkspaceEnterTab: ExplorerOnWorkspaceEnterTab) =>
+      void updateSettings({ explorerOnWorkspaceEnterTab }),
+    [updateSettings],
+  );
+  if (settings.explorerOnWorkspaceEnter === "never") return null;
+  return (
+    <SettingsSelect
+      label={t("settings.layout.openInSidePane.sources.explorerOnWorkspaceEnterTab.label")}
+      value={settings.explorerOnWorkspaceEnterTab}
+      options={options}
+      onValueChange={change}
+    />
+  );
+}
+
 /** Where things open: files, diffs, subagents, pull requests, and script URLs. Desktop only. */
 export function OpenLocationSection() {
   const { t } = useTranslation();
@@ -149,6 +181,7 @@ export function OpenLocationSection() {
         />
         <ServiceUrlRow />
         <ExplorerOnWorkspaceEnterRow />
+        <ExplorerOnWorkspaceEnterTabRow />
       </SettingsCard>
     </SettingsSection>
   );

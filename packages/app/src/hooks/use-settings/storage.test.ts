@@ -424,6 +424,25 @@ describe("loadAppSettingsFromStorage", () => {
     expect(legacySide.openInSidePane).not.toHaveProperty("pullRequests");
   });
 
+  it("opens Explorer on Overview by default and keeps the chosen tab", async () => {
+    const load = (stored: unknown) =>
+      loadAppSettingsFromStorage(
+        makeDeps({
+          storage: createInMemoryKeyValueStorage({ [APP_SETTINGS_KEY]: JSON.stringify(stored) }),
+        }),
+      );
+
+    expect((await loadAppSettingsFromStorage(makeDeps())).explorerOnWorkspaceEnterTab).toBe(
+      "overview",
+    );
+    expect(
+      (await load({ explorerOnWorkspaceEnterTab: "needed" })).explorerOnWorkspaceEnterTab,
+    ).toBe("needed");
+    expect((await load({ explorerOnWorkspaceEnterTab: "bogus" })).explorerOnWorkspaceEnterTab).toBe(
+      "overview",
+    );
+  });
+
   it("loads configured terminal scrollback lines from app settings", async () => {
     const deps = makeDeps({
       storage: createInMemoryKeyValueStorage({

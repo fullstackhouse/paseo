@@ -38,14 +38,18 @@ export function showExplorerForAttention(workspaceKey: string, item: AttentionIt
   }
 }
 
+function hasOverviewTab(workspaceKey: string): boolean {
+  const layout = useWorkspaceLayoutStore.getState().layoutByWorkspace[workspaceKey];
+  return Boolean(
+    layout && collectAllTabs(layout.root).some((tab) => tab.target.kind === "overview"),
+  );
+}
+
 /** Shows Explorer on its Overview tab when the workspace still has one; closing it is respected. */
 function showExplorerOnOverview(workspaceKey: string): void {
   const paneId = showExplorerSidebar({ isCompact: false, workspaceKey });
   const store = useWorkspaceLayoutStore.getState();
-  const layout = store.layoutByWorkspace[workspaceKey];
-  const hasOverview =
-    layout && collectAllTabs(layout.root).some((tab) => tab.target.kind === "overview");
-  if (!paneId || !hasOverview) return;
+  if (!paneId || !hasOverviewTab(workspaceKey)) return;
   store.openTab({
     workspaceKey,
     target: { kind: "overview" },
@@ -68,6 +72,7 @@ export function useExplorerAutoShow(input: {
   const { serverId, workspaceId, workspaceKey, workspaceActive, isCompact } = input;
   const hydrated = useWorkspaceLayoutStoreHydrated();
   const setting = useSettings((settings) => settings.explorerOnWorkspaceEnter);
+  const tabSetting = useSettings((settings) => settings.explorerOnWorkspaceEnterTab);
   const items = useWorkspaceAttention(serverId, workspaceId);
   const itemsRef = useRef(items);
   itemsRef.current = items;
@@ -90,13 +95,18 @@ export function useExplorerAutoShow(input: {
     if (decision.kind === "show") {
       showExplorerOnOverview(workspaceKey);
     } else if (decision.kind === "item") {
-      showExplorerForAttention(workspaceKey, decision.item);
+      // Overview lists the item under "Your move"; without an Overview tab, go to the item's tab.
+      if (tabSetting === "overview" && hasOverviewTab(workspaceKey)) {
+        showExplorerOnOverview(workspaceKey);
+      } else {
+        showExplorerForAttention(workspaceKey, decision.item);
+      }
       store.setExplorerAttention(workspaceKey, {
         hidden: false,
         seenKeys: itemsRef.current.map((item) => item.key),
       });
     }
-  }, [hydrated, isCompact, setting, workspaceActive, workspaceKey]);
+  }, [hydrated, isCompact, setting, tabSetting, workspaceActive, workspaceKey]);
 
   const onExplorerToggled = useCallback(
     (nowOpen: boolean) => {
