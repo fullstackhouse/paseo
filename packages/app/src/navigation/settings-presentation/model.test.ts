@@ -143,3 +143,28 @@ describe("Settings search query", () => {
     expect(settings.store.getState().searchQuery).toBe("");
   });
 });
+
+describe("Settings row reveal", () => {
+  it("is claimed once, by the matching title, before it expires", () => {
+    const settings = createSettingsPresentation();
+    settings.requestReveal("Code font", 1000);
+    expect(settings.claimReveal("Theme", 1001)).toBe(false);
+    expect(settings.claimReveal("Code font", 1001)).toBe(true);
+    expect(settings.claimReveal("Code font", 1002)).toBe(false);
+  });
+
+  it("does not fire for a row that renders after the request expired", () => {
+    const settings = createSettingsPresentation();
+    settings.requestReveal("Update daemon", 1000);
+    expect(settings.claimReveal("Update daemon", 1000 + 3001)).toBe(false);
+    expect(settings.store.getState().reveal).toBeNull();
+  });
+
+  it("is dropped on leaving Settings", () => {
+    const settings = createSettingsPresentation();
+    settings.enterRoute({ key: "app", pathname: "/settings/appearance" }, "host");
+    settings.requestReveal("Code font");
+    settings.enterRoute({ key: "workspace", pathname: "/h/host/workspace/workspace" }, "host");
+    expect(settings.store.getState().reveal).toBeNull();
+  });
+});

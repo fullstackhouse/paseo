@@ -6,9 +6,9 @@ import {
   useIsLastWorkspaceSelectionHydrated,
   useLastWorkspaceSelection,
 } from "@/stores/navigation-active-workspace-store";
-import { createSettingsPresentation } from "./model";
+import { selection } from "./selection";
 
-const selection = createSettingsPresentation();
+export { claimSettingsReveal, requestSettingsReveal, useIsSettingsRevealTarget } from "./selection";
 
 // Mount once above the sibling Settings routes so replacements and Back share
 // one visit, and leaving Settings gives the next workspace entry a fresh default.

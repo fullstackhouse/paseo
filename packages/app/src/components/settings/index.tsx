@@ -26,11 +26,13 @@ import { useIsCompactFormFactor } from "@/constants/layout";
 import { settingsStyles } from "@/styles/settings";
 import { ControlSizeProvider } from "@/components/ui/control-size";
 import { useSettingsRowLayout } from "./row-density";
+import { SettingsRevealText } from "./reveal-text";
 export { SettingsGroup } from "./headings/settings-group";
 export { SettingsSection } from "./headings/settings-section";
 export { SettingsCollapsibleRow } from "./collapsible-row";
 export { SettingsDetailRow } from "./detail-row";
 export { SettingsInfoTip } from "./headings/settings-info-tip";
+export { SettingsRevealText } from "./reveal-text";
 
 /** What app screens can add to a plugin-facing row: an accessory beside the label, such as an info tip. */
 interface AppRowExtras {
@@ -73,11 +75,11 @@ export function SettingsRow({
       <View style={styles.label}>
         {labelAccessory ? (
           <View style={styles.labelRow}>
-            <Text style={accessoryTitleStyle}>{label}</Text>
+            <SettingsRevealText style={accessoryTitleStyle}>{label}</SettingsRevealText>
             {labelAccessory}
           </View>
         ) : (
-          <Text style={layout.title}>{label}</Text>
+          <SettingsRevealText style={layout.title}>{label}</SettingsRevealText>
         )}
         {typeof hint === "string" ? <Text style={layout.hint}>{hint}</Text> : hint}
         {error ? (

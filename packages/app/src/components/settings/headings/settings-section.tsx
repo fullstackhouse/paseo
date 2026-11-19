@@ -1,8 +1,9 @@
 import { useMemo, type ReactNode } from "react";
-import { Text, View, type StyleProp, type ViewStyle } from "react-native";
+import { View, type StyleProp, type ViewStyle } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { ExternalLink, type ExternalLinkProps } from "@/components/ui/external-link";
 import { SettingsInfoTip } from "./settings-info-tip";
+import { SettingsRevealText } from "../reveal-text";
 import { settingsStyles } from "@/styles/settings";
 
 interface SettingsSectionProps {
@@ -52,7 +53,7 @@ export function SettingsSection({
     <View style={sectionStyle} testID={testID}>
       <View style={styles.header}>
         <View style={styles.titleRow}>
-          <Text style={settingsStyles.sectionHeaderTitle}>{title}</Text>
+          <SettingsRevealText style={settingsStyles.sectionHeaderTitle}>{title}</SettingsRevealText>
           {info ? (
             <SettingsInfoTip
               title={title}

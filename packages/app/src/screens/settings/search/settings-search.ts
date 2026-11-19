@@ -13,6 +13,8 @@ export interface SettingsSearchDoc {
   hint?: string;
   /** Where the setting lives, shown under the title ("Appearance", "Host · Agents"). */
   location: string;
+  /** True for a setting row, which picking scrolls to; false for a whole section. */
+  revealsRow: boolean;
 }
 
 function normalize(text: string): string {
@@ -76,12 +78,14 @@ export function buildSettingsSearchDocs(input: BuildSettingsSearchDocsInput): Se
       target: { kind: "section", section: section.id } as const,
       title: section.label,
       location: input.appGroupLabel,
+      revealsRow: false,
     })),
     ...input.hostSections.map((section) => ({
       id: `host:${section.id}`,
       target: { kind: "host", section: section.id } as const,
       title: section.label,
       location: input.hostGroupLabel,
+      revealsRow: false,
     })),
   ];
 
@@ -97,6 +101,7 @@ export function buildSettingsSearchDocs(input: BuildSettingsSearchDocsInput): Se
         title: resolve(entry.title),
         hint: entry.hint === undefined ? undefined : resolve(entry.hint),
         location,
+        revealsRow: true,
       },
     ];
   });

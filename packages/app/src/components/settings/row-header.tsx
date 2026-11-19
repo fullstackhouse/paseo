@@ -8,6 +8,7 @@ import { PressHighlight } from "@/components/ui/press-highlight";
 import { settingsStyles } from "@/styles/settings";
 import { ICON_SIZE, type Theme } from "@/styles/theme";
 import { useSettingsRowLayout } from "./row-density";
+import { SettingsRevealText } from "./reveal-text";
 
 const ThemedChevron = withUnistyles(ChevronRight);
 const hoveredIconColorMapping = (theme: Theme) => ({ color: theme.colors.foreground });
@@ -82,11 +83,11 @@ export function SettingsRowHeader({
           <View style={settingsStyles.rowContent}>
             {labelAccessory ? (
               <View style={styles.labelRow}>
-                <Text style={layout.title}>{label}</Text>
+                <SettingsRevealText style={layout.title}>{label}</SettingsRevealText>
                 {labelAccessory}
               </View>
             ) : (
-              <Text style={layout.title}>{label}</Text>
+              <SettingsRevealText style={layout.title}>{label}</SettingsRevealText>
             )}
             {hint ? <Text style={layout.hint}>{hint}</Text> : null}
           </View>

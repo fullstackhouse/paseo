@@ -23,6 +23,7 @@ import { identityColor } from "@/styles/identity-colors";
 import { settingsStyles } from "@/styles/settings";
 import { ICON_SIZE, type Theme } from "@/styles/theme";
 import type { HostProfile } from "@/types/host-connection";
+import { SettingsRevealText } from "@/components/settings/reveal-text";
 
 const ThemedPencil = withUnistyles(Pencil);
 
@@ -114,7 +115,9 @@ function ColorRow({ color, onChange }: { color: HostColor; onChange: (color: Hos
   return (
     <View style={[settingsStyles.row, settingsStyles.rowBorder]}>
       <View style={settingsStyles.rowContent}>
-        <Text style={settingsStyles.rowTitle}>{t("settings.host.appearance.color.label")}</Text>
+        <SettingsRevealText style={settingsStyles.rowTitle}>
+          {t("settings.host.appearance.color.label")}
+        </SettingsRevealText>
       </View>
       <DropdownMenu>
         <DropdownTrigger
@@ -153,7 +156,9 @@ function BadgeDisplayRow({
   return (
     <View style={[settingsStyles.row, settingsStyles.rowBorder]}>
       <View style={settingsStyles.rowContent}>
-        <Text style={settingsStyles.rowTitle}>{t("settings.host.appearance.badge.label")}</Text>
+        <SettingsRevealText style={settingsStyles.rowTitle}>
+          {t("settings.host.appearance.badge.label")}
+        </SettingsRevealText>
       </View>
       <DropdownMenu>
         <DropdownTrigger
@@ -278,7 +283,9 @@ export function HostAppearanceSection({ host }: { host: HostProfile }) {
       <View style={settingsStyles.card}>
         <View style={settingsStyles.row}>
           <View style={settingsStyles.rowContent}>
-            <Text style={settingsStyles.rowTitle}>{t("settings.host.appearance.name.label")}</Text>
+            <SettingsRevealText style={settingsStyles.rowTitle}>
+              {t("settings.host.appearance.name.label")}
+            </SettingsRevealText>
           </View>
           <View style={styles.nameValue}>
             <Text style={styles.nameText} numberOfLines={1}>

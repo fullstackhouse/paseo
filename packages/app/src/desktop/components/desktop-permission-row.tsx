@@ -5,6 +5,7 @@ import { Check } from "lucide-react-native";
 import { Button } from "@/components/ui/button";
 import { settingsStyles } from "@/styles/settings";
 import type { DesktopPermissionStatus } from "@/desktop/permissions/desktop-permissions";
+import { SettingsRevealText } from "@/components/settings/reveal-text";
 
 export interface DesktopPermissionRowProps {
   title: string;
@@ -49,7 +50,7 @@ export function DesktopPermissionRow({
   return (
     <View style={rowStyle}>
       <View style={settingsStyles.rowContent}>
-        <Text style={settingsStyles.rowTitle}>{title}</Text>
+        <SettingsRevealText style={settingsStyles.rowTitle}>{title}</SettingsRevealText>
       </View>
       <View style={styles.permissionRowActions}>
         {isGranted ? (

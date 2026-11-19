@@ -11,6 +11,7 @@ import { useDesktopPermissions } from "@/desktop/permissions/use-desktop-permiss
 import { useDesktopSettings } from "@/desktop/settings/desktop-settings";
 import { SettingsSection } from "@/components/settings/headings/settings-section";
 import { settingsStyles } from "@/styles/settings";
+import { SettingsRevealText } from "@/components/settings/reveal-text";
 
 const ThemedRotateCw = withUnistyles(RotateCw, (theme) => ({
   size: theme.iconSize.md,
@@ -96,7 +97,9 @@ export function DesktopNotificationsSection() {
         />
         <View style={[settingsStyles.row, settingsStyles.rowBorder]}>
           <View style={settingsStyles.rowContent}>
-            <Text style={settingsStyles.rowTitle}>{t("settings.notifications.playSound")}</Text>
+            <SettingsRevealText style={settingsStyles.rowTitle}>
+              {t("settings.notifications.playSound")}
+            </SettingsRevealText>
             <Text style={settingsStyles.rowHint}>{t("settings.notifications.playSoundHint")}</Text>
           </View>
           <Switch
@@ -109,7 +112,9 @@ export function DesktopNotificationsSection() {
         </View>
         <View style={[settingsStyles.row, settingsStyles.rowBorder]}>
           <View style={settingsStyles.rowContent}>
-            <Text style={settingsStyles.rowTitle}>{t("settings.notifications.test")}</Text>
+            <SettingsRevealText style={settingsStyles.rowTitle}>
+              {t("settings.notifications.test")}
+            </SettingsRevealText>
             <Text style={settingsStyles.rowHint}>
               {notificationsGranted
                 ? t("settings.notifications.testHint")

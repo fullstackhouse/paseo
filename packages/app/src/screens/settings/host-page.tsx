@@ -71,6 +71,7 @@ import { RestartRecoveryCard } from "./restart-recovery-card";
 import { IdleRuntimeCleanupCard } from "./idle-runtime-cleanup-card";
 import { SnoozedPermissionCard } from "./snoozed-permission-card";
 import { restartDaemonFromSettings, updateDaemonFromSettings } from "./daemon-lifecycle";
+import { SettingsRevealText } from "@/components/settings/reveal-text";
 
 const ThemedRestart = withUnistyles(RotateCw);
 const ThemedUpdate = withUnistyles(ArrowUpToLine);
@@ -547,9 +548,9 @@ function ConnectionRow({
   return (
     <View style={rowStyle}>
       <View style={settingsStyles.rowContent}>
-        <Text style={settingsStyles.rowTitle} numberOfLines={1}>
+        <SettingsRevealText style={settingsStyles.rowTitle} numberOfLines={1}>
           {title}
-        </Text>
+        </SettingsRevealText>
       </View>
       <Text style={latencyTextStyle}>{latencyText}</Text>
       <Button variant="ghost" textStyle={destructiveTextStyle} onPress={handlePressRemove}>
@@ -665,7 +666,9 @@ function RestartDaemonCard({ host }: { host: HostProfile }) {
     <View style={settingsStyles.card} testID="host-page-restart-card">
       <View style={settingsStyles.row}>
         <View style={settingsStyles.rowContent}>
-          <Text style={settingsStyles.rowTitle}>{t("settings.host.daemon.restart.title")}</Text>
+          <SettingsRevealText style={settingsStyles.rowTitle}>
+            {t("settings.host.daemon.restart.title")}
+          </SettingsRevealText>
           <Text style={settingsStyles.rowHint}>{t("settings.host.daemon.restart.hint")}</Text>
         </View>
         <Button
@@ -863,7 +866,9 @@ function UpdateDaemonCard({ host }: { host: HostProfile }) {
     <View style={settingsStyles.card} testID="host-page-update-card">
       <View style={settingsStyles.row}>
         <View style={settingsStyles.rowContent}>
-          <Text style={settingsStyles.rowTitle}>{t("settings.host.daemon.update.title")}</Text>
+          <SettingsRevealText style={settingsStyles.rowTitle}>
+            {t("settings.host.daemon.update.title")}
+          </SettingsRevealText>
           <Text style={settingsStyles.rowHint}>
             {desktopManaged
               ? t("settings.host.daemon.update.desktopManagedHint")
@@ -928,7 +933,9 @@ function AutoArchiveMergedWorkspacesCard({ serverId }: { serverId: string }) {
     <View style={settingsStyles.card} testID="host-page-auto-archive-merged-workspaces-card">
       <View style={settingsStyles.row}>
         <View style={settingsStyles.rowContent}>
-          <Text style={settingsStyles.rowTitle}>Archive merged PR workspaces</Text>
+          <SettingsRevealText style={settingsStyles.rowTitle}>
+            Archive merged PR workspaces
+          </SettingsRevealText>
           <Text style={settingsStyles.rowHint}>
             Automatically archive clean Paseo workspaces after their pull request is merged
           </Text>
@@ -967,7 +974,9 @@ function EnableTerminalAgentHooksCard({ serverId }: { serverId: string }) {
     <View style={settingsStyles.card} testID="host-page-terminal-agent-hooks-card">
       <View style={settingsStyles.row}>
         <View style={settingsStyles.rowContent}>
-          <Text style={settingsStyles.rowTitle}>Enable terminal agent hooks</Text>
+          <SettingsRevealText style={settingsStyles.rowTitle}>
+            Enable terminal agent hooks
+          </SettingsRevealText>
           <Text style={settingsStyles.rowHint}>
             Get notifications and status from terminal agents. This installs hooks in your agent
             config files.
@@ -1038,9 +1047,9 @@ function AppendSystemPromptCard({ serverId }: { serverId: string }) {
       <View style={settingsStyles.card} testID="host-page-append-system-prompt-card">
         <View style={settingsStyles.row}>
           <View style={settingsStyles.rowContent}>
-            <Text style={settingsStyles.rowTitle}>
+            <SettingsRevealText style={settingsStyles.rowTitle}>
               {t("settings.host.orchestration.systemPrompt.title")}
-            </Text>
+            </SettingsRevealText>
             <Text style={settingsStyles.rowHint}>
               {t("settings.host.orchestration.systemPrompt.hint")}
             </Text>
@@ -1113,7 +1122,9 @@ function PairDeviceRow({ serverId }: { serverId: string }) {
         testID="host-page-pair-device-row"
       >
         <View style={settingsStyles.rowContent}>
-          <Text style={settingsStyles.rowTitle}>{t("settings.host.pairDevices.rowTitle")}</Text>
+          <SettingsRevealText style={settingsStyles.rowTitle}>
+            {t("settings.host.pairDevices.rowTitle")}
+          </SettingsRevealText>
           <Text style={settingsStyles.rowHint}>{t("settings.host.pairDevices.rowHint")}</Text>
         </View>
         <ChevronRight size={theme.iconSize.sm} color={theme.colors.foregroundMuted} />
@@ -1248,11 +1259,11 @@ function RemoveHostSection({
       <View style={settingsStyles.card}>
         <View style={settingsStyles.row}>
           <View style={settingsStyles.rowContent}>
-            <Text style={settingsStyles.rowTitle}>
+            <SettingsRevealText style={settingsStyles.rowTitle}>
               {isLocalDaemon
                 ? t("settings.host.daemon.remove.localTitle")
                 : t("settings.host.daemon.remove.title")}
-            </Text>
+            </SettingsRevealText>
             <Text style={settingsStyles.rowHint}>
               {stopsOwnedDaemon
                 ? t("settings.host.daemon.remove.localHint")
@@ -1379,9 +1390,9 @@ function TerminalProfileRow({
         )}
       </View>
       <View style={settingsStyles.rowContent}>
-        <Text style={settingsStyles.rowTitle} numberOfLines={1}>
+        <SettingsRevealText style={settingsStyles.rowTitle} numberOfLines={1}>
           {profile.name}
-        </Text>
+        </SettingsRevealText>
         <Text style={settingsStyles.rowHint} numberOfLines={1}>
           {commandText}
         </Text>

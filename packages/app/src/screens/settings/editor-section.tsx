@@ -5,6 +5,7 @@ import { Switch } from "@/components/ui/switch";
 import { useAppSettings } from "@/hooks/use-settings";
 import { settingsStyles } from "@/styles/settings";
 import { SettingsSection } from "@/components/settings/headings/settings-section";
+import { SettingsRevealText } from "@/components/settings/reveal-text";
 
 export function EditorSection() {
   const { t } = useTranslation();
@@ -18,7 +19,9 @@ export function EditorSection() {
       <View style={settingsStyles.card}>
         <View style={settingsStyles.row}>
           <View style={settingsStyles.rowContent}>
-            <Text style={settingsStyles.rowTitle}>{t("settings.editor.vimKeybindings")}</Text>
+            <SettingsRevealText style={settingsStyles.rowTitle}>
+              {t("settings.editor.vimKeybindings")}
+            </SettingsRevealText>
             <Text style={settingsStyles.rowHint}>{t("settings.editor.vimHint")}</Text>
           </View>
           <Switch

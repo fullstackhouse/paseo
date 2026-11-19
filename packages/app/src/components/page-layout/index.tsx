@@ -1,14 +1,23 @@
-import { useMemo, type ReactNode } from "react";
+import { useCallback, useMemo, useRef, type ReactNode } from "react";
 import { Platform, ScrollView, Text, View } from "react-native";
-import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
+import {
+  KeyboardAwareScrollView,
+  type KeyboardAwareScrollViewRef,
+} from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StyleSheet } from "react-native-unistyles";
 import { BackHeader } from "@/components/headers/back-header";
 import { MenuHeader } from "@/components/headers/menu-header";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { SPACING } from "@/styles/theme";
+import { PageScrollContext } from "./page-scroll";
+
+export { usePageScroll } from "./page-scroll";
 
 const PageScrollView = Platform.OS === "android" ? KeyboardAwareScrollView : ScrollView;
+
+// How far above a revealed element the page stops, so its section context stays visible.
+const REVEAL_TOP_OFFSET = SPACING[16];
 
 interface PageLayoutProps {
   title?: string;
@@ -38,6 +47,21 @@ export function PageLayout({
   const insets = useSafeAreaInsets();
   const scrollContentStyle = useMemo(() => ({ paddingBottom: insets.bottom }), [insets.bottom]);
   const showTitle = !isCompact && title !== undefined;
+  // A plain ScrollView off Android: call only ScrollView methods through this ref.
+  const scrollRef = useRef<KeyboardAwareScrollViewRef>(null);
+  const contentRef = useRef<View>(null);
+  const scrollToNode = useCallback((node: Pick<View, "measureLayout">) => {
+    const content = contentRef.current;
+    if (!content) return;
+    node.measureLayout(
+      content,
+      (_x, y) => {
+        scrollRef.current?.scrollTo({ y: Math.max(0, y - REVEAL_TOP_OFFSET), animated: true });
+      },
+      () => {},
+    );
+  }, []);
+  const pageScroll = useMemo(() => ({ scrollToNode }), [scrollToNode]);
 
   return (
     <View style={styles.container}>
@@ -49,11 +73,12 @@ export function PageLayout({
       <PageScrollView
         // Leave room for field borders and padding around the focused native input.
         {...(Platform.OS === "android" ? { bottomOffset: SPACING[4] } : {})}
+        ref={scrollRef}
         style={styles.scroll}
         contentContainerStyle={scrollContentStyle}
         testID={testID}
       >
-        <View style={styles.content}>
+        <View ref={contentRef} style={styles.content}>
           {showTitle ? (
             <View style={styles.titleRow} testID={titleTestID}>
               <Text style={styles.title} testID="page-title">
@@ -62,7 +87,7 @@ export function PageLayout({
               {actions}
             </View>
           ) : null}
-          {children}
+          <PageScrollContext.Provider value={pageScroll}>{children}</PageScrollContext.Provider>
         </View>
       </PageScrollView>
     </View>

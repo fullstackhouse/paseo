@@ -140,6 +140,7 @@ import {
 } from "@/utils/host-routes";
 import {
   selectSettingsHost,
+  requestSettingsReveal,
   setSettingsSearchQuery,
   useSettingsHostSelection,
   useSettingsSearchQuery,
@@ -149,7 +150,6 @@ import {
   buildSettingsSearchDocs,
   searchSettings,
   type SettingsSearchDoc,
-  type SettingsSearchTarget,
 } from "@/screens/settings/search/settings-search";
 import { SETTINGS_SEARCH_ENTRIES } from "@/screens/settings/search/settings-search-index";
 import { returnFromSettings, type SettingsView } from "@/navigation/settings-navigation";
@@ -379,7 +379,9 @@ function GeneralSection({ settings, handleLanguageChange }: GeneralSectionProps)
       <View style={settingsStyles.card}>
         <View style={settingsStyles.row}>
           <View style={settingsStyles.rowContent}>
-            <SettingsRevealText style={settingsStyles.rowTitle}>{t("settings.general.language.label")}</SettingsRevealText>
+            <SettingsRevealText style={settingsStyles.rowTitle}>
+              {t("settings.general.language.label")}
+            </SettingsRevealText>
             <Text style={settingsStyles.rowHint}>{t("settings.general.language.description")}</Text>
           </View>
           <DropdownMenu>
@@ -411,7 +413,9 @@ function ShowSetupAgainRow() {
   return (
     <View style={[settingsStyles.row, settingsStyles.rowBorder]}>
       <View style={settingsStyles.rowContent}>
-        <SettingsRevealText style={settingsStyles.rowTitle}>{t("settings.general.setup.label")}</SettingsRevealText>
+        <SettingsRevealText style={settingsStyles.rowTitle}>
+          {t("settings.general.setup.label")}
+        </SettingsRevealText>
         <Text style={settingsStyles.rowHint}>{t("settings.general.setup.description")}</Text>
       </View>
       <Button variant="secondary" onPress={openOnboarding ?? undefined} disabled={!openOnboarding}>
@@ -444,7 +448,9 @@ function DiagnosticsSection({
       <View style={settingsStyles.card}>
         <View style={settingsStyles.row} testID="app-diagnostic-row">
           <View style={settingsStyles.rowContent}>
-            <SettingsRevealText style={settingsStyles.rowTitle}>{t("settings.diagnostics.app.rowTitle")}</SettingsRevealText>
+            <SettingsRevealText style={settingsStyles.rowTitle}>
+              {t("settings.diagnostics.app.rowTitle")}
+            </SettingsRevealText>
             <Text style={settingsStyles.rowHint}>{t("settings.diagnostics.app.rowHint")}</Text>
           </View>
           <Button variant="secondary" onPress={openAppDiagnostic}>
@@ -453,7 +459,9 @@ function DiagnosticsSection({
         </View>
         <View style={settingsStyles.row}>
           <View style={settingsStyles.rowContent}>
-            <SettingsRevealText style={settingsStyles.rowTitle}>{t("settings.diagnostics.testAudio")}</SettingsRevealText>
+            <SettingsRevealText style={settingsStyles.rowTitle}>
+              {t("settings.diagnostics.testAudio")}
+            </SettingsRevealText>
             {playbackTestResult ? (
               <Text style={settingsStyles.rowHint}>{playbackTestResult}</Text>
             ) : null}
@@ -487,7 +495,9 @@ function AboutSection({ appVersion, appVersionText, isDesktopApp }: AboutSection
         <View style={settingsStyles.card}>
           <View style={settingsStyles.row}>
             <View style={settingsStyles.rowContent}>
-              <SettingsRevealText style={settingsStyles.rowTitle}>{t("settings.about.appVersion")}</SettingsRevealText>
+              <SettingsRevealText style={settingsStyles.rowTitle}>
+                {t("settings.about.appVersion")}
+              </SettingsRevealText>
               <Text style={settingsStyles.rowHint}>{t("settings.about.thisDevice")}</Text>
             </View>
             <Text style={styles.aboutValue}>{appVersionText}</Text>
@@ -518,7 +528,9 @@ function WhatsNewRow() {
       {({ hovered }: PressableStateCallbackType & { hovered?: boolean }) => (
         <>
           <View style={settingsStyles.rowContent}>
-            <SettingsRevealText style={settingsStyles.rowTitle}>{t("changelog.title")}</SettingsRevealText>
+            <SettingsRevealText style={settingsStyles.rowTitle}>
+              {t("changelog.title")}
+            </SettingsRevealText>
             <Text style={settingsStyles.rowHint}>{t("settings.about.whatsNewHint")}</Text>
           </View>
           <ChevronRight
@@ -721,7 +733,9 @@ function DesktopAppUpdateRow() {
       </View>
       <View style={[settingsStyles.row, settingsStyles.rowBorder]}>
         <View style={settingsStyles.rowContent}>
-          <SettingsRevealText style={settingsStyles.rowTitle}>{t("settings.about.updates.label")}</SettingsRevealText>
+          <SettingsRevealText style={settingsStyles.rowTitle}>
+            {t("settings.about.updates.label")}
+          </SettingsRevealText>
           <Text style={settingsStyles.rowHint}>{statusText}</Text>
           {readyUpdateVersion ? (
             <Text style={settingsStyles.rowHint}>
@@ -1009,9 +1023,9 @@ function SettingsSearchResultRow({
   onSelect,
 }: {
   doc: SettingsSearchDoc;
-  onSelect: (target: SettingsSearchTarget) => void;
+  onSelect: (doc: SettingsSearchDoc) => void;
 }) {
-  const handlePress = useCallback(() => onSelect(doc.target), [doc.target, onSelect]);
+  const handlePress = useCallback(() => onSelect(doc), [doc, onSelect]);
   return (
     <Pressable
       accessibilityRole="button"
@@ -1037,7 +1051,7 @@ function SettingsSearchResults({
   onSelect,
 }: {
   results: SettingsSearchDoc[];
-  onSelect: (target: SettingsSearchTarget) => void;
+  onSelect: (doc: SettingsSearchDoc) => void;
 }) {
   const { t } = useTranslation();
   if (results.length === 0) {
@@ -1097,9 +1111,10 @@ function SettingsSidebar({
   );
   const isSearching = searchQuery.trim().length > 0;
   const handleSelectSearchResult = useCallback(
-    (target: SettingsSearchTarget) => {
-      if (target.kind === "section") onSelectSection(target.section);
-      else onSelectHostSection(target.section);
+    (doc: SettingsSearchDoc) => {
+      if (doc.revealsRow) requestSettingsReveal(doc.title);
+      if (doc.target.kind === "section") onSelectSection(doc.target.section);
+      else onSelectHostSection(doc.target.section);
     },
     [onSelectHostSection, onSelectSection],
   );
