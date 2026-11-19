@@ -121,9 +121,12 @@ export interface AppSettings {
   pullRequestOpenLocation: PullRequestOpenLocation;
   /** FSH, desktop: when entering a workspace shows Explorer by itself. */
   explorerOnWorkspaceEnter: ExplorerOnWorkspaceEnter;
+  /** FSH, desktop: the tab Explorer shows when entering a workspace opens it. */
+  explorerOnWorkspaceEnterTab: ExplorerOnWorkspaceEnterTab;
 }
 
 export type ExplorerOnWorkspaceEnter = "never" | "needed" | "always";
+export type ExplorerOnWorkspaceEnterTab = "overview" | "needed";
 
 export type AppSettingsUpdate =
   | Partial<AppSettings>
@@ -184,6 +187,7 @@ export const DEFAULT_CLIENT_SETTINGS: AppSettings = {
   openInSidePane: DEFAULT_OPEN_IN_SIDE_PANE_PREFERENCES,
   pullRequestOpenLocation: "explorer",
   explorerOnWorkspaceEnter: "needed",
+  explorerOnWorkspaceEnterTab: "overview",
 };
 
 export const DEFAULT_APP_SETTINGS: Settings = {
@@ -315,6 +319,7 @@ const StoredAppSettingsSchema = z
       }),
     pullRequestOpenLocation: z.enum(["main", "side", "explorer"]).optional(),
     explorerOnWorkspaceEnter: z.enum(["never", "needed", "always"]).catch("needed"),
+    explorerOnWorkspaceEnterTab: z.enum(["overview", "needed"]).catch("overview"),
     // COMPAT(explorerSidebarRouting): replaced by source-specific side-pane preferences in v0.6.
     openSupportingTabsInSidePanel: z.boolean().optional().catch(undefined),
     // COMPAT(rendererDesktopSettings): these fields used to share this renderer-owned key.
