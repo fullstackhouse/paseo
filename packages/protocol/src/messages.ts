@@ -4575,7 +4575,7 @@ export const WorkspaceProjectDescriptorPayloadSchema = z.object({
   projectIconRevision: z.string().optional(),
   projectRootPath: z.string(),
   projectKind: z.enum(["git", "non_git", "directory"]),
-  // COMPAT(projectLastAgentSetup): FSH-only, added in v0.15.4; older hosts omit it. Remove optional after 2027-05-19.
+  // COMPAT(projectLastAgentSetup): FSH-only, added after v0.15.4; older hosts omit it. Remove gate after 2027-05-19.
   projectLastAgentSetup: ProjectLastAgentSetupSchema.optional(),
   // COMPAT(directorySync): sequence of this latest directory projection.
   syncSeq: z.number().int().positive().optional(),

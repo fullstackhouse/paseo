@@ -215,7 +215,7 @@ export function normalizeProjectDescriptor(
     projectIconRevision: payload.projectIconRevision,
     projectRootPath: payload.projectRootPath,
     projectKind: payload.projectKind,
-    // COMPAT(projectLastAgentSetup): added in v0.15.4, older hosts omit it; remove after 2027-05-19.
+    // COMPAT(projectLastAgentSetup): FSH-only, added after v0.15.4; older hosts omit it. Remove gate after 2027-05-19.
     projectLastAgentSetup: payload.projectLastAgentSetup ?? null,
   };
 }
