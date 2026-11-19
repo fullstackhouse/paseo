@@ -131,7 +131,7 @@ release builds in a short-lived release workspace from `origin/main` or a releas
 
 - **Use shared Markdown everywhere in the app.** App surfaces use `MarkdownRenderer`; plugins use `Markdown` from `@getpaseo/plugin/client/ui`. Keep parsing and rendering in the host; use `afterBlock` for review annotations. See [Markdown rendering](docs/markdown-renderer.md).
 
-- **Run plugin changes in Jacek's local Paseo for live testing.** Follow [Test a plugin change](docs/plugins.md#test-a-plugin-change) and leave the changed plugin running.
+- **Test plugin changes in a separate Paseo instance.** Follow [paseo-run](.agents/skills/paseo-run/SKILL.md); install and reload only in its isolated home. Use the main instance only when explicitly requested.
 - **Desktop asks belong beside the conversation.** Use a tab in the existing [Explorer sidebar](docs/explorer-sidebar.md#explorer-sidebar), not an additional split pane; the badge shows or closes its tab. Plugin layout changes are opt-in: preserve anchored popovers by default, and opt Asks into Explorer. Mobile keeps bottom sheets.
 
 - **NEVER restart the main Paseo daemon on port 6767 without permission** — it manages all running agents. If you're an agent, restarting it kills your own process.
