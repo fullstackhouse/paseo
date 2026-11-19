@@ -106,9 +106,10 @@ export function hasRunningAgent(
 }
 
 /**
- * The tab an attention item opens Explorer on. Overview only when its Your move lists the item
- * as a row (`deriveYourMove`): PR readiness and merges never get one, and failing checks hide
- * while an agent runs, so those open the PR tab.
+ * The tab an attention item opens Explorer on. Overview when its Your move lists the item
+ * (`deriveYourMove`): agent and plugin items always, PR items only while no agent runs. A PR that is
+ * ready or merged shows there as the git row (Merge, Archive), which a pending commit or push
+ * displaces; that case still opens Overview.
  */
 export function pickAttentionTab(input: {
   tabSetting: ExplorerOnWorkspaceEnterTab;
@@ -123,9 +124,8 @@ export function pickAttentionTab(input: {
     case "plugin":
       return "overview";
     case "pr-checks-failed":
-      return input.agentRunning ? "item" : "overview";
     case "pr-ready":
     case "pr-merged":
-      return "item";
+      return input.agentRunning ? "item" : "overview";
   }
 }

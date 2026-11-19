@@ -127,9 +127,9 @@ workspace opens the Explorer sidebar** (Never / When something needs you, the de
 `packages/app/src/workspace-attention/` owns it. Attention items are pending permissions, plugin
 workspace summary items with `needsYou`, failed agents, and the PR's failed checks, readiness to
 merge, or merge. Each item has a key, and the first unseen one decides. **Explorer sidebar opens on** picks the tab.
-Under **Overview**, the default, Explorer opens on Overview when its Your move lists the item. PR readiness and merges
-never get a row there, and failing checks hide while an agent runs, so those open the PR tab instead, as does any item
-in a workspace whose Overview tab was closed (`pickAttentionTab`). Under **The tab that needs you**, the item picks it:
+Under **Overview**, the default, Explorer opens on Overview when its Your move lists the item. While an agent runs,
+Your move hides PR items, so those open the PR tab instead, as does any item in a workspace whose Overview tab was
+closed (`pickAttentionTab`). Under **The tab that needs you**, the item picks it:
 the plugin's panel, the PR tab, or the current tab for agent items, whose tab lives in the main pane. The decision runs once per
 entry, never while you stay. Hiding Explorer with the toggle records the keys present then
 (`explorerAttentionByWorkspace`), so it stays hidden until a new key appears; under Always it otherwise

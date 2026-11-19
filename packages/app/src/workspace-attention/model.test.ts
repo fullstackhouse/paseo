@@ -202,13 +202,15 @@ describe("pickAttentionTab", () => {
     expect(pick("failed")).toBe("overview");
     expect(pick("plugin")).toBe("overview");
     expect(pick("pr-checks-failed")).toBe("overview");
+    expect(pick("pr-ready")).toBe("overview");
+    expect(pick("pr-merged")).toBe("overview");
     expect(pick("plugin", { agentRunning: true })).toBe("overview");
   });
 
   it("opens the item's tab when Overview wouldn't list it", () => {
     expect(pick("pr-checks-failed", { agentRunning: true })).toBe("item");
-    expect(pick("pr-ready")).toBe("item");
-    expect(pick("pr-merged")).toBe("item");
+    expect(pick("pr-ready", { agentRunning: true })).toBe("item");
+    expect(pick("pr-merged", { agentRunning: true })).toBe("item");
   });
 
   it("opens the item's tab once Overview was closed", () => {
