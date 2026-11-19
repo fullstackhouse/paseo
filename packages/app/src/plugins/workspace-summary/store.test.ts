@@ -72,13 +72,15 @@ describe("WorkspaceSummaryStore", () => {
       id: "status",
       workspaceId: "w",
       title: "Status",
-      status: { state: "blocked", summary: " Needs approval ", now: "", updatedAt: 5 },
+      status: { state: "blocked", summary: " Needs approval ", now: "", goal: " ", updatedAt: 5 },
     });
     expect(store.forWorkspace("s", "w")[0]?.status).toEqual({
       state: "blocked",
       summary: "Needs approval",
       updatedAt: 5,
     });
+    item.update({ status: { state: "working", goal: " Ship it ", summary: "x", updatedAt: 6 } });
+    expect(store.forWorkspace("s", "w")[0]?.status?.goal).toBe("Ship it");
     item.update({ status: { state: "bogus", summary: "x", updatedAt: 1 } as never });
     expect(store.forWorkspace("s", "w")[0]?.status).toBeNull();
     item.update({ status: { state: "done", summary: "", updatedAt: 1 } });

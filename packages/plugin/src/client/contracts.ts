@@ -214,6 +214,8 @@ export interface PluginWorkspaceStatus {
   state: "working" | "waiting_on_you" | "blocked" | "done";
   /** True once an agent turn started after the status was written: the human already replied. */
   answered?: boolean;
+  /** The whole job and its overall progress, shown above the Status card. Survives turn-level updates. */
+  goal?: string;
   summary: string;
   /** What the agent is doing right now. */
   now?: string;

@@ -2322,6 +2322,7 @@ export const en = {
         idle: "idle",
       },
       status: "Status",
+      goal: "Goal",
       statusFallbackWorking: "The agent is working · no status reported",
       statusFallbackIdle: "No status reported",
       state: {

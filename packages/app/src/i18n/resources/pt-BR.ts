@@ -2330,6 +2330,7 @@ export const ptBR: TranslationResources = {
         idle: "ocioso",
       },
       status: "Status",
+      goal: "Objetivo",
       statusFallbackWorking: "O agente está trabalhando · nenhum status informado",
       statusFallbackIdle: "Nenhum status informado",
       state: {

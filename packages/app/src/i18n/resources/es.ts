@@ -2345,6 +2345,7 @@ export const es: TranslationResources = {
         idle: "inactivo",
       },
       status: "Estado",
+      goal: "Objetivo",
       statusFallbackWorking: "El agente está trabajando · sin estado informado",
       statusFallbackIdle: "Sin estado informado",
       state: {

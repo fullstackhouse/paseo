@@ -2332,6 +2332,7 @@ export const ru: TranslationResources = {
         idle: "простаивает",
       },
       status: "Статус",
+      goal: "Цель",
       statusFallbackWorking: "Агент работает · статус не сообщён",
       statusFallbackIdle: "Статус не сообщён",
       state: {
