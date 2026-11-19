@@ -65,6 +65,12 @@ describe("searchSettings", () => {
     });
   });
 
+  it("marks setting rows as revealable and whole sections as not", () => {
+    const docs = buildDocs();
+    expect(searchSettings(docs, "code font")[0]?.revealsRow).toBe(true);
+    expect(searchSettings(docs, "appear")[0]?.revealsRow).toBe(false);
+  });
+
   it("finds section names", () => {
     expect(searchSettings(buildDocs(), "appear")[0]).toMatchObject({
       title: "Appearance",
