@@ -2,6 +2,10 @@ import { promises as fs } from "node:fs";
 
 import type { Logger } from "pino";
 import { z } from "zod";
+import {
+  ProjectLastAgentSetupSchema,
+  type ProjectLastAgentSetup,
+} from "@getpaseo/protocol/messages";
 
 import { writeJsonFileAtomic } from "./atomic-file.js";
 import { areEquivalentPaths } from "../utils/path.js";
@@ -41,6 +45,11 @@ const PersistedProjectRecordSchema = z.object({
   customIconRevision: z
     .string()
     .nullable()
+    .optional()
+    .transform((value) => value ?? null),
+  // The setup of the project's most recently prompted top-level agent. Kept here so it survives
+  // archiving that agent; null until one is prompted.
+  lastAgentSetup: ProjectLastAgentSetupSchema.nullable()
     .optional()
     .transform((value) => value ?? null),
   createdAt: z.string(),
@@ -486,6 +495,26 @@ export class FileBackedProjectRegistry
     if (!project) return null;
     await this.notifyMutation({ kind: "upsert", projectId, project });
     return project;
+  }
+
+  /**
+   * Saves the setup of the project's latest prompted agent when it is newer than the stored one.
+   * Returns the active project it was saved on, or null. Skips mutation listeners: the setup is
+   * part of no workspace, and each listener re-describes every workspace of the project.
+   */
+  async recordLastAgentSetup(
+    projectId: string,
+    setup: ProjectLastAgentSetup,
+  ): Promise<PersistedProjectRecord | null> {
+    let recorded = false;
+    const project = await super.update(projectId, (current) => {
+      const stored = current.lastAgentSetup;
+      if (current.archivedAt) return current;
+      if (stored && Date.parse(stored.promptedAt) >= Date.parse(setup.promptedAt)) return current;
+      recorded = true;
+      return { ...current, lastAgentSetup: setup };
+    });
+    return recorded ? project : null;
   }
 
   async archive(projectId: string, archivedAt: string): Promise<void> {
