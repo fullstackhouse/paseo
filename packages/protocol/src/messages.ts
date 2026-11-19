@@ -4545,6 +4545,18 @@ export const FetchRecentProviderSessionsResponseMessageSchema = z.object({
   }),
 });
 
+// The setup of a project's most recently prompted top-level agent. The daemon keeps it on the
+// project, so it outlives the agent and its workspace being archived.
+export const ProjectLastAgentSetupSchema = z.object({
+  provider: z.string(),
+  model: z.string().nullable(),
+  modeId: z.string().nullable(),
+  thinkingOptionId: z.string().nullable(),
+  // Agent feature values by feature id: toggles are booleans, selects strings.
+  featureValues: z.record(z.string(), z.union([z.boolean(), z.string(), z.null()])),
+  promptedAt: z.string(),
+});
+
 // COMPAT(workspaceProjects): added in v0.1.97, drop the optional gate when floor >= v0.1.97.
 // A project parent that has zero active workspaces. The sidebar renders the
 // project row with a new-workspace child so projects persist after their last
@@ -4563,6 +4575,8 @@ export const WorkspaceProjectDescriptorPayloadSchema = z.object({
   projectIconRevision: z.string().optional(),
   projectRootPath: z.string(),
   projectKind: z.enum(["git", "non_git", "directory"]),
+  // COMPAT(projectLastAgentSetup): FSH-only, added after v0.15.4; older hosts omit it. Remove gate after 2027-05-19.
+  projectLastAgentSetup: ProjectLastAgentSetupSchema.optional(),
   // COMPAT(directorySync): sequence of this latest directory projection.
   syncSeq: z.number().int().positive().optional(),
 });
@@ -7615,6 +7629,7 @@ export type ProjectCheckoutLitePayload = z.infer<typeof ProjectCheckoutLitePaylo
 export type ProjectPlacementPayload = z.infer<typeof ProjectPlacementPayloadSchema>;
 export type WorkspaceStateBucket = z.infer<typeof WorkspaceStateBucketSchema>;
 export type WorkspaceDescriptorPayload = z.infer<typeof WorkspaceDescriptorPayloadSchema>;
+export type ProjectLastAgentSetup = z.infer<typeof ProjectLastAgentSetupSchema>;
 export type WorkspaceProjectDescriptorPayload = z.infer<
   typeof WorkspaceProjectDescriptorPayloadSchema
 >;

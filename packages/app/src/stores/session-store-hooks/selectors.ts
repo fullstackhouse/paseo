@@ -5,6 +5,7 @@ import {
   type WorkspaceStructure,
   type WorkspaceStructureProject,
 } from "@/projects/workspace-structure";
+import type { ProjectLastAgentSetup } from "@getpaseo/protocol/messages";
 import type { DesktopBadgeWorkspaceStatus } from "@/utils/desktop-badge-state";
 import { resolveWorkspaceMapKeyByIdentity } from "@/utils/workspace-identity";
 import type { Agent, ProjectDescriptor, WorkspaceDescriptor } from "../session-store";
@@ -321,7 +322,10 @@ export interface RecentProjectActivity {
   projectId: string;
   /** Epoch ms of the project's latest prompt, or its newest workspace when nothing was prompted. */
   lastUsedAt: number;
-  /** The setup of the project's most recently prompted top-level agent; null without one. */
+  /**
+   * The setup of the project's most recently prompted top-level agent; null without one. Hosts
+   * that save it on the project keep it after that agent is archived.
+   */
   agentSetup: RecentAgentSetup | null;
 }
 
@@ -345,45 +349,91 @@ function agentSetup(agent: Agent): RecentAgentSetup {
   };
 }
 
+function savedAgentSetup(setup: ProjectLastAgentSetup): RecentAgentSetup {
+  return {
+    provider: setup.provider,
+    modelId: setup.model ?? "",
+    modeId: setup.modeId ?? "",
+    thinkingOptionId: setup.thinkingOptionId ?? "",
+    featureValues: { ...setup.featureValues },
+  };
+}
+
+type RecentProjectEntry = RecentProjectActivity & { agentTime: number };
+type RecentProjectEntries = Map<string, RecentProjectEntry>;
+
+function touchRecentProject(
+  entries: RecentProjectEntries,
+  projectId: string,
+  time: number,
+): RecentProjectEntry {
+  const entry = entries.get(projectId);
+  if (entry) {
+    if (time > entry.lastUsedAt) entry.lastUsedAt = time;
+    return entry;
+  }
+  const created = { projectId, lastUsedAt: time, agentSetup: null, agentTime: -1 };
+  entries.set(projectId, created);
+  return created;
+}
+
+// The host's saved setup outlives the agent that ran it, so a project whose recent agents are all
+// archived still offers what you last used, not an older agent that is still open.
+function applySavedAgentSetups(
+  entries: RecentProjectEntries,
+  projects: Iterable<ProjectDescriptor>,
+): void {
+  for (const project of projects) {
+    const saved = project.projectLastAgentSetup;
+    const time = saved ? Date.parse(saved.promptedAt) : Number.NaN;
+    if (!saved || !Number.isFinite(time)) continue;
+    const entry = touchRecentProject(entries, project.projectId, time);
+    if (time > entry.agentTime) {
+      entry.agentTime = time;
+      entry.agentSetup = savedAgentSetup(saved);
+    }
+  }
+}
+
+function applyOpenAgents(
+  entries: RecentProjectEntries,
+  agents: Iterable<Agent>,
+  projectIdByWorkspaceId: Map<string, string>,
+): void {
+  for (const agent of agents) {
+    if (agent.parentAgentId) continue;
+    const projectId = agent.workspaceId ? projectIdByWorkspaceId.get(agent.workspaceId) : undefined;
+    const entry = projectId ? entries.get(projectId) : undefined;
+    if (!entry) continue;
+    const time = activityTime(agent);
+    // On a tie the open agent is the one the host saved; it also has any later setup change.
+    if (time >= entry.agentTime) {
+      entry.agentTime = time;
+      entry.agentSetup = agentSetup(agent);
+    }
+    if (time > entry.lastUsedAt) entry.lastUsedAt = time;
+  }
+}
+
 /** The host's projects, most recently used first, each with its latest agent's setup. */
 export function selectRecentProjects(
   state: SessionsSnapshot,
   serverId: string | null,
 ): RecentProjectActivity[] {
   const session = serverId ? state.sessions[serverId] : undefined;
-  if (!session || session.workspaces.size === 0) {
+  const projects = session?.projects ?? new Map<string, ProjectDescriptor>();
+  if (!session || (session.workspaces.size === 0 && projects.size === 0)) {
     return EMPTY_RECENT_PROJECTS;
   }
-  const byProjectId = new Map<string, RecentProjectActivity & { agentTime: number }>();
+  const entries: RecentProjectEntries = new Map();
   const projectIdByWorkspaceId = new Map<string, string>();
   for (const workspace of session.workspaces.values()) {
     projectIdByWorkspaceId.set(workspace.id, workspace.projectId);
-    const time = activityTime(workspace);
-    const entry = byProjectId.get(workspace.projectId);
-    if (!entry) {
-      byProjectId.set(workspace.projectId, {
-        projectId: workspace.projectId,
-        lastUsedAt: time,
-        agentSetup: null,
-        agentTime: -1,
-      });
-    } else if (time > entry.lastUsedAt) {
-      entry.lastUsedAt = time;
-    }
+    touchRecentProject(entries, workspace.projectId, activityTime(workspace));
   }
-  for (const agent of session.agents?.values() ?? []) {
-    if (agent.parentAgentId) continue;
-    const projectId = agent.workspaceId ? projectIdByWorkspaceId.get(agent.workspaceId) : undefined;
-    const entry = projectId ? byProjectId.get(projectId) : undefined;
-    if (!entry) continue;
-    const time = activityTime(agent);
-    if (time > entry.agentTime) {
-      entry.agentTime = time;
-      entry.agentSetup = agentSetup(agent);
-    }
-    if (time > entry.lastUsedAt) entry.lastUsedAt = time;
-  }
-  return Array.from(byProjectId.values())
+  applySavedAgentSetups(entries, projects.values());
+  applyOpenAgents(entries, session.agents?.values() ?? [], projectIdByWorkspaceId);
+  return Array.from(entries.values())
     .sort(
       (left, right) =>
         right.lastUsedAt - left.lastUsedAt || left.projectId.localeCompare(right.projectId),
