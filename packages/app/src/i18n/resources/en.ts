@@ -2606,6 +2606,13 @@ export const en = {
               always: "Always",
             },
           },
+          explorerOnWorkspaceEnterTab: {
+            label: "Explorer sidebar opens on",
+            options: {
+              overview: "Overview",
+              needed: "The tab that needs you",
+            },
+          },
         },
       },
     },

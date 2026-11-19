@@ -3,6 +3,8 @@ import type { WorkspaceSummaryItem } from "@/plugins/workspace-summary/store";
 import {
   decideExplorerAutoShow,
   deriveAttentionItems,
+  hasRunningAgent,
+  pickAttentionTab,
   type AttentionInput,
   type AttentionItem,
 } from "./model";
@@ -174,5 +176,64 @@ describe("decideExplorerAutoShow", () => {
     expect(decideExplorerAutoShow({ setting: "needed", items: [], record: null })).toEqual({
       kind: "none",
     });
+  });
+});
+
+describe("pickAttentionTab", () => {
+  const item = (kind: AttentionItem["kind"]): AttentionItem => {
+    if (kind === "permission" || kind === "failed") return { kind, key: kind, agentId: "a" };
+    if (kind === "plugin") return { kind, key: kind, item: summary() };
+    return { kind, key: kind };
+  };
+  const pick = (
+    kind: AttentionItem["kind"],
+    over: Partial<Parameters<typeof pickAttentionTab>[0]> = {},
+  ) =>
+    pickAttentionTab({
+      tabSetting: "overview",
+      item: item(kind),
+      hasOverview: true,
+      agentRunning: false,
+      ...over,
+    });
+
+  it("opens Overview for items its Your move lists", () => {
+    expect(pick("permission")).toBe("overview");
+    expect(pick("failed")).toBe("overview");
+    expect(pick("plugin")).toBe("overview");
+    expect(pick("pr-checks-failed")).toBe("overview");
+    expect(pick("pr-ready")).toBe("overview");
+    expect(pick("pr-merged")).toBe("overview");
+    expect(pick("plugin", { agentRunning: true })).toBe("overview");
+  });
+
+  it("opens the item's tab when Overview wouldn't list it", () => {
+    expect(pick("pr-checks-failed", { agentRunning: true })).toBe("item");
+    expect(pick("pr-ready", { agentRunning: true })).toBe("item");
+    expect(pick("pr-merged", { agentRunning: true })).toBe("item");
+  });
+
+  it("opens the item's tab once Overview was closed", () => {
+    expect(pick("permission", { hasOverview: false })).toBe("item");
+  });
+
+  it("opens the item's tab under 'The tab that needs you'", () => {
+    expect(pick("permission", { tabSetting: "needed" })).toBe("item");
+    expect(pick("plugin", { tabSetting: "needed" })).toBe("item");
+  });
+});
+
+describe("hasRunningAgent", () => {
+  const agents = (status: string, over: { workspaceId?: string; archivedAt?: Date | null } = {}) =>
+    new Map([["a", { workspaceId: "w", archivedAt: null, status, ...over }]]) as Parameters<
+      typeof hasRunningAgent
+    >[0];
+
+  it("counts only live running agents of the workspace", () => {
+    expect(hasRunningAgent(agents("running"), "w")).toBe(true);
+    expect(hasRunningAgent(agents("idle"), "w")).toBe(false);
+    expect(hasRunningAgent(agents("running", { workspaceId: "x" }), "w")).toBe(false);
+    expect(hasRunningAgent(agents("running", { archivedAt: new Date() }), "w")).toBe(false);
+    expect(hasRunningAgent(undefined, "w")).toBe(false);
   });
 });
