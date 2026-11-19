@@ -1,5 +1,4 @@
 import { useMemo, useSyncExternalStore } from "react";
-import { useAppSettings } from "@/hooks/use-settings";
 import {
   workspaceSummaryStore,
   type WorkspaceSummaryItem,
@@ -9,10 +8,7 @@ import type { WorkspaceDescriptor } from "@/stores/session-store";
 /** What plugins say about an idle workspace's work, folded across their summary items. */
 export type ReportedWork = "needs_you" | "working" | "done";
 
-/** `null` while the experimental setting is off: statuses come from turn state alone. */
-export type ReportedWorkLookup =
-  | ((serverId: string, workspaceId: string) => ReportedWork | null)
-  | null;
+export type ReportedWorkLookup = (serverId: string, workspaceId: string) => ReportedWork | null;
 
 /** Something waiting on the human wins, then any work still going; done only when nothing else is reported. */
 export function foldReportedWork(items: readonly WorkspaceSummaryItem[]): ReportedWork | null {
@@ -69,7 +65,7 @@ export function applyReportedWork(
 /** Folds every summary item once, keyed by host and workspace. */
 export function createReportedWorkLookup(
   entries: readonly WorkspaceSummaryItem[],
-): (serverId: string, workspaceId: string) => ReportedWork | null {
+): ReportedWorkLookup {
   const grouped = new Map<string, WorkspaceSummaryItem[]>();
   for (const entry of entries) {
     const key = `${entry.serverId}:${entry.workspaceId}`;
@@ -84,11 +80,10 @@ export function createReportedWorkLookup(
 
 /** The lookup status derivation takes; a new one whenever a plugin updates a summary item. */
 export function useReportedWorkLookup(): ReportedWorkLookup {
-  const enabled = useAppSettings().settings.sidebarAgentReportedStatus;
   const entries = useSyncExternalStore(
     workspaceSummaryStore.subscribe,
     workspaceSummaryStore.getSnapshot,
     workspaceSummaryStore.getSnapshot,
   );
-  return useMemo(() => (enabled ? createReportedWorkLookup(entries) : null), [enabled, entries]);
+  return useMemo(() => createReportedWorkLookup(entries), [entries]);
 }

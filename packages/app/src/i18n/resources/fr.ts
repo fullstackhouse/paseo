@@ -1256,7 +1256,6 @@ export const fr: TranslationResources = {
         project: "Projet",
         status: "Statut",
         labels: "Libellés",
-        agentReportedStatus: "Statut indiqué par l’agent (bêta)",
       },
       titleSource: {
         label: "Titre",
