@@ -1,0 +1,8 @@
+{
+  "id": "computer-control",
+  "name": "Computer control",
+  "description": "Queue Chrome tasks and hand control to a person for authentication.",
+  "requirements": {
+    "paseo": ">=0.15.3"
+  }
+}

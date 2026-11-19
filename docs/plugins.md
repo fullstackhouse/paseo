@@ -88,25 +88,17 @@ never deletes it. The global `pluginsEnabled` switch remains available.
 
 ### Test a plugin change
 
-During plugin development, run the local working copy on Jacek's local Paseo host so he can test changes live. Install or point the plugin's directory source at that working copy, reload the plugin after changes, and verify the loaded source and status. Leave it running and tell him where to test. Reload only the plugin; restarting the main daemon still requires permission.
+Test plugin changes in a separate Paseo instance. Follow [Test a change next to your main Paseo](development.md#test-a-change-next-to-your-main-paseo) to seed and start the worktree daemon and desktop window.
 
-Live testing means the desktop app Jacek is currently running. If plugin work needs a host UI change, use the [installed desktop renderer workflow](development.md#testing-ui-in-the-running-desktop-app). Apply this to the current change before handing it over; a browser preview or second app does not satisfy this request.
-
-For additional isolated checks, use a throwaway daemon started by the installed `paseo` CLI. Copy your config so the other plugins and providers match, give it a free port, and drop the password and relay:
+Install the plugin working copy into that daemon:
 
 ```bash
-H="$PWD/.dev/paseo-home"   # keep it out of git
-mkdir -p "$H"
-node -e 'const fs=require("fs");const c=JSON.parse(fs.readFileSync(process.argv[1]));c.daemon={...c.daemon,listen:"127.0.0.1:6790"};delete c.daemon.auth;delete c.daemon.relay;fs.writeFileSync(process.argv[2]+"/config.json",JSON.stringify(c,null,2))' ~/.paseo/config.json "$H"
-paseo daemon start --home "$H"
-paseo plugin remove my-plugin --home "$H"    # only if your config already has this ID
-paseo plugin install "$PWD" --home "$H"
-paseo plugin ls --home "$H"
+paseo plugin install /absolute/path/to/plugin --home .dev/paseo-home
+paseo plugin reload my-plugin --home .dev/paseo-home
+paseo plugin ls --home .dev/paseo-home
 ```
 
-Install refuses an ID that is already configured, which is why the copied entry is removed first. After each edit run `paseo plugin reload my-plugin --home "$H"`. To see the UI, use **Add host** in your main app with `localhost:6790`. Run `paseo daemon stop --home "$H"` when done.
-
-To test a Paseo change together with a plugin, run the Paseo branch as described in [Test a change next to your main Paseo](development.md#test-a-change-next-to-your-main-paseo) and install the plugin worktree into that daemon with `paseo plugin install <dir> --home <paseo worktree>/.dev/paseo-home`.
+Install refuses an existing ID. If the seeded configuration already includes it, remove that entry from the isolated daemon before installing the working copy. Verify the source path, `running` status, and actual branch window. Keep tests and test agents in this isolated home; do not install or reload on the main daemon unless explicitly requested.
 
 ## Client translations
 
