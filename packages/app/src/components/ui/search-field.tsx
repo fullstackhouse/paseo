@@ -33,6 +33,10 @@ export interface SearchFieldProps {
   testID?: string;
   clearTestID?: string;
   autoFocus?: boolean;
+  /** Runs before the field's own Escape handling; call `preventDefault()` to claim the key. */
+  onKeyPress?: (event: NativeSyntheticEvent<TextInputKeyPressEventData>) => void;
+  /** Enter on a hardware keyboard, or the keyboard's search key. */
+  onSubmit?: () => void;
 }
 
 export interface SearchFieldHandle {
@@ -58,6 +62,8 @@ export const SearchField = forwardRef<SearchFieldHandle, SearchFieldProps>(funct
     testID,
     clearTestID,
     autoFocus,
+    onKeyPress,
+    onSubmit,
   },
   ref,
 ) {
@@ -83,11 +89,12 @@ export const SearchField = forwardRef<SearchFieldHandle, SearchFieldProps>(funct
   );
   const handleKeyPress = useCallback(
     (event: NativeSyntheticEvent<TextInputKeyPressEventData>) => {
-      if (event.nativeEvent.key !== "Escape") return;
+      onKeyPress?.(event);
+      if (event.defaultPrevented || event.nativeEvent.key !== "Escape") return;
       if (inputRef.current?.getText()) handleClear();
       else inputRef.current?.blur();
     },
-    [handleClear],
+    [handleClear, onKeyPress],
   );
 
   return (
@@ -101,6 +108,7 @@ export const SearchField = forwardRef<SearchFieldHandle, SearchFieldProps>(funct
         onFocus={handleFocus}
         onBlur={handleBlur}
         onKeyPress={handleKeyPress}
+        onSubmitEditing={onSubmit}
         placeholder={placeholder}
         accessibilityLabel={accessibilityLabel ?? placeholder}
         autoCapitalize="none"

@@ -6,7 +6,9 @@ import {
   ScrollView,
   Text,
   View,
+  type NativeSyntheticEvent,
   type PressableStateCallbackType,
+  type TextInputKeyPressEventData,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useFocusEffect } from "expo-router/react-navigation";
@@ -961,7 +963,15 @@ function SidebarGroup({ label, children }: { label?: string; children: ReactNode
   );
 }
 
-function SettingsSearchBar() {
+type SettingsSearchStep = 1 | -1;
+
+function SettingsSearchBar({
+  onStep,
+  onSubmit,
+}: {
+  onStep: (step: SettingsSearchStep) => void;
+  onSubmit: () => void;
+}) {
   const { t } = useTranslation();
   const query = useSettingsSearchQuery();
   const fieldRef = useRef<SearchFieldHandle>(null);
@@ -980,10 +990,21 @@ function SettingsSearchBar() {
       return () => window.removeEventListener("keydown", onKeyDown, true);
     }, []),
   );
+  const handleKeyPress = useCallback(
+    (event: NativeSyntheticEvent<TextInputKeyPressEventData>) => {
+      const { key } = event.nativeEvent;
+      if (key !== "ArrowDown" && key !== "ArrowUp") return;
+      event.preventDefault();
+      onStep(key === "ArrowDown" ? 1 : -1);
+    },
+    [onStep],
+  );
   return (
     <View style={sidebarStyles.searchBar}>
       <SearchField
         ref={fieldRef}
+        onKeyPress={handleKeyPress}
+        onSubmit={onSubmit}
         value={query}
         onChangeText={setSettingsSearchQuery}
         placeholder={t("settings.search.placeholder")}
@@ -1018,11 +1039,15 @@ function useSettingsSearchDocs(
   );
 }
 
+const SELECTED_STATE = { selected: true };
+
 function SettingsSearchResultRow({
   doc,
+  isActive,
   onSelect,
 }: {
   doc: SettingsSearchDoc;
+  isActive: boolean;
   onSelect: (doc: SettingsSearchDoc) => void;
 }) {
   const handlePress = useCallback(() => onSelect(doc), [doc, onSelect]);
@@ -1031,8 +1056,9 @@ function SettingsSearchResultRow({
       accessibilityRole="button"
       accessibilityLabel={`${doc.title}, ${doc.location}`}
       onPress={handlePress}
+      accessibilityState={isActive ? SELECTED_STATE : undefined}
       testID={`settings-search-result-${doc.id}`}
-      style={sidebarItemStyle}
+      style={isActive ? selectedSidebarItemStyle : sidebarItemStyle}
     >
       <View style={sidebarStyles.resultText}>
         <Text style={sidebarStyles.resultTitle} numberOfLines={1}>
@@ -1048,9 +1074,11 @@ function SettingsSearchResultRow({
 
 function SettingsSearchResults({
   results,
+  activeIndex,
   onSelect,
 }: {
   results: SettingsSearchDoc[];
+  activeIndex: number;
   onSelect: (doc: SettingsSearchDoc) => void;
 }) {
   const { t } = useTranslation();
@@ -1063,8 +1091,13 @@ function SettingsSearchResults({
   }
   return (
     <SidebarGroup>
-      {results.map((doc) => (
-        <SettingsSearchResultRow key={doc.id} doc={doc} onSelect={onSelect} />
+      {results.map((doc, index) => (
+        <SettingsSearchResultRow
+          key={doc.id}
+          doc={doc}
+          isActive={index === activeIndex}
+          onSelect={onSelect}
+        />
       ))}
     </SidebarGroup>
   );
@@ -1118,6 +1151,22 @@ function SettingsSidebar({
     },
     [onSelectHostSection, onSelectSection],
   );
+  // Keyed by query so typing puts the highlight back on the top result without an effect.
+  const [cursor, setCursor] = useState({ query: searchQuery, index: 0 });
+  const activeResultIndex = cursor.query === searchQuery ? cursor.index : 0;
+  const handleSearchStep = useCallback(
+    (step: SettingsSearchStep) => {
+      if (searchResults.length === 0) return;
+      const index = (activeResultIndex + step + searchResults.length) % searchResults.length;
+      setCursor({ query: searchQuery, index });
+    },
+    [activeResultIndex, searchQuery, searchResults.length],
+  );
+  const handleSearchSubmit = useCallback(() => {
+    const doc = searchResults[activeResultIndex];
+    if (doc) handleSelectSearchResult(doc);
+  }, [activeResultIndex, handleSelectSearchResult, searchResults]);
+  const searchBar = <SettingsSearchBar onStep={handleSearchStep} onSubmit={handleSearchSubmit} />;
   const insets = useSafeAreaInsets();
   const isDesktop = layout === "desktop";
   const sidebarScroll = useSettingsSidebarScroll(isDesktop);
@@ -1210,7 +1259,11 @@ function SettingsSidebar({
     </>
   );
   const sidebarBody = isSearching ? (
-    <SettingsSearchResults results={searchResults} onSelect={handleSelectSearchResult} />
+    <SettingsSearchResults
+      results={searchResults}
+      activeIndex={activeResultIndex}
+      onSelect={handleSelectSearchResult}
+    />
   ) : (
     navigationBody
   );
@@ -1234,7 +1287,7 @@ function SettingsSidebar({
               testID="settings-back-to-workspace"
             />
           </View>
-          <SettingsSearchBar />
+          {searchBar}
           <ScrollView
             style={sidebarStyles.scrollBody}
             showsVerticalScrollIndicator={false}
@@ -1247,7 +1300,7 @@ function SettingsSidebar({
         </View>
       ) : (
         <>
-          <SettingsSearchBar />
+          {searchBar}
           {sidebarBody}
         </>
       )}
