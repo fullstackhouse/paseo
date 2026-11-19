@@ -192,9 +192,8 @@ export interface PluginWorkspaceSummaryItemState {
   /** A workspace panel of this plugin to open in Explorer when the item needs the human. */
   panelId?: string;
   /**
-   * Where the workspace's work stands, as its agent reported it. FSH-only, experimental: with
-   * Grouping > Agent-reported status on, the sidebar groups an idle workspace by this (and by
-   * `needsYou`) instead of by whether its last turn was read. `null` clears it.
+   * Where the workspace's work stands, as its agent reported it. FSH-only: the sidebar groups an
+   * idle workspace by this (and by `needsYou`) instead of by whether its last turn was read. `null` clears it.
    */
   workState?: PluginWorkspaceWorkState | null;
   /**

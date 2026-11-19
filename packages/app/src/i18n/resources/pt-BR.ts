@@ -1304,7 +1304,6 @@ export const ptBR: TranslationResources = {
         project: "Projeto",
         status: "Status",
         labels: "Etiquetas",
-        agentReportedStatus: "Status informado pelo agente (beta)",
       },
       titleSource: {
         label: "Título",

@@ -37,9 +37,6 @@ export interface SidebarDisplayPreferences {
   pluginRowBadgeItems: readonly PluginWorkspaceRowBadgeItemGroup[];
   isPluginRowBadgeItemVisible: (key: string) => boolean;
   togglePluginRowBadgeItem: (key: string) => void;
-  /** Experimental: idle workspaces are grouped by what their agents reported. */
-  agentReportedStatus: boolean;
-  toggleAgentReportedStatus: () => void;
   checksDisplay: SidebarChecksDisplay;
   setChecksDisplay: (display: SidebarChecksDisplay) => void;
   trailing: SidebarWorkspaceTrailing;
@@ -89,7 +86,6 @@ export function useSidebarDisplayPreferences(): SidebarDisplayPreferences {
       sidebarRowItems,
       sidebarChecksDisplay,
       sidebarPluginRowBadgeItems,
-      sidebarAgentReportedStatus,
     },
     updateSettings,
   } = useAppSettings();
@@ -130,9 +126,6 @@ export function useSidebarDisplayPreferences(): SidebarDisplayPreferences {
     [updateSettings, sidebarRowItems],
   );
 
-  const toggleAgentReportedStatus = useCallback(() => {
-    void updateSettings({ sidebarAgentReportedStatus: !sidebarAgentReportedStatus });
-  }, [updateSettings, sidebarAgentReportedStatus]);
 
   const setChecksDisplay = useCallback(
     (display: SidebarChecksDisplay) => {
@@ -165,8 +158,6 @@ export function useSidebarDisplayPreferences(): SidebarDisplayPreferences {
       pluginRowBadgeItems,
       isPluginRowBadgeItemVisible,
       togglePluginRowBadgeItem,
-      agentReportedStatus: sidebarAgentReportedStatus,
-      toggleAgentReportedStatus,
       checksDisplay: sidebarChecksDisplay,
       setChecksDisplay,
       trailing: sidebarWorkspaceTrailing,
@@ -195,8 +186,6 @@ export function useSidebarDisplayPreferences(): SidebarDisplayPreferences {
       pluginRowBadgeItems,
       isPluginRowBadgeItemVisible,
       togglePluginRowBadgeItem,
-      sidebarAgentReportedStatus,
-      toggleAgentReportedStatus,
       sidebarChecksDisplay,
       setChecksDisplay,
       sidebarWorkspaceTrailing,
