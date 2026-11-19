@@ -3,6 +3,7 @@ import { z } from "zod";
 import {
   AgentStatusSchema,
   AgentTimelineItemPayloadSchema,
+  ProjectLastAgentSetupSchema,
   WorkspaceGitHubRuntimePayloadSchema,
 } from "@getpaseo/protocol/messages";
 import { AgentProviderSchema } from "@getpaseo/protocol/provider-manifest";
@@ -344,6 +345,7 @@ const StoredProjectSchema = z.strictObject({
   projectIconRevision: z.string().optional(),
   projectRootPath: z.string(),
   projectKind: z.enum(["git", "non_git", "directory"]),
+  projectLastAgentSetup: ProjectLastAgentSetupSchema.optional(),
 });
 
 const StoredTimelineSchema = z.strictObject({
@@ -757,6 +759,9 @@ function serializeProject(project: ProjectDescriptor): StoredProject {
     projectIconRevision: project.projectIconRevision,
     projectRootPath: project.projectRootPath,
     projectKind: project.projectKind,
+    ...(project.projectLastAgentSetup
+      ? { projectLastAgentSetup: project.projectLastAgentSetup }
+      : {}),
   };
 }
 
