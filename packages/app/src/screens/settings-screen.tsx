@@ -45,7 +45,10 @@ import {
   ChevronRight,
 } from "lucide-react-native";
 import { DropdownTrigger } from "@/components/ui/dropdown-trigger";
-import { SearchField } from "@/components/ui/search-field";
+import { SearchField, type SearchFieldHandle } from "@/components/ui/search-field";
+import { findShortcutPlatform, isFindShortcut } from "@/pane-find";
+import { hasActiveWebOverlay } from "@/lib/overlay-root";
+import { isImeComposingKeyboardEvent } from "@/utils/keyboard-ime";
 import { ComboboxTrigger } from "@/components/ui/combobox-trigger";
 import { SidebarHeaderRow } from "@/components/sidebar/sidebar-header-row";
 import { HostPicker as SharedHostPicker } from "@/components/hosts/host-picker";
@@ -152,6 +155,7 @@ import { SETTINGS_SEARCH_ENTRIES } from "@/screens/settings/search/settings-sear
 import { returnFromSettings, type SettingsView } from "@/navigation/settings-navigation";
 import { isNative, isWeb } from "@/constants/platform";
 import { useOpenOnboarding } from "@/onboarding";
+import { SettingsRevealText } from "@/components/settings/reveal-text";
 
 // ---------------------------------------------------------------------------
 // View model
@@ -375,7 +379,7 @@ function GeneralSection({ settings, handleLanguageChange }: GeneralSectionProps)
       <View style={settingsStyles.card}>
         <View style={settingsStyles.row}>
           <View style={settingsStyles.rowContent}>
-            <Text style={settingsStyles.rowTitle}>{t("settings.general.language.label")}</Text>
+            <SettingsRevealText style={settingsStyles.rowTitle}>{t("settings.general.language.label")}</SettingsRevealText>
             <Text style={settingsStyles.rowHint}>{t("settings.general.language.description")}</Text>
           </View>
           <DropdownMenu>
@@ -407,7 +411,7 @@ function ShowSetupAgainRow() {
   return (
     <View style={[settingsStyles.row, settingsStyles.rowBorder]}>
       <View style={settingsStyles.rowContent}>
-        <Text style={settingsStyles.rowTitle}>{t("settings.general.setup.label")}</Text>
+        <SettingsRevealText style={settingsStyles.rowTitle}>{t("settings.general.setup.label")}</SettingsRevealText>
         <Text style={settingsStyles.rowHint}>{t("settings.general.setup.description")}</Text>
       </View>
       <Button variant="secondary" onPress={openOnboarding ?? undefined} disabled={!openOnboarding}>
@@ -440,7 +444,7 @@ function DiagnosticsSection({
       <View style={settingsStyles.card}>
         <View style={settingsStyles.row} testID="app-diagnostic-row">
           <View style={settingsStyles.rowContent}>
-            <Text style={settingsStyles.rowTitle}>{t("settings.diagnostics.app.rowTitle")}</Text>
+            <SettingsRevealText style={settingsStyles.rowTitle}>{t("settings.diagnostics.app.rowTitle")}</SettingsRevealText>
             <Text style={settingsStyles.rowHint}>{t("settings.diagnostics.app.rowHint")}</Text>
           </View>
           <Button variant="secondary" onPress={openAppDiagnostic}>
@@ -449,7 +453,7 @@ function DiagnosticsSection({
         </View>
         <View style={settingsStyles.row}>
           <View style={settingsStyles.rowContent}>
-            <Text style={settingsStyles.rowTitle}>{t("settings.diagnostics.testAudio")}</Text>
+            <SettingsRevealText style={settingsStyles.rowTitle}>{t("settings.diagnostics.testAudio")}</SettingsRevealText>
             {playbackTestResult ? (
               <Text style={settingsStyles.rowHint}>{playbackTestResult}</Text>
             ) : null}
@@ -483,7 +487,7 @@ function AboutSection({ appVersion, appVersionText, isDesktopApp }: AboutSection
         <View style={settingsStyles.card}>
           <View style={settingsStyles.row}>
             <View style={settingsStyles.rowContent}>
-              <Text style={settingsStyles.rowTitle}>{t("settings.about.appVersion")}</Text>
+              <SettingsRevealText style={settingsStyles.rowTitle}>{t("settings.about.appVersion")}</SettingsRevealText>
               <Text style={settingsStyles.rowHint}>{t("settings.about.thisDevice")}</Text>
             </View>
             <Text style={styles.aboutValue}>{appVersionText}</Text>
@@ -514,7 +518,7 @@ function WhatsNewRow() {
       {({ hovered }: PressableStateCallbackType & { hovered?: boolean }) => (
         <>
           <View style={settingsStyles.rowContent}>
-            <Text style={settingsStyles.rowTitle}>{t("changelog.title")}</Text>
+            <SettingsRevealText style={settingsStyles.rowTitle}>{t("changelog.title")}</SettingsRevealText>
             <Text style={settingsStyles.rowHint}>{t("settings.about.whatsNewHint")}</Text>
           </View>
           <ChevronRight
@@ -597,9 +601,9 @@ function HostVersionRow({
   return (
     <View style={rowStyle}>
       <View style={settingsStyles.rowContent}>
-        <Text style={settingsStyles.rowTitle} numberOfLines={1}>
+        <SettingsRevealText style={settingsStyles.rowTitle} numberOfLines={1}>
           {host.label}
-        </Text>
+        </SettingsRevealText>
         {isMismatch ? (
           <Text style={settingsStyles.rowHint}>{t("settings.about.versionDiffers")}</Text>
         ) : null}
@@ -701,9 +705,9 @@ function DesktopAppUpdateRow() {
           release (fsh-updater), which has no beta channel. */}
       <View style={[settingsStyles.row, settingsStyles.rowBorder]}>
         <View style={settingsStyles.rowContent}>
-          <Text style={settingsStyles.rowTitle}>
+          <SettingsRevealText style={settingsStyles.rowTitle}>
             {t("settings.about.updates.autoInstallLabel")}
-          </Text>
+          </SettingsRevealText>
           <Text style={settingsStyles.rowHint}>
             {t("settings.about.updates.autoInstallDescription")}
           </Text>
@@ -717,7 +721,7 @@ function DesktopAppUpdateRow() {
       </View>
       <View style={[settingsStyles.row, settingsStyles.rowBorder]}>
         <View style={settingsStyles.rowContent}>
-          <Text style={settingsStyles.rowTitle}>{t("settings.about.updates.label")}</Text>
+          <SettingsRevealText style={settingsStyles.rowTitle}>{t("settings.about.updates.label")}</SettingsRevealText>
           <Text style={settingsStyles.rowHint}>{statusText}</Text>
           {readyUpdateVersion ? (
             <Text style={settingsStyles.rowHint}>
@@ -946,9 +950,26 @@ function SidebarGroup({ label, children }: { label?: string; children: ReactNode
 function SettingsSearchBar() {
   const { t } = useTranslation();
   const query = useSettingsSearchQuery();
+  const fieldRef = useRef<SearchFieldHandle>(null);
+  useFocusEffect(
+    useCallback(() => {
+      if (!isWeb) return undefined;
+      function onKeyDown(event: KeyboardEvent) {
+        if (event.defaultPrevented || hasActiveWebOverlay() || isImeComposingKeyboardEvent(event))
+          return;
+        if (!isFindShortcut(event, findShortcutPlatform())) return;
+        event.preventDefault();
+        fieldRef.current?.focus();
+      }
+      // Capture phase: RN Web text inputs stop keydown before it bubbles to the document.
+      window.addEventListener("keydown", onKeyDown, true);
+      return () => window.removeEventListener("keydown", onKeyDown, true);
+    }, []),
+  );
   return (
     <View style={sidebarStyles.searchBar}>
       <SearchField
+        ref={fieldRef}
         value={query}
         onChangeText={setSettingsSearchQuery}
         placeholder={t("settings.search.placeholder")}

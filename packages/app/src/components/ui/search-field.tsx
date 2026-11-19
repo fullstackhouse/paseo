@@ -1,5 +1,10 @@
-import { useCallback, useRef, useState, type ReactElement } from "react";
-import { Pressable, View } from "react-native";
+import { forwardRef, useCallback, useImperativeHandle, useRef, useState } from "react";
+import {
+  Pressable,
+  View,
+  type NativeSyntheticEvent,
+  type TextInputKeyPressEventData,
+} from "react-native";
 import { Search, X } from "lucide-react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import type { Theme } from "@/styles/theme";
@@ -30,23 +35,32 @@ export interface SearchFieldProps {
   autoFocus?: boolean;
 }
 
+export interface SearchFieldHandle {
+  /** Focuses the field and selects its text, so typing replaces the last query. */
+  focus(): void;
+}
+
 /**
  * The standalone search box that leads a screen's filter rail. Its chrome is
  * the host filter pill's, so the two sit on the same rail and read as one row
  * of controls; only the border colour moves on focus, which keeps the leading
  * icon from shifting. It owns its own clear affordance — a caller rendering its
- * own X has been handed the wrong component.
+ * own X has been handed the wrong component. Escape clears a query, then leaves
+ * the field.
  */
-export function SearchField({
-  value,
-  onChangeText,
-  placeholder,
-  accessibilityLabel,
-  clearAccessibilityLabel,
-  testID,
-  clearTestID,
-  autoFocus,
-}: SearchFieldProps): ReactElement {
+export const SearchField = forwardRef<SearchFieldHandle, SearchFieldProps>(function SearchField(
+  {
+    value,
+    onChangeText,
+    placeholder,
+    accessibilityLabel,
+    clearAccessibilityLabel,
+    testID,
+    clearTestID,
+    autoFocus,
+  },
+  ref,
+) {
   const [isFocused, setIsFocused] = useState(false);
   const inputRef = useRef<EditingTextInputHandle>(null);
   const handleFocus = useCallback(() => setIsFocused(true), []);
@@ -55,6 +69,26 @@ export function SearchField({
     inputRef.current?.replaceText("");
     onChangeText("");
   }, [onChangeText]);
+  useImperativeHandle(
+    ref,
+    () => ({
+      focus: () => {
+        const input = inputRef.current;
+        if (!input) return;
+        input.focus();
+        input.setSelection({ start: 0, end: input.getText().length });
+      },
+    }),
+    [],
+  );
+  const handleKeyPress = useCallback(
+    (event: NativeSyntheticEvent<TextInputKeyPressEventData>) => {
+      if (event.nativeEvent.key !== "Escape") return;
+      if (inputRef.current?.getText()) handleClear();
+      else inputRef.current?.blur();
+    },
+    [handleClear],
+  );
 
   return (
     <View style={[styles.field, isFocused && styles.fieldFocused]}>
@@ -66,6 +100,7 @@ export function SearchField({
         onChangeText={onChangeText}
         onFocus={handleFocus}
         onBlur={handleBlur}
+        onKeyPress={handleKeyPress}
         placeholder={placeholder}
         accessibilityLabel={accessibilityLabel ?? placeholder}
         autoCapitalize="none"
@@ -87,7 +122,7 @@ export function SearchField({
       ) : null}
     </View>
   );
-}
+});
 
 const SEARCH_FIELD_MAX_WIDTH = 420;
 
