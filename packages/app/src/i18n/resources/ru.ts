@@ -2453,6 +2453,11 @@ export const ru: TranslationResources = {
       switchHost: "Сменить хост",
       local: "Локальный",
     },
+    search: {
+      placeholder: "Поиск по настройкам",
+      clear: "Очистить поиск",
+      noResults: "Нет настроек, соответствующих запросу.",
+    },
     backToWorkspace: "Назад",
     addHost: "Добавить хост",
     enableBuiltInDaemon: "Включить встроенный демон",

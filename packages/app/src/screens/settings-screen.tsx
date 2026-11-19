@@ -45,6 +45,7 @@ import {
   ChevronRight,
 } from "lucide-react-native";
 import { DropdownTrigger } from "@/components/ui/dropdown-trigger";
+import { SearchField } from "@/components/ui/search-field";
 import { ComboboxTrigger } from "@/components/ui/combobox-trigger";
 import { SidebarHeaderRow } from "@/components/sidebar/sidebar-header-row";
 import { HostPicker as SharedHostPicker } from "@/components/hosts/host-picker";
@@ -136,9 +137,18 @@ import {
 } from "@/utils/host-routes";
 import {
   selectSettingsHost,
+  setSettingsSearchQuery,
   useSettingsHostSelection,
+  useSettingsSearchQuery,
   useSettingsSidebarScroll,
 } from "@/navigation/settings-presentation";
+import {
+  buildSettingsSearchDocs,
+  searchSettings,
+  type SettingsSearchDoc,
+  type SettingsSearchTarget,
+} from "@/screens/settings/search/settings-search";
+import { SETTINGS_SEARCH_ENTRIES } from "@/screens/settings/search/settings-search-index";
 import { returnFromSettings, type SettingsView } from "@/navigation/settings-navigation";
 import { isNative, isWeb } from "@/constants/platform";
 import { useOpenOnboarding } from "@/onboarding";
@@ -933,6 +943,98 @@ function SidebarGroup({ label, children }: { label?: string; children: ReactNode
   );
 }
 
+function SettingsSearchBar() {
+  const { t } = useTranslation();
+  const query = useSettingsSearchQuery();
+  return (
+    <View style={sidebarStyles.searchBar}>
+      <SearchField
+        value={query}
+        onChangeText={setSettingsSearchQuery}
+        placeholder={t("settings.search.placeholder")}
+        clearAccessibilityLabel={t("settings.search.clear")}
+        testID="settings-search-input"
+        clearTestID="settings-search-clear"
+      />
+    </View>
+  );
+}
+
+function useSettingsSearchDocs(
+  appSections: SidebarSectionItem[],
+  hasHosts: boolean,
+): SettingsSearchDoc[] {
+  const { t } = useTranslation();
+  return useMemo(
+    () =>
+      buildSettingsSearchDocs({
+        entries: SETTINGS_SEARCH_ENTRIES,
+        appSections: appSections.map((item) => ({ id: item.id, label: t(item.labelKey) })),
+        hostSections: hasHosts
+          ? HOST_SECTION_ITEMS.map((item) => ({ id: item.id, label: t(item.labelKey) }))
+          : [],
+        appGroupLabel: t("settings.groups.app"),
+        hostGroupLabel: t("settings.groups.host"),
+        isDesktopApp: isElectronRuntime(),
+        isWeb,
+        translate: (key) => t(key),
+      }),
+    [appSections, hasHosts, t],
+  );
+}
+
+function SettingsSearchResultRow({
+  doc,
+  onSelect,
+}: {
+  doc: SettingsSearchDoc;
+  onSelect: (target: SettingsSearchTarget) => void;
+}) {
+  const handlePress = useCallback(() => onSelect(doc.target), [doc.target, onSelect]);
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${doc.title}, ${doc.location}`}
+      onPress={handlePress}
+      testID={`settings-search-result-${doc.id}`}
+      style={sidebarItemStyle}
+    >
+      <View style={sidebarStyles.resultText}>
+        <Text style={sidebarStyles.resultTitle} numberOfLines={1}>
+          {doc.title}
+        </Text>
+        <Text style={sidebarStyles.resultLocation} numberOfLines={1}>
+          {doc.location}
+        </Text>
+      </View>
+    </Pressable>
+  );
+}
+
+function SettingsSearchResults({
+  results,
+  onSelect,
+}: {
+  results: SettingsSearchDoc[];
+  onSelect: (target: SettingsSearchTarget) => void;
+}) {
+  const { t } = useTranslation();
+  if (results.length === 0) {
+    return (
+      <Text style={sidebarStyles.searchEmpty} testID="settings-search-empty">
+        {t("settings.search.noResults")}
+      </Text>
+    );
+  }
+  return (
+    <SidebarGroup>
+      {results.map((doc) => (
+        <SettingsSearchResultRow key={doc.id} doc={doc} onSelect={onSelect} />
+      ))}
+    </SidebarGroup>
+  );
+}
+
 interface SettingsSidebarProps {
   view: SettingsView;
   onSelectSection: (section: SettingsSectionSlug) => void;
@@ -962,7 +1064,24 @@ function SettingsSidebar({
   const hasHosts = sortedHosts.length > 0;
   const enableBuiltInDaemonOption = useEnableBuiltInDaemonOption();
   const isDesktopApp = isElectronRuntime();
-  const items = SIDEBAR_SECTION_ITEMS.filter((item) => isSectionAvailable(item, isDesktopApp));
+  const items = useMemo(
+    () => SIDEBAR_SECTION_ITEMS.filter((item) => isSectionAvailable(item, isDesktopApp)),
+    [isDesktopApp],
+  );
+  const searchDocs = useSettingsSearchDocs(items, hasHosts);
+  const searchQuery = useSettingsSearchQuery();
+  const searchResults = useMemo(
+    () => searchSettings(searchDocs, searchQuery),
+    [searchDocs, searchQuery],
+  );
+  const isSearching = searchQuery.trim().length > 0;
+  const handleSelectSearchResult = useCallback(
+    (target: SettingsSearchTarget) => {
+      if (target.kind === "section") onSelectSection(target.section);
+      else onSelectHostSection(target.section);
+    },
+    [onSelectHostSection, onSelectSection],
+  );
   const insets = useSafeAreaInsets();
   const isDesktop = layout === "desktop";
   const sidebarScroll = useSettingsSidebarScroll(isDesktop);
@@ -980,7 +1099,7 @@ function SettingsSidebar({
   if (view.kind === "project") selectedHostSection = "projects";
   if (view.kind === "plugin") selectedHostSection = "plugins";
 
-  const sidebarBody = (
+  const navigationBody = (
     <>
       <SidebarGroup label={t("settings.groups.app")}>
         {items.map((item) => (
@@ -1054,6 +1173,11 @@ function SettingsSidebar({
       )}
     </>
   );
+  const sidebarBody = isSearching ? (
+    <SettingsSearchResults results={searchResults} onSelect={handleSelectSearchResult} />
+  ) : (
+    navigationBody
+  );
 
   return (
     <View
@@ -1074,6 +1198,7 @@ function SettingsSidebar({
               testID="settings-back-to-workspace"
             />
           </View>
+          <SettingsSearchBar />
           <ScrollView
             style={sidebarStyles.scrollBody}
             showsVerticalScrollIndicator={false}
@@ -1084,7 +1209,10 @@ function SettingsSidebar({
           </ScrollView>
         </View>
       ) : (
-        sidebarBody
+        <>
+          <SettingsSearchBar />
+          {sidebarBody}
+        </>
       )}
     </View>
   );
@@ -1620,6 +1748,31 @@ const sidebarStyles = StyleSheet.create((theme) => ({
     color: theme.colors.foregroundMuted,
     fontWeight: theme.fontWeight.normal,
     flex: 1,
+  },
+  searchBar: {
+    flexDirection: "row",
+    paddingHorizontal: theme.spacing[2],
+    paddingTop: theme.spacing[2],
+  },
+  searchEmpty: {
+    fontSize: theme.fontSize.base,
+    color: theme.colors.foregroundMuted,
+    paddingHorizontal: theme.spacing[4],
+    paddingVertical: theme.spacing[4],
+  },
+  resultText: {
+    flex: 1,
+    minWidth: 0,
+    paddingVertical: { xs: theme.spacing[1], md: theme.spacing[0.5] },
+  },
+  resultTitle: {
+    fontSize: { xs: theme.fontSize.lg, md: theme.fontSize.base },
+    color: theme.colors.foreground,
+    fontWeight: theme.fontWeight.normal,
+  },
+  resultLocation: {
+    fontSize: theme.fontSize.sm,
+    color: theme.colors.foregroundMuted,
   },
   pickerTrigger: {
     flexDirection: "row",

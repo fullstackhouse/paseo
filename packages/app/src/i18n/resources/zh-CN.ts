@@ -2392,6 +2392,11 @@ export const zhCN: TranslationResources = {
       switchHost: "切换主机",
       local: "本机",
     },
+    search: {
+      placeholder: "搜索设置",
+      clear: "清除搜索",
+      noResults: "没有与搜索匹配的设置。",
+    },
     backToWorkspace: "返回",
     addHost: "添加主机",
     enableBuiltInDaemon: "启用内置 daemon",

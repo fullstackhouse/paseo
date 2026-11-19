@@ -2441,6 +2441,11 @@ export const ja: TranslationResources = {
       switchHost: "ホストを切り替え",
       local: "ローカル",
     },
+    search: {
+      placeholder: "設定を検索",
+      clear: "検索をクリア",
+      noResults: "検索に一致する設定はありません。",
+    },
     backToWorkspace: "戻る",
     addHost: "ホストを追加",
     enableBuiltInDaemon: "組み込みデーモンを有効にする",

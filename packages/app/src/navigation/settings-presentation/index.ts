@@ -32,6 +32,12 @@ export function useSettingsHostSelection(): string | null {
 
 export const selectSettingsHost = selection.selectHost;
 
+export function useSettingsSearchQuery(): string {
+  return useStore(selection.store, (state) => state.searchQuery);
+}
+
+export const setSettingsSearchQuery = selection.setSearchQuery;
+
 // Sibling routes remount the wide sidebar. Only the current mount owns its
 // offset: RN Web can deliver its final scroll callback after unmount.
 export function useSettingsSidebarScroll(enabled: boolean) {

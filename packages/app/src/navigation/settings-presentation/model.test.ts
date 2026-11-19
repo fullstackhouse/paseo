@@ -130,3 +130,16 @@ describe("Settings sidebar presentation", () => {
     expect(settings.attachSidebar().offset).toBe(0);
   });
 });
+
+describe("Settings search query", () => {
+  it("survives moving between sections and clears on leaving Settings", () => {
+    const settings = createSettingsPresentation();
+    settings.enterRoute({ key: "root", pathname: "/settings" }, "host");
+    settings.setSearchQuery("font");
+    settings.enterRoute({ key: "app", pathname: "/settings/appearance" }, "host");
+    settings.enterRoute({ key: "root", pathname: "/settings" }, "host");
+    expect(settings.store.getState().searchQuery).toBe("font");
+    settings.enterRoute({ key: "workspace", pathname: "/h/host/workspace/workspace" }, "host");
+    expect(settings.store.getState().searchQuery).toBe("");
+  });
+});

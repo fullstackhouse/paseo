@@ -7,10 +7,15 @@ interface SettingsRouteEntry {
 
 interface SettingsSelectionState {
   selectedServerId: string | null;
+  /** The settings search query; kept across sections so results survive a pick and Back. */
+  searchQuery: string;
 }
 
 export function createSettingsPresentation() {
-  const store = createStore<SettingsSelectionState>(() => ({ selectedServerId: null }));
+  const store = createStore<SettingsSelectionState>(() => ({
+    selectedServerId: null,
+    searchQuery: "",
+  }));
   const enteredRoutes = new Map<string, string>();
   let inSettings = false;
   let sidebarOffset = 0;
@@ -42,6 +47,7 @@ export function createSettingsPresentation() {
       sidebarOwner = null;
       inSettings = false;
       enteredRoutes.clear();
+      store.setState({ searchQuery: "" });
       return;
     }
     // A retained route returning through Back must not replay its old host intent.
@@ -62,5 +68,9 @@ export function createSettingsPresentation() {
     store.setState({ selectedServerId: serverId });
   }
 
-  return { store, enterRoute, selectHost, attachSidebar };
+  function setSearchQuery(searchQuery: string): void {
+    store.setState({ searchQuery });
+  }
+
+  return { store, enterRoute, selectHost, setSearchQuery, attachSidebar };
 }
