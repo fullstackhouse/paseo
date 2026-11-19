@@ -35,6 +35,7 @@ import { DEFAULT_MONO_FONT_STACK, DEFAULT_UI_FONT_STACK } from "@/styles/theme";
 import { isNative } from "@/constants/platform";
 import { settingsStyles } from "@/styles/settings";
 import { AppearancePreview } from "./appearance-preview";
+import { SettingsRevealText } from "@/components/settings/reveal-text";
 
 // Platform default stacks can be the bare native tokens ("normal"/"monospace");
 // those read as a bug, so show a human label in the placeholder instead.
@@ -96,7 +97,7 @@ function FontFamilyRow({
   return (
     <View style={withBorder ? styles.rowWithBorder : settingsStyles.row}>
       <View style={settingsStyles.rowContent}>
-        <Text style={settingsStyles.rowTitle}>{title}</Text>
+        <SettingsRevealText style={settingsStyles.rowTitle}>{title}</SettingsRevealText>
         <Text style={settingsStyles.rowHint}>{hint}</Text>
       </View>
       <TextInput
@@ -139,7 +140,7 @@ function FontSizeRow({
   return (
     <View style={withBorder ? styles.rowWithBorder : settingsStyles.row}>
       <View style={settingsStyles.rowContent}>
-        <Text style={settingsStyles.rowTitle}>{title}</Text>
+        <SettingsRevealText style={settingsStyles.rowTitle}>{title}</SettingsRevealText>
         <Text style={settingsStyles.rowHint}>{hint}</Text>
       </View>
       <View style={styles.sizeField}>
@@ -195,7 +196,9 @@ function ContentWidthRow({ value, onChange }: ContentWidthRowProps) {
   return (
     <View style={settingsStyles.row}>
       <View style={settingsStyles.rowContent}>
-        <Text style={settingsStyles.rowTitle}>{t("settings.appearance.layout.contentWidth")}</Text>
+        <SettingsRevealText style={settingsStyles.rowTitle}>
+          {t("settings.appearance.layout.contentWidth")}
+        </SettingsRevealText>
         <Text style={settingsStyles.rowHint}>
           {t("settings.appearance.layout.contentWidthHint")}
         </Text>
@@ -264,9 +267,9 @@ function SyntaxRow({ value, onChange }: SyntaxRowProps) {
   return (
     <View style={settingsStyles.row}>
       <View style={settingsStyles.rowContent}>
-        <Text style={settingsStyles.rowTitle}>
+        <SettingsRevealText style={settingsStyles.rowTitle}>
           {t("settings.appearance.syntax.highlightTheme")}
-        </Text>
+        </SettingsRevealText>
         <Text style={settingsStyles.rowHint}>
           {t("settings.appearance.syntax.highlightThemeHint")}
         </Text>

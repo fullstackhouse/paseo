@@ -2451,6 +2451,11 @@ export const ptBR: TranslationResources = {
       switchHost: "Trocar host",
       local: "Local",
     },
+    search: {
+      placeholder: "Buscar configurações",
+      clear: "Limpar busca",
+      noResults: "Nenhuma configuração corresponde à sua busca.",
+    },
     backToWorkspace: "Voltar",
     addHost: "Adicionar host",
     enableBuiltInDaemon: "Ativar o daemon integrado",

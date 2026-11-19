@@ -613,3 +613,22 @@ export async function expectRestartRecoveryPrompt(page: Page, prompt: string) {
   await sheet.getByRole("button", { name: "Cancel", exact: true }).click();
   await expect(sheet).toHaveCount(0);
 }
+
+export async function searchSettings(page: Page, query: string): Promise<void> {
+  await page.getByTestId("settings-search-input").fill(query);
+}
+
+/** Picks the search result whose title is `title` (its label reads "<title>, <location>"). */
+export async function pickSettingsSearchResult(page: Page, title: string): Promise<void> {
+  await page
+    .getByTestId("settings-sidebar")
+    .getByRole("button", { name: new RegExp(`^${title}, `) })
+    .click();
+}
+
+/** The page scrolled away from the top and the row titled `title` is on screen. */
+export async function expectSettingsRowRevealed(page: Page, title: string): Promise<void> {
+  const scrollBody = page.getByTestId("settings-detail-scroll-body");
+  await expect.poll(() => scrollBody.evaluate((node) => node.scrollTop)).toBeGreaterThan(0);
+  await expect(scrollBody.getByText(title, { exact: true })).toBeInViewport();
+}

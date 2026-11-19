@@ -2466,6 +2466,11 @@ export const es: TranslationResources = {
       switchHost: "Cambiar de anfitrión",
       local: "Local",
     },
+    search: {
+      placeholder: "Buscar en ajustes",
+      clear: "Borrar búsqueda",
+      noResults: "Ningún ajuste coincide con tu búsqueda.",
+    },
     backToWorkspace: "Atrás",
     addHost: "Agregar anfitrión",
     enableBuiltInDaemon: "Activar el demonio integrado",

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { ComponentType, ReactNode } from "react";
 import {
   Alert,
@@ -6,7 +6,9 @@ import {
   ScrollView,
   Text,
   View,
+  type NativeSyntheticEvent,
   type PressableStateCallbackType,
+  type TextInputKeyPressEventData,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useFocusEffect } from "expo-router/react-navigation";
@@ -45,6 +47,10 @@ import {
   ChevronRight,
 } from "lucide-react-native";
 import { DropdownTrigger } from "@/components/ui/dropdown-trigger";
+import { SearchField, type SearchFieldHandle } from "@/components/ui/search-field";
+import { findShortcutPlatform, isFindShortcut } from "@/pane-find";
+import { hasActiveWebOverlay } from "@/lib/overlay-root";
+import { isImeComposingKeyboardEvent } from "@/utils/keyboard-ime";
 import { ComboboxTrigger } from "@/components/ui/combobox-trigger";
 import { SidebarHeaderRow } from "@/components/sidebar/sidebar-header-row";
 import { HostPicker as SharedHostPicker } from "@/components/hosts/host-picker";
@@ -136,12 +142,27 @@ import {
 } from "@/utils/host-routes";
 import {
   selectSettingsHost,
+  requestSettingsReveal,
+  handOffSettingsSearchFocus,
+  markSettingsSearchResultOpened,
+  setSettingsSearchCursor,
+  setSettingsSearchQuery,
+  takeSettingsSearchFocus,
+  useSettingsSearchCursor,
   useSettingsHostSelection,
+  useSettingsSearchQuery,
   useSettingsSidebarScroll,
 } from "@/navigation/settings-presentation";
+import {
+  buildSettingsSearchDocs,
+  searchSettings,
+  type SettingsSearchDoc,
+} from "@/screens/settings/search/settings-search";
+import { SETTINGS_SEARCH_ENTRIES } from "@/screens/settings/search/settings-search-index";
 import { returnFromSettings, type SettingsView } from "@/navigation/settings-navigation";
 import { isNative, isWeb } from "@/constants/platform";
 import { useOpenOnboarding } from "@/onboarding";
+import { SettingsRevealText } from "@/components/settings/reveal-text";
 
 // ---------------------------------------------------------------------------
 // View model
@@ -365,7 +386,9 @@ function GeneralSection({ settings, handleLanguageChange }: GeneralSectionProps)
       <View style={settingsStyles.card}>
         <View style={settingsStyles.row}>
           <View style={settingsStyles.rowContent}>
-            <Text style={settingsStyles.rowTitle}>{t("settings.general.language.label")}</Text>
+            <SettingsRevealText style={settingsStyles.rowTitle}>
+              {t("settings.general.language.label")}
+            </SettingsRevealText>
             <Text style={settingsStyles.rowHint}>{t("settings.general.language.description")}</Text>
           </View>
           <DropdownMenu>
@@ -397,7 +420,9 @@ function ShowSetupAgainRow() {
   return (
     <View style={[settingsStyles.row, settingsStyles.rowBorder]}>
       <View style={settingsStyles.rowContent}>
-        <Text style={settingsStyles.rowTitle}>{t("settings.general.setup.label")}</Text>
+        <SettingsRevealText style={settingsStyles.rowTitle}>
+          {t("settings.general.setup.label")}
+        </SettingsRevealText>
         <Text style={settingsStyles.rowHint}>{t("settings.general.setup.description")}</Text>
       </View>
       <Button variant="secondary" onPress={openOnboarding ?? undefined} disabled={!openOnboarding}>
@@ -430,7 +455,9 @@ function DiagnosticsSection({
       <View style={settingsStyles.card}>
         <View style={settingsStyles.row} testID="app-diagnostic-row">
           <View style={settingsStyles.rowContent}>
-            <Text style={settingsStyles.rowTitle}>{t("settings.diagnostics.app.rowTitle")}</Text>
+            <SettingsRevealText style={settingsStyles.rowTitle}>
+              {t("settings.diagnostics.app.rowTitle")}
+            </SettingsRevealText>
             <Text style={settingsStyles.rowHint}>{t("settings.diagnostics.app.rowHint")}</Text>
           </View>
           <Button variant="secondary" onPress={openAppDiagnostic}>
@@ -439,7 +466,9 @@ function DiagnosticsSection({
         </View>
         <View style={settingsStyles.row}>
           <View style={settingsStyles.rowContent}>
-            <Text style={settingsStyles.rowTitle}>{t("settings.diagnostics.testAudio")}</Text>
+            <SettingsRevealText style={settingsStyles.rowTitle}>
+              {t("settings.diagnostics.testAudio")}
+            </SettingsRevealText>
             {playbackTestResult ? (
               <Text style={settingsStyles.rowHint}>{playbackTestResult}</Text>
             ) : null}
@@ -473,7 +502,9 @@ function AboutSection({ appVersion, appVersionText, isDesktopApp }: AboutSection
         <View style={settingsStyles.card}>
           <View style={settingsStyles.row}>
             <View style={settingsStyles.rowContent}>
-              <Text style={settingsStyles.rowTitle}>{t("settings.about.appVersion")}</Text>
+              <SettingsRevealText style={settingsStyles.rowTitle}>
+                {t("settings.about.appVersion")}
+              </SettingsRevealText>
               <Text style={settingsStyles.rowHint}>{t("settings.about.thisDevice")}</Text>
             </View>
             <Text style={styles.aboutValue}>{appVersionText}</Text>
@@ -504,7 +535,9 @@ function WhatsNewRow() {
       {({ hovered }: PressableStateCallbackType & { hovered?: boolean }) => (
         <>
           <View style={settingsStyles.rowContent}>
-            <Text style={settingsStyles.rowTitle}>{t("changelog.title")}</Text>
+            <SettingsRevealText style={settingsStyles.rowTitle}>
+              {t("changelog.title")}
+            </SettingsRevealText>
             <Text style={settingsStyles.rowHint}>{t("settings.about.whatsNewHint")}</Text>
           </View>
           <ChevronRight
@@ -587,9 +620,9 @@ function HostVersionRow({
   return (
     <View style={rowStyle}>
       <View style={settingsStyles.rowContent}>
-        <Text style={settingsStyles.rowTitle} numberOfLines={1}>
+        <SettingsRevealText style={settingsStyles.rowTitle} numberOfLines={1}>
           {host.label}
-        </Text>
+        </SettingsRevealText>
         {isMismatch ? (
           <Text style={settingsStyles.rowHint}>{t("settings.about.versionDiffers")}</Text>
         ) : null}
@@ -691,9 +724,9 @@ function DesktopAppUpdateRow() {
           release (fsh-updater), which has no beta channel. */}
       <View style={[settingsStyles.row, settingsStyles.rowBorder]}>
         <View style={settingsStyles.rowContent}>
-          <Text style={settingsStyles.rowTitle}>
+          <SettingsRevealText style={settingsStyles.rowTitle}>
             {t("settings.about.updates.autoInstallLabel")}
-          </Text>
+          </SettingsRevealText>
           <Text style={settingsStyles.rowHint}>
             {t("settings.about.updates.autoInstallDescription")}
           </Text>
@@ -707,7 +740,9 @@ function DesktopAppUpdateRow() {
       </View>
       <View style={[settingsStyles.row, settingsStyles.rowBorder]}>
         <View style={settingsStyles.rowContent}>
-          <Text style={settingsStyles.rowTitle}>{t("settings.about.updates.label")}</Text>
+          <SettingsRevealText style={settingsStyles.rowTitle}>
+            {t("settings.about.updates.label")}
+          </SettingsRevealText>
           <Text style={settingsStyles.rowHint}>{statusText}</Text>
           {readyUpdateVersion ? (
             <Text style={settingsStyles.rowHint}>
@@ -933,6 +968,161 @@ function SidebarGroup({ label, children }: { label?: string; children: ReactNode
   );
 }
 
+type SettingsSearchStep = 1 | -1;
+
+// Lets a burst of keystrokes settle before the section under the results changes.
+const SEARCH_AUTO_OPEN_DELAY_MS = 200;
+
+function isSettingsSearchTargetShown(
+  target: SettingsSearchDoc["target"],
+  view: SettingsView,
+): boolean {
+  if (target.kind === "section") return view.kind === "section" && view.section === target.section;
+  return view.kind === "host" && view.section === target.section;
+}
+
+function SettingsSearchBar({
+  onStep,
+  onSubmit,
+}: {
+  onStep: (step: SettingsSearchStep) => void;
+  onSubmit: () => void;
+}) {
+  const { t } = useTranslation();
+  const query = useSettingsSearchQuery();
+  const fieldRef = useRef<SearchFieldHandle>(null);
+  // Opening a result remounts the wide sidebar; keep typing where it left off.
+  useLayoutEffect(() => {
+    if (takeSettingsSearchFocus()) fieldRef.current?.focus({ select: false });
+  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      if (!isWeb) return undefined;
+      function onKeyDown(event: KeyboardEvent) {
+        if (event.defaultPrevented || hasActiveWebOverlay() || isImeComposingKeyboardEvent(event))
+          return;
+        if (!isFindShortcut(event, findShortcutPlatform())) return;
+        event.preventDefault();
+        fieldRef.current?.focus();
+      }
+      // Capture phase: RN Web text inputs stop keydown before it bubbles to the document.
+      window.addEventListener("keydown", onKeyDown, true);
+      return () => window.removeEventListener("keydown", onKeyDown, true);
+    }, []),
+  );
+  const handleKeyPress = useCallback(
+    (event: NativeSyntheticEvent<TextInputKeyPressEventData>) => {
+      const { key } = event.nativeEvent;
+      if (key !== "ArrowDown" && key !== "ArrowUp") return;
+      event.preventDefault();
+      onStep(key === "ArrowDown" ? 1 : -1);
+    },
+    [onStep],
+  );
+  return (
+    <View style={sidebarStyles.searchBar}>
+      <SearchField
+        ref={fieldRef}
+        onKeyPress={handleKeyPress}
+        onSubmit={onSubmit}
+        value={query}
+        onChangeText={setSettingsSearchQuery}
+        placeholder={t("settings.search.placeholder")}
+        clearAccessibilityLabel={t("settings.search.clear")}
+        testID="settings-search-input"
+        clearTestID="settings-search-clear"
+      />
+    </View>
+  );
+}
+
+function useSettingsSearchDocs(
+  appSections: SidebarSectionItem[],
+  hasHosts: boolean,
+): SettingsSearchDoc[] {
+  const { t } = useTranslation();
+  return useMemo(
+    () =>
+      buildSettingsSearchDocs({
+        entries: SETTINGS_SEARCH_ENTRIES,
+        appSections: appSections.map((item) => ({ id: item.id, label: t(item.labelKey) })),
+        hostSections: hasHosts
+          ? HOST_SECTION_ITEMS.map((item) => ({ id: item.id, label: t(item.labelKey) }))
+          : [],
+        appGroupLabel: t("settings.groups.app"),
+        hostGroupLabel: t("settings.groups.host"),
+        isDesktopApp: isElectronRuntime(),
+        isWeb,
+        translate: (key) => t(key),
+      }),
+    [appSections, hasHosts, t],
+  );
+}
+
+const SELECTED_STATE = { selected: true };
+
+function SettingsSearchResultRow({
+  doc,
+  isActive,
+  onSelect,
+}: {
+  doc: SettingsSearchDoc;
+  isActive: boolean;
+  onSelect: (doc: SettingsSearchDoc) => void;
+}) {
+  const handlePress = useCallback(() => onSelect(doc), [doc, onSelect]);
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${doc.title}, ${doc.location}`}
+      onPress={handlePress}
+      accessibilityState={isActive ? SELECTED_STATE : undefined}
+      testID={`settings-search-result-${doc.id}`}
+      style={isActive ? selectedSidebarItemStyle : sidebarItemStyle}
+    >
+      <View style={sidebarStyles.resultText}>
+        <Text style={sidebarStyles.resultTitle} numberOfLines={1}>
+          {doc.title}
+        </Text>
+        <Text style={sidebarStyles.resultLocation} numberOfLines={1}>
+          {doc.location}
+        </Text>
+      </View>
+    </Pressable>
+  );
+}
+
+function SettingsSearchResults({
+  results,
+  activeIndex,
+  onSelect,
+}: {
+  results: SettingsSearchDoc[];
+  activeIndex: number;
+  onSelect: (doc: SettingsSearchDoc) => void;
+}) {
+  const { t } = useTranslation();
+  if (results.length === 0) {
+    return (
+      <Text style={sidebarStyles.searchEmpty} testID="settings-search-empty">
+        {t("settings.search.noResults")}
+      </Text>
+    );
+  }
+  return (
+    <SidebarGroup>
+      {results.map((doc, index) => (
+        <SettingsSearchResultRow
+          key={doc.id}
+          doc={doc}
+          isActive={index === activeIndex}
+          onSelect={onSelect}
+        />
+      ))}
+    </SidebarGroup>
+  );
+}
+
 interface SettingsSidebarProps {
   view: SettingsView;
   onSelectSection: (section: SettingsSectionSlug) => void;
@@ -962,9 +1152,65 @@ function SettingsSidebar({
   const hasHosts = sortedHosts.length > 0;
   const enableBuiltInDaemonOption = useEnableBuiltInDaemonOption();
   const isDesktopApp = isElectronRuntime();
-  const items = SIDEBAR_SECTION_ITEMS.filter((item) => isSectionAvailable(item, isDesktopApp));
+  const items = useMemo(
+    () => SIDEBAR_SECTION_ITEMS.filter((item) => isSectionAvailable(item, isDesktopApp)),
+    [isDesktopApp],
+  );
+  const searchDocs = useSettingsSearchDocs(items, hasHosts);
+  const searchQuery = useSettingsSearchQuery();
+  const searchResults = useMemo(
+    () => searchSettings(searchDocs, searchQuery),
+    [searchDocs, searchQuery],
+  );
+  const isSearching = searchQuery.trim().length > 0;
+  const openSearchResult = useCallback(
+    (doc: SettingsSearchDoc) => {
+      if (doc.revealsRow) requestSettingsReveal(doc.title);
+      if (doc.target.kind === "section") onSelectSection(doc.target.section);
+      else onSelectHostSection(doc.target.section);
+    },
+    [onSelectHostSection, onSelectSection],
+  );
+  // A picked result becomes the highlighted one, so auto-open doesn't move off it.
+  const handleSelectSearchResult = useCallback(
+    (doc: SettingsSearchDoc) => {
+      markSettingsSearchResultOpened(doc.id);
+      setSettingsSearchCursor(Math.max(0, searchResults.indexOf(doc)));
+      openSearchResult(doc);
+    },
+    [openSearchResult, searchResults],
+  );
+  const searchCursor = useSettingsSearchCursor();
+  const activeResultIndex = searchCursor < searchResults.length ? searchCursor : 0;
+  const handleSearchStep = useCallback(
+    (step: SettingsSearchStep) => {
+      if (searchResults.length === 0) return;
+      setSettingsSearchCursor(
+        (activeResultIndex + step + searchResults.length) % searchResults.length,
+      );
+    },
+    [activeResultIndex, searchResults.length],
+  );
+  const handleSearchSubmit = useCallback(() => {
+    const doc = searchResults[activeResultIndex];
+    if (doc) handleSelectSearchResult(doc);
+  }, [activeResultIndex, handleSelectSearchResult, searchResults]);
+  const searchBar = <SettingsSearchBar onStep={handleSearchStep} onSubmit={handleSearchSubmit} />;
   const insets = useSafeAreaInsets();
   const isDesktop = layout === "desktop";
+  // On desktop the section sits beside the results, so the highlighted result opens
+  // as you type or move the highlight. On mobile opening it would hide the results.
+  const activeResult = isSearching ? searchResults[activeResultIndex] : undefined;
+  useEffect(() => {
+    if (!isDesktop || !activeResult) return undefined;
+    const timer = setTimeout(() => {
+      if (!markSettingsSearchResultOpened(activeResult.id)) return;
+      // Only a section change remounts the field; a stale handoff would steal focus later.
+      if (!isSettingsSearchTargetShown(activeResult.target, view)) handOffSettingsSearchFocus();
+      openSearchResult(activeResult);
+    }, SEARCH_AUTO_OPEN_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [activeResult, isDesktop, openSearchResult, view]);
   const sidebarScroll = useSettingsSidebarScroll(isDesktop);
   const outerContainerStyle = useMemo(
     () => [isDesktop ? sidebarStyles.desktopContainer : sidebarStyles.mobileContainer],
@@ -980,7 +1226,7 @@ function SettingsSidebar({
   if (view.kind === "project") selectedHostSection = "projects";
   if (view.kind === "plugin") selectedHostSection = "plugins";
 
-  const sidebarBody = (
+  const navigationBody = (
     <>
       <SidebarGroup label={t("settings.groups.app")}>
         {items.map((item) => (
@@ -1054,6 +1300,15 @@ function SettingsSidebar({
       )}
     </>
   );
+  const sidebarBody = isSearching ? (
+    <SettingsSearchResults
+      results={searchResults}
+      activeIndex={activeResultIndex}
+      onSelect={handleSelectSearchResult}
+    />
+  ) : (
+    navigationBody
+  );
 
   return (
     <View
@@ -1074,9 +1329,11 @@ function SettingsSidebar({
               testID="settings-back-to-workspace"
             />
           </View>
+          {searchBar}
           <ScrollView
             style={sidebarStyles.scrollBody}
             showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
             testID="settings-sidebar-scroll-body"
             {...sidebarScroll}
           >
@@ -1084,7 +1341,10 @@ function SettingsSidebar({
           </ScrollView>
         </View>
       ) : (
-        sidebarBody
+        <>
+          {searchBar}
+          {sidebarBody}
+        </>
       )}
     </View>
   );
@@ -1431,7 +1691,11 @@ export default function SettingsScreen({ view, openAddHostIntent = null }: Setti
     return (
       <View style={styles.container}>
         <BackHeader title={t("settings.title")} onBack={handleBackToWorkspace} />
-        <ScrollView style={styles.scrollView} contentContainerStyle={insetBottomStyle}>
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={insetBottomStyle}
+          keyboardShouldPersistTaps="handled"
+        >
           <SettingsSidebar
             view={view}
             onSelectSection={handleSelectSection}
@@ -1620,6 +1884,31 @@ const sidebarStyles = StyleSheet.create((theme) => ({
     color: theme.colors.foregroundMuted,
     fontWeight: theme.fontWeight.normal,
     flex: 1,
+  },
+  searchBar: {
+    flexDirection: "row",
+    paddingHorizontal: theme.spacing[2],
+    paddingTop: theme.spacing[2],
+  },
+  searchEmpty: {
+    fontSize: theme.fontSize.base,
+    color: theme.colors.foregroundMuted,
+    paddingHorizontal: theme.spacing[4],
+    paddingVertical: theme.spacing[4],
+  },
+  resultText: {
+    flex: 1,
+    minWidth: 0,
+    paddingVertical: { xs: theme.spacing[1], md: theme.spacing[0.5] },
+  },
+  resultTitle: {
+    fontSize: { xs: theme.fontSize.lg, md: theme.fontSize.base },
+    color: theme.colors.foreground,
+    fontWeight: theme.fontWeight.normal,
+  },
+  resultLocation: {
+    fontSize: theme.fontSize.sm,
+    color: theme.colors.foregroundMuted,
   },
   pickerTrigger: {
     flexDirection: "row",

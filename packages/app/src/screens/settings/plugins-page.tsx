@@ -36,6 +36,7 @@ import {
 } from "@/plugins/updates/check-plugin-updates";
 import { settingsStyles } from "@/styles/settings";
 import { confirmDialog } from "@/utils/confirm-dialog";
+import { SettingsRevealText } from "@/components/settings/reveal-text";
 
 const pluginQueryKey = (serverId: string) => ["plugins", serverId] as const;
 const PLUGIN_SOURCE_DOCS_URL = "https://paseo.sh/docs/plugins/reference#plugin-sources";
@@ -603,7 +604,9 @@ export function HostPluginsPage({ serverId }: { serverId: string }) {
         <View style={settingsStyles.card}>
           <View style={settingsStyles.row}>
             <View style={settingsStyles.rowContent}>
-              <Text style={settingsStyles.rowTitle}>{t("settings.plugins.globalTitle")}</Text>
+              <SettingsRevealText style={settingsStyles.rowTitle}>
+                {t("settings.plugins.globalTitle")}
+              </SettingsRevealText>
               <Text style={settingsStyles.rowHint}>{t("settings.plugins.globalHint")}</Text>
             </View>
             <Switch

@@ -52,6 +52,9 @@ import {
   expectSettingsHostPickerLabel,
   openSettingsHostSection,
   removeCurrentHostFromSettings,
+  searchSettings,
+  pickSettingsSearchResult,
+  expectSettingsRowRevealed,
 } from "../support/helpers/settings";
 import { getServerId } from "../support/helpers/server-id";
 import { expectAppRoute } from "../support/helpers/route-assertions";
@@ -155,6 +158,59 @@ test.describe("Settings sidebar scroll position", () => {
     await openSettingsSection(page, "diagnostics");
     await expectDiagnosticsContent(page);
     await expectSettingsSidebarScrollOffset(page, appScrollTop);
+  });
+});
+
+test.describe("Settings search", () => {
+  test.use({ viewport: { width: 1000, height: 500 } });
+
+  test("picking a setting opens its section scrolled to that row", async ({ page }) => {
+    await gotoAppShell(page);
+    await openSettings(page);
+    await searchSettings(page, "highlight theme");
+    await pickSettingsSearchResult(page, "Highlight theme");
+    await expectAppRoute(page, buildSettingsSectionRoute("appearance"));
+    await expectSettingsRowRevealed(page, "Highlight theme");
+  });
+
+  test("picking a setting in the open section scrolls to that row", async ({ page }) => {
+    await gotoAppShell(page);
+    await openSettings(page);
+    await openSettingsSection(page, "appearance");
+    await expectSettingsDetailScrollOffset(page, 0);
+    await searchSettings(page, "code size");
+    await pickSettingsSearchResult(page, "Code size");
+    await expectSettingsRowRevealed(page, "Code size");
+  });
+
+  test("typing opens the highlighted result and arrows move it, keeping focus", async ({
+    page,
+  }) => {
+    await gotoAppShell(page);
+    await openSettings(page);
+    const input = page.getByTestId("settings-search-input");
+    await input.click();
+    await input.pressSequentially("code");
+    await expectAppRoute(page, buildSettingsSectionRoute("appearance"));
+    await expect(input).toBeFocused();
+    await expect(input).toHaveValue("code");
+    await page.keyboard.press("ArrowDown");
+    await expectSettingsRowRevealed(page, "Code size");
+    await expect(input).toBeFocused();
+  });
+
+  test("Cmd/Ctrl+F focuses the search and Escape clears, then leaves it", async ({ page }) => {
+    await gotoAppShell(page);
+    await openSettings(page);
+    const input = page.getByTestId("settings-search-input");
+    await page.keyboard.press("ControlOrMeta+f");
+    await expect(input).toBeFocused();
+    await input.pressSequentially("font");
+    await page.keyboard.press("Escape");
+    await expect(input).toHaveValue("");
+    await expect(input).toBeFocused();
+    await page.keyboard.press("Escape");
+    await expect(input).not.toBeFocused();
   });
 });
 

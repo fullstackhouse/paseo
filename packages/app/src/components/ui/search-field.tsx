@@ -1,5 +1,10 @@
-import { useCallback, useRef, useState, type ReactElement } from "react";
-import { Pressable, View } from "react-native";
+import { forwardRef, useCallback, useImperativeHandle, useRef, useState } from "react";
+import {
+  Pressable,
+  View,
+  type NativeSyntheticEvent,
+  type TextInputKeyPressEventData,
+} from "react-native";
 import { Search, X } from "lucide-react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import type { Theme } from "@/styles/theme";
@@ -28,6 +33,18 @@ export interface SearchFieldProps {
   testID?: string;
   clearTestID?: string;
   autoFocus?: boolean;
+  /** Runs before the field's own Escape handling; call `preventDefault()` to claim the key. */
+  onKeyPress?: (event: NativeSyntheticEvent<TextInputKeyPressEventData>) => void;
+  /** Enter on a hardware keyboard, or the keyboard's search key. */
+  onSubmit?: () => void;
+}
+
+export interface SearchFieldHandle {
+  /**
+   * Focuses the field. By default selects its text so typing replaces the last
+   * query; `{ select: false }` puts the caret at the end instead.
+   */
+  focus(options?: { select?: boolean }): void;
 }
 
 /**
@@ -35,18 +52,24 @@ export interface SearchFieldProps {
  * the host filter pill's, so the two sit on the same rail and read as one row
  * of controls; only the border colour moves on focus, which keeps the leading
  * icon from shifting. It owns its own clear affordance — a caller rendering its
- * own X has been handed the wrong component.
+ * own X has been handed the wrong component. Escape clears a query, then leaves
+ * the field.
  */
-export function SearchField({
-  value,
-  onChangeText,
-  placeholder,
-  accessibilityLabel,
-  clearAccessibilityLabel,
-  testID,
-  clearTestID,
-  autoFocus,
-}: SearchFieldProps): ReactElement {
+export const SearchField = forwardRef<SearchFieldHandle, SearchFieldProps>(function SearchField(
+  {
+    value,
+    onChangeText,
+    placeholder,
+    accessibilityLabel,
+    clearAccessibilityLabel,
+    testID,
+    clearTestID,
+    autoFocus,
+    onKeyPress,
+    onSubmit,
+  },
+  ref,
+) {
   const [isFocused, setIsFocused] = useState(false);
   const inputRef = useRef<EditingTextInputHandle>(null);
   const handleFocus = useCallback(() => setIsFocused(true), []);
@@ -55,6 +78,28 @@ export function SearchField({
     inputRef.current?.replaceText("");
     onChangeText("");
   }, [onChangeText]);
+  useImperativeHandle(
+    ref,
+    () => ({
+      focus: (options) => {
+        const input = inputRef.current;
+        if (!input) return;
+        input.focus();
+        const end = input.getText().length;
+        input.setSelection({ start: options?.select === false ? end : 0, end });
+      },
+    }),
+    [],
+  );
+  const handleKeyPress = useCallback(
+    (event: NativeSyntheticEvent<TextInputKeyPressEventData>) => {
+      onKeyPress?.(event);
+      if (event.defaultPrevented || event.nativeEvent.key !== "Escape") return;
+      if (inputRef.current?.getText()) handleClear();
+      else inputRef.current?.blur();
+    },
+    [handleClear, onKeyPress],
+  );
 
   return (
     <View style={[styles.field, isFocused && styles.fieldFocused]}>
@@ -66,6 +111,8 @@ export function SearchField({
         onChangeText={onChangeText}
         onFocus={handleFocus}
         onBlur={handleBlur}
+        onKeyPress={handleKeyPress}
+        onSubmitEditing={onSubmit}
         placeholder={placeholder}
         accessibilityLabel={accessibilityLabel ?? placeholder}
         autoCapitalize="none"
@@ -87,7 +134,7 @@ export function SearchField({
       ) : null}
     </View>
   );
-}
+});
 
 const SEARCH_FIELD_MAX_WIDTH = 420;
 

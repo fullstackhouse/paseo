@@ -6,6 +6,7 @@ import { SettingsSection } from "@/components/settings";
 import { FormTextInput } from "@/components/ui/form-field";
 import { parseTerminalScrollbackLines, useAppSettings } from "@/hooks/use-settings";
 import { settingsStyles } from "@/styles/settings";
+import { SettingsRevealText } from "@/components/settings/reveal-text";
 
 export function TerminalSection() {
   const { t } = useTranslation();
@@ -34,9 +35,9 @@ export function TerminalSection() {
       <View style={settingsStyles.card}>
         <View style={settingsStyles.row}>
           <View style={settingsStyles.rowContent}>
-            <Text style={settingsStyles.rowTitle}>
+            <SettingsRevealText style={settingsStyles.rowTitle}>
               {t("settings.general.terminalScrollback.label")}
-            </Text>
+            </SettingsRevealText>
             <Text style={settingsStyles.rowHint}>
               {t("settings.general.terminalScrollback.description")}
             </Text>

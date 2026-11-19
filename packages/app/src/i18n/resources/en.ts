@@ -2441,6 +2441,11 @@ export const en = {
       switchHost: "Switch host",
       local: "Local",
     },
+    search: {
+      placeholder: "Search settings",
+      clear: "Clear search",
+      noResults: "No settings match your search.",
+    },
     backToWorkspace: "Back",
     addHost: "Add host",
     enableBuiltInDaemon: "Enable built-in daemon",
