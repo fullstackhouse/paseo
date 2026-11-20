@@ -111,7 +111,7 @@ async function withSharedMarkdownFiles(page: Page, run: () => Promise<void>) {
 }
 
 async function returnToSharedMarkdownChat(page: Page) {
-  await page.getByRole("button", { name: "Shared Markdown", exact: true }).click();
+  await agentTab(page, "Shared Markdown").click();
 }
 
 async function openSharedMarkdownFile(page: Page, name: string) {
@@ -253,7 +253,7 @@ test("inline-code paths preserve stable recognition and file navigation", async 
 });
 
 async function openInlineRegressionFile(page: Page, path: string) {
-  await page.getByRole("button", { name: "Inline path regression", exact: true }).click();
+  await agentTab(page, "Inline path regression").click();
   await page
     .getByTestId("assistant-message")
     .getByRole("link", { name: path, exact: true })
@@ -306,3 +306,10 @@ test("Markdown images show a zoom-in cursor", async ({ page }) => {
     await session.cleanup();
   }
 });
+
+/** The agent's tab, not the Overview row that names the same agent when Explorer is open. */
+function agentTab(page: Page, name: string) {
+  return page
+    .getByRole("button", { name, exact: true })
+    .and(page.locator('[data-testid^="workspace-tab-"]'));
+}
