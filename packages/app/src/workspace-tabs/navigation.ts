@@ -1,5 +1,6 @@
 import { useWorkspaceLayoutStore } from "@/stores/workspace-layout-store";
 import { usePanelStore } from "@/stores/panel-store";
+import { noteExplicitExplorerReveal } from "@/workspace-attention/explicit-reveal";
 
 /** Reveals the actual destination after placement and deduplication, including existing tabs. */
 export function revealWorkspaceTab(workspaceKey: string, tabId: string | null): string | null {
@@ -10,6 +11,7 @@ export function revealWorkspaceTab(workspaceKey: string, tabId: string | null): 
   if (!destination) return null;
   if (destination.kind === "sheet") return tabId;
   store.focusTab(workspaceKey, tabId);
+  if (destination.host === "explorer") noteExplicitExplorerReveal(workspaceKey);
   if (store.layoutMode === "compact") {
     const panels = usePanelStore.getState();
     if (destination.host === "explorer") panels.showMobileFileExplorer();

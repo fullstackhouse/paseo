@@ -7,6 +7,7 @@ import {
 import { collectAllTabs } from "@/stores/workspace-layout-actions";
 import { openExplorerSidebarView, showExplorerSidebar } from "@/workspace-tabs/explorer-sidebar";
 import { useWorkspaceAttention } from "./attention";
+import { takeExplicitExplorerReveal } from "./explicit-reveal";
 import { useSessionStore } from "@/stores/session-store";
 import {
   decideExplorerAutoShow,
@@ -93,6 +94,8 @@ export function useExplorerAutoShow(input: {
     decidedForRef.current = workspaceKey;
     const store = useWorkspaceLayoutStore.getState();
     store.autoOpenOverviewTab(workspaceKey);
+    // Entered by opening an Explorer tab: that tab stays selected; its items wait for the next entry.
+    if (takeExplicitExplorerReveal(workspaceKey)) return;
     const decision = decideExplorerAutoShow({
       setting,
       items: itemsRef.current,
