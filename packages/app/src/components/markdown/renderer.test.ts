@@ -284,6 +284,9 @@ describe("bare URL sentence punctuation", () => {
     ["http://[::1]:8059/?token=t-1", "'"],
     ["https://github.com/o/r/compare/main...user:repo:fix/branch", ""],
     ["https://example.com/a:b/c", ":"],
+    ["file:///Users/test/.ai/prototypes/overview-v3/index.html", ""],
+    ["file:///Users/test/project/src/app.tsx#L81", "."],
+    ["file:///C:/Users/test/app.tsx", ","],
   ])("links %s whole and leaves %j outside", async (url, punctuation) => {
     const prepared = prepareMarkdownSource(`See ${url}${punctuation} now`);
     const tree = recognizeTextLinks(
@@ -300,6 +303,17 @@ describe("bare URL sentence punctuation", () => {
       },
       { type: "Text", content: `${punctuation} now` },
     ]);
+  });
+
+  it("links a bare file URL at the start of a line", async () => {
+    const url = "file:///Users/test/.ai/prototypes/overview-v3/index.html";
+    const prepared = prepareMarkdownSource(`Open locally:\n${url}`);
+    const tree = recognizeTextLinks(
+      await parseMarkdown(prepared.render(), { latexMath: false }),
+      prepared.linkRecognition.text,
+      prepared.linkRecognition.inlineCode,
+    );
+    expect(JSON.stringify(tree)).toContain(`"url":"${url}"`);
   });
 
   it.each(["[Authored](https://example.com/a.)", "<https://example.com/a.>"])(
