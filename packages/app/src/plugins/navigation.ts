@@ -3,6 +3,7 @@ import { router } from "expo-router";
 import type { PluginPanelLocation } from "@getpaseo/plugin/client";
 import { navigateToWorkspace } from "@/stores/navigation-active-workspace-store";
 import { useWorkspaceLayoutStore } from "@/stores/workspace-layout-store";
+import { showWorkspaceExplorer } from "./explorer-placement";
 import { buildPluginSurfaceRoute } from "./routes";
 import type { PluginNavigation } from "./actions";
 
@@ -28,11 +29,13 @@ export function createPluginNavigation(input: {
         buildPluginSurfaceRoute(serverId, pluginId, { kind: "surface", id: surfaceId }, params),
       );
     },
-    openScreenTab({ pluginId, screenId, params, workspaceId: targetWorkspaceId }) {
+    openScreenTab({ pluginId, screenId, params, workspaceId: targetWorkspaceId, location }) {
       navigateToWorkspace({
         serverId,
         workspaceId: targetWorkspaceId,
         target: { kind: "plugin_screen", pluginId, screenId, params },
+        placement:
+          location === "explorer" ? showWorkspaceExplorer(serverId, targetWorkspaceId) : undefined,
       });
     },
     openWorkspacePanel(pluginId, panelId, location) {

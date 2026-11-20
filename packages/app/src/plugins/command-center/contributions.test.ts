@@ -190,6 +190,13 @@ describe("plugin Command Center contributions", () => {
       rpcValue = (await context.rpc(inspect, { value: 4 })).value;
       context.openSurface("main");
       context.openScreen({ screenId: "main", params: { id: "1" }, workspaceId: workspace.id });
+      context.openScreen({
+        screenId: "main",
+        params: { id: "2" },
+        workspaceId: workspace.id,
+        location: "explorer",
+      });
+      expect(context.screenTabLocations).toContain("explorer");
       context.openPanel("details", { location: "explorer" });
     });
     const actions = buildPluginCommandCenterContributions({
@@ -202,8 +209,8 @@ describe("plugin Command Center contributions", () => {
         openSurface(pluginId, surfaceId) {
           opened.push(`${pluginId}/surface/${surfaceId}`);
         },
-        openScreenTab({ pluginId, screenId, workspaceId }) {
-          opened.push(`${pluginId}/tab/${screenId}/${workspaceId}`);
+        openScreenTab({ pluginId, screenId, workspaceId, location }) {
+          opened.push(`${pluginId}/tab/${screenId}/${workspaceId}/${location}`);
         },
         openWorkspacePanel(pluginId, panelId, location) {
           opened.push(`${pluginId}/workspace/${panelId}/${location}`);
@@ -224,7 +231,8 @@ describe("plugin Command Center contributions", () => {
     expect(receivedPaseo).toBe(installed.paseo);
     expect(opened).toEqual([
       "review/surface/main",
-      `review/tab/main/${workspace.id}`,
+      `review/tab/main/${workspace.id}/workspace`,
+      `review/tab/main/${workspace.id}/explorer`,
       "review/agent/details/agent-1/explorer",
     ]);
   });

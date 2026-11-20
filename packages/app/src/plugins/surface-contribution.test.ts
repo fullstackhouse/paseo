@@ -159,13 +159,19 @@ describe("parsePluginOpenScreenInput", () => {
       screenId: "bot",
       params: {},
       workspaceId: null,
+      location: "workspace",
     });
     expect(parsePluginOpenScreenInput(plugin, { screenId: "bot", params: { botId: "2" } })).toEqual(
-      { screenId: "bot", params: { botId: "2" }, workspaceId: null },
+      { screenId: "bot", params: { botId: "2" }, workspaceId: null, location: "workspace" },
     );
     expect(
       parsePluginOpenScreenInput(plugin, { screenId: "bot", params: { serverId: "x" } }),
-    ).toEqual({ screenId: "bot", params: { serverId: "x" }, workspaceId: null });
+    ).toEqual({
+      screenId: "bot",
+      params: { serverId: "x" },
+      workspaceId: null,
+      location: "workspace",
+    });
   });
 
   it("takes a workspace to open the screen in as a tab", () => {
@@ -173,6 +179,7 @@ describe("parsePluginOpenScreenInput", () => {
       screenId: "bot",
       params: {},
       workspaceId: "ws-1",
+      location: "workspace",
     });
     expect(parsePluginOpenScreenInput(plugin, { screenId: "bot", workspaceId: " " })).toMatchObject(
       {
@@ -184,9 +191,26 @@ describe("parsePluginOpenScreenInput", () => {
     );
   });
 
+  it("takes the Explorer sidebar as the tab's location", () => {
+    expect(
+      parsePluginOpenScreenInput(plugin, {
+        screenId: "bot",
+        workspaceId: "ws-1",
+        location: "explorer",
+      }),
+    ).toMatchObject({ workspaceId: "ws-1", location: "explorer" });
+    expect(() =>
+      parsePluginOpenScreenInput(plugin, {
+        screenId: "bot",
+        workspaceId: "ws-1",
+        location: "side",
+      }),
+    ).toThrow('location must be "workspace" or "explorer"');
+  });
+
   it("throws on a bare id, an unknown screen, or params that are not strings", () => {
     expect(() => parsePluginOpenScreenInput(plugin, "bot")).toThrow(
-      "{ screenId, params?, workspaceId? }",
+      "{ screenId, params?, workspaceId?, location? }",
     );
     expect(() => parsePluginOpenScreenInput(plugin, { screenId: "missing" })).toThrow(
       "unavailable: missing",

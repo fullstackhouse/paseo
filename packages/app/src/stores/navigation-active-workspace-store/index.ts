@@ -36,7 +36,7 @@ const lastWorkspaceSelectionStore = createLastWorkspaceSelectionStore(
 
 function navigateDeps(): NavigateToWorkspaceDeps {
   return {
-    revealTab: revealWorkspaceTab,
+    revealTab: (workspaceKey, tabId) => revealWorkspaceTab(workspaceKey, tabId, { entering: true }),
     revealWorkspace: () => {
       if (useWorkspaceLayoutStore.getState().layoutMode === "compact") {
         usePanelStore.getState().showMobileAgent();

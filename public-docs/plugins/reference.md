@@ -727,6 +727,11 @@ the same screen with the same params focuses the existing tab; other params open
 a tab the screen gets the same props, and Paseo owns the tab's title, close button, and error
 boundary. Hosts older than this field ignore it and open the screen over the app.
 
+Add `location: "explorer"` to open that tab in the workspace's Explorer sidebar, beside the
+conversation, and show the sidebar. An existing tab moves there. The default, `"workspace"`, opens
+it in the main pane. Older hosts ignore `location` and open the tab in the main pane; check that
+`client.screenTabLocations` includes `"explorer"` before relying on it.
+
 ### Sidebar items
 
 `addSidebarHeaderItem` adds a row to the list at the top of the sidebar. `addSidebarFooterItem`
