@@ -179,11 +179,17 @@ describe("buildStatusGroups", () => {
         statusEnteredAt: d("2026-01-01T00:00:00Z"),
       }),
       ws({ workspaceKey: "srv:dn", statusBucket: "done", statusEnteredAt: null }),
+      ws({
+        workspaceKey: "srv:blk",
+        statusBucket: "blocked",
+        statusEnteredAt: d("2026-01-01T00:00:00Z"),
+      }),
     ];
 
     const groups = buildStatusGroups(workspaces, emptyProjectNames, i18n.t);
 
     expect(groups.map((g) => g.bucket)).toEqual(STATUS_BUCKET_ORDER);
+    expect(groups.at(-1)?.label).toBe("Blocked");
     expect(groups.map((g) => g.label)).toEqual(
       STATUS_BUCKET_ORDER.map((b) => getStatusBucketLabel(b, i18n.t)),
     );
@@ -242,6 +248,7 @@ describe("getStatusBucketLabel", () => {
         "À relire",
         "En cours",
         "Terminé",
+        "Bloqué",
       ]);
     } finally {
       await i18n.changeLanguage("en");

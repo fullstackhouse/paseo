@@ -60,6 +60,8 @@ describe("WorkspaceSummaryStore", () => {
       workState: "working",
     });
     expect(store.forWorkspace("s", "w")[0]?.workState).toBe("working");
+    item.update({ workState: "blocked" });
+    expect(store.forWorkspace("s", "w")[0]?.workState).toBe("blocked");
     item.update({ workState: null });
     expect(store.forWorkspace("s", "w")[0]?.workState).toBeUndefined();
     item.update({ workState: "bogus" as never });

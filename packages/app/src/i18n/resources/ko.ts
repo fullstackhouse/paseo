@@ -1268,6 +1268,7 @@ export const ko: TranslationResources = {
       readyToReview: "검토 대기",
       working: "실행 중",
       done: "완료",
+      blocked: "막힘",
     },
     display: {
       showBackground: "백그라운드 표시",

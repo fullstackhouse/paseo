@@ -1279,6 +1279,7 @@ export const ru: TranslationResources = {
       readyToReview: "На проверку",
       working: "В работе",
       done: "Готово",
+      blocked: "Заблокировано",
     },
     display: {
       showBackground: "Показать фоновые пространства",

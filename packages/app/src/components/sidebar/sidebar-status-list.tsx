@@ -6,6 +6,7 @@ import {
   useMemo,
   useState,
   type MutableRefObject,
+  type ReactElement,
   type ReactNode,
   type Ref,
 } from "react";
@@ -32,6 +33,7 @@ import {
   CircleAlert,
   CircleCheck,
   CircleDot,
+  CirclePause,
   CircleX,
 } from "lucide-react-native";
 import { useToast } from "@/contexts/toast-context";
@@ -99,6 +101,7 @@ const ThemedChevronRight = withUnistyles(ChevronRight);
 const ThemedCircleAlert = withUnistyles(CircleAlert);
 const ThemedCircleCheck = withUnistyles(CircleCheck);
 const ThemedCircleDot = withUnistyles(CircleDot);
+const ThemedCirclePause = withUnistyles(CirclePause);
 const ThemedCircleX = withUnistyles(CircleX);
 const EMPTY_SHORTCUT_INDEX = new Map<string, number>();
 
@@ -524,7 +527,7 @@ function StatusGroupLeadingVisual({
   return <ThemedChevronDown uniProps={mutedGroupIconProps} />;
 }
 
-function StatusGroupIcon({ bucket }: { bucket: StatusBucket }) {
+function StatusGroupIcon({ bucket }: { bucket: StatusBucket }): ReactElement {
   switch (bucket) {
     case "needs_input":
       return <ThemedCircleAlert uniProps={needsInputGroupIconProps} />;
@@ -536,6 +539,8 @@ function StatusGroupIcon({ bucket }: { bucket: StatusBucket }) {
       return <ThemedCircleDot uniProps={runningGroupIconProps} />;
     case "done":
       return <ThemedCircleCheck uniProps={mutedGroupIconProps} />;
+    case "blocked":
+      return <ThemedCirclePause uniProps={mutedGroupIconProps} />;
   }
 }
 

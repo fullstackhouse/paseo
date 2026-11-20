@@ -1271,6 +1271,7 @@ export const en = {
       readyToReview: "Ready to review",
       working: "Working",
       done: "Done",
+      blocked: "Blocked",
     },
     display: {
       showBackground: "Show background",

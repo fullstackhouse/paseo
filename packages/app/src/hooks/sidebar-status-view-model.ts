@@ -12,6 +12,7 @@ const STATUS_BUCKET_LABEL_KEYS = {
   attention: "sidebar.statusBucket.readyToReview",
   running: "sidebar.statusBucket.working",
   done: "sidebar.statusBucket.done",
+  blocked: "sidebar.statusBucket.blocked",
 } as const satisfies Record<StatusBucket, string>;
 
 export function getStatusBucketLabel(bucket: StatusBucket, t: TFunction): string {

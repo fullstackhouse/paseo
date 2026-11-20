@@ -1274,6 +1274,7 @@ export const ja: TranslationResources = {
       readyToReview: "レビュー待ち",
       working: "実行中",
       done: "完了",
+      blocked: "ブロック中",
     },
     display: {
       showBackground: "バックグラウンドを表示",

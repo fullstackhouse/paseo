@@ -1253,6 +1253,7 @@ export const zhCN: TranslationResources = {
       readyToReview: "待查看",
       working: "运行中",
       done: "已完成",
+      blocked: "受阻",
     },
     display: {
       showBackground: "显示后台工作区",
