@@ -2230,7 +2230,6 @@ export const ja: TranslationResources = {
         done: "完了",
         answered: "回答済み",
       },
-      now: "現在",
       yourMove: "あなたの番",
       permissionTitle: "権限リクエスト",
       open: "開く",

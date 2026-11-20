@@ -60,7 +60,6 @@ import {
   permissionFacts,
   permissionResponse,
   pullRequestFacts,
-  showNowLine,
   type WorkspaceStateWord,
   type YourMoveRow,
 } from "./overview/model";
@@ -279,28 +278,21 @@ function StatusBlock({
   if (!status) return null;
   const state: StatusTone = status.answered ? "answered" : status.state;
   const outdated = isStatusOutdated({ updatedAt: status.updatedAt, agentRunning, lastPromptAt });
+  // One line: the state word leads the agent's summary. "Now" stays in the Status tab; next to the
+  // summary it described the same progress twice.
   const content = (
     <>
       <View style={styles.stateLine}>
         <View style={dotStyle(state)} />
-        <Text style={stateWordStyle(state)}>{t(`panels.overview.state.${state}`)}</Text>
-        <View style={styles.fill} />
-        {item?.panelId ? (
-          <ThemedChevronRight size={SMALL_ICON_SIZE} uniProps={extraMutedColorMapping} />
-        ) : null}
+        <Text style={outdated ? styles.summaryStale : styles.summary} numberOfLines={5}>
+          <Text style={stateWordStyle(state)}>{t(`panels.overview.state.${state}`)}</Text>
+          {" · "}
+          {status.summary}
+        </Text>
       </View>
       {outdated && lastPromptAt !== null ? (
         <Text style={styles.outdated} testID="overview-status-outdated">
           {t("panels.overview.outdated", { time: formatTimeAgo(new Date(lastPromptAt)) })}
-        </Text>
-      ) : null}
-      <Text style={outdated ? styles.summaryStale : styles.summary} numberOfLines={5}>
-        {status.summary}
-      </Text>
-      {showNowLine(status) ? (
-        <Text style={outdated ? styles.nowStale : styles.now}>
-          <Text style={styles.nowLabel}>{t("panels.overview.now")} </Text>
-          {status.now}
         </Text>
       ) : null}
     </>
@@ -1064,8 +1056,13 @@ export const overviewPanelRegistration = definePanel("overview", {
 });
 
 const styles = StyleSheet.create((theme) => {
-  const dot = { width: 8, height: 8, borderRadius: theme.borderRadius.full } as const;
-  const stateWord = { fontSize: theme.fontSize.sm, fontWeight: theme.fontWeight.semibold } as const;
+  const dot = {
+    width: 8,
+    height: 8,
+    borderRadius: theme.borderRadius.full,
+    marginTop: 7,
+  } as const;
+  const stateWord = { fontWeight: theme.fontWeight.semibold } as const;
   const word = { fontSize: theme.fontSize.sm, flexShrink: 0, maxWidth: "50%" } as const;
   const lead = {
     gap: theme.spacing[3],
@@ -1074,7 +1071,6 @@ const styles = StyleSheet.create((theme) => {
     borderWidth: 1,
   } as const;
   const summary = { fontSize: theme.fontSize.base, color: theme.colors.foreground } as const;
-  const now = { fontSize: theme.fontSize.sm, color: theme.colors.foregroundMuted } as const;
   const contextRow = {
     flexDirection: "row",
     alignItems: "center",
@@ -1106,16 +1102,15 @@ const styles = StyleSheet.create((theme) => {
       color: theme.colors.foregroundExtraMuted,
     },
     story: {
-      gap: theme.spacing[1.5],
-      paddingHorizontal: theme.spacing[3],
-      paddingVertical: theme.spacing[3],
+      gap: theme.spacing[1],
+      paddingVertical: theme.spacing[1],
+      paddingHorizontal: theme.spacing[1],
       marginHorizontal: -theme.spacing[1],
-      borderRadius: theme.borderRadius.lg,
-      backgroundColor: theme.colors.surface1,
+      borderRadius: theme.borderRadius.md,
     },
     stateLine: {
       flexDirection: "row",
-      alignItems: "center",
+      alignItems: "flex-start",
       gap: theme.spacing[2],
     },
     fill: { flex: 1 },
@@ -1135,12 +1130,6 @@ const styles = StyleSheet.create((theme) => {
     },
     summary,
     summaryStale: { ...summary, opacity: 0.55 },
-    now,
-    nowStale: { ...now, opacity: 0.55 },
-    nowLabel: {
-      fontWeight: theme.fontWeight.medium,
-      color: theme.colors.foreground,
-    },
     moves: {
       gap: theme.spacing[2],
     },

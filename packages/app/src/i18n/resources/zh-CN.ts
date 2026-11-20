@@ -2182,7 +2182,6 @@ export const zhCN: TranslationResources = {
         done: "完成",
         answered: "已回复",
       },
-      now: "当前",
       yourMove: "待你处理",
       permissionTitle: "权限请求",
       open: "打开",

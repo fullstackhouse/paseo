@@ -128,11 +128,6 @@ export function overviewSubtitle(input: {
   return input.goal || input.project || null;
 }
 
-/** "Now" on a done card restates the state ("Nothing left"). */
-export function showNowLine(status: Pick<PluginWorkspaceStatus, "now" | "state">): boolean {
-  return Boolean(status.now) && status.state !== "done";
-}
-
 /**
  * The one Code row worth showing, if any. The git move already names the PR (or, without one, the
  * branch), so the row would repeat it; a branch row with nothing to report is skipped too.

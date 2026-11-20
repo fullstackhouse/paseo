@@ -2257,7 +2257,6 @@ export const fr: TranslationResources = {
         done: "Terminé",
         answered: "Répondu",
       },
-      now: "Maintenant",
       yourMove: "À vous",
       permissionTitle: "Demande d’autorisation",
       open: "Ouvrir",

@@ -2242,7 +2242,6 @@ export const ptBR: TranslationResources = {
         done: "Concluído",
         answered: "Respondido",
       },
-      now: "Agora",
       yourMove: "Sua vez",
       permissionTitle: "Pedido de permissão",
       open: "Abrir",

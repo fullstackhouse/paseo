@@ -2257,7 +2257,6 @@ export const es: TranslationResources = {
         done: "Hecho",
         answered: "Respondido",
       },
-      now: "Ahora",
       yourMove: "Tu turno",
       permissionTitle: "Solicitud de permiso",
       open: "Abrir",

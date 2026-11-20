@@ -17,7 +17,6 @@ import {
   MAX_ENTRIES_PER_ITEM,
   overviewSubtitle,
   partitionSummaryItems,
-  showNowLine,
 } from "./model";
 
 function summaryItem(patch: Partial<WorkspaceSummaryItem>): WorkspaceSummaryItem {
@@ -174,14 +173,6 @@ describe("overviewSubtitle", () => {
     expect(overviewSubtitle({ goal: "Ship it", project: "paseo" })).toBe("Ship it");
     expect(overviewSubtitle({ goal: null, project: "paseo" })).toBe("paseo");
     expect(overviewSubtitle({ goal: "", project: null })).toBe(null);
-  });
-});
-
-describe("showNowLine", () => {
-  it("hides Now on a done card", () => {
-    expect(showNowLine({ state: "done", now: "Nothing left." })).toBe(false);
-    expect(showNowLine({ state: "working", now: "Running tests" })).toBe(true);
-    expect(showNowLine({ state: "working", now: undefined })).toBe(false);
   });
 });
 

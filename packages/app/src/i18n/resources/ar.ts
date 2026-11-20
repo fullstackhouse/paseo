@@ -2205,7 +2205,6 @@ export const ar: TranslationResources = {
         done: "منتهٍ",
         answered: "تم الرد",
       },
-      now: "الآن",
       yourMove: "دورك",
       permissionTitle: "طلب إذن",
       open: "فتح",

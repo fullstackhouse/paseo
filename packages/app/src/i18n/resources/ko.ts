@@ -2217,7 +2217,6 @@ export const ko: TranslationResources = {
         done: "완료",
         answered: "응답함",
       },
-      now: "현재",
       yourMove: "내 차례",
       permissionTitle: "권한 요청",
       open: "열기",

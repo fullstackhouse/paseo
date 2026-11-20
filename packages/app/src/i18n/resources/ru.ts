@@ -2243,7 +2243,6 @@ export const ru: TranslationResources = {
         done: "Готово",
         answered: "Отвечено",
       },
-      now: "Сейчас",
       yourMove: "Ваш ход",
       permissionTitle: "Запрос разрешения",
       open: "Открыть",

@@ -2232,7 +2232,6 @@ export const en = {
         done: "Done",
         answered: "Answered",
       },
-      now: "Now",
       yourMove: "Your move",
       permissionTitle: "Permission request",
       open: "Open",

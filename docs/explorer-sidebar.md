@@ -161,9 +161,10 @@ is the storyboard in `.ai/prototypes/overview-v3/`.
 
 - **What is this?** The workspace name, then the status card's goal as its subtitle (the project name without one).
   No ⋯ menu: archive, editor and branch actions live in the workspace header and the sidebar.
-- **Where does it stand?** The summary item that carries `status` (paseo-status), as a block: a dot and state word, the
-  summary, and "Now" unless the state is done. When someone prompted an agent after the card's last update and no
-  agent runs now, the block dims and says so. Without a card, nothing.
+- **Where does it stand?** The summary item that carries `status` (paseo-status), as one line: a dot and state word,
+  then the agent's summary. "Now" stays in the Status tab; next to the summary it repeated the same progress. When
+  someone prompted an agent after the card's last update and no agent runs now, the line dims and says so. Without a
+  card, nothing.
 - **What do I do?** Your move: the attention items, one row per plugin `entries` item, then failing checks and the
   header's primary git action, from the same `useGitActions` result so the two can't disagree. The first item is a card
   with its actions; the rest are one-line rows. A plain tool permission is answered in place with its own actions;

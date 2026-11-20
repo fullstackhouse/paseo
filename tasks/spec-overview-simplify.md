@@ -194,6 +194,8 @@ Desired state above, the storyboard wins once approved.
 Made while building, on the review of the running app (2026-11-20). They supersede the storyboard where they differ:
 
 - **No calm line.** An empty Your move renders nothing; "Nothing needs you" was noise.
+- **One status line.** The state word leads the summary inline, with no box. "Now" is dropped from Overview (it
+  repeated the summary's progress); the Status tab still shows it.
 - **No fallback for a missing status card.** "No status reported" is gone; without a card the block renders nothing.
 - **Agent row:** shown only as an "Agents" context row when several root agents share the workspace (storyboard s9).
   This replaces Q3's "only when it differs".
