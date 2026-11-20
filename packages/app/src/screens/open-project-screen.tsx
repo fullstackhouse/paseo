@@ -245,7 +245,8 @@ const styles = StyleSheet.create((theme) => ({
     maxWidth: 452,
     flexDirection: "row",
     flexWrap: "wrap",
-    justifyContent: "flex-start",
+    // Full rows fill the width exactly, so this only centers an odd last tile.
+    justifyContent: "center",
     gap: theme.spacing[3],
   },
   tile: {
