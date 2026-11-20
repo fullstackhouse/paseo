@@ -221,6 +221,7 @@ describe("migrateAppSettings", () => {
 
   it("moves the Explorer to open on every workspace once, then keeps a later pick", async () => {
     const storage = createInMemoryKeyValueStorage();
+    storage.entries.set(SETTINGS_MIGRATIONS_KEY, JSON.stringify({ applied: ["steer-default"] }));
     const needed: AppSettings = { ...DEFAULT_CLIENT_SETTINGS, explorerOnWorkspaceEnter: "needed" };
 
     const first = await migrateAppSettings(needed, storage);
@@ -231,5 +232,12 @@ describe("migrateAppSettings", () => {
 
     const never: AppSettings = { ...DEFAULT_CLIENT_SETTINGS, explorerOnWorkspaceEnter: "never" };
     expect((await migrateAppSettings(never, storage)).explorerOnWorkspaceEnter).toBe("never");
+  });
+
+  it("leaves a fresh profile's seeded Explorer setting alone", async () => {
+    const storage = createInMemoryKeyValueStorage();
+    const needed: AppSettings = { ...DEFAULT_CLIENT_SETTINGS, explorerOnWorkspaceEnter: "needed" };
+
+    expect((await migrateAppSettings(needed, storage)).explorerOnWorkspaceEnter).toBe("needed");
   });
 });

@@ -26,7 +26,8 @@ const COLLAPSE_TOOL_CALLS_DEFAULT_MIGRATION = "collapse-tool-calls-default";
 /**
  * Entering a workspace opened the Explorer only "when something needs you" by default, and that
  * default was materialized into storage, so it cannot be told apart from a deliberate pick. This
- * moves every install to "always" once; picking another value afterwards sticks.
+ * moves every existing install to "always" once; picking another value afterwards sticks. A fresh
+ * profile has nothing stale and keeps whatever its storage was seeded with.
  */
 const EXPLORER_ALWAYS_DEFAULT_MIGRATION = "explorer-always-default";
 
@@ -84,7 +85,7 @@ export async function migrateAppSettings(
 
   if (!applied.has(EXPLORER_ALWAYS_DEFAULT_MIGRATION)) {
     migrated =
-      migrated.explorerOnWorkspaceEnter === "always"
+      migrationMarker === null || migrated.explorerOnWorkspaceEnter === "always"
         ? migrated
         : { ...migrated, explorerOnWorkspaceEnter: "always" };
     applied.add(EXPLORER_ALWAYS_DEFAULT_MIGRATION);
