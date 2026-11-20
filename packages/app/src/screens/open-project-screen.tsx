@@ -1,10 +1,10 @@
 import { useHosts, useHostRuntimeLastError } from "@/runtime/host-runtime";
-import { useCallback, useEffect, useState, type ComponentType } from "react";
+import { useCallback, useEffect, useMemo, useState, type ComponentType } from "react";
 import { useTranslation } from "react-i18next";
 import { View, Text, Pressable, ScrollView } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { useRouter } from "expo-router";
-import { FolderOpen, Inbox, Plug, Smartphone } from "lucide-react-native";
+import { FolderOpen, Inbox, Plug, Plus, Smartphone } from "lucide-react-native";
 import { PaseoLogo } from "@/components/icons/paseo-logo";
 import { CommunityLinks } from "@/components/community-links";
 import { MenuHeader } from "@/components/headers/menu-header";
@@ -20,7 +20,9 @@ import {
 } from "@/constants/layout";
 import { useLocalDaemonServerId } from "@/hooks/use-is-local-daemon";
 import { PairDeviceModal } from "@/desktop/components/pair-device-modal";
-import { buildSettingsHostSectionRoute } from "@/utils/host-routes";
+import { buildNewWorkspaceRoute, buildSettingsHostSectionRoute } from "@/utils/host-routes";
+import { useHostProjects } from "@/projects/host-projects";
+import { resolveHomeTiles, type HomeTileId } from "@/screens/open-project/home-tiles";
 
 const WINDOW_CONTENT_DATASET = { "window-content": "" };
 
@@ -34,6 +36,8 @@ export function OpenProjectScreen() {
   const chooseHost = useHostChooser();
   const localServerId = useLocalDaemonServerId();
   const [isPairDeviceOpen, setIsPairDeviceOpen] = useState(false);
+  const hostServerIds = useMemo(() => hosts.map((host) => host.serverId), [hosts]);
+  const hasProjects = useHostProjects(hostServerIds).length > 0;
 
   const isCompactLayout = useIsCompactFormFactor();
 
@@ -47,6 +51,10 @@ export function OpenProjectScreen() {
     void openProjectPicker();
   }, [openProjectPicker]);
 
+  const handleNewWorkspace = useCallback(() => {
+    router.navigate(buildNewWorkspaceRoute());
+  }, [router]);
+
   const handleOpenPairDevice = useCallback(() => setIsPairDeviceOpen(true), []);
   const handleClosePairDevice = useCallback(() => setIsPairDeviceOpen(false), []);
 
@@ -58,6 +66,40 @@ export function OpenProjectScreen() {
       },
     });
   }, [chooseHost, router]);
+
+  const tiles = resolveHomeTiles({ hasProjects, canPairDevice: Boolean(localServerId) });
+  const tileContent: Record<HomeTileId, HomeTileContent> = {
+    "new-workspace": {
+      icon: Plus,
+      copyKey: "newWorkspace",
+      onPress: handleNewWorkspace,
+      testID: "open-project-new-workspace",
+    },
+    "add-project": {
+      icon: FolderOpen,
+      copyKey: "addProject",
+      onPress: handleOpenPicker,
+      testID: "open-project-submit",
+    },
+    "import-session": {
+      icon: Inbox,
+      copyKey: "importSession",
+      onPress: importSession.open,
+      testID: "open-project-import-session",
+    },
+    "setup-providers": {
+      icon: Plug,
+      copyKey: "setupProviders",
+      onPress: handleOpenProviders,
+      testID: "open-project-setup-providers",
+    },
+    "pair-device": {
+      icon: Smartphone,
+      copyKey: "pairDevice",
+      onPress: handleOpenPairDevice,
+      testID: "open-project-pair-device",
+    },
+  };
 
   return (
     <View style={styles.container}>
@@ -75,37 +117,20 @@ export function OpenProjectScreen() {
             <HostError key={host.serverId} serverId={host.serverId} label={host.label} />
           ))}
           <View style={styles.tiles}>
-            <HomeTile
-              icon={FolderOpen}
-              title={t("openProject.tiles.addProject.title")}
-              description={t("openProject.tiles.addProject.description")}
-              onPress={handleOpenPicker}
-              testID="open-project-submit"
-              accent
-            />
-            <HomeTile
-              icon={Inbox}
-              title={t("openProject.tiles.importSession.title")}
-              description={t("openProject.tiles.importSession.description")}
-              onPress={importSession.open}
-              testID="open-project-import-session"
-            />
-            <HomeTile
-              icon={Plug}
-              title={t("openProject.tiles.setupProviders.title")}
-              description={t("openProject.tiles.setupProviders.description")}
-              onPress={handleOpenProviders}
-              testID="open-project-setup-providers"
-            />
-            {localServerId ? (
-              <HomeTile
-                icon={Smartphone}
-                title={t("openProject.tiles.pairDevice.title")}
-                description={t("openProject.tiles.pairDevice.description")}
-                onPress={handleOpenPairDevice}
-                testID="open-project-pair-device"
-              />
-            ) : null}
+            {tiles.map((tileId, index) => {
+              const tile = tileContent[tileId];
+              return (
+                <HomeTile
+                  key={tileId}
+                  icon={tile.icon}
+                  title={t(`openProject.tiles.${tile.copyKey}.title`)}
+                  description={t(`openProject.tiles.${tile.copyKey}.description`)}
+                  onPress={tile.onPress}
+                  testID={tile.testID}
+                  accent={index === 0}
+                />
+              );
+            })}
           </View>
         </View>
         <View style={styles.communityRow}>
@@ -130,6 +155,13 @@ function HostError({ serverId, label }: { serverId: string; label: string }) {
       {label}: {error}
     </Text>
   ) : null;
+}
+
+interface HomeTileContent {
+  icon: ComponentType<{ size: number; color: string }>;
+  copyKey: "newWorkspace" | "addProject" | "importSession" | "setupProviders" | "pairDevice";
+  onPress: () => void;
+  testID: string;
 }
 
 interface HomeTileProps {
