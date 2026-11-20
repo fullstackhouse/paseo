@@ -8,6 +8,7 @@ import { isNative } from "@/constants/platform";
 import { useSessionStore } from "@/stores/session-store";
 import { useSidebarViewStore } from "@/stores/sidebar-view-store";
 import { useHosts } from "@/runtime/host-runtime";
+import { useReportedWorkLookup } from "@/workspace-status/reported-work";
 
 type ColorScheme = "dark" | "light";
 
@@ -92,9 +93,10 @@ export function useFaviconStatus() {
     () => createFaviconStatusSelector({ showBackground }),
     [showBackground],
   );
+  const reportedWork = useReportedWorkLookup();
   const selectMacDockBadgeCount = useMemo(
-    () => createMacDockBadgeCountSelector({ showBackground }),
-    [showBackground],
+    () => createMacDockBadgeCountSelector({ showBackground, reportedWork }),
+    [reportedWork, showBackground],
   );
   const status = useSessionStore(selectFaviconStatus);
   const dockBadgeCount = useSessionStore(selectMacDockBadgeCount);

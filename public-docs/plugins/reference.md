@@ -1144,15 +1144,15 @@ See the [workspace row badges example](https://github.com/getpaseo/paseo/tree/ma
 host what the plugin knows about one workspace. Register one per workspace and keep it current with
 `update(patch)`; `remove()` drops it, and stopping the plugin removes all of them.
 
-| Field       | Meaning                                                                                                                                      |
-| ----------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| `title`     | The item's name, such as "Asks".                                                                                                             |
-| `label`     | Optional short text, such as "2 waiting on you".                                                                                             |
-| `count`     | Optional number.                                                                                                                             |
-| `needsYou`  | True while something in the workspace waits on the human.                                                                                    |
-| `key`       | Identifies what waits, such as the newest item's id. Change it when something new arrives.                                                   |
-| `panelId`   | Optional. A workspace panel of this plugin, registered with `locations` including `explorer`.                                                |
-| `workState` | Optional, experimental. `"waiting"`, `"working"` or `"done"`: where the workspace's work stands, as its agent reported it. `null` clears it. |
+| Field       | Meaning                                                                                                                                                   |
+| ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `title`     | The item's name, such as "Asks".                                                                                                                          |
+| `label`     | Optional short text, such as "2 waiting on you".                                                                                                          |
+| `count`     | Optional number.                                                                                                                                          |
+| `needsYou`  | True while something in the workspace waits on the human.                                                                                                 |
+| `key`       | Identifies what waits, such as the newest item's id. Change it when something new arrives.                                                                |
+| `panelId`   | Optional. A workspace panel of this plugin, registered with `locations` including `explorer`.                                                             |
+| `workState` | Optional, experimental. `"waiting"`, `"working"`, `"blocked"` or `"done"`: where the workspace's work stands, as its agent reported it. `null` clears it. |
 
 On desktop, entering a workspace opens Explorer for an item with `needsYou` whose `key` the user
 hasn't seen there, on `panelId`, when **Open Explorer when entering a workspace** allows it. A `key`
@@ -1160,9 +1160,15 @@ that was present when the user hid Explorer doesn't open it again; a new `key` d
 
 An idle workspace
 is grouped by its summary items instead of by whether its last turn was read: any `needsYou`
-or `workState: "waiting"` puts it in Ready to review, otherwise any `workState: "working"` in Working, otherwise `"done"` in Done. A
+or `workState: "waiting"` puts it in Ready to review, otherwise any `workState: "working"` in Working, otherwise any `"blocked"` in Blocked, otherwise `"done"` in Done. A
 running agent, a failure or a permission prompt still wins. Workspaces with no `needsYou` and no
 `workState` keep the usual grouping.
+
+Use `"blocked"` when the work waits on something other than the human: another workspace or agent, a
+reviewer, CI. Blocked sits at the bottom of the sidebar with no needs-you mark. Hosts without the
+Blocked group drop the value and group the workspace by its turn.
+
+The dock badge counts workspaces in Ready to review, Needs input and Failed; Working, Done and Blocked don't count.
 
 ```ts
 const items = new Map<string, PluginWorkspaceSummaryItemRegistration>();

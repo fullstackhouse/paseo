@@ -1,10 +1,16 @@
 import type { WorkspaceDescriptor } from "@/stores/session-store";
+import type { SidebarStateBucket } from "@/utils/sidebar-agent-state";
+import type { WorkspaceAgentActivity } from "@/utils/workspace-agent-activity";
+import { deriveEffectiveWorkspaceStatus } from "@/workspace-status";
+import type { ReportedWorkLookup } from "@/workspace-status/reported-work";
 import { memoizeOnSessionMaps } from "./memoize-on-session-maps";
 
-export type DesktopBadgeWorkspaceStatus = WorkspaceDescriptor["status"];
+/** A workspace's status as the sidebar derives it (`deriveEffectiveWorkspaceStatus`): Blocked and Done never count. */
+export type DesktopBadgeWorkspaceStatus = SidebarStateBucket;
 
 interface WorkspaceStatusSession {
   workspaces: ReadonlyMap<string, WorkspaceDescriptor>;
+  workspaceAgentActivity?: ReadonlyMap<string, WorkspaceAgentActivity>;
 }
 
 interface WorkspaceStatusSource {
@@ -22,6 +28,8 @@ export function isWorkspaceActionableForDesktopBadge(status: DesktopBadgeWorkspa
 export interface DockBadgeOptions {
   /** Count background workspaces too, as the sidebar shows them while Show background is on. */
   showBackground?: boolean;
+  /** FSH: plugin reports regroup idle workspaces, as in the sidebar, so Blocked and Done stop counting. */
+  reportedWork?: ReportedWorkLookup;
 }
 
 export function selectMacDockBadgeCount(
@@ -29,12 +37,19 @@ export function selectMacDockBadgeCount(
   options: DockBadgeOptions = {},
 ): number | undefined {
   let actionableCount = 0;
-  for (const session of Object.values(state.sessions)) {
+  for (const [serverId, session] of Object.entries(state.sessions)) {
     if (!session) continue;
     for (const workspace of session.workspaces.values()) {
       // A hidden background workspace would leave the badge pointing at nothing in the sidebar.
       if (workspace.background && !options.showBackground) continue;
-      if (isWorkspaceActionableForDesktopBadge(workspace.status)) actionableCount += 1;
+      // The status as the sidebar derives it: a root agent mid-turn wins over a report.
+      const { status } = deriveEffectiveWorkspaceStatus({
+        serverId,
+        workspace,
+        workspaceAgentActivity: session.workspaceAgentActivity,
+        reportedWork: options.reportedWork,
+      });
+      if (isWorkspaceActionableForDesktopBadge(status)) actionableCount += 1;
     }
   }
   return actionableCount > 0 ? actionableCount : undefined;
@@ -45,7 +60,7 @@ export function createMacDockBadgeCountSelector(
   options: DockBadgeOptions = {},
 ): (state: WorkspaceStatusSource) => number | undefined {
   return memoizeOnSessionMaps<WorkspaceStatusSession, WorkspaceStatusSource, number | undefined>(
-    (session) => [session.workspaces],
+    (session) => [session.workspaces, session.workspaceAgentActivity],
     (state) => selectMacDockBadgeCount(state, options),
   );
 }

@@ -20,6 +20,7 @@ export interface SessionsSnapshot {
       workspaces: Map<string, WorkspaceDescriptor>;
       projects?: Map<string, ProjectDescriptor>;
       agents?: Map<string, Agent>;
+      workspaceAgentActivity?: ReadonlyMap<string, WorkspaceAgentActivity>;
     }
   >;
 }

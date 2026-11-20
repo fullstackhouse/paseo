@@ -44,6 +44,7 @@ describe("desktop-badge-state", () => {
   it("ignores running and done workspace statuses", () => {
     expect(isWorkspaceActionableForDesktopBadge("running")).toBe(false);
     expect(isWorkspaceActionableForDesktopBadge("done")).toBe(false);
+    expect(isWorkspaceActionableForDesktopBadge("blocked")).toBe(false);
   });
 
   it("returns undefined when no visible workspaces need attention", () => {
@@ -94,5 +95,21 @@ describe("desktop-badge-state", () => {
     expect(select({ sessions: { ...state.sessions } })).toBe(1);
 
     expect(select(stateWith(workspace("a", "attention"), workspace("b", "failed")))).toBe(2);
+  });
+
+  it("counts by plugin reports, so Blocked and Done stop counting and needs-you counts", () => {
+    const reported = { blocked: "blocked", done: "done", waiting: "needs_you" } as const;
+    const count = selectMacDockBadgeCount(
+      stateWith(
+        workspace("blocked", "attention"),
+        workspace("done", "attention"),
+        workspace("waiting", "done"),
+      ),
+      {
+        reportedWork: (serverId, workspaceId) =>
+          serverId === "srv_a" ? (reported[workspaceId as keyof typeof reported] ?? null) : null,
+      },
+    );
+    expect(count).toBe(1);
   });
 });
