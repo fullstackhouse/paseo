@@ -409,6 +409,35 @@ describe("runGitCommand", () => {
     ]);
   });
 
+  it("runs a low-priority sweep after normal work and labels it from the context", async () => {
+    const { runGitCommand, runWithGitCommandContext, snapshotGitCommandRuntimeMetrics } =
+      await loadRunGitCommand(1);
+    enqueueSpawnBehaviors(
+      { delayMs: 100, stdoutData: "active" },
+      { stdoutData: "normal" },
+      { stdoutData: "sweep" },
+    );
+
+    const active = runGitCommand(["status"], { cwd: process.cwd() });
+    await vi.waitFor(() => expect(fakeSpawnController.processes).toHaveLength(1));
+    const sweep = runWithGitCommandContext({ priority: "low", provenance: "sweep" }, async () => {
+      await Promise.resolve();
+      return runGitCommand(["rev-parse", "sweep"], { cwd: process.cwd() });
+    });
+    await Promise.resolve();
+    const normal = runGitCommand(["rev-parse", "normal"], { cwd: process.cwd() });
+
+    await expect(Promise.all([active, normal, sweep])).resolves.toEqual([
+      expect.objectContaining({ stdout: "active" }),
+      expect.objectContaining({ stdout: "normal" }),
+      expect.objectContaining({ stdout: "sweep" }),
+    ]);
+    expect(Object.fromEntries(snapshotGitCommandRuntimeMetrics().provenanceTop)).toMatchObject({
+      sweep: 1,
+      unattributed: 2,
+    });
+  });
+
   it("binds queue provenance to a Git command runner", async () => {
     const { createRunGitCommand, snapshotGitCommandRuntimeMetrics } = await loadRunGitCommand(1);
     enqueueSpawnBehaviors({ stdoutData: "ok" });

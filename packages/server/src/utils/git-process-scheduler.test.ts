@@ -68,6 +68,28 @@ describe("GitProcessScheduler", () => {
     expect(started).toEqual([0, 3, 2]);
   });
 
+  test("runs low-priority sweep work only after normal and high work", async () => {
+    const scheduler = new GitProcessScheduler({
+      maxProcessesPerSecond: 100,
+      maxProcessConcurrency: 1,
+    });
+    const releases: Array<() => void> = [];
+    const started: number[] = [];
+
+    const active = scheduler.run(createConcurrencyTask(0, started, releases));
+    await vi.waitFor(() => expect(started).toEqual([0]));
+    const sweep = scheduler.run(createConcurrencyTask(2, started, releases), { priority: "low" });
+    const refresh = scheduler.run(createConcurrencyTask(3, started, releases));
+    const userOperation = scheduler.run(createConcurrencyTask(4, started, releases), {
+      priority: "high",
+    });
+
+    releases.shift()?.();
+    await Promise.all([active, sweep, refresh, userOperation]);
+
+    expect(started).toEqual([0, 4, 3, 2]);
+  });
+
   test("yields to daemon liveness work between process starts", async () => {
     const scheduler = new GitProcessScheduler({
       maxProcessesPerSecond: 100,

@@ -22,6 +22,7 @@ import {
   WorkspaceReconciliationService,
 } from "./workspace-reconciliation-service.js";
 import { deriveProjectKey } from "./project-key.js";
+import { currentGitCommandContext } from "../utils/run-git-command.js";
 
 let probeDirectory: string;
 let probePath: string;
@@ -584,6 +585,54 @@ describe("WorkspaceReconciliationService", () => {
       clearImmediate(unrelated);
     }
   }, 30000);
+
+  test("runs a full sweep's git reads at low priority, labelled for metrics", async () => {
+    const workspaceRoot = realpathSync(mkdtempSync(path.join(tmpdir(), "reconcile-priority-")));
+    tempDirs.push(workspaceRoot);
+    const { projects, workspaces, projectRegistry, workspaceRegistry } = createTestRegistries();
+    projects.set(
+      "p1",
+      createPersistedProjectRecord({
+        projectId: "p1",
+        rootPath: workspaceRoot,
+        kind: "git",
+        displayName: "priority",
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      }),
+    );
+    workspaces.set(
+      "w1",
+      createPersistedWorkspaceRecord({
+        workspaceId: "w1",
+        projectId: "p1",
+        cwd: workspaceRoot,
+        kind: "local_checkout",
+        displayName: "priority",
+        branch: "main",
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      }),
+    );
+    const contexts: Array<ReturnType<typeof currentGitCommandContext>> = [];
+    const service = new WorkspaceReconciliationService({
+      projectRegistry,
+      workspaceRegistry,
+      logger: createTestLogger(),
+      workspaceGitService: {
+        getCheckout: async (cwd) => {
+          contexts.push(currentGitCommandContext());
+          return createCheckout(cwd, { isGit: true, currentBranch: "main", worktreeRoot: cwd });
+        },
+      },
+    });
+
+    await service.reconcileNow();
+    expect(contexts.length).toBeGreaterThan(0);
+    expect(new Set(contexts.map((context) => JSON.stringify(context)))).toEqual(
+      new Set([JSON.stringify({ priority: "low", provenance: "workspace-reconciliation:full" })]),
+    );
+  });
 
   test("preserves workspace archival that lands during boot reconciliation", async () => {
     const workspaceRoot = realpathSync(mkdtempSync(path.join(tmpdir(), "reconcile-archive-race-")));

@@ -96,6 +96,7 @@ temporary by design: every patch is meant to go upstream and then drop out of `f
 - FSH-only (upstreamable): website e2e serves GitHub release and repo fixtures from `e2e/registry-server.mjs` through an optional `GITHUB_API_URL` override, so CI no longer gets 500s when shared runners hit GitHub's unauthenticated rate limit
 - FSH-only (upstreamable): creating a worktree workspace no longer waits for the source checkout's git status. When you picked no branch and the status hasn't loaded, the daemon resolves the default base itself. That status request took up to five minutes on a busy daemon while the create itself took seconds
 - FSH-only (upstreamable): while a workspace is being created, the New workspace screen shows **Start another**. It clears the form for the next workspace and lets the first one finish in the background without navigating to it; it appears in the sidebar when ready
+- FSH-only (upstreamable): the five-minute workspace reconciliation sweep runs its git processes at a new low priority, labelled `workspace-reconciliation:full` in metrics. On a host with 200 workspaces each sweep is about 2,000 processes, and status requests from the app used to stall 45–60s behind it
 
 Keep this list in sync with what's merged into `fsh`.
 

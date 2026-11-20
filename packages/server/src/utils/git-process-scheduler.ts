@@ -16,7 +16,8 @@ export interface ScheduledGitProcess<T> {
   exited: Promise<void>;
 }
 
-export type GitProcessPriority = "normal" | "high";
+/** high: a user waits on it. normal: workspace refreshes. low: periodic sweeps over every workspace. */
+export type GitProcessPriority = "low" | "normal" | "high";
 
 function parsePositiveInteger(value: string | undefined): number | undefined {
   if (value === undefined) {
@@ -48,6 +49,7 @@ export class GitProcessScheduler {
   private readonly startThrottled;
   private readonly highPriorityQueue: Array<() => void> = [];
   private readonly normalPriorityQueue: Array<() => void> = [];
+  private readonly lowPriorityQueue: Array<() => void> = [];
   private admitted = 0;
   private running = 0;
   private waiting = 0;
@@ -84,8 +86,7 @@ export class GitProcessScheduler {
           this.scheduleDrain();
         });
       };
-      const queue =
-        options?.priority === "high" ? this.highPriorityQueue : this.normalPriorityQueue;
+      const queue = this.queueFor(options?.priority ?? "normal");
       queue.push(admit);
       if (this.admitted === 0 && !this.drainScheduled) {
         this.drainOne();
@@ -95,11 +96,21 @@ export class GitProcessScheduler {
     });
   }
 
+  private queueFor(priority: GitProcessPriority): Array<() => void> {
+    if (priority === "high") return this.highPriorityQueue;
+    if (priority === "low") return this.lowPriorityQueue;
+    return this.normalPriorityQueue;
+  }
+
   private scheduleDrain(): void {
     if (this.drainScheduled || this.admitted >= this.policy.maxProcessConcurrency) {
       return;
     }
-    if (this.highPriorityQueue.length === 0 && this.normalPriorityQueue.length === 0) {
+    if (
+      this.highPriorityQueue.length === 0 &&
+      this.normalPriorityQueue.length === 0 &&
+      this.lowPriorityQueue.length === 0
+    ) {
       return;
     }
     this.drainScheduled = true;
@@ -111,7 +122,10 @@ export class GitProcessScheduler {
     if (this.admitted >= this.policy.maxProcessConcurrency) {
       return;
     }
-    const admit = this.highPriorityQueue.shift() ?? this.normalPriorityQueue.shift();
+    const admit =
+      this.highPriorityQueue.shift() ??
+      this.normalPriorityQueue.shift() ??
+      this.lowPriorityQueue.shift();
     if (!admit) {
       return;
     }

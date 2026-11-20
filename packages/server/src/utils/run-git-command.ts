@@ -25,10 +25,30 @@ const DEFAULT_STDERR_LIMIT = 2048;
 
 let gitProcessScheduler = new GitProcessScheduler(resolveGitProcessPolicy({ env: process.env }));
 let gitRuntimeMetrics = createGitCommandRuntimeMetricsWindow(gitProcessScheduler.policy);
-const gitCommandPriority = new AsyncLocalStorage<GitProcessPriority>();
+interface GitCommandContext {
+  priority: GitProcessPriority;
+  /** Labels commands in runtime metrics when the caller passes no explicit provenance. */
+  provenance?: string;
+}
+
+const gitCommandContext = new AsyncLocalStorage<GitCommandContext>();
 
 export function runWithGitCommandPriority<T>(priority: GitProcessPriority, operation: () => T): T {
-  return gitCommandPriority.run(priority, operation);
+  return runWithGitCommandContext({ priority }, operation);
+}
+
+/** The priority and label git commands started here would get; undefined outside any context. */
+export function currentGitCommandContext(): Readonly<GitCommandContext> | undefined {
+  return gitCommandContext.getStore();
+}
+
+/** Every git command started inside `operation`, however deep, inherits this priority and label. */
+export function runWithGitCommandContext<T>(
+  context: { priority: GitProcessPriority; provenance?: string },
+  operation: () => T,
+): T {
+  const provenance = context.provenance ?? gitCommandContext.getStore()?.provenance;
+  return gitCommandContext.run({ priority: context.priority, provenance }, operation);
 }
 
 function createGitCommandRuntimeMetricsWindow(policy: GitProcessPolicy) {
@@ -285,7 +305,10 @@ function executeGitCommand<Output>(
     active: gitProcessScheduler.activeCount,
     pending: gitProcessScheduler.pendingCount,
   });
-  const runtimeMetric = gitRuntimeMetrics.submit(getGitOperation(args), provenance);
+  const runtimeMetric = gitRuntimeMetrics.submit(
+    getGitOperation(args),
+    provenance ?? gitCommandContext.getStore()?.provenance,
+  );
   const startCommand = () => {
     let releaseProcessSlot!: () => void;
     const exited = new Promise<void>((resolve) => {
@@ -559,7 +582,7 @@ function executeGitCommand<Output>(
     return { result: resultPromise, exited };
   };
   const promise = gitProcessScheduler.run(startCommand, {
-    priority: gitCommandPriority.getStore() ?? "normal",
+    priority: gitCommandContext.getStore()?.priority ?? "normal",
   });
   gitRuntimeMetrics.observeLimiter(
     gitProcessScheduler.activeCount,

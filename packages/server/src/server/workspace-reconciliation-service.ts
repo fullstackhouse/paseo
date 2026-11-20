@@ -17,6 +17,7 @@ import {
   type MutableWorkspacePlacement,
 } from "./workspace-registry-model.js";
 import { workspaceIdsForProjects } from "./workspace-directory.js";
+import { runWithGitCommandContext } from "../utils/run-git-command.js";
 import { deriveProjectKey } from "./project-key.js";
 
 const DEFAULT_RESCAN_INTERVAL_MS = 5 * 60_000;
@@ -555,8 +556,18 @@ export class WorkspaceReconciliationService {
     }
     this.reconciling = true;
     try {
-      await this.syncProjectRootWatches();
-      const result = mode === "full" ? await this.runOnce() : await this.reconcileGitMetadata();
+      // A full sweep reads every workspace (~2000 git processes on a large host). It runs below
+      // workspace refreshes and client requests so they never queue behind it.
+      const result = await runWithGitCommandContext(
+        {
+          priority: mode === "full" ? "low" : "normal",
+          provenance: `workspace-reconciliation:${mode}`,
+        },
+        async () => {
+          await this.syncProjectRootWatches();
+          return mode === "full" ? await this.runOnce() : await this.reconcileGitMetadata();
+        },
+      );
       const workspaceIds = new Set<string>();
       const projectIds = new Set<string>();
       for (const change of result.changesApplied) {
