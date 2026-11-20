@@ -1046,7 +1046,13 @@ async function runRegression({
   await page.getByTestId("command-center-input").fill("Split pane right");
   await page.getByText("Split pane right", { exact: true }).click();
   assert(
-    (await originalDeck.getByTestId("workspace-tabs-row").filter({ visible: true }).count()) === 2,
+    // The Explorer sidebar has a tab row of its own; count the work panes' rows only.
+    (await originalDeck
+      .locator(
+        '[data-testid="workspace-tabs-row"]:not([data-testid="workspace-explorer-sidebar"] *)',
+      )
+      .filter({ visible: true })
+      .count()) === 2,
     "Split pane command did not produce two visible panes",
   );
   await originalDeck.getByTestId(`workspace-tab-browser_${browserId}`).last().click();
