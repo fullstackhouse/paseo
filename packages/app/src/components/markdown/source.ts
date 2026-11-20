@@ -32,11 +32,11 @@ function createFilePattern(path: string): RegExp {
   );
 }
 
-// Matches bare URLs that MD4C does not autolink, like single-label or bracketed hosts.
+// Matches bare URLs that MD4C does not autolink, like single-label or bracketed hosts and file URLs.
 // Quotes and unbalanced closing parentheses end the URL. Trailing sentence punctuation stays outside.
 const URL_CHARACTER = String.raw`[^\s<>()"'\x60]`;
 const URL_GROUP = String.raw`\(${URL_CHARACTER}*\)`;
-const BARE_URL = String.raw`https?://(?:${URL_CHARACTER}|${URL_GROUP})*(?:[^\s<>()"'\x60.,;:!?]|${URL_GROUP})`;
+const BARE_URL = String.raw`(?:https?|file)://(?:${URL_CHARACTER}|${URL_GROUP})*(?:[^\s<>()"'\x60.,;:!?]|${URL_GROUP})`;
 
 const FILE_PATTERN = createFilePattern(PROSE_PATH);
 function linkMetadata(inlineCodePaths: ReadonlySet<string>) {
