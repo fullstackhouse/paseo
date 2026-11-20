@@ -5,9 +5,14 @@ on:
   # A release or main push must not redeploy the temporary Cloudflare bridge.
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     steps:
       - uses: actions/checkout@v4

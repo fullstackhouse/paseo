@@ -32,8 +32,7 @@ on:
       - .github/workflows/fsh-android.yml
   workflow_dispatch:
 
-permissions:
-  contents: write
+permissions: {}
 
 concurrency:
   group: fsh-android-${{ github.ref }}
@@ -42,6 +41,8 @@ concurrency:
 jobs:
   apk:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
 
