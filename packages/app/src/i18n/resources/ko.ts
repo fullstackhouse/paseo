@@ -1766,6 +1766,10 @@ export const ko: TranslationResources = {
   },
   openProject: {
     tiles: {
+      newWorkspace: {
+        title: "새 워크스페이스",
+        description: "프로젝트에서 에이전트를 시작합니다",
+      },
       addProject: {
         title: "프로젝트 추가",
         description: "내 컴퓨터의 폴더를 엽니다",

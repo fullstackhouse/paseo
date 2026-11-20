@@ -1803,6 +1803,10 @@ export const es: TranslationResources = {
   },
   openProject: {
     tiles: {
+      newWorkspace: {
+        title: "Nuevo espacio de trabajo",
+        description: "Inicie un agente en uno de sus proyectos",
+      },
       addProject: {
         title: "Agregar un proyecto",
         description: "Abra una carpeta en su máquina",

@@ -1774,6 +1774,10 @@ export const ja: TranslationResources = {
   },
   openProject: {
     tiles: {
+      newWorkspace: {
+        title: "新しいワークスペース",
+        description: "プロジェクトでエージェントを開始",
+      },
       addProject: {
         title: "プロジェクトを追加",
         description: "マシン上のフォルダを開く",

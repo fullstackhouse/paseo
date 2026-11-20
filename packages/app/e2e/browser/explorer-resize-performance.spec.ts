@@ -22,6 +22,22 @@ async function waitForResizePaint(page: Page): Promise<void> {
   );
 }
 
+// Unistyles drops a style's CSS rule from the shared stylesheet when the garbage collector
+// frees an element it styled without an explicit cleanup (screens left earlier, such as the
+// home screen at startup). That rewrite lands whenever a GC happens to run, so a GC during
+// the drag would count against Explorer. Collect first, and let the cleanups land, so the
+// measurement sees only what the drag itself writes.
+async function settleGarbageCollectedStyles(page: Page): Promise<void> {
+  const cdp = await page.context().newCDPSession(page);
+  try {
+    await cdp.send("HeapProfiler.collectGarbage");
+  } finally {
+    await cdp.detach();
+  }
+  await waitForResizePaint(page);
+  await waitForResizePaint(page);
+}
+
 async function beginResizeMeasurement(page: Page): Promise<void> {
   await page.evaluate(() => {
     const stylesheet = document.getElementById("unistyles-web");
@@ -52,6 +68,7 @@ async function previewExplorerResize(page: Page, distance: number) {
   const before = (await explorer.boundingBox())!.width;
   const x = bounds.x + bounds.width / 2;
   const y = bounds.y + 100;
+  await settleGarbageCollectedStyles(page);
   await page.mouse.move(x, y);
   await page.mouse.down();
   await waitForResizePaint(page);

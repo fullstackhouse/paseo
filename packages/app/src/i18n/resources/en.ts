@@ -1783,6 +1783,10 @@ export const en = {
   },
   openProject: {
     tiles: {
+      newWorkspace: {
+        title: "New workspace",
+        description: "Start an agent in one of your projects",
+      },
       addProject: {
         title: "Add a project",
         description: "Open a folder on your machine",

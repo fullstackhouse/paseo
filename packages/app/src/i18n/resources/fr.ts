@@ -1799,6 +1799,10 @@ export const fr: TranslationResources = {
   },
   openProject: {
     tiles: {
+      newWorkspace: {
+        title: "Nouvel espace de travail",
+        description: "Lancez un agent dans l'un de vos projets",
+      },
       addProject: {
         title: "Ajouter un projet",
         description: "Ouvrez un dossier sur votre machine",
