@@ -1,5 +1,5 @@
 import { Text, View } from "react-native";
-import { ArrowLeftToLine, RotateCw, Settings } from "lucide-react-native";
+import { ArrowLeftToLine, Home, Plus, RotateCw, Settings } from "lucide-react-native";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,8 @@ interface WorkspaceRouteStateActions {
   onRetryHost: () => void;
   onManageHost: () => void;
   onDismissMissingWorkspace: () => void;
+  onGoHome: () => void;
+  onNewWorkspace: () => void;
   onRecoverWorkspace: () => void;
   onRetryRecoveryInspection: () => void;
 }
@@ -31,10 +33,10 @@ export function renderWorkspaceRouteGate(input: {
       return <WorkspaceConnecting hostName={input.state.hostName} />;
     case "missing":
       return (
-        <WorkspaceEmptyState
-          titleKey="workspace.route.recovery.unavailableTitle"
+        <MissingWorkspace
           hostName={input.state.hostName}
-          onDismiss={input.actions.onDismissMissingWorkspace}
+          onGoHome={input.actions.onGoHome}
+          onNewWorkspace={input.actions.onNewWorkspace}
         />
       );
     case "archived":
@@ -252,6 +254,46 @@ function WorkspaceUnreachable({
           </Button>
         </View>
       ) : null}
+    </View>
+  );
+}
+
+// Back said nothing about where it led (on a cold start, the home screen), so name both exits.
+function MissingWorkspace({
+  hostName,
+  onGoHome,
+  onNewWorkspace,
+}: {
+  hostName: string;
+  onGoHome: () => void;
+  onNewWorkspace: () => void;
+}) {
+  const { t } = useTranslation();
+
+  return (
+    <View style={styles.emptyState}>
+      <View style={styles.textStack}>
+        <Text style={styles.title}>{t("workspace.route.recovery.unavailableTitle")}</Text>
+        <Text style={styles.description}>{hostName}</Text>
+      </View>
+      <View style={styles.actions}>
+        <Button
+          variant="default"
+          leftIcon={Home}
+          onPress={onGoHome}
+          testID="workspace-missing-go-home"
+        >
+          {t("shell.commandCenter.home")}
+        </Button>
+        <Button
+          variant="outline"
+          leftIcon={Plus}
+          onPress={onNewWorkspace}
+          testID="workspace-missing-new-workspace"
+        >
+          {t("sidebar.actions.newWorkspace")}
+        </Button>
+      </View>
     </View>
   );
 }

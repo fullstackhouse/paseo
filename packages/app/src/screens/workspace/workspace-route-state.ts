@@ -94,23 +94,3 @@ export function resolveWorkspaceRouteState(input: {
       };
   }
 }
-
-/**
- * At startup the app reopens the last workspace before the host's workspace list arrives.
- * When the list proves that workspace gone (archived elsewhere), the "unavailable" screen is
- * a dead end the user never asked for. Leave it instead, unless something explicitly targeted
- * this workspace (a notification or agent link), which keeps the recovery screens.
- */
-export function shouldLeaveRestoredMissingWorkspace(input: {
-  state: WorkspaceRouteState;
-  isRouteFocused: boolean;
-  isRestoredSelection: boolean;
-  hasPendingOpenTarget: boolean;
-}): boolean {
-  return (
-    input.state.kind === "missing" &&
-    input.isRouteFocused &&
-    input.isRestoredSelection &&
-    !input.hasPendingOpenTarget
-  );
-}
