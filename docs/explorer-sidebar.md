@@ -131,8 +131,9 @@ Under **Overview**, the default, Explorer opens on Overview when its Your move l
 Your move hides PR items, so those open the PR tab instead, as does any item in a workspace whose Overview tab was
 closed (`pickAttentionTab`). Under **The tab that needs you**, the item picks it:
 the plugin's panel, the PR tab, or the current tab for agent items, whose tab lives in the main pane. The decision runs once per
-entry, never while you stay. An entry that itself reveals an Explorer tab (a plugin screen opened with `location: "explorer"`, a
-PR open) skips it, so the tab you asked for stays selected (`workspace-attention/explicit-reveal.ts`). Hiding Explorer with the toggle records the keys present then
+entry, never while you stay. A navigation from outside the workspace that reveals an Explorer tab (a plugin screen opened
+with `location: "explorer"`) skips it for the entry that follows, so the tab you asked for stays selected. Tab clicks
+inside the workspace don't count (`workspace-attention/explicit-reveal.ts`). Hiding Explorer with the toggle records the keys present then
 (`explorerAttentionByWorkspace`), so it stays hidden until a new key appears; under Always it otherwise
 reopens on every entry.
 
