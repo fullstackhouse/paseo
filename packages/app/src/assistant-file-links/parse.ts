@@ -181,6 +181,17 @@ export function parseFileProtocolUrl(value: string): InlinePathTarget | null {
     return null;
   }
 
+  // Agents print `file:///a.ts:42` as often as `#L42`; read the editor-style suffix too.
+  const suffix = parsedUrl.hash ? null : normalizedPath.match(INLINE_COLON_LINE_SUFFIX);
+  if (suffix) {
+    const lineStart = parseInt(suffix[2], 10);
+    const lineEnd = suffix[3] ? parseInt(suffix[3], 10) : undefined;
+    if (lineStart <= 0 || (lineEnd !== undefined && lineEnd < lineStart)) {
+      return null;
+    }
+    return { raw: value, path: suffix[1], lineStart, lineEnd };
+  }
+
   return {
     raw: value,
     path: normalizedPath,
