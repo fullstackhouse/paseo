@@ -47,6 +47,19 @@ describe("selectSidebarGroupVisibility", () => {
     expect(result.canToggle).toBe(true);
   });
 
+  it("collapses Blocked rows past the limit like Done: they ask nothing of you", () => {
+    const items = rows(Array(9).fill("blocked"));
+    const result = selectSidebarGroupVisibility({
+      items,
+      expanded: false,
+      policy: workspacePolicy,
+      selection: null,
+    });
+
+    expect(result.visibleItems).toEqual(items.slice(0, 7));
+    expect(result.canToggle).toBe(true);
+  });
+
   it("leaves selected rows in place when they are already in the baseline", () => {
     const items = rows([...Array(8).fill("done"), "running", "done"]);
     const expected = [...items.slice(0, 7), items[8]];

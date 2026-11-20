@@ -49,6 +49,11 @@ export const STATUS_BUCKET_ORDER: readonly SidebarStateBucket[] = [
   "blocked",
 ] as const;
 
+/** Done and Blocked ask nothing of you, so a collapsed group may hide them past its limit. */
+export function isIdleSidebarBucket(bucket: SidebarStateBucket): boolean {
+  return bucket === "done" || bucket === "blocked";
+}
+
 /**
  * Collapses many workspace status buckets into the single most urgent one, so a
  * collapsed project row can stand in for the child rows it hides.

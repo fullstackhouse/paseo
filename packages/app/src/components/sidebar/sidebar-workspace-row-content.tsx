@@ -235,7 +235,8 @@ function WorkspaceStatusIndicator({
     // workspaces by indentation alone, and with nothing in the leading slot the rail has no
     // edge to read against — a workspace carrying its own glyph starts looking like a project
     // header. The dot is muted to half opacity so it holds the rail without reporting status.
-    // Blocked asks nothing of you either; its group header says why it is there.
+    // Blocked asks nothing of you either, so it shares Done's dot; status grouping puts it under its
+    // own header, and the row's accessibility label names it.
     return reserveIdleSpace ? (
       <View style={styles.workspaceStatusDot} testID={`workspace-status-indicator-${bucket}`}>
         <View style={styles.idleStatusDot} />
