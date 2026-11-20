@@ -17,7 +17,6 @@ import {
 } from "lucide-react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import invariant from "tiny-invariant";
-import { useShallow } from "zustand/shallow";
 import { useAgentDescriptor } from "@/agent-presentation";
 import { SettingsSection } from "@/components/settings/headings/settings-section";
 import { StatusIcon } from "@/components/status-icon";
@@ -47,7 +46,7 @@ import {
 } from "@/plugins/workspace-summary/store";
 import { WorkspaceSummaryEntryView } from "@/plugins/workspace-summary/entry-view";
 import { navigateToWorkspace } from "@/stores/navigation-active-workspace-store";
-import { useSessionStore, type WorkspaceDescriptor } from "@/stores/session-store";
+import { useSessionStore, type Agent, type WorkspaceDescriptor } from "@/stores/session-store";
 import { useWorkspaceFields } from "@/stores/session-store-hooks";
 import type { Theme } from "@/styles/theme";
 import {
@@ -55,6 +54,7 @@ import {
   deriveWorkspaceLineage,
   type WorkspaceRef,
 } from "@/subagents/lineage";
+import { isWorkspaceRootAgent } from "@/subagents/workspace-root-policy";
 import { useLineageFocus } from "@/subagents/lineage-focus";
 import { navigateToAgent } from "@/utils/navigate-to-agent";
 import { formatTimeAgo } from "@/utils/time";
@@ -65,9 +65,12 @@ import { showExplorerForAttention } from "@/workspace-attention/auto-show";
 import { openExplorerSidebarView } from "@/workspace-tabs/explorer-sidebar";
 import { buildWorkspaceTabPersistenceKey } from "@/workspace-tabs/model";
 import {
+  deriveCodeRow,
   deriveWorkspaceStateWord,
   deriveYourMove,
+  isStatusOutdated,
   partitionSummaryItems,
+  shouldShowAgentRow,
   type WorkspaceStateWord,
   type YourMoveRow,
 } from "./overview/model";
@@ -124,6 +127,7 @@ function selectWorkspaceFacts(workspace: WorkspaceDescriptor) {
 type WorkspaceFacts = ReturnType<typeof selectWorkspaceFacts>;
 
 function OverviewPanel(): ReactElement {
+  const { t } = useTranslation();
   const { serverId, workspaceId, target } = usePaneContext();
   invariant(target.kind === "overview", "OverviewPanel requires overview target");
   const workspaceKey = buildWorkspaceTabPersistenceKey({ serverId, workspaceId });
@@ -140,34 +144,40 @@ function OverviewPanel(): ReactElement {
     icons: GIT_ACTION_ICONS,
   });
   const git = isGitWorkspace && gitStatusLoaded ? gitActions : null;
+  const moves = useYourMove({ serverId, workspaceId, agentRunning, facts, gitActions: git });
+  const codeRow = isGitWorkspace ? overviewCodeRow(facts, moves, t) : null;
 
   return (
     // Themed insets sit on a View: contentContainerStyle drops them on web (docs/unistyles.md).
     <ScrollView testID="overview-panel">
       <View style={styles.body}>
         <View style={styles.where}>
-          <WorkspaceHeader facts={facts} workspaceKey={workspaceKey} gitActions={git} />
-          <AgentRow serverId={serverId} workspaceId={workspaceId} />
+          <WorkspaceHeader
+            facts={facts}
+            goal={status?.status?.goal ?? null}
+            workspaceKey={workspaceKey}
+            gitActions={git}
+          />
+          <StatusSection
+            item={status}
+            serverId={serverId}
+            workspaceId={workspaceId}
+            agentRunning={agentRunning}
+            workspaceKey={workspaceKey}
+          />
+          <AgentRow serverId={serverId} workspaceId={workspaceId} workspaceName={facts?.name} />
           <WorkspaceLineageBlock serverId={serverId} workspaceId={workspaceId} />
         </View>
-        {status?.status?.goal ? (
-          <Section title="panels.overview.goal">
-            <Text style={styles.goal} testID="overview-goal">
-              {status.status.goal}
-            </Text>
-          </Section>
-        ) : null}
-        <StatusSection item={status} agentRunning={agentRunning} workspaceKey={workspaceKey} />
         <YourMoveSection
+          rows={moves}
           serverId={serverId}
-          workspaceId={workspaceId}
           workspaceKey={workspaceKey}
           agentRunning={agentRunning}
           facts={facts}
           gitActions={git}
         />
-        {isGitWorkspace && facts && workspaceKey ? (
-          <CodeSection facts={facts} workspaceKey={workspaceKey} />
+        {codeRow && facts && workspaceKey ? (
+          <CodeSection kind={codeRow} facts={facts} workspaceKey={workspaceKey} />
         ) : null}
         {more.length > 0 && workspaceKey ? (
           <Section title="panels.overview.more">
@@ -181,6 +191,36 @@ function OverviewPanel(): ReactElement {
   );
 }
 
+/** Your move, shared with the Code section so it can skip a row that repeats the git move. */
+function useYourMove(input: {
+  serverId: string;
+  workspaceId: string;
+  agentRunning: boolean;
+  facts: WorkspaceFacts | null;
+  gitActions: GitActions | null;
+}): YourMoveRow[] {
+  const items = useWorkspaceAttention(input.serverId, input.workspaceId);
+  return deriveYourMove({
+    items,
+    agentRunning: input.agentRunning,
+    gitPrimaryId: input.gitActions?.primary?.id ?? null,
+    prMerged: Boolean(input.facts?.pullRequest?.isMerged),
+  });
+}
+
+function overviewCodeRow(
+  facts: WorkspaceFacts | null,
+  moves: readonly YourMoveRow[],
+  t: Translate,
+): "pr" | "branch" | null {
+  if (!facts) return null;
+  return deriveCodeRow({
+    hasPullRequest: Boolean(facts.pullRequest),
+    gitMoveShown: moves.some((move) => move.kind === "git"),
+    branchHasFacts: gitMoveFacts(facts, t) !== "",
+  });
+}
+
 // ── Where am I ───────────────────────────────────────────────────────────
 
 function findGitAction(actions: GitActions | null, id: GitAction["id"]): GitAction | null {
@@ -189,17 +229,20 @@ function findGitAction(actions: GitActions | null, id: GitAction["id"]): GitActi
   return all.find((action) => action?.id === id) ?? null;
 }
 
+/** Title, then the goal as its subtitle: what this workspace is, before where it stands. */
 function WorkspaceHeader({
   facts,
+  goal,
   workspaceKey,
   gitActions,
 }: {
   facts: WorkspaceFacts | null;
+  goal: string | null;
   workspaceKey: string | null;
   gitActions: GitActions | null;
 }): ReactElement {
   const { t } = useTranslation();
-  const subtitle = [facts?.project, facts?.branch].filter(Boolean).join(" · ");
+  const subtitle = goal || facts?.project;
   return (
     <View style={styles.header} testID="overview-workspace">
       <View style={styles.rowText}>
@@ -207,7 +250,7 @@ function WorkspaceHeader({
           {facts?.name ?? t("workspace.tabs.loading")}
         </Text>
         {subtitle ? (
-          <Text style={styles.rowFacts} numberOfLines={1}>
+          <Text style={styles.goal} numberOfLines={3} testID="overview-goal">
             {subtitle}
           </Text>
         ) : null}
@@ -272,60 +315,64 @@ function WorkspaceMenu({
   );
 }
 
+/** The agent Overview describes, shown only when the title doesn't already say which one it is. */
 function AgentRow({
   serverId,
   workspaceId,
+  workspaceName,
 }: {
   serverId: string;
   workspaceId: string;
-}): ReactElement {
-  const { t } = useTranslation();
+  workspaceName: string | undefined;
+}): ReactElement | null {
   const focus = useLineageFocus(serverId, workspaceId);
-  if (!focus) return <Row title={t("panels.overview.noAgent")} testID="overview-agent" />;
-  return <FocusedAgentRow serverId={focus.serverId} agentId={focus.agentId} />;
+  const rootAgentCount = useSessionStore((state) =>
+    countWorkspaceRootAgents(state.sessions[serverId]?.agents, workspaceId),
+  );
+  if (!focus) return null;
+  return (
+    <FocusedAgentRow
+      serverId={focus.serverId}
+      agentId={focus.agentId}
+      workspaceName={workspaceName ?? null}
+      rootAgentCount={rootAgentCount}
+    />
+  );
+}
+
+function countWorkspaceRootAgents(
+  agents: ReadonlyMap<string, Agent> | undefined,
+  workspaceId: string,
+): number {
+  if (!agents) return 0;
+  const target = normalizeWorkspaceOpaqueId(workspaceId);
+  let count = 0;
+  for (const agent of agents.values()) {
+    if (agent.archivedAt || normalizeWorkspaceOpaqueId(agent.workspaceId) !== target) continue;
+    const parent = agent.parentAgentId ? agents.get(agent.parentAgentId) : undefined;
+    if (isWorkspaceRootAgent(agent, parent)) count += 1;
+  }
+  return count;
 }
 
 function FocusedAgentRow({
   serverId,
   agentId,
+  workspaceName,
+  rootAgentCount,
 }: {
   serverId: string;
   agentId: string;
-}): ReactElement {
-  const { t } = useTranslation();
+  workspaceName: string | null;
+  rootAgentCount: number;
+}): ReactElement | null {
   const descriptor = useAgentDescriptor({ kind: "agent", agentId }, { serverId });
-  const context = useSessionStore(
-    useShallow((state) => {
-      const usage = state.sessions[serverId]?.agents.get(agentId)?.lastUsage;
-      return {
-        used: usage?.contextWindowUsedTokens ?? null,
-        max: usage?.contextWindowMaxTokens ?? null,
-      };
-    }),
-  );
   const open = useCallback(() => navigateToAgent({ serverId, agentId }), [agentId, serverId]);
-  const contextFacts =
-    context.used && context.max
-      ? t("panels.overview.context", {
-          used: formatTokens(context.used),
-          max: formatTokens(context.max),
-        })
-      : undefined;
+  const title = descriptor.label || null;
+  if (!shouldShowAgentRow({ agentTitle: title, workspaceName, rootAgentCount })) return null;
   return (
-    <Row
-      agentDescriptor={descriptor}
-      title={descriptor.label || t("panels.overview.agent")}
-      facts={contextFacts}
-      onPress={open}
-      testID="overview-agent"
-    />
+    <Row agentDescriptor={descriptor} title={title ?? ""} onPress={open} testID="overview-agent" />
   );
-}
-
-function formatTokens(tokens: number): string {
-  if (tokens >= 1_000_000) return `${Math.round(tokens / 100_000) / 10}m`;
-  if (tokens >= 1000) return `${Math.round(tokens / 1000)}k`;
-  return String(tokens);
 }
 
 /** Lineage by workspace: where this work came from, and the workspaces it handed off to. */
@@ -478,17 +525,41 @@ function wordStyle(word: WorkspaceStateWord) {
 
 // ── Status ───────────────────────────────────────────────────────────────
 
+/** Newest activity among the workspace's agents, to tell whether the status card is outdated. */
+function selectLastActivityAt(
+  agents: ReadonlyMap<string, Agent> | undefined,
+  workspaceId: string,
+): number | null {
+  if (!agents) return null;
+  const target = normalizeWorkspaceOpaqueId(workspaceId);
+  let latest: number | null = null;
+  for (const agent of agents.values()) {
+    if (agent.archivedAt || normalizeWorkspaceOpaqueId(agent.workspaceId) !== target) continue;
+    const at = agent.lastActivityAt.getTime();
+    if (latest === null || at > latest) latest = at;
+  }
+  return latest;
+}
+
+/** No section label: the card reads as the paragraph under the title and goal. */
 function StatusSection({
   item,
+  serverId,
+  workspaceId,
   agentRunning,
   workspaceKey,
 }: {
   item: WorkspaceSummaryItem | null;
+  serverId: string;
+  workspaceId: string;
   agentRunning: boolean;
   workspaceKey: string | null;
 }): ReactElement {
   const { t } = useTranslation();
   const status = item?.status;
+  const lastActivityAt = useSessionStore((state) =>
+    selectLastActivityAt(state.sessions[serverId]?.agents, workspaceId),
+  );
   const open = useCallback(() => {
     if (item && workspaceKey) {
       showExplorerForAttention(workspaceKey, { kind: "plugin", key: item.key ?? "", item });
@@ -496,25 +567,28 @@ function StatusSection({
   }, [item, workspaceKey]);
   if (!status) {
     return (
-      <Section title="panels.overview.status">
-        <Text style={styles.quiet} testID="overview-status-empty">
-          {agentRunning
-            ? t("panels.overview.statusFallbackWorking")
-            : t("panels.overview.statusFallbackIdle")}
-        </Text>
-      </Section>
+      <Text style={styles.quiet} testID="overview-status-empty">
+        {agentRunning
+          ? t("panels.overview.statusFallbackWorking")
+          : t("panels.overview.statusFallbackIdle")}
+      </Text>
     );
   }
   const badge = status.answered ? "answered" : status.state;
+  const outdated = isStatusOutdated({ updatedAt: status.updatedAt, agentRunning, lastActivityAt });
   const content = (
     <>
       <View style={styles.cardHead}>
         <View style={badgeStyle(badge)}>
           <Text style={badgeTextStyle(badge)}>{t(`panels.overview.state.${badge}`)}</Text>
         </View>
-        <Text style={styles.age} numberOfLines={1}>
-          {t("panels.overview.updated", { time: formatTimeAgo(new Date(status.updatedAt)) })}
-        </Text>
+        {outdated ? (
+          <Text style={styles.outdated} numberOfLines={1} testID="overview-status-outdated">
+            {t("panels.overview.outdated", { time: formatTimeAgo(new Date(status.updatedAt)) })}
+          </Text>
+        ) : (
+          <View style={styles.cardHeadFill} />
+        )}
         {item?.panelId ? (
           <ThemedChevronRight size={SMALL_ICON_SIZE} uniProps={mutedColorMapping} />
         ) : null}
@@ -522,7 +596,7 @@ function StatusSection({
       <Text style={styles.summary} numberOfLines={4}>
         {status.summary}
       </Text>
-      {status.now ? (
+      {status.now && status.state !== "done" ? (
         <Text style={styles.rowFacts}>
           <Text style={styles.nowLabel}>{t("panels.overview.now")} </Text>
           {status.now}
@@ -530,25 +604,24 @@ function StatusSection({
       ) : null}
     </>
   );
+  if (item?.panelId) {
+    return (
+      <PressHighlight
+        accessibilityRole="button"
+        accessibilityLabel={status.summary}
+        onPress={open}
+        style={styles.card}
+        highlightStyle={styles.rowPressed}
+        testID="overview-status"
+      >
+        {content}
+      </PressHighlight>
+    );
+  }
   return (
-    <Section title="panels.overview.status">
-      {item?.panelId ? (
-        <PressHighlight
-          accessibilityRole="button"
-          accessibilityLabel={status.summary}
-          onPress={open}
-          style={styles.card}
-          highlightStyle={styles.rowPressed}
-          testID="overview-status"
-        >
-          {content}
-        </PressHighlight>
-      ) : (
-        <View style={styles.card} testID="overview-status">
-          {content}
-        </View>
-      )}
-    </Section>
+    <View style={styles.card} testID="overview-status">
+      {content}
+    </View>
   );
 }
 
@@ -572,28 +645,21 @@ function badgeTextStyle(state: BadgeState) {
 // ── Your move ────────────────────────────────────────────────────────────
 
 function YourMoveSection({
+  rows,
   serverId,
-  workspaceId,
   workspaceKey,
   agentRunning,
   facts,
   gitActions,
 }: {
+  rows: YourMoveRow[];
   serverId: string;
-  workspaceId: string;
   workspaceKey: string | null;
   agentRunning: boolean;
   facts: WorkspaceFacts | null;
   gitActions: GitActions | null;
 }): ReactElement {
   const { t } = useTranslation();
-  const items = useWorkspaceAttention(serverId, workspaceId);
-  const rows = deriveYourMove({
-    items,
-    agentRunning,
-    gitPrimaryId: gitActions?.primary?.id ?? null,
-    prMerged: Boolean(facts?.pullRequest?.isMerged),
-  });
   return (
     <Section title="panels.overview.yourMove" count={rows.length > 1 ? rows.length : undefined}>
       {rows.length === 0 ? (
@@ -775,7 +841,7 @@ function useMoveView(
         return {
           icon: primary.icon ?? <ThemedGitBranch size={ICON_SIZE} uniProps={mutedColorMapping} />,
           title: gitMoveTitle(facts, t),
-          facts: gitMoveFacts(facts, t),
+          facts: gitMoveRowFacts(facts, t) || undefined,
           action: primary.label,
           run: () => runGitAction(primary),
         };
@@ -791,21 +857,30 @@ function gitMoveTitle(facts: WorkspaceFacts | null, t: Translate): string {
   return facts?.branch ?? t("panels.overview.noBranch");
 }
 
+/** The git move names the PR, so it carries the PR's checks and review state the Code row would have. */
+function gitMoveRowFacts(facts: WorkspaceFacts | null, t: Translate): string {
+  const pr = facts?.pullRequest;
+  const prFacts = pr && !pr.isMerged ? pullRequestFacts(pr, t) : "";
+  return [prFacts, gitMoveFacts(facts, t)].filter(Boolean).join(" · ");
+}
+
+/** What the branch has to report; empty when in sync, clean, or already merged. */
 function gitMoveFacts(facts: WorkspaceFacts | null, t: Translate): string {
-  if (!facts) return "";
-  const parts = [syncFacts(facts.ahead, facts.behind, t("panels.overview.inSync"))];
-  const diff = diffFacts(facts.diffStat);
-  if (diff) parts.push(diff);
+  if (!facts || facts.pullRequest?.isMerged) return "";
+  const parts = [syncFacts(facts.ahead, facts.behind), diffFacts(facts.diffStat)];
   if (facts.isDirty) parts.push(t("panels.overview.uncommitted"));
-  return parts.join(" · ");
+  return parts.filter(Boolean).join(" · ");
 }
 
 // ── Code ─────────────────────────────────────────────────────────────────
 
+/** At most one row: the PR, else the branch. Hidden when Your move already names it. */
 function CodeSection({
+  kind,
   facts,
   workspaceKey,
 }: {
+  kind: "pr" | "branch";
   facts: WorkspaceFacts;
   workspaceKey: string;
 }): ReactElement {
@@ -820,14 +895,16 @@ function CodeSection({
   );
   return (
     <Section title="panels.overview.code">
-      <Row
-        icon={ThemedGitBranch}
-        title={facts.branch ?? t("panels.overview.noBranch")}
-        facts={gitMoveFacts(facts, t)}
-        onPress={openChanges}
-        testID="overview-branch"
-      />
-      {facts.pullRequest ? (
+      {kind === "branch" ? (
+        <Row
+          icon={ThemedGitBranch}
+          title={facts.branch ?? t("panels.overview.noBranch")}
+          facts={gitMoveFacts(facts, t)}
+          onPress={openChanges}
+          testID="overview-branch"
+        />
+      ) : null}
+      {kind === "pr" && facts.pullRequest ? (
         <Row
           icon={ThemedGitPullRequest}
           title={pullRequestTitle(facts.pullRequest)}
@@ -844,9 +921,8 @@ function CodeSection({
   );
 }
 
-function syncFacts(ahead: number | null, behind: number | null, inSync: string): string {
-  const parts = [ahead ? `↑${ahead}` : "", behind ? `↓${behind}` : ""].filter(Boolean);
-  return parts.length > 0 ? parts.join(" ") : inSync;
+function syncFacts(ahead: number | null, behind: number | null): string {
+  return [ahead ? `↑${ahead}` : "", behind ? `↓${behind}` : ""].filter(Boolean).join(" ");
 }
 
 function diffFacts(diffStat: { additions: number; deletions: number } | null): string {
@@ -1106,11 +1182,12 @@ const styles = StyleSheet.create((theme) => {
       alignItems: "center",
       gap: theme.spacing[2],
     },
-    age: {
+    cardHeadFill: { flex: 1 },
+    outdated: {
       flex: 1,
       minWidth: 0,
       fontSize: theme.fontSize.sm,
-      color: theme.colors.foregroundExtraMuted,
+      color: theme.colors.statusWarning,
     },
     summary: {
       fontSize: theme.fontSize.base,
@@ -1118,9 +1195,7 @@ const styles = StyleSheet.create((theme) => {
     },
     goal: {
       fontSize: theme.fontSize.base,
-      color: theme.colors.foreground,
-      paddingHorizontal: theme.spacing[2],
-      paddingVertical: theme.spacing[1],
+      color: theme.colors.foregroundMuted,
     },
     nowLabel: {
       fontWeight: theme.fontWeight.medium,

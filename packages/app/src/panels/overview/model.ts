@@ -99,3 +99,51 @@ export function partitionSummaryItems(items: readonly WorkspaceSummaryItem[]): {
   }
   return { status, more };
 }
+
+/** An agent may keep working briefly after reporting; activity this soon after the card doesn't outdate it. */
+export const STATUS_OUTDATED_GRACE_MS = 2 * 60_000;
+
+/**
+ * Whether the status card may no longer describe the work: an agent was active well after the card's
+ * last update. While an agent runs the card is due for its end-of-turn update, so it isn't flagged.
+ */
+export function isStatusOutdated(input: {
+  updatedAt: number;
+  agentRunning: boolean;
+  lastActivityAt: number | null;
+}): boolean {
+  if (input.agentRunning || input.lastActivityAt === null) return false;
+  return input.lastActivityAt - input.updatedAt > STATUS_OUTDATED_GRACE_MS;
+}
+
+/**
+ * The agent row earns its place only when it says something the title doesn't: the agent has its
+ * own title, or several root agents share the workspace and the row tells which one this is.
+ */
+export function shouldShowAgentRow(input: {
+  agentTitle: string | null;
+  workspaceName: string | null;
+  rootAgentCount: number;
+}): boolean {
+  if (!input.agentTitle) return false;
+  if (input.rootAgentCount > 1) return true;
+  return normalizeTitle(input.agentTitle) !== normalizeTitle(input.workspaceName ?? "");
+}
+
+function normalizeTitle(title: string): string {
+  return title.trim().toLowerCase();
+}
+
+/**
+ * The one Code row worth showing, if any. The git move already names the PR (or, without one, the
+ * branch), so the row would repeat it; a branch row with nothing to report is skipped too.
+ */
+export function deriveCodeRow(input: {
+  hasPullRequest: boolean;
+  gitMoveShown: boolean;
+  branchHasFacts: boolean;
+}): "pr" | "branch" | null {
+  if (input.gitMoveShown) return null;
+  if (input.hasPullRequest) return "pr";
+  return input.branchHasFacts ? "branch" : null;
+}
