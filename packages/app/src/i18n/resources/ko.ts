@@ -2210,8 +2210,6 @@ export const ko: TranslationResources = {
         failed: "실패",
         idle: "유휴",
       },
-      statusFallbackWorking: "에이전트 작업 중 · 보고된 상태 없음",
-      statusFallbackIdle: "보고된 상태 없음",
       state: {
         working: "작업 중",
         waiting_on_you: "응답 대기",
@@ -2221,8 +2219,6 @@ export const ko: TranslationResources = {
       },
       now: "현재",
       yourMove: "내 차례",
-      nothingNeedsYou: "처리할 일이 없습니다",
-      nothingWhileWorking: "처리할 일이 없습니다 · 에이전트 작업 중",
       permissionTitle: "권한 요청",
       open: "열기",
       prMergedTitle: "PR #{{number}} 병합됨",

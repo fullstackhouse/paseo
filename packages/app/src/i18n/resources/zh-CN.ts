@@ -2175,8 +2175,6 @@ export const zhCN: TranslationResources = {
         failed: "失败",
         idle: "空闲",
       },
-      statusFallbackWorking: "代理正在工作 · 未报告状态",
-      statusFallbackIdle: "未报告状态",
       state: {
         working: "进行中",
         waiting_on_you: "等你处理",
@@ -2186,8 +2184,6 @@ export const zhCN: TranslationResources = {
       },
       now: "当前",
       yourMove: "待你处理",
-      nothingNeedsYou: "没有需要你处理的事",
-      nothingWhileWorking: "没有需要你处理的事 · 代理正在工作",
       permissionTitle: "权限请求",
       open: "打开",
       prMergedTitle: "PR #{{number}} 已合并",

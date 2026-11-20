@@ -3,7 +3,6 @@ import { Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import {
   Archive,
-  Check,
   ChevronRight,
   CircleAlert,
   GitBranch,
@@ -70,7 +69,6 @@ const ThemedLayoutDashboard = withUnistyles(LayoutDashboard);
 const ThemedChevronRight = withUnistyles(ChevronRight);
 const ThemedGitBranch = withUnistyles(GitBranch);
 const ThemedArchive = withUnistyles(Archive);
-const ThemedCheck = withUnistyles(Check);
 const ThemedAsk = withUnistyles(MessageCircleQuestion);
 const ThemedShield = withUnistyles(ShieldQuestion);
 const ThemedAlert = withUnistyles(CircleAlert);
@@ -159,7 +157,6 @@ function OverviewPanel(): ReactElement {
           rows={moves}
           serverId={serverId}
           workspaceKey={workspaceKey}
-          agentRunning={agentRunning}
           facts={facts}
           gitActions={git}
         />
@@ -267,7 +264,7 @@ function StatusBlock({
   workspaceId: string;
   agentRunning: boolean;
   workspaceKey: string | null;
-}): ReactElement {
+}): ReactElement | null {
   const { t } = useTranslation();
   const status = item?.status;
   const lastPromptAt = useSessionStore((state) =>
@@ -278,15 +275,8 @@ function StatusBlock({
       showExplorerForAttention(workspaceKey, { kind: "plugin", key: item.key ?? "", item });
     }
   }, [item, workspaceKey]);
-  if (!status) {
-    return (
-      <Text style={styles.quiet} testID="overview-status-empty">
-        {agentRunning
-          ? t("panels.overview.statusFallbackWorking")
-          : t("panels.overview.statusFallbackIdle")}
-      </Text>
-    );
-  }
+  // No card says nothing worth a line: the title and Your move carry the workspace on their own.
+  if (!status) return null;
   const state: StatusTone = status.answered ? "answered" : status.state;
   const outdated = isStatusOutdated({ updatedAt: status.updatedAt, agentRunning, lastPromptAt });
   const content = (
@@ -377,31 +367,16 @@ function YourMove({
   rows,
   serverId,
   workspaceKey,
-  agentRunning,
   facts,
   gitActions,
 }: {
   rows: YourMoveRow[];
   serverId: string;
   workspaceKey: string | null;
-  agentRunning: boolean;
   facts: WorkspaceFacts | null;
   gitActions: GitActions | null;
-}): ReactElement {
-  const { t } = useTranslation();
-  if (rows.length === 0) {
-    // One calm line rather than nothing: "nothing needs you" is a fact to read, not an absence to infer.
-    return (
-      <View style={styles.calm} testID="overview-your-move-empty">
-        <ThemedCheck size={SMALL_ICON_SIZE} uniProps={mutedColorMapping} />
-        <Text style={styles.calmText}>
-          {agentRunning
-            ? t("panels.overview.nothingWhileWorking")
-            : t("panels.overview.nothingNeedsYou")}
-        </Text>
-      </View>
-    );
-  }
+}): ReactElement | null {
+  if (rows.length === 0) return null;
   return (
     <Section title="panels.overview.yourMove" count={rows.length > 1 ? rows.length : undefined}>
       {rows.map((row, index) => {
@@ -1165,19 +1140,6 @@ const styles = StyleSheet.create((theme) => {
     nowLabel: {
       fontWeight: theme.fontWeight.medium,
       color: theme.colors.foreground,
-    },
-    quiet: {
-      fontSize: theme.fontSize.sm,
-      color: theme.colors.foregroundMuted,
-    },
-    calm: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: theme.spacing[2],
-    },
-    calmText: {
-      fontSize: theme.fontSize.sm,
-      color: theme.colors.foregroundMuted,
     },
     moves: {
       gap: theme.spacing[2],

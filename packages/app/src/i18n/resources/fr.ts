@@ -2250,8 +2250,6 @@ export const fr: TranslationResources = {
         failed: "en échec",
         idle: "inactif",
       },
-      statusFallbackWorking: "L’agent travaille · aucun statut signalé",
-      statusFallbackIdle: "Aucun statut signalé",
       state: {
         working: "En cours",
         waiting_on_you: "Vous attend",
@@ -2261,8 +2259,6 @@ export const fr: TranslationResources = {
       },
       now: "Maintenant",
       yourMove: "À vous",
-      nothingNeedsYou: "Rien ne vous attend",
-      nothingWhileWorking: "Rien ne vous attend · l’agent travaille",
       permissionTitle: "Demande d’autorisation",
       open: "Ouvrir",
       prMergedTitle: "PR #{{number}} fusionnée",

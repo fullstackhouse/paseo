@@ -2236,8 +2236,6 @@ export const ru: TranslationResources = {
         failed: "ошибка",
         idle: "простаивает",
       },
-      statusFallbackWorking: "Агент работает · статус не сообщён",
-      statusFallbackIdle: "Статус не сообщён",
       state: {
         working: "Работает",
         waiting_on_you: "Ждёт вас",
@@ -2247,8 +2245,6 @@ export const ru: TranslationResources = {
       },
       now: "Сейчас",
       yourMove: "Ваш ход",
-      nothingNeedsYou: "Вас ничего не ждёт",
-      nothingWhileWorking: "Вас ничего не ждёт · агент работает",
       permissionTitle: "Запрос разрешения",
       open: "Открыть",
       prMergedTitle: "PR #{{number}} слит",

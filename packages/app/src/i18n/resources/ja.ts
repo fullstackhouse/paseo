@@ -2223,8 +2223,6 @@ export const ja: TranslationResources = {
         failed: "失敗",
         idle: "待機中",
       },
-      statusFallbackWorking: "エージェントが作業中 · ステータス未報告",
-      statusFallbackIdle: "ステータス未報告",
       state: {
         working: "作業中",
         waiting_on_you: "あなた待ち",
@@ -2234,8 +2232,6 @@ export const ja: TranslationResources = {
       },
       now: "現在",
       yourMove: "あなたの番",
-      nothingNeedsYou: "対応が必要なものはありません",
-      nothingWhileWorking: "対応が必要なものはありません · エージェントが作業中",
       permissionTitle: "権限リクエスト",
       open: "開く",
       prMergedTitle: "PR #{{number}} マージ済み",

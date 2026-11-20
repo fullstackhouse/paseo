@@ -2235,8 +2235,6 @@ export const ptBR: TranslationResources = {
         failed: "falhou",
         idle: "ocioso",
       },
-      statusFallbackWorking: "O agente está trabalhando · nenhum status informado",
-      statusFallbackIdle: "Nenhum status informado",
       state: {
         working: "Trabalhando",
         waiting_on_you: "Aguardando você",
@@ -2246,8 +2244,6 @@ export const ptBR: TranslationResources = {
       },
       now: "Agora",
       yourMove: "Sua vez",
-      nothingNeedsYou: "Nada aguarda você",
-      nothingWhileWorking: "Nada aguarda você · o agente está trabalhando",
       permissionTitle: "Pedido de permissão",
       open: "Abrir",
       prMergedTitle: "PR #{{number}} mesclado",

@@ -2225,8 +2225,6 @@ export const en = {
         failed: "failed",
         idle: "idle",
       },
-      statusFallbackWorking: "The agent is working · no status reported",
-      statusFallbackIdle: "No status reported",
       state: {
         working: "Working",
         waiting_on_you: "Waiting on you",
@@ -2236,8 +2234,6 @@ export const en = {
       },
       now: "Now",
       yourMove: "Your move",
-      nothingNeedsYou: "Nothing needs you",
-      nothingWhileWorking: "Nothing needs you · the agent is working",
       permissionTitle: "Permission request",
       open: "Open",
       prMergedTitle: "PR #{{number}} merged",

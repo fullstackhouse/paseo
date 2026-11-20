@@ -2198,8 +2198,6 @@ export const ar: TranslationResources = {
         failed: "فشل",
         idle: "خامل",
       },
-      statusFallbackWorking: "الوكيل يعمل · لم يُبلَّغ عن حالة",
-      statusFallbackIdle: "لم يُبلَّغ عن حالة",
       state: {
         working: "قيد العمل",
         waiting_on_you: "بانتظارك",
@@ -2209,8 +2207,6 @@ export const ar: TranslationResources = {
       },
       now: "الآن",
       yourMove: "دورك",
-      nothingNeedsYou: "لا شيء بانتظارك",
-      nothingWhileWorking: "لا شيء بانتظارك · الوكيل يعمل",
       permissionTitle: "طلب إذن",
       open: "فتح",
       prMergedTitle: "تم دمج PR #{{number}}",

@@ -2250,8 +2250,6 @@ export const es: TranslationResources = {
         failed: "falló",
         idle: "inactivo",
       },
-      statusFallbackWorking: "El agente está trabajando · sin estado informado",
-      statusFallbackIdle: "Sin estado informado",
       state: {
         working: "Trabajando",
         waiting_on_you: "Te espera",
@@ -2261,8 +2259,6 @@ export const es: TranslationResources = {
       },
       now: "Ahora",
       yourMove: "Tu turno",
-      nothingNeedsYou: "Nada te espera",
-      nothingWhileWorking: "Nada te espera · el agente está trabajando",
       permissionTitle: "Solicitud de permiso",
       open: "Abrir",
       prMergedTitle: "PR #{{number}} fusionada",

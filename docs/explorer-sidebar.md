@@ -163,13 +163,13 @@ is the storyboard in `.ai/prototypes/overview-v3/`.
   No ⋯ menu: archive, editor and branch actions live in the workspace header and the sidebar.
 - **Where does it stand?** The summary item that carries `status` (paseo-status), as a block: a dot and state word, the
   summary, and "Now" unless the state is done. When someone prompted an agent after the card's last update and no
-  agent runs now, the block dims and says so. Without a card, one muted line.
+  agent runs now, the block dims and says so. Without a card, nothing.
 - **What do I do?** Your move: the attention items, one row per plugin `entries` item, then failing checks and the
   header's primary git action, from the same `useGitActions` result so the two can't disagree. The first item is a card
   with its actions; the rest are one-line rows. A plain tool permission is answered in place with its own actions;
   plans and questions open the agent. A summary item with an `EntryComponent` renders its entries itself
   (`plugins/workspace-summary/entry-view.tsx`), so an ask is answered in place too. While an agent runs, only blocking
-  items show. Archive is only a move once the PR merged. With nothing to do, one calm line.
+  items show. Archive is only a move once the PR merged. With nothing to do, nothing: no section and no "nothing needs you" line.
 - **Context**: one-line facts the blocks above don't say, under a rule, and nothing when there are none: From (the
   nearest ancestor's workspace), Started (the workspaces the focused agent started), the PR or a branch with something
   to report when the git move doesn't already name it, Agents when several root agents share the workspace, and plugin
