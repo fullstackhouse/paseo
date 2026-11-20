@@ -1,6 +1,6 @@
 # Spec: Overview, simplified: title → goal → status → your move
 
-Status: design approved · 2026-11-20 · reviewed: `fsh` @ 3e3340aae (`packages/app/src/panels/overview-panel.tsx`)
+Status: implemented in PR #143 · 2026-11-20 · reviewed: `fsh` @ 3e3340aae (`packages/app/src/panels/overview-panel.tsx`)
 
 Follows [spec-overview-v2.md](spec-overview-v2.md). Its section order stays. This spec removes what repeats and puts the
 four things the operator reads on entering a workspace at the top, with nothing between them.
@@ -188,6 +188,20 @@ Storyboard: [`.ai/prototypes/overview-v3/`](../.ai/prototypes/overview-v3/index.
 designs from the operator's questions rather than today's components: what is this (title, goal), where does it stand
 (state word, summary), what do I do (Your move, answered in place), then one-line context. Where it differs from the
 Desired state above, the storyboard wins once approved.
+
+## Decisions after the storyboard
+
+Made while building, on the review of the running app (2026-11-20). They supersede the storyboard where they differ:
+
+- **No calm line.** An empty Your move renders nothing; "Nothing needs you" was noise.
+- **One status line.** The state word leads the summary inline, with no box. "Now" is dropped from Overview (it
+  repeated the summary's progress); the Status tab still shows it.
+- **No fallback for a missing status card.** "No status reported" is gone; without a card the block renders nothing.
+- **Agent row:** shown only as an "Agents" context row when several root agents share the workspace (storyboard s9).
+  This replaces Q3's "only when it differs".
+- **Permissions answered in place** only when one line shows everything approved (command with its directory, path,
+  query or URL), with the agent's reason after it. Edits, writes, plans and questions open the agent.
+- **Outdated** keys on prompts (`lastUserMessageAt`), not on `lastActivityAt`, which moves on renames and mode changes.
 
 ## Next step
 
