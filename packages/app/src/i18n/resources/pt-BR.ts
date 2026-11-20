@@ -1705,6 +1705,10 @@ export const ptBR: TranslationResources = {
   },
   openProject: {
     tiles: {
+      newWorkspace: {
+        title: "Novo workspace",
+        description: "Inicie um agente em um dos seus projetos",
+      },
       addProject: {
         title: "Adicionar um projeto",
         description: "Abra uma pasta na sua máquina",

@@ -1672,6 +1672,10 @@ export const ar: TranslationResources = {
   },
   openProject: {
     tiles: {
+      newWorkspace: {
+        title: "مساحة عمل جديدة",
+        description: "ابدأ وكيلًا في أحد مشاريعك",
+      },
       addProject: {
         title: "أضف مشروعًا",
         description: "افتح مجلدًا على جهازك",
