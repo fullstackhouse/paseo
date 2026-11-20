@@ -100,20 +100,32 @@ export function partitionSummaryItems(items: readonly WorkspaceSummaryItem[]): {
   return { status, more };
 }
 
-/** An agent may keep working briefly after reporting; activity this soon after the card doesn't outdate it. */
-export const STATUS_OUTDATED_GRACE_MS = 2 * 60_000;
-
 /**
- * Whether the status card may no longer describe the work: an agent was active well after the card's
- * last update. While an agent runs the card is due for its end-of-turn update, so it isn't flagged.
+ * Whether the status card may no longer describe the work: someone prompted an agent after the card's
+ * last update and that turn ended without a new card. While an agent runs the card is due for its
+ * end-of-turn update, so it isn't flagged. Prompts, not `lastActivityAt`: that moves on renames and
+ * mode or model changes, which don't make a summary wrong.
  */
 export function isStatusOutdated(input: {
   updatedAt: number;
   agentRunning: boolean;
-  lastActivityAt: number | null;
+  lastPromptAt: number | null;
 }): boolean {
-  if (input.agentRunning || input.lastActivityAt === null) return false;
-  return input.lastActivityAt - input.updatedAt > STATUS_OUTDATED_GRACE_MS;
+  if (input.agentRunning || input.lastPromptAt === null) return false;
+  return input.lastPromptAt > input.updatedAt;
+}
+
+/** The goal says what the workspace is for; without one, the project at least says where it lives. */
+export function overviewSubtitle(input: {
+  goal: string | null;
+  project: string | null;
+}): string | null {
+  return input.goal || input.project || null;
+}
+
+/** "Now" on a done card restates the state ("Nothing left"). */
+export function showNowLine(status: Pick<PluginWorkspaceStatus, "now" | "state">): boolean {
+  return Boolean(status.now) && status.state !== "done";
 }
 
 /**
@@ -146,4 +158,54 @@ export function deriveCodeRow(input: {
   if (input.gitMoveShown) return null;
   if (input.hasPullRequest) return "pr";
   return input.branchHasFacts ? "branch" : null;
+}
+
+type Translate = (key: string) => string;
+
+export interface PullRequestFacts {
+  isMerged: boolean;
+  checksStatus?: "none" | "pending" | "success" | "failure";
+  reviewDecision?: "approved" | "changes_requested" | "pending" | null;
+}
+
+export interface BranchFactsInput {
+  ahead: number | null;
+  behind: number | null;
+  isDirty: boolean | null;
+  diffStat: { additions: number; deletions: number } | null;
+  pullRequest: PullRequestFacts | null;
+}
+
+export function pullRequestFacts(pr: PullRequestFacts, t: Translate): string {
+  if (pr.isMerged) return t("panels.overview.merged");
+  const parts: string[] = [];
+  if (pr.checksStatus === "failure") parts.push(t("panels.overview.checksFailing"));
+  else if (pr.checksStatus === "pending") parts.push(t("panels.overview.checksRunning"));
+  else if (pr.checksStatus === "success") parts.push(t("panels.overview.checksPassed"));
+  if (pr.reviewDecision === "approved") parts.push(t("panels.overview.approved"));
+  else if (pr.reviewDecision === "changes_requested")
+    parts.push(t("panels.overview.changesRequested"));
+  else if (pr.reviewDecision === "pending") parts.push(t("panels.overview.reviewRequired"));
+  return parts.join(" · ");
+}
+
+/** What the branch has to report; empty when in sync, clean, or already merged. */
+export function branchFacts(facts: BranchFactsInput | null, t: Translate): string {
+  if (!facts || facts.pullRequest?.isMerged) return "";
+  const sync = [facts.ahead ? `↑${facts.ahead}` : "", facts.behind ? `↓${facts.behind}` : ""]
+    .filter(Boolean)
+    .join(" ");
+  const diff =
+    facts.diffStat && (facts.diffStat.additions > 0 || facts.diffStat.deletions > 0)
+      ? `+${facts.diffStat.additions} −${facts.diffStat.deletions}`
+      : "";
+  const dirty = facts.isDirty ? t("panels.overview.uncommitted") : "";
+  return [sync, diff, dirty].filter(Boolean).join(" · ");
+}
+
+/** The git move names the PR, so it carries the PR's checks and review state the Code row would have. */
+export function gitMoveFacts(facts: BranchFactsInput | null, t: Translate): string {
+  const pr = facts?.pullRequest;
+  const prFacts = pr && !pr.isMerged ? pullRequestFacts(pr, t) : "";
+  return [prFacts, branchFacts(facts, t)].filter(Boolean).join(" · ");
 }

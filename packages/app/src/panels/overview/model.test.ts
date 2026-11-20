@@ -3,14 +3,17 @@ import type { WorkspaceSummaryItem } from "@/plugins/workspace-summary/store";
 import type { Agent } from "@/stores/session-store";
 import type { AttentionItem } from "@/workspace-attention/model";
 import {
+  branchFacts,
   deriveCodeRow,
   deriveWorkspaceStateWord,
   deriveYourMove,
+  gitMoveFacts,
   isStatusOutdated,
   MAX_ENTRIES_PER_ITEM,
+  overviewSubtitle,
   partitionSummaryItems,
   shouldShowAgentRow,
-  STATUS_OUTDATED_GRACE_MS,
+  showNowLine,
 } from "./model";
 
 function summaryItem(patch: Partial<WorkspaceSummaryItem>): WorkspaceSummaryItem {
@@ -139,30 +142,77 @@ describe("partitionSummaryItems", () => {
 describe("isStatusOutdated", () => {
   const updatedAt = 1_000_000;
 
-  it("flags a card when an idle agent was active well after it", () => {
-    expect(
-      isStatusOutdated({
-        updatedAt,
-        agentRunning: false,
-        lastActivityAt: updatedAt + STATUS_OUTDATED_GRACE_MS + 1,
-      }),
-    ).toBe(true);
+  it("flags a card when a prompt came after it and the turn ended without a new one", () => {
+    expect(isStatusOutdated({ updatedAt, agentRunning: false, lastPromptAt: updatedAt + 1 })).toBe(
+      true,
+    );
   });
 
-  it("ignores the activity that wraps up the turn which reported the card", () => {
-    expect(
-      isStatusOutdated({ updatedAt, agentRunning: false, lastActivityAt: updatedAt + 30_000 }),
-    ).toBe(false);
+  it("doesn't flag a card reported after the last prompt", () => {
+    expect(isStatusOutdated({ updatedAt, agentRunning: false, lastPromptAt: updatedAt - 1 })).toBe(
+      false,
+    );
   });
 
   it("doesn't flag while an agent runs, since the card is due an update", () => {
-    expect(
-      isStatusOutdated({ updatedAt, agentRunning: true, lastActivityAt: updatedAt + 3_600_000 }),
-    ).toBe(false);
+    expect(isStatusOutdated({ updatedAt, agentRunning: true, lastPromptAt: updatedAt + 1 })).toBe(
+      false,
+    );
   });
 
-  it("doesn't flag without agent activity", () => {
-    expect(isStatusOutdated({ updatedAt, agentRunning: false, lastActivityAt: null })).toBe(false);
+  it("doesn't flag without a prompt", () => {
+    expect(isStatusOutdated({ updatedAt, agentRunning: false, lastPromptAt: null })).toBe(false);
+  });
+});
+
+describe("overviewSubtitle", () => {
+  it("prefers the goal, then the project", () => {
+    expect(overviewSubtitle({ goal: "Ship it", project: "paseo" })).toBe("Ship it");
+    expect(overviewSubtitle({ goal: null, project: "paseo" })).toBe("paseo");
+    expect(overviewSubtitle({ goal: "", project: null })).toBe(null);
+  });
+});
+
+describe("showNowLine", () => {
+  it("hides Now on a done card", () => {
+    expect(showNowLine({ state: "done", now: "Nothing left." })).toBe(false);
+    expect(showNowLine({ state: "working", now: "Running tests" })).toBe(true);
+    expect(showNowLine({ state: "working", now: undefined })).toBe(false);
+  });
+});
+
+describe("branch and git move facts", () => {
+  const t = (key: string) => key.replace("panels.overview.", "");
+  const clean = { ahead: 0, behind: 0, isDirty: false, diffStat: null, pullRequest: null };
+
+  it("says nothing for a clean branch in sync", () => {
+    expect(branchFacts(clean, t)).toBe("");
+    expect(gitMoveFacts(clean, t)).toBe("");
+  });
+
+  it("lists sync, diff and uncommitted changes", () => {
+    const facts = {
+      ...clean,
+      ahead: 2,
+      isDirty: true,
+      diffStat: { additions: 10, deletions: 3 },
+    };
+    expect(branchFacts(facts, t)).toBe("↑2 · +10 −3 · uncommitted");
+  });
+
+  it("says nothing once the PR merged", () => {
+    const facts = { ...clean, ahead: 1, pullRequest: { isMerged: true } };
+    expect(branchFacts(facts, t)).toBe("");
+    expect(gitMoveFacts(facts, t)).toBe("");
+  });
+
+  it("puts an open PR's checks and review before the branch facts on the git move", () => {
+    const facts = {
+      ...clean,
+      ahead: 2,
+      pullRequest: { isMerged: false, checksStatus: "failure", reviewDecision: "pending" } as const,
+    };
+    expect(gitMoveFacts(facts, t)).toBe("checksFailing · reviewRequired · ↑2");
   });
 });
 

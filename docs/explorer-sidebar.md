@@ -159,20 +159,22 @@ Overview is an Explorer-only singleton tab that summarizes the workspace on desk
 (`packages/app/src/panels/overview-panel.tsx`). It reads top to bottom as title → goal → status → your move, and
 shows each fact once: no section label above the goal or status, no repeated title, branch or PR.
 
-- **Where am I**: the workspace name, then the status card's goal as its subtitle (the project name without one). The
-  focused agent's row shows only when its title differs from the workspace name or several root agents share the
-  workspace. Then lineage by workspace: the nearest ancestor's workspace and the workspaces the focused agent started,
-  each with one state word. The word comes from that workspace's status card, else from its agents
-  (`overview/model.ts`). Rare actions (Lineage details, Archive) sit in its ⋯ menu.
+- **Header**: the workspace name, then the status card's goal as its subtitle (the project name without one). Rare
+  actions (Lineage details, Archive) sit in its ⋯ menu.
 - **Status**: the summary item that carries `status` (paseo-status) renders as a card: state, summary, and "Now" unless
-  the state is done. Its age shows only when the card is outdated: an idle agent was active over two minutes after its
-  last update. Without a card, a single muted line.
+  the state is done. Its age shows only when the card is outdated: someone prompted an agent after its last update
+  and no agent is running now. `lastActivityAt` doesn't work for this; it moves on renames and mode or model changes.
+  Without a card, a single muted line.
 - **Your move**: the attention items as a list, one row per plugin `entries` item, then failing checks and the header's
   primary git action, from the same `useGitActions` result so the two can't disagree. Only the first row has a button.
   While an agent runs, only blocking items show. Archive is only a move once the PR merged. The git row carries the
   PR's checks and review state.
   A summary item with an `EntryComponent` renders its entries itself (`plugins/workspace-summary/entry-view.tsx`), so
   an ask is answered in place: the first starts open with its actions, the rest expand inline.
+- **Agent and lineage**: the focused agent's row, only when its title differs from the workspace name or several root
+  agents share the workspace. Then lineage by workspace: the nearest ancestor's workspace and the workspaces the focused
+  agent started, each with one state word. The word comes from that workspace's status card, else from its agents
+  (`overview/model.ts`).
 - **Code**: one row, the PR or else a branch with something to report, and none when the git move already names it.
   Changes and the PR tab are in the same tab bar.
 
