@@ -9,6 +9,7 @@ import {
   defaultBasePickerItem,
   pickerItemToCheckoutRequest,
   type PickerItem,
+  resolveCreateCheckoutRequest,
 } from "./new-workspace-picker-item";
 
 const prItem: ForgeSearchItem = {
@@ -101,6 +102,36 @@ describe("pickerItemToCheckoutRequest", () => {
         number: 21,
         projectPath: "acme/repo",
       },
+    });
+  });
+});
+
+describe("resolveCreateCheckoutRequest", () => {
+  it("uses the picked ref without needing the checkout status", () => {
+    const picked: PickerItem = {
+      kind: "branch",
+      name: "feature",
+      refName: "refs/heads/feature",
+      accessibilityLabel: "feature",
+    };
+    expect(resolveCreateCheckoutRequest({ selectedItem: picked, checkoutStatus: null })).toEqual({
+      action: "branch-off",
+      refName: "refs/heads/feature",
+    });
+  });
+
+  it("derives the default base from a loaded checkout status", () => {
+    expect(
+      resolveCreateCheckoutRequest({
+        selectedItem: null,
+        checkoutStatus: { currentBranch: "main", upstreamRef: "refs/remotes/upstream/main" },
+      }),
+    ).toEqual({ action: "branch-off", refName: "refs/remotes/upstream/main" });
+  });
+
+  it("lets the daemon resolve the default base while the checkout status is still loading", () => {
+    expect(resolveCreateCheckoutRequest({ selectedItem: null, checkoutStatus: null })).toEqual({
+      action: "branch-off",
     });
   });
 });
