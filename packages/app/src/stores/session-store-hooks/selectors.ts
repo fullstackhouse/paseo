@@ -7,6 +7,7 @@ import {
 } from "@/projects/workspace-structure";
 import type { ProjectLastAgentSetup } from "@getpaseo/protocol/messages";
 import type { DesktopBadgeWorkspaceStatus } from "@/utils/desktop-badge-state";
+import { applyReportedWork, type ReportedWorkLookup } from "@/workspace-status/reported-work";
 import { resolveWorkspaceMapKeyByIdentity } from "@/utils/workspace-identity";
 import type { Agent, ProjectDescriptor, WorkspaceDescriptor } from "../session-store";
 
@@ -460,13 +461,20 @@ export function selectHasWorkspaces(state: SessionsSnapshot, serverId: string | 
   return (state.sessions[serverId]?.workspaces?.size ?? 0) > 0;
 }
 
+/** Each workspace's status regrouped by what plugins report, so the badge counts what the sidebar asks of you. */
 export function selectWorkspaceStatusesForBadges(
   state: SessionsSnapshot,
+  reportedWork?: ReportedWorkLookup,
 ): DesktopBadgeWorkspaceStatus[] {
   const statuses: DesktopBadgeWorkspaceStatus[] = [];
-  for (const session of Object.values(state.sessions)) {
+  for (const [serverId, session] of Object.entries(state.sessions)) {
     for (const workspace of session.workspaces.values()) {
-      statuses.push(workspace.status);
+      const turn = {
+        status: workspace.status,
+        runningFromBackgroundWork: workspace.runningFromBackgroundWork,
+        enteredAt: null,
+      };
+      statuses.push(applyReportedWork(turn, reportedWork?.(serverId, workspace.id)).status);
     }
   }
   return statuses;

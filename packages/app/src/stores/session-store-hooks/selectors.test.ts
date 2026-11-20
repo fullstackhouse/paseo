@@ -818,6 +818,28 @@ describe("selectWorkspaceStatusesForBadges", () => {
 
     tracked.stop();
   });
+
+  it("regroups idle workspaces by what plugins report, so Blocked and Done stop counting", () => {
+    const blocked = createWorkspace({ id: "blocked", status: "attention" });
+    const done = createWorkspace({ id: "done", status: "attention" });
+    const waiting = createWorkspace({ id: "waiting", status: "done" });
+    const running = createWorkspace({ id: "running", status: "running" });
+    initializeWorkspaces([blocked, done, waiting, running]);
+    const reported = {
+      blocked: "blocked",
+      done: "done",
+      waiting: "needs_you",
+      running: "blocked",
+    } as const;
+
+    const statuses = selectWorkspaceStatusesForBadges(
+      useSessionStore.getState(),
+      (serverId, workspaceId) =>
+        serverId === SERVER_ID ? reported[workspaceId as keyof typeof reported] : null,
+    );
+
+    expect(statuses).toEqual(["blocked", "done", "attention", "running"]);
+  });
 });
 
 it("a prompt changes only its project's structure and output preserves both project identities", () => {
