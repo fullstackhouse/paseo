@@ -7,7 +7,9 @@ import {
 } from "@/projects/workspace-structure";
 import type { ProjectLastAgentSetup } from "@getpaseo/protocol/messages";
 import type { DesktopBadgeWorkspaceStatus } from "@/utils/desktop-badge-state";
-import { applyReportedWork, type ReportedWorkLookup } from "@/workspace-status/reported-work";
+import type { WorkspaceAgentActivity } from "@/utils/workspace-agent-activity";
+import { deriveEffectiveWorkspaceStatus } from "@/workspace-status";
+import type { ReportedWorkLookup } from "@/workspace-status/reported-work";
 import { resolveWorkspaceMapKeyByIdentity } from "@/utils/workspace-identity";
 import type { Agent, ProjectDescriptor, WorkspaceDescriptor } from "../session-store";
 
@@ -23,6 +25,7 @@ export interface SessionsSnapshot {
       workspaces: Map<string, WorkspaceDescriptor>;
       projects?: Map<string, ProjectDescriptor>;
       agents?: Map<string, Agent>;
+      workspaceAgentActivity?: ReadonlyMap<string, WorkspaceAgentActivity>;
     }
   >;
 }
@@ -461,7 +464,7 @@ export function selectHasWorkspaces(state: SessionsSnapshot, serverId: string | 
   return (state.sessions[serverId]?.workspaces?.size ?? 0) > 0;
 }
 
-/** Each workspace's status regrouped by what plugins report, so the badge counts what the sidebar asks of you. */
+/** Each workspace's status as the sidebar derives it, plugin reports included, so the badge counts what the sidebar asks of you. */
 export function selectWorkspaceStatusesForBadges(
   state: SessionsSnapshot,
   reportedWork?: ReportedWorkLookup,
@@ -469,12 +472,13 @@ export function selectWorkspaceStatusesForBadges(
   const statuses: DesktopBadgeWorkspaceStatus[] = [];
   for (const [serverId, session] of Object.entries(state.sessions)) {
     for (const workspace of session.workspaces.values()) {
-      const turn = {
-        status: workspace.status,
-        runningFromBackgroundWork: workspace.runningFromBackgroundWork,
-        enteredAt: null,
-      };
-      statuses.push(applyReportedWork(turn, reportedWork?.(serverId, workspace.id)).status);
+      const derived = deriveEffectiveWorkspaceStatus({
+        serverId,
+        workspace,
+        workspaceAgentActivity: session.workspaceAgentActivity,
+        reportedWork,
+      });
+      statuses.push(derived.status);
     }
   }
   return statuses;

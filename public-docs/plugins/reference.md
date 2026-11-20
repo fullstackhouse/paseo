@@ -931,11 +931,13 @@ An idle workspace
 is grouped by its summary items instead of by whether its last turn was read: any `needsYou`
 or `workState: "waiting"` puts it in Ready to review, otherwise any `workState: "working"` in Working, otherwise any `"blocked"` in Blocked, otherwise `"done"` in Done. A
 running agent, a failure or a permission prompt still wins. Workspaces with no `needsYou` and no
-`workState` keep the usual grouping. The dock badge counts the workspaces this grouping puts in Ready to review, Needs input or Failed.
+`workState` keep the usual grouping.
 
 Use `"blocked"` when the work waits on something other than the human: another workspace or agent, a
 reviewer, CI. Blocked sits at the bottom of the sidebar with no needs-you mark. Hosts without the
 Blocked group drop the value and group the workspace by its turn.
+
+The dock badge counts workspaces in Ready to review, Needs input and Failed; Working, Done and Blocked don't count.
 
 ```ts
 const items = new Map<string, PluginWorkspaceSummaryItemRegistration>();

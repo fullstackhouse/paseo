@@ -1,6 +1,6 @@
 import type { SidebarStateBucket } from "@/utils/sidebar-agent-state";
 
-/** A workspace's status as the sidebar groups it, plugin reports applied: Blocked and Done never count. */
+/** A workspace's status as the sidebar derives it (`deriveEffectiveWorkspaceStatus`): Blocked and Done never count. */
 export type DesktopBadgeWorkspaceStatus = SidebarStateBucket;
 
 export function isWorkspaceActionableForDesktopBadge(status: DesktopBadgeWorkspaceStatus): boolean {

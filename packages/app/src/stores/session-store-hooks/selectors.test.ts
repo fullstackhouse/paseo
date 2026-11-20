@@ -824,12 +824,17 @@ describe("selectWorkspaceStatusesForBadges", () => {
     const done = createWorkspace({ id: "done", status: "attention" });
     const waiting = createWorkspace({ id: "waiting", status: "done" });
     const running = createWorkspace({ id: "running", status: "running" });
-    initializeWorkspaces([blocked, done, waiting, running]);
+    const devServer = {
+      ...createWorkspace({ id: "dev-server", status: "running" }),
+      runningFromBackgroundWork: true,
+    };
+    initializeWorkspaces([blocked, done, waiting, running, devServer]);
     const reported = {
       blocked: "blocked",
       done: "done",
       waiting: "needs_you",
       running: "blocked",
+      "dev-server": "needs_you",
     } as const;
 
     const statuses = selectWorkspaceStatusesForBadges(
@@ -838,7 +843,23 @@ describe("selectWorkspaceStatusesForBadges", () => {
         serverId === SERVER_ID ? reported[workspaceId as keyof typeof reported] : null,
     );
 
-    expect(statuses).toEqual(["blocked", "done", "attention", "running"]);
+    expect(statuses).toEqual(["blocked", "done", "attention", "running", "attention"]);
+  });
+
+  it("lets a root agent mid-turn win over a report, as the sidebar does", () => {
+    const workspace = createWorkspace({ id: "w", status: "done" });
+    const state = {
+      sessions: {
+        [SERVER_ID]: {
+          workspaces: new Map([[workspace.id, workspace]]),
+          workspaceAgentActivity: new Map([
+            [workspace.id, { agentId: "a", status: "running" as const, enteredAt: new Date() }],
+          ]),
+        },
+      },
+    };
+
+    expect(selectWorkspaceStatusesForBadges(state, () => "needs_you")).toEqual(["running"]);
   });
 });
 
