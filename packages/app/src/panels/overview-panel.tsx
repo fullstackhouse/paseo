@@ -14,7 +14,6 @@ import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import invariant from "tiny-invariant";
 import type { AgentPermissionAction, AgentPermissionRequest } from "@getpaseo/protocol/agent-types";
 import { useAgentDescriptor } from "@/agent-presentation";
-import { SettingsSection } from "@/components/settings/headings/settings-section";
 import { Button } from "@/components/ui/button";
 import { PressHighlight } from "@/components/ui/press-highlight";
 import { ScrollView } from "@/components/ui/scroll-view";
@@ -285,7 +284,7 @@ function StatusBlock({
       <View style={styles.stateLine}>
         <View style={dotStyle(state)} />
         <Text style={outdated ? styles.summaryStale : styles.summary} numberOfLines={5}>
-          <Text style={stateWordStyle(state)}>{t(`panels.overview.state.${state}`)}</Text>
+          <Text style={styles.stateWord}>{t(`panels.overview.state.${state}`)}</Text>
           {" · "}
           {status.summary}
         </Text>
@@ -326,14 +325,6 @@ function dotStyle(state: StatusTone) {
   return styles.dotMuted;
 }
 
-function stateWordStyle(state: StatusTone) {
-  if (state === "working") return styles.stateRun;
-  if (state === "waiting_on_you") return styles.stateWarn;
-  if (state === "blocked") return styles.stateDanger;
-  if (state === "done") return styles.stateOk;
-  return styles.stateMuted;
-}
-
 // ── 3. What do I do ──────────────────────────────────────────────────────
 
 /** `title` is an i18n key: section titles never come from data. */
@@ -348,10 +339,13 @@ function Section({
 }): ReactElement {
   const { t } = useTranslation();
   const label = count ? `${t(title)} · ${count}` : t(title);
+  // A label on the panel's rail, like the agent list's section headings: SettingsSection insets
+  // its title for settings cards, which put it off the title and card rail here.
   return (
-    <SettingsSection title={label} flush>
+    <View style={styles.section}>
+      <Text style={styles.sectionLabel}>{label}</Text>
       <View style={styles.moves}>{children}</View>
-    </SettingsSection>
+    </View>
   );
 }
 
@@ -446,7 +440,7 @@ function MoveRow({
     );
   }
   return (
-    <View style={leadStyle(view.tone)} testID={`overview-move-${row.kind}`}>
+    <View style={styles.lead} testID={`overview-move-${row.kind}`}>
       <View style={styles.leadHead}>
         <View style={styles.leadIcon}>{view.icon}</View>
         <View style={styles.leadText}>
@@ -465,13 +459,6 @@ function MoveRow({
       </View>
     </View>
   );
-}
-
-function leadStyle(tone: Tone) {
-  if (tone === "warn") return styles.leadWarn;
-  if (tone === "danger") return styles.leadDanger;
-  if (tone === "merged") return styles.leadMerged;
-  return styles.leadOk;
 }
 
 function selectPendingPermission(
@@ -1062,13 +1049,12 @@ const styles = StyleSheet.create((theme) => {
     borderRadius: theme.borderRadius.full,
     marginTop: 7,
   } as const;
-  const stateWord = { fontWeight: theme.fontWeight.semibold } as const;
   const word = { fontSize: theme.fontSize.sm, flexShrink: 0, maxWidth: "50%" } as const;
   const lead = {
     gap: theme.spacing[3],
     padding: theme.spacing[3],
     borderRadius: theme.borderRadius.lg,
-    borderWidth: 1,
+    backgroundColor: theme.colors.surface1,
   } as const;
   const summary = { fontSize: theme.fontSize.base, color: theme.colors.foreground } as const;
   const contextRow = {
@@ -1090,7 +1076,7 @@ const styles = StyleSheet.create((theme) => {
     },
     title: {
       fontSize: theme.fontSize.lg,
-      fontWeight: theme.fontWeight.semibold,
+      fontWeight: theme.fontWeight.medium,
       color: theme.colors.foreground,
     },
     goal: {
@@ -1114,57 +1100,38 @@ const styles = StyleSheet.create((theme) => {
       gap: theme.spacing[2],
     },
     fill: { flex: 1 },
-    dotRun: { ...dot, backgroundColor: theme.colors.accentBright },
-    dotWarn: { ...dot, backgroundColor: theme.colors.statusWarning },
-    dotDanger: { ...dot, backgroundColor: theme.colors.statusDanger },
-    dotOk: { ...dot, backgroundColor: theme.colors.statusSuccess },
+    dotRun: { ...dot, backgroundColor: theme.colors.statusDotRunning },
+    dotWarn: { ...dot, backgroundColor: theme.colors.statusDotWarning },
+    dotDanger: { ...dot, backgroundColor: theme.colors.statusDotDanger },
+    dotOk: { ...dot, backgroundColor: theme.colors.statusDotSuccess },
     dotMuted: { ...dot, backgroundColor: theme.colors.foregroundMuted },
-    stateRun: { ...stateWord, color: theme.colors.accentBright },
-    stateWarn: { ...stateWord, color: theme.colors.statusWarning },
-    stateDanger: { ...stateWord, color: theme.colors.statusDanger },
-    stateOk: { ...stateWord, color: theme.colors.statusSuccess },
-    stateMuted: { ...stateWord, color: theme.colors.foregroundMuted },
+    // The dot carries the state; the word stays on the text colour so the two never disagree.
+    stateWord: { fontWeight: theme.fontWeight.medium, color: theme.colors.foreground },
     outdated: {
       fontSize: theme.fontSize.sm,
       color: theme.colors.statusWarning,
     },
     summary,
     summaryStale: { ...summary, opacity: 0.55 },
-    moves: {
+    section: {
       gap: theme.spacing[2],
     },
-    leadOk: {
-      ...lead,
-      borderColor: theme.colors.statusSuccess,
-      backgroundColor: theme.colors.statusSuccessTint,
+    sectionLabel: {
+      fontSize: theme.fontSize.sm,
+      fontWeight: theme.fontWeight.medium,
+      color: theme.colors.foregroundMuted,
     },
-    leadWarn: {
-      ...lead,
-      borderColor: theme.colors.statusWarning,
-      backgroundColor: theme.colors.statusWarningTint,
+    moves: {
+      gap: theme.spacing[1],
     },
-    leadDanger: {
-      ...lead,
-      borderColor: theme.colors.statusDanger,
-      backgroundColor: theme.colors.statusDangerTint,
-    },
-    leadMerged: {
-      ...lead,
-      borderColor: theme.colors.statusMerged,
-      backgroundColor: theme.colors.surface1,
-    },
+    lead,
     leadHead: {
       flexDirection: "row",
       alignItems: "flex-start",
       gap: theme.spacing[3],
     },
     leadIcon: {
-      width: 26,
-      height: 26,
-      borderRadius: theme.borderRadius.md,
-      alignItems: "center",
-      justifyContent: "center",
-      backgroundColor: theme.colors.surface2,
+      paddingTop: 2,
     },
     leadText: {
       flex: 1,
@@ -1184,7 +1151,7 @@ const styles = StyleSheet.create((theme) => {
       flexDirection: "row",
       flexWrap: "wrap",
       gap: theme.spacing[1.5],
-      paddingLeft: 26 + theme.spacing[3],
+      paddingLeft: ICON_SIZE + theme.spacing[3],
     },
     next: {
       flexDirection: "row",
@@ -1193,8 +1160,6 @@ const styles = StyleSheet.create((theme) => {
       minHeight: 36,
       paddingHorizontal: theme.spacing[3],
       borderRadius: theme.borderRadius.md,
-      borderWidth: 1,
-      borderColor: theme.colors.border,
     },
     nextTitle: {
       flex: 1,
@@ -1204,9 +1169,6 @@ const styles = StyleSheet.create((theme) => {
     },
     context: {
       gap: theme.spacing[0.5],
-      paddingTop: theme.spacing[3],
-      borderTopWidth: 1,
-      borderTopColor: theme.colors.border,
     },
     contextRow,
     childRow: { ...contextRow, paddingLeft: theme.spacing[1.5] + 60 },
