@@ -896,7 +896,7 @@ describe("appearance settings", () => {
           toolCallDetailLevel: "overview",
         }),
         [SETTINGS_MIGRATIONS_KEY]: JSON.stringify({
-          applied: ["steer-default", "collapse-tool-calls-default"],
+          applied: ["steer-default", "collapse-tool-calls-default", "explorer-always-default"],
         }),
       }),
     });

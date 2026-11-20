@@ -173,6 +173,28 @@ const test = daemonTest.extend<{
             }
           }
 
+          // Specs were written with the Explorer opening only when something needs you. Many seed
+          // their own app settings, replacing the default below, so fill the field into any
+          // settings written without it; specs about the Explorer set it explicitly.
+          const setItem = Storage.prototype.setItem;
+          Storage.prototype.setItem = function (key: string, value: string) {
+            if (key === "@paseo:app-settings") {
+              try {
+                const settings = JSON.parse(value);
+                if (
+                  settings &&
+                  typeof settings === "object" &&
+                  !("explorerOnWorkspaceEnter" in settings)
+                ) {
+                  value = JSON.stringify({ ...settings, explorerOnWorkspaceEnter: "needed" });
+                }
+              } catch {
+                // Not JSON: leave it for the app to reject.
+              }
+            }
+            return setItem.call(this, key, value);
+          };
+
           localStorage.setItem("@paseo:e2e", "1");
           localStorage.setItem("@paseo:e2e-seed-nonce", nonce);
 

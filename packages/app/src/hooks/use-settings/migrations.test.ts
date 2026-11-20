@@ -50,7 +50,11 @@ describe("migrateAppSettings", () => {
 
     expect(result.sendBehavior).toBe("steer");
     expect(storedSendBehavior(storage)).toBe("steer");
-    expect(appliedIds(storage)).toEqual(["steer-default", "collapse-tool-calls-default"]);
+    expect(appliedIds(storage)).toEqual([
+      "steer-default",
+      "collapse-tool-calls-default",
+      "explorer-always-default",
+    ]);
   });
 
   it("leaves interrupt alone once the migration has run", async () => {
@@ -69,7 +73,11 @@ describe("migrateAppSettings", () => {
 
     expect(result.sendBehavior).toBe("queue");
     expect(storage.entries.has(APP_SETTINGS_KEY)).toBe(false);
-    expect(appliedIds(storage)).toEqual(["steer-default", "collapse-tool-calls-default"]);
+    expect(appliedIds(storage)).toEqual([
+      "steer-default",
+      "collapse-tool-calls-default",
+      "explorer-always-default",
+    ]);
   });
 
   it("marks itself applied on a fresh install without rewriting settings", async () => {
@@ -78,7 +86,11 @@ describe("migrateAppSettings", () => {
     await migrateAppSettings(settingsWith("steer"), storage);
 
     expect(storage.entries.has(APP_SETTINGS_KEY)).toBe(false);
-    expect(appliedIds(storage)).toEqual(["steer-default", "collapse-tool-calls-default"]);
+    expect(appliedIds(storage)).toEqual([
+      "steer-default",
+      "collapse-tool-calls-default",
+      "explorer-always-default",
+    ]);
   });
 
   it("keeps unknown migration ids written by a newer client", async () => {
@@ -92,6 +104,7 @@ describe("migrateAppSettings", () => {
       "some-later-migration",
       "steer-default",
       "collapse-tool-calls-default",
+      "explorer-always-default",
     ]);
   });
 
@@ -106,6 +119,7 @@ describe("migrateAppSettings", () => {
     expect(appliedIds(storage)).toEqual([
       "steer-default",
       "collapse-tool-calls-default",
+      "explorer-always-default",
       "mobile-content-16",
     ]);
   });
@@ -118,7 +132,11 @@ describe("migrateAppSettings", () => {
 
     expect(result.contentFontSize).toBe(15);
     expect(storedContentFontSize(storage)).toBeUndefined();
-    expect(appliedIds(storage)).toEqual(["steer-default", "collapse-tool-calls-default"]);
+    expect(appliedIds(storage)).toEqual([
+      "steer-default",
+      "collapse-tool-calls-default",
+      "explorer-always-default",
+    ]);
   });
 
   it("lets a mobile user choose 15px after the default migration ran", async () => {
@@ -194,6 +212,32 @@ describe("migrateAppSettings", () => {
     const result = await migrateAppSettings(settingsWith("steer"), recovered);
 
     expect(result.sendBehavior).toBe("steer");
-    expect(appliedIds(recovered)).toEqual(["steer-default", "collapse-tool-calls-default"]);
+    expect(appliedIds(recovered)).toEqual([
+      "steer-default",
+      "collapse-tool-calls-default",
+      "explorer-always-default",
+    ]);
+  });
+
+  it("moves the Explorer to open on every workspace once, then keeps a later pick", async () => {
+    const storage = createInMemoryKeyValueStorage();
+    storage.entries.set(SETTINGS_MIGRATIONS_KEY, JSON.stringify({ applied: ["steer-default"] }));
+    const needed: AppSettings = { ...DEFAULT_CLIENT_SETTINGS, explorerOnWorkspaceEnter: "needed" };
+
+    const first = await migrateAppSettings(needed, storage);
+    expect(first.explorerOnWorkspaceEnter).toBe("always");
+    expect(JSON.parse(storage.entries.get(APP_SETTINGS_KEY) ?? "{}").explorerOnWorkspaceEnter).toBe(
+      "always",
+    );
+
+    const never: AppSettings = { ...DEFAULT_CLIENT_SETTINGS, explorerOnWorkspaceEnter: "never" };
+    expect((await migrateAppSettings(never, storage)).explorerOnWorkspaceEnter).toBe("never");
+  });
+
+  it("leaves a fresh profile's seeded Explorer setting alone", async () => {
+    const storage = createInMemoryKeyValueStorage();
+    const needed: AppSettings = { ...DEFAULT_CLIENT_SETTINGS, explorerOnWorkspaceEnter: "needed" };
+
+    expect((await migrateAppSettings(needed, storage)).explorerOnWorkspaceEnter).toBe("needed");
   });
 });

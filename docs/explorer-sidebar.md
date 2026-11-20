@@ -123,7 +123,7 @@ overlay; at 600 points and above it reserves width beside the workspace. Native 
 touch resize handle. Full workspace splits remain a separate web-only capability.
 
 Desktop can also show Explorer when you enter a workspace: Settings → Open location → **Entering a
-workspace opens the Explorer sidebar** (Never / When something needs you, the default / Always).
+workspace opens the Explorer sidebar** (Never / When something needs you / Always, the default).
 `packages/app/src/workspace-attention/` owns it. Attention items are pending permissions, plugin
 workspace summary items with `needsYou`, failed agents, and the PR's failed checks, readiness to
 merge, or merge. Each item has a key, and the first unseen one decides. **Explorer sidebar opens on** picks the tab.
