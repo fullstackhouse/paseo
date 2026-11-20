@@ -729,7 +729,8 @@ boundary. Hosts older than this field ignore it and open the screen over the app
 
 Add `location: "explorer"` to open that tab in the workspace's Explorer sidebar, beside the
 conversation, and show the sidebar. An existing tab moves there. The default, `"workspace"`, opens
-it in the main pane. Older hosts ignore `location` and open the tab in the main pane.
+it in the main pane. Older hosts ignore `location` and open the tab in the main pane; check that
+`client.screenTabLocations` includes `"explorer"` before relying on it.
 
 ### Sidebar items
 

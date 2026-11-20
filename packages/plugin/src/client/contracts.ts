@@ -446,6 +446,11 @@ export interface PluginCommandCapabilities {
     input: ZodInput<InputSchema>,
   ): Promise<ZodOutput<OutputSchema>>;
   openScreen(input: PluginOpenScreenInput): void;
+  /**
+   * The `location` values `openScreen` honours for a `workspaceId` tab. Undefined on hosts that ignore
+   * `location` and always open the tab in the main pane; check for `"explorer"` before relying on it.
+   */
+  readonly screenTabLocations?: readonly PluginPanelLocation[];
   /** @deprecated Use `openScreen`. */
   openSurface(id: string): void;
   openSettings(id: string): void;

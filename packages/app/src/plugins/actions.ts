@@ -30,6 +30,11 @@ export interface PluginNavigation {
   ): void;
 }
 
+const SCREEN_TAB_LOCATIONS: readonly PluginPanelLocation[] = Object.freeze([
+  "workspace",
+  "explorer",
+]);
+
 export function createPluginCapabilities(
   plugin: InstalledPlugin,
   navigation: PluginNavigation,
@@ -51,6 +56,7 @@ export function createPluginCapabilities(
       navigation.openSettings(plugin.id, screenId);
     },
     openScreen,
+    screenTabLocations: SCREEN_TAB_LOCATIONS,
     // COMPAT(pluginSidebarAliases): added in v0.11.0, remove after 2027-03-29
     openSurface: (screenId) => openScreen({ screenId }),
   };
