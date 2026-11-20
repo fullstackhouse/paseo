@@ -29,8 +29,7 @@ on:
     types: [opened, synchronize, reopened, labeled, closed]
   workflow_dispatch:
 
-permissions:
-  contents: write
+permissions: {}
 
 jobs:
   macos-arm64:
@@ -40,6 +39,8 @@ jobs:
        contains(github.event.pull_request.labels.*.name, 'deploy') &&
        (github.event.action != 'labeled' || github.event.label.name == 'deploy'))
     runs-on: macos-15
+    permissions:
+      contents: read
     # Job-level, so PR events that skip this job (other labels, close) don't cancel a running build.
     concurrency:
       group: fsh-desktop-${{ github.event.pull_request.number || github.ref }}
@@ -178,6 +179,8 @@ jobs:
        contains(github.event.pull_request.labels.*.name, 'deploy') &&
        (github.event.action != 'labeled' || github.event.label.name == 'deploy'))
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
     timeout-minutes: 45
     concurrency:
       group: fsh-desktop-linux-${{ github.event.pull_request.number || github.ref }}
@@ -263,6 +266,8 @@ jobs:
   publish:
     needs: [macos-arm64, linux-x64]
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     # The build jobs serialize per platform, but publish jobs from back-to-back pushes could still
     # run out of order and make the older commit "latest". Never cancelled: a waiting publish that a
     # newer one replaces is fine, a half-created release isn't.
@@ -315,6 +320,8 @@ jobs:
   delete-pr-prereleases:
     if: github.event_name == 'pull_request' && github.event.action == 'closed'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:

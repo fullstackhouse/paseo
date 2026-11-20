@@ -19,6 +19,8 @@ concurrency:
 env:
   SOURCE_TAG: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || github.ref_name }}
 
+permissions: {}
+
 jobs:
   ensure-release:
     permissions:

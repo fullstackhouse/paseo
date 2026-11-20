@@ -36,9 +36,13 @@ env:
   REGISTRY: ghcr.io
   PLATFORMS: linux/amd64,linux/arm64
 
+permissions: {}
+
 jobs:
   setup:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     outputs:
       image: ${{ steps.values.outputs.image }}
       install_version: ${{ steps.values.outputs.install_version }}

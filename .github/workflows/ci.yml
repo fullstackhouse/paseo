@@ -21,6 +21,9 @@ env:
   # postinstall download from NuGet is large enough to make npm ci flaky.
   ONNXRUNTIME_NODE_INSTALL: skip
 
+permissions:
+  contents: read
+
 jobs:
   changes:
     name: changes
@@ -63,6 +66,8 @@ jobs:
     needs: changes
     if: ${{ !cancelled() && (needs.changes.outputs.full != 'false' || needs.changes.outputs.format != 'false' || needs.changes.outputs.quality != 'false' || needs.changes.outputs.relay != 'false' || needs.changes.outputs.sdk != 'false') }}
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
 
@@ -139,6 +144,8 @@ jobs:
     needs: changes
     if: ${{ !cancelled() && (needs.changes.outputs.full != 'false' || needs.changes.outputs.quality != 'false') }}
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
 
@@ -182,6 +189,8 @@ jobs:
     needs: changes
     if: ${{ !cancelled() && (needs.changes.outputs.full != 'false' || needs.changes.outputs.server != 'false' || needs.changes.outputs.hub != 'false') }}
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - &server_capacity
         name: Log runner capacity
@@ -240,6 +249,8 @@ jobs:
     needs: changes
     if: ${{ !cancelled() && (needs.changes.outputs.full != 'false' || needs.changes.outputs.server != 'false' || needs.changes.outputs.hub != 'false') }}
     runs-on: windows-latest
+    permissions:
+      contents: read
     steps:
       - *server_capacity
       - *server_checkout
@@ -263,6 +274,8 @@ jobs:
     needs: changes
     if: ${{ !cancelled() && (needs.changes.outputs.full != 'false' || needs.changes.outputs.server != 'false') }}
     runs-on: windows-latest
+    permissions:
+      contents: read
     steps:
       - *server_capacity
       - *server_checkout
@@ -285,6 +298,8 @@ jobs:
     needs: changes
     if: ${{ !cancelled() && (needs.changes.outputs.full != 'false' || needs.changes.outputs.server != 'false') }}
     runs-on: macos-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
 
@@ -397,6 +412,8 @@ jobs:
     needs: changes
     if: ${{ !cancelled() && (needs.changes.outputs.full != 'false' || needs.changes.outputs.app != 'false') }}
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
 
@@ -423,6 +440,8 @@ jobs:
     needs: changes
     if: ${{ !cancelled() && (needs.changes.outputs.full != 'false' || needs.changes.outputs.browser != 'false') }}
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
     env:
       PLAYWRIGHT_SHARD: "1/8"
       PLAYWRIGHT_ARTIFACT: "1"
@@ -479,6 +498,8 @@ jobs:
     needs: changes
     if: ${{ !cancelled() && (needs.changes.outputs.full != 'false' || needs.changes.outputs.browser != 'false') }}
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
     env:
       PLAYWRIGHT_SHARD: "2/8"
       PLAYWRIGHT_ARTIFACT: "2"
@@ -489,6 +510,8 @@ jobs:
     needs: changes
     if: ${{ !cancelled() && (needs.changes.outputs.full != 'false' || needs.changes.outputs.browser != 'false') }}
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
     env:
       PLAYWRIGHT_SHARD: "3/8"
       PLAYWRIGHT_ARTIFACT: "3"
@@ -499,6 +522,8 @@ jobs:
     needs: changes
     if: ${{ !cancelled() && (needs.changes.outputs.full != 'false' || needs.changes.outputs.browser != 'false') }}
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
     env:
       PLAYWRIGHT_SHARD: "4/8"
       PLAYWRIGHT_ARTIFACT: "4"
@@ -509,6 +534,8 @@ jobs:
     needs: changes
     if: ${{ !cancelled() && (needs.changes.outputs.full != 'false' || needs.changes.outputs.browser != 'false') }}
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
     env:
       PLAYWRIGHT_SHARD: "5/8"
       PLAYWRIGHT_ARTIFACT: "5"
@@ -519,6 +546,8 @@ jobs:
     needs: changes
     if: ${{ !cancelled() && (needs.changes.outputs.full != 'false' || needs.changes.outputs.browser != 'false') }}
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
     env:
       PLAYWRIGHT_SHARD: "6/8"
       PLAYWRIGHT_ARTIFACT: "6"
@@ -529,6 +558,8 @@ jobs:
     needs: changes
     if: ${{ !cancelled() && (needs.changes.outputs.full != 'false' || needs.changes.outputs.browser != 'false') }}
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
     env:
       PLAYWRIGHT_SHARD: "7/8"
       PLAYWRIGHT_ARTIFACT: "7"
@@ -539,6 +570,8 @@ jobs:
     needs: changes
     if: ${{ !cancelled() && (needs.changes.outputs.full != 'false' || needs.changes.outputs.browser != 'false') }}
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
     env:
       PLAYWRIGHT_SHARD: "8/8"
       PLAYWRIGHT_ARTIFACT: "8"
@@ -549,6 +582,8 @@ jobs:
     needs: changes
     if: ${{ !cancelled() && (needs.changes.outputs.full != 'false' || needs.changes.outputs.cli != 'false') }}
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     env:
       PASEO_LOCAL_SPEECH_AUTO_DOWNLOAD: "0"
       PASEO_DICTATION_ENABLED: "0"
@@ -584,6 +619,8 @@ jobs:
     needs: changes
     if: ${{ !cancelled() && (needs.changes.outputs.full != 'false' || needs.changes.outputs.cli != 'false') }}
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     env:
       PASEO_LOCAL_SPEECH_AUTO_DOWNLOAD: "0"
       PASEO_DICTATION_ENABLED: "0"
@@ -597,6 +634,8 @@ jobs:
     needs: changes
     if: ${{ !cancelled() && (needs.changes.outputs.full != 'false' || needs.changes.outputs.cli != 'false') }}
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     env:
       PASEO_LOCAL_SPEECH_AUTO_DOWNLOAD: "0"
       PASEO_DICTATION_ENABLED: "0"
