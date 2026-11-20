@@ -1434,6 +1434,7 @@ export const en = {
     title: "New workspace",
     recentProjects: "Recent projects",
     create: "Create",
+    startAnother: "Start another",
     isolation: {
       local: "Local",
       worktree: "New worktree",

@@ -1426,6 +1426,7 @@ export const ar: TranslationResources = {
     title: "مساحة عمل جديدة",
     recentProjects: "المشاريع الأخيرة",
     create: "يخلق",
+    startAnother: "ابدأ مساحة أخرى",
     isolation: {
       local: "محلي",
       worktree: "شجرة عمل جديدة",

@@ -1462,6 +1462,7 @@ export const es: TranslationResources = {
     title: "Nuevo espacio de trabajo",
     recentProjects: "Proyectos recientes",
     create: "Crear",
+    startAnother: "Crear otro",
     isolation: {
       local: "Local",
       worktree: "Nuevo worktree",
