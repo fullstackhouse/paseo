@@ -733,6 +733,66 @@ describe("WorkspaceGitServiceImpl", () => {
     service.dispose();
   });
 
+  test("admits a client's snapshot request ahead of queued background refreshes", async () => {
+    const backgroundCwds = Array.from({ length: WORKSPACE_GIT_REFRESH_CONCURRENCY + 2 }, (_, i) =>
+      path.resolve(`/tmp/background-repo-${i}`),
+    );
+    const clientCwd = path.resolve("/tmp/client-repo");
+    const queuedBackgroundCwd = backgroundCwds.at(-1)!;
+    const gates = new Map(
+      [...backgroundCwds, clientCwd].map((cwd) => [cwd, createDeferred<CheckoutStatusGit>()]),
+    );
+    const startedReads: string[] = [];
+    const getCheckoutStatus = vi.fn((cwd: string) => {
+      startedReads.push(cwd);
+      return gates.get(cwd)!.promise;
+    });
+    const runGitCommand = vi.fn(async (_args: string[], options: { cwd: string }) => ({
+      stdout: `${options.cwd}\n`,
+      stderr: "",
+      truncated: false,
+      exitCode: 0,
+      signal: null,
+    }));
+    const service = createService({
+      getCheckoutStatus,
+      runGitCommand,
+      subscribe: vi.fn(async () => createAsyncSubscription()),
+    });
+
+    // Observed workspaces refresh in the background and fill every admission slot.
+    const subscriptions = backgroundCwds.map((cwd) => service.registerWorkspace({ cwd }, vi.fn()));
+    await vi.waitFor(() => {
+      expect(service.getMetrics()).toMatchObject({
+        workspaceRefreshAdmissionActiveCount: WORKSPACE_GIT_REFRESH_CONCURRENCY,
+        workspaceRefreshAdmissionPendingCount: 2,
+      });
+    });
+
+    // A client asks for one new checkout and for one whose background refresh is still queued.
+    const clientRead = service.getSnapshot(clientCwd, { includeForge: false });
+    const promotedRead = service.getSnapshot(queuedBackgroundCwd, { includeForge: false });
+    const readsBeforeRelease = startedReads.length;
+
+    gates.get(backgroundCwds[0]!)!.resolve(createCheckoutStatus(backgroundCwds[0]!));
+    gates.get(backgroundCwds[1]!)!.resolve(createCheckoutStatus(backgroundCwds[1]!));
+    await vi.waitFor(() => {
+      expect(startedReads.length).toBe(readsBeforeRelease + 2);
+    });
+    expect(startedReads.slice(readsBeforeRelease)).toEqual(
+      expect.arrayContaining([clientCwd, queuedBackgroundCwd]),
+    );
+
+    for (const [cwd, gate] of gates) {
+      gate.resolve(createCheckoutStatus(cwd));
+    }
+    await Promise.all([clientRead, promotedRead]);
+    for (const subscription of subscriptions) {
+      subscription.unsubscribe();
+    }
+    service.dispose();
+  });
+
   test("bounds workspace observation setup pipelines", async () => {
     const cwds = Array.from(
       { length: WORKSPACE_GIT_OBSERVATION_SETUP_CONCURRENCY + 2 },

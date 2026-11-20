@@ -28,7 +28,6 @@ import { useToast } from "@/contexts/toast-context";
 import { useAgentInputDraft } from "@/composer/draft/input-draft";
 import { useForgeSearchQuery } from "@/git/use-forge-search-query";
 import { useCheckoutStatusQuery } from "@/git/use-status-query";
-import { ensureCheckoutStatus } from "@/git/checkout-status-cache";
 import { useDaemonConfig } from "@/hooks/use-daemon-config";
 import { resolveTerminalProfiles } from "@getpaseo/protocol/terminal-profiles";
 import type { TerminalProfile } from "@getpaseo/protocol/messages";
@@ -90,7 +89,7 @@ import {
   buildPickerOptionData,
   defaultBasePickerItem,
   pickerItemLabel,
-  pickerItemToCheckoutRequest,
+  resolveCreateCheckoutRequest,
   type BranchPickerDetail,
   type PickerCheckoutRequest,
   type PickerItem,
@@ -1254,18 +1253,8 @@ export function NewWorkspaceScreen({
       }
       const connectedClient = withConnectedClient();
       const createsWorktree = !supportsWorkspaceMultiplicity || effectiveIsolation === "worktree";
-      const checkoutStatusForCreate = createsWorktree
-        ? await ensureCheckoutStatus({
-            queryClient,
-            client: connectedClient,
-            serverId: selectedServerId,
-            cwd: selectedSourceDirectory,
-          })
-        : null;
-      const checkoutRequest = checkoutStatusForCreate
-        ? pickerItemToCheckoutRequest(
-            selectedItem ?? defaultBasePickerItem(checkoutStatusForCreate),
-          )
+      const checkoutRequest = createsWorktree
+        ? resolveCreateCheckoutRequest({ selectedItem, checkoutStatus: checkoutStatus ?? null })
         : undefined;
       const normalizedWorkspace = await createMultiplicityWorkspace({
         idempotencyKey: creationIdentity.draftId,
@@ -1288,11 +1277,11 @@ export function NewWorkspaceScreen({
       return normalizedWorkspace;
     },
     [
+      checkoutStatus,
       creationIdentity,
       creationResult,
       effectiveIsolation,
       mergeWorkspaces,
-      queryClient,
       selectedItem,
       selectedProject,
       selectedServerId,

@@ -236,6 +236,20 @@ export function pickerItemToCheckoutRequest(
   }
 }
 
+// What a create request branches off. Creation never waits on checkout status: that request
+// can take minutes on a busy daemon. When it has not loaded yet, a bare branch-off lets the
+// daemon resolve the same default base `defaultBasePickerItem` describes.
+export function resolveCreateCheckoutRequest(input: {
+  selectedItem: PickerItem | null;
+  checkoutStatus: BaseRefCheckoutStatus | null;
+}): PickerCheckoutRequest | undefined {
+  if (input.selectedItem) return pickerItemToCheckoutRequest(input.selectedItem);
+  if (input.checkoutStatus) {
+    return pickerItemToCheckoutRequest(defaultBasePickerItem(input.checkoutStatus));
+  }
+  return { action: "branch-off" };
+}
+
 export function prPickerOptionId(number: number): string {
   return `${PR_OPTION_PREFIX}${number}`;
 }
