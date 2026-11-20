@@ -1,6 +1,6 @@
 # Spec: Overview, simplified: title → goal → status → your move
 
-Status: in design · 2026-11-20 · reviewed: `fsh` @ 3e3340aae (`packages/app/src/panels/overview-panel.tsx`)
+Status: design approved · 2026-11-20 · reviewed: `fsh` @ 3e3340aae (`packages/app/src/panels/overview-panel.tsx`)
 
 Follows [spec-overview-v2.md](spec-overview-v2.md). Its section order stays. This spec removes what repeats and puts the
 four things the operator reads on entering a workspace at the top, with nothing between them.
@@ -117,7 +117,7 @@ live state (main-scenario); lineage rows by workspace (naming, from v2).
 
 Top to bottom. The first four lines answer S1–S3 with no labels and no repeats.
 
-1. **Title**: workspace name. ⋯ menu on the right (unchanged).
+1. **Title**: workspace name. No ⋯ menu: archive, editor and branch actions already live in the workspace header and the sidebar.
 2. **Goal** as the title's subtitle, regular weight, muted, up to 2 lines. No "Goal" label. (F5)
    Without a goal: the project name in its place (Q2, decided).
 3. **Status** without a section label: state badge, then the summary, up to 4 lines. Press opens the Status tab
@@ -152,7 +152,7 @@ Removed: the header's `project · branch` subtitle (F6, replaced by the goal), t
 
 - Status press → Status tab; ask entries answered in place; the one-button Your move.
 - Lineage block and its rows: answers "where did this come from" (v2 S1), not shown in this screenshot.
-- ⋯ menu: Lineage details, Archive.
+- Archive, open in editor, copy branch: in the workspace header and the sidebar, not on Overview. Lineage details: the Lineage tab.
 - PR checks and review state: on the PR row, or on the git move row when that row names the PR.
 - More: plugin facts that fit nowhere else.
 

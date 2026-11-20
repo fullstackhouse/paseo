@@ -198,15 +198,11 @@ const fixtures = {
 // ── renderers ───────────────────────────────────────────────────────────
 const CHEV = `<span class="ov-chev">${ic('chevron-right')}</span>`
 
-function identity(st, { menu }) {
+function identity(st) {
   const goal = st.goal ?? st.ws.project
   return `<header class="ov-id">
     <h1 class="ov-title">${esc(st.ws.name)}</h1>
-    <span class="ov-kebab ${menu ? 'is-on' : ''}" aria-label="Workspace actions">${ic('more')}</span>
     <p class="ov-goal ${st.goal ? '' : 'is-fallback'}">${esc(goal)}</p>
-    ${menu ? `<div class="ov-menu" role="menu">
-      <div>${ic('code')} Open in editor</div><div>${ic('copy')} Copy branch name</div><div>${ic('fork')} Lineage</div><hr />
-      <div>${ic('archive')} Archive workspace…</div></div>` : ''}
   </header>`
 }
 
@@ -251,7 +247,7 @@ function context(st) {
 }
 
 function overview(st, opts = {}) {
-  return `<div class="ov">${identity(st, opts)}${story(st)}${moves(st)}${context(st)}</div>`
+  return `<div class="ov">${identity(st)}${story(st)}${moves(st)}${context(st)}</div>`
 }
 
 // ── frame: the app window at one width ──────────────────────────────────
@@ -286,10 +282,10 @@ function page(st, { mobile, menu = false }) {
 }
 
 // ── screens: one entry per state ────────────────────────────────────────
-const S = (id, nav, title, task, refs, fx, notes, opts = {}) => ({ id, nav, title, task, refs, notes, html: both((mobile) => page(fixtures[fx], { mobile, ...opts })) })
+const S = (id, nav, title, task, refs, fx, notes) => ({ id, nav, title, task, refs, notes, html: both((mobile) => page(fixtures[fx], { mobile })) })
 const screens = [
   S('s1', 'Merged', 'PR merged, nothing left (the screenshot case)', 'Jacek comes back to a workspace whose PR merged and wants to archive it.', ['S1', 'S2', 'S3'], 'merged', [
-    'Four lines tell the whole story: title, goal, <b>Done</b> with its one-sentence summary, then the one button. No branch, PR row, agent row, context size or "updated" time: each repeated something above it or answered nothing.',
+    'No ⋯ menu on Overview: archive, editor and branch actions already live in the workspace header and the sidebar. Four lines tell the whole story: title, goal, <b>Done</b> with its one-sentence summary, then the one button. No branch, PR row, agent row, context size or "updated" time: each repeated something above it or answered nothing.',
     'The state word replaces the badge pill: a coloured dot and word read faster and cost no chrome.',
     'The status block opens the Status tab (done list, next steps) — details live there, not here.',
   ]),
@@ -333,9 +329,6 @@ const screens = [
     'No git means no code facts anywhere; nothing renders empty.',
     'The failure is the move: open the agent to see the error, or retry.',
   ]),
-  S('s11', '⋯ menu', 'Workspace menu', 'Jacek archives a workspace whose PR isn\'t merged, or opens it in his editor.', ['main-scenario'], 'working', [
-    'Rare lifecycle actions live behind ⋯ so the main area keeps one kind of button: the next step.',
-  ], { menu: true }),
 ]
 
 // ── document ────────────────────────────────────────────────────────────
