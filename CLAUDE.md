@@ -131,6 +131,7 @@ release builds in a short-lived release workspace from `origin/main` or a releas
 - **Run plugin changes in Jacek's local Paseo for live testing.** Follow [Test a plugin change](docs/plugins.md#test-a-plugin-change) and leave the changed plugin running.
 - **Desktop asks belong beside the conversation.** Use a tab in the existing [Explorer sidebar](docs/explorer-sidebar.md#explorer-sidebar), not an additional split pane; the badge shows or closes its tab. Plugin layout changes are opt-in: preserve anchored popovers by default, and opt Asks into Explorer. Mobile keeps bottom sheets.
 
+- **Test Paseo changes on a completely separate instance.** Its own daemon, home and window, unseeded, with throwaway test projects ([how](docs/development.md#test-a-change-next-to-your-main-paseo)). Never connect a branch to the main daemon (`app-main`) and never copy data from `~/.paseo`.
 - **NEVER restart the main Paseo daemon on port 6767 without permission** — it manages all running agents. If you're an agent, restarting it kills your own process.
 - **Verify local dev in its actual window:** check appearance and capture fresh console errors after reload. Do not dismiss React warnings as expected dev noise without tracing their cause.
 - **NEVER assume a timeout means the service needs restarting** — timeouts can be transient.
