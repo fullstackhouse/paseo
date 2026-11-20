@@ -15,6 +15,7 @@ import invariant from "tiny-invariant";
 import type { AgentPermissionAction, AgentPermissionRequest } from "@getpaseo/protocol/agent-types";
 import { useAgentDescriptor } from "@/agent-presentation";
 import { Button } from "@/components/ui/button";
+import { StatusBadge, type StatusBadgeVariant } from "@/components/ui/status-badge";
 import { PressHighlight } from "@/components/ui/press-highlight";
 import { ScrollView } from "@/components/ui/scroll-view";
 import { GIT_ACTION_ICONS } from "@/git/action-icons";
@@ -277,18 +278,20 @@ function StatusBlock({
   if (!status) return null;
   const state: StatusTone = status.answered ? "answered" : status.state;
   const outdated = isStatusOutdated({ updatedAt: status.updatedAt, agentRunning, lastPromptAt });
-  // One line: the state word leads the agent's summary. "Now" stays in the Status tab; next to the
-  // summary it described the same progress twice.
+  // A card so the agent's own account reads as one object: the state as a pill, then its summary.
+  // "Now" stays in the Status tab; next to the summary it described the same progress twice.
   const content = (
     <>
       <View style={styles.stateLine}>
-        <View style={dotStyle(state)} />
-        <Text style={outdated ? styles.summaryStale : styles.summary} numberOfLines={5}>
-          <Text style={styles.stateWord}>{t(`panels.overview.state.${state}`)}</Text>
-          {" · "}
-          {status.summary}
-        </Text>
+        <StatePill state={state} />
+        <View style={styles.fill} />
+        {item?.panelId ? (
+          <ThemedChevronRight size={SMALL_ICON_SIZE} uniProps={extraMutedColorMapping} />
+        ) : null}
       </View>
+      <Text style={outdated ? styles.summaryStale : styles.summary} numberOfLines={5}>
+        {status.summary}
+      </Text>
       {outdated && lastPromptAt !== null ? (
         <Text style={styles.outdated} testID="overview-status-outdated">
           {t("panels.overview.outdated", { time: formatTimeAgo(new Date(lastPromptAt)) })}
@@ -315,6 +318,25 @@ function StatusBlock({
       {content}
     </View>
   );
+}
+
+function StatePill({ state }: { state: StatusTone }): ReactElement {
+  const { t } = useTranslation();
+  const dot = useMemo(() => <View style={dotStyle(state)} />, [state]);
+  return (
+    <StatusBadge
+      label={t(`panels.overview.state.${state}`)}
+      variant={badgeVariant(state)}
+      leading={dot}
+    />
+  );
+}
+
+function badgeVariant(state: StatusTone): StatusBadgeVariant {
+  if (state === "waiting_on_you") return "warning";
+  if (state === "blocked") return "error";
+  if (state === "done") return "success";
+  return "muted";
 }
 
 function dotStyle(state: StatusTone) {
@@ -1044,10 +1066,9 @@ export const overviewPanelRegistration = definePanel("overview", {
 
 const styles = StyleSheet.create((theme) => {
   const dot = {
-    width: 8,
-    height: 8,
+    width: 6,
+    height: 6,
     borderRadius: theme.borderRadius.full,
-    marginTop: 7,
   } as const;
   const word = { fontSize: theme.fontSize.sm, flexShrink: 0, maxWidth: "50%" } as const;
   const lead = {
@@ -1088,15 +1109,14 @@ const styles = StyleSheet.create((theme) => {
       color: theme.colors.foregroundExtraMuted,
     },
     story: {
-      gap: theme.spacing[1],
-      paddingVertical: theme.spacing[1],
-      paddingHorizontal: theme.spacing[1],
-      marginHorizontal: -theme.spacing[1],
-      borderRadius: theme.borderRadius.md,
+      gap: theme.spacing[2],
+      padding: theme.spacing[3],
+      borderRadius: theme.borderRadius.lg,
+      backgroundColor: theme.colors.surface1,
     },
     stateLine: {
       flexDirection: "row",
-      alignItems: "flex-start",
+      alignItems: "center",
       gap: theme.spacing[2],
     },
     fill: { flex: 1 },
@@ -1105,8 +1125,6 @@ const styles = StyleSheet.create((theme) => {
     dotDanger: { ...dot, backgroundColor: theme.colors.statusDotDanger },
     dotOk: { ...dot, backgroundColor: theme.colors.statusDotSuccess },
     dotMuted: { ...dot, backgroundColor: theme.colors.foregroundMuted },
-    // The dot carries the state; the word stays on the text colour so the two never disagree.
-    stateWord: { fontWeight: theme.fontWeight.medium, color: theme.colors.foreground },
     outdated: {
       fontSize: theme.fontSize.sm,
       color: theme.colors.statusWarning,
