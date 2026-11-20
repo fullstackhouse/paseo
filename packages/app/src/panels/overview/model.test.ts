@@ -4,6 +4,10 @@ import type { Agent } from "@/stores/session-store";
 import type { AttentionItem } from "@/workspace-attention/model";
 import {
   branchFacts,
+  canAnswerPermissionInPlace,
+  permissionActions,
+  permissionResponse,
+  permissionSubject,
   deriveCodeRow,
   deriveWorkspaceStateWord,
   deriveYourMove,
@@ -238,5 +242,51 @@ describe("deriveCodeRow", () => {
     expect(
       deriveCodeRow({ hasPullRequest: false, gitMoveShown: false, branchHasFacts: false }),
     ).toBe(null);
+  });
+});
+
+describe("permissions on Overview", () => {
+  const shell = { kind: "tool", detail: { type: "shell", command: "npm run db:migrate" } } as const;
+
+  it("says what a tool permission would do in one line", () => {
+    expect(permissionSubject(shell)).toBe("npm run db:migrate");
+    expect(permissionSubject({ kind: "tool", detail: { type: "read", filePath: "a.ts" } })).toBe(
+      "a.ts",
+    );
+    expect(
+      permissionSubject({ kind: "tool", detail: { type: "fetch", url: "https://x.test" } }),
+    ).toBe("https://x.test");
+  });
+
+  it("answers in place only when that line shows everything being approved", () => {
+    expect(canAnswerPermissionInPlace(shell)).toBe(true);
+    expect(
+      canAnswerPermissionInPlace({ kind: "tool", detail: { type: "edit", filePath: "a.ts" } }),
+    ).toBe(false);
+    expect(canAnswerPermissionInPlace({ kind: "tool" })).toBe(false);
+    expect(canAnswerPermissionInPlace({ ...shell, kind: "plan" })).toBe(false);
+    expect(canAnswerPermissionInPlace({ ...shell, kind: "question" })).toBe(false);
+  });
+
+  it("falls back to accept and deny when the request names no actions", () => {
+    const actions = permissionActions(shell, { accept: "Accept", deny: "Deny" });
+    expect(actions.map((action) => [action.id, action.behavior])).toEqual([
+      ["accept", "allow"],
+      ["reject", "deny"],
+    ]);
+    const own = [{ id: "always", label: "Allow always", behavior: "allow" as const }];
+    expect(permissionActions({ ...shell, actions: own }, { accept: "A", deny: "D" })).toBe(own);
+  });
+
+  it("maps an action to its response", () => {
+    expect(permissionResponse({ id: "accept", label: "A", behavior: "allow" })).toEqual({
+      behavior: "allow",
+      selectedActionId: "accept",
+    });
+    expect(permissionResponse({ id: "reject", label: "D", behavior: "deny" })).toEqual({
+      behavior: "deny",
+      selectedActionId: "reject",
+      message: "Denied by user",
+    });
   });
 });

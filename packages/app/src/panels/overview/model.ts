@@ -1,3 +1,8 @@
+import type {
+  AgentPermissionAction,
+  AgentPermissionRequest,
+  AgentPermissionResponse,
+} from "@getpaseo/protocol/agent-types";
 import type { PluginWorkspaceStatus, PluginWorkspaceSummaryEntry } from "@getpaseo/plugin/client";
 import type { WorkspaceSummaryItem } from "@/plugins/workspace-summary/store";
 import type { Agent } from "@/stores/session-store";
@@ -46,7 +51,7 @@ export type YourMoveRow =
 /**
  * Everything that waits on the human, in the attention ladder's order, then the git step.
  * While an agent runs only blocking items show: failing checks and git actions would race it.
- * Archive is only a move once the PR merged; before that it lives in the ⋯ menu.
+ * Archive is only a move once the PR merged; before that it lives in the workspace header.
  */
 export function deriveYourMove(input: {
   items: readonly AttentionItem[];
@@ -81,7 +86,7 @@ export function deriveYourMove(input: {
 
 /**
  * Where each plugin summary item renders: an item with a status is the Status card; one that can
- * need the human (`needsYou`, `entries`) belongs to Your move; anything else is a fact under More.
+ * need the human (`needsYou`, `entries`) belongs to Your move; anything else is a context footer fact.
  */
 export function partitionSummaryItems(items: readonly WorkspaceSummaryItem[]): {
   status: WorkspaceSummaryItem | null;
@@ -190,4 +195,50 @@ export function gitMoveFacts(facts: BranchFactsInput | null, t: Translate): stri
   const pr = facts?.pullRequest;
   const prFacts = pr && !pr.isMerged ? pullRequestFacts(pr, t) : "";
   return [prFacts, branchFacts(facts, t)].filter(Boolean).join(" · ");
+}
+
+type PermissionRequest = Pick<AgentPermissionRequest, "kind" | "detail" | "actions">;
+
+/**
+ * What a tool permission would do, in one line: the command, path, query or URL. Null when one line
+ * can't say it (an edit's diff, a write's content), so the request has to be read in the agent.
+ */
+export function permissionSubject(request: PermissionRequest): string | null {
+  const detail = request.detail;
+  if (!detail) return null;
+  switch (detail.type) {
+    case "shell":
+      return detail.command;
+    case "read":
+      return detail.filePath;
+    case "search":
+      return detail.query;
+    case "fetch":
+      return detail.url;
+    default:
+      return null;
+  }
+}
+
+/** Answer on Overview only when the one line shows everything being approved. */
+export function canAnswerPermissionInPlace(request: PermissionRequest): boolean {
+  if (request.kind === "question" || request.kind === "plan") return false;
+  return permissionSubject(request) !== null;
+}
+
+export function permissionActions(
+  request: PermissionRequest,
+  labels: { accept: string; deny: string },
+): AgentPermissionAction[] {
+  if (Array.isArray(request.actions) && request.actions.length > 0) return request.actions;
+  return [
+    { id: "accept", label: labels.accept, behavior: "allow", variant: "primary" },
+    { id: "reject", label: labels.deny, behavior: "deny", variant: "danger" },
+  ];
+}
+
+export function permissionResponse(action: AgentPermissionAction): AgentPermissionResponse {
+  return action.behavior === "allow"
+    ? { behavior: "allow", selectedActionId: action.id }
+    : { behavior: "deny", selectedActionId: action.id, message: "Denied by user" };
 }

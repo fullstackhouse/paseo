@@ -13,11 +13,7 @@ import {
 } from "lucide-react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import invariant from "tiny-invariant";
-import type {
-  AgentPermissionAction,
-  AgentPermissionRequest,
-  AgentPermissionResponse,
-} from "@getpaseo/protocol/agent-types";
+import type { AgentPermissionAction, AgentPermissionRequest } from "@getpaseo/protocol/agent-types";
 import { useAgentDescriptor } from "@/agent-presentation";
 import { SettingsSection } from "@/components/settings/headings/settings-section";
 import { Button } from "@/components/ui/button";
@@ -53,6 +49,7 @@ import { openExplorerSidebarView } from "@/workspace-tabs/explorer-sidebar";
 import { buildWorkspaceTabPersistenceKey } from "@/workspace-tabs/model";
 import {
   branchFacts,
+  canAnswerPermissionInPlace,
   deriveCodeRow,
   deriveWorkspaceStateWord,
   deriveYourMove,
@@ -60,6 +57,9 @@ import {
   isStatusOutdated,
   overviewSubtitle,
   partitionSummaryItems,
+  permissionActions,
+  permissionResponse,
+  permissionSubject,
   pullRequestFacts,
   showNowLine,
   type WorkspaceStateWord,
@@ -537,10 +537,7 @@ function PermissionActions({
     (action: AgentPermissionAction) => {
       if (!client || !request) return;
       setResponding(action.id);
-      const response: AgentPermissionResponse =
-        action.behavior === "allow"
-          ? { behavior: "allow", selectedActionId: action.id }
-          : { behavior: "deny", selectedActionId: action.id, message: "Denied by user" };
+      const response = permissionResponse(action);
       client
         .respondToPermissionAndWait(agentId, request.id, response, PERMISSION_TIMEOUT_MS)
         .catch((error: unknown) => {
@@ -550,30 +547,17 @@ function PermissionActions({
     },
     [agentId, client, request],
   );
-  if (!request || request.kind === "question" || request.kind === "plan") {
+  if (!request || !canAnswerPermissionInPlace(request)) {
     return (
       <Button variant="default" onPress={fallback.run} testID="overview-next-step-button">
         {fallback.action}
       </Button>
     );
   }
-  const actions: AgentPermissionAction[] =
-    Array.isArray(request.actions) && request.actions.length > 0
-      ? request.actions
-      : [
-          {
-            id: "accept",
-            label: t("agentStream.permission.accept"),
-            behavior: "allow",
-            variant: "primary",
-          },
-          {
-            id: "reject",
-            label: t("agentStream.permission.deny"),
-            behavior: "deny",
-            variant: "danger",
-          },
-        ];
+  const actions = permissionActions(request, {
+    accept: t("agentStream.permission.accept"),
+    deny: t("agentStream.permission.deny"),
+  });
   return (
     <>
       {actions.map((action) => (
@@ -671,7 +655,11 @@ function permissionMoveView(
     icon: <ThemedShield size={ICON_SIZE} uniProps={warningColorMapping} />,
     tone: "warn",
     title: permission?.title ?? permission?.name ?? t("panels.overview.permissionTitle"),
-    facts: permission?.description || agentLabel || undefined,
+    facts:
+      (permission && permissionSubject(permission)) ||
+      permission?.description ||
+      agentLabel ||
+      undefined,
     action: t("panels.overview.reviewPermission"),
     run: () => navigateToAgent({ serverId, agentId }),
   };
