@@ -3,10 +3,11 @@ import { useCreateFlowStore, type PendingCreateAttempt } from "@/stores/create-f
 import { useSessionStore, type WorkspaceDescriptor } from "@/stores/session-store";
 import type { WorkspaceAgentActivity } from "@/utils/workspace-agent-activity";
 import { resolveWorkspaceMapKeyByIdentity } from "@/utils/workspace-identity";
+import type { SidebarStateBucket } from "@/utils/sidebar-agent-state";
 import { applyReportedWork, useReportedWorkLookup, type ReportedWorkLookup } from "./reported-work";
 
 interface EffectiveWorkspaceStatus {
-  status: WorkspaceDescriptor["status"];
+  status: SidebarStateBucket;
   /** Running only because an idle agent's background shells or monitors are live. */
   runningFromBackgroundWork?: boolean;
   enteredAt: Date | null;

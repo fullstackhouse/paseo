@@ -178,7 +178,11 @@ export interface PluginWorkspaceSummaryItemState {
   entries?: PluginWorkspaceSummaryEntry[];
 }
 
-export type PluginWorkspaceWorkState = "waiting" | "working" | "done";
+/**
+ * `waiting`: on the human. `blocked`: on something else (other workspaces, a reviewer, CI); grouped
+ * under Blocked, not needs you. Hosts without `blocked` drop it, leaving the workspace to its turn state.
+ */
+export type PluginWorkspaceWorkState = "waiting" | "blocked" | "working" | "done";
 
 export interface PluginWorkspaceStatus {
   state: "working" | "waiting_on_you" | "blocked" | "done";

@@ -1,5 +1,6 @@
 import type { SidebarStateBucket } from "@/hooks/sidebar-workspaces-view-model";
 import type { ActiveWorkspaceSelection } from "@/stores/last-workspace-selection";
+import { isIdleSidebarBucket } from "@/utils/sidebar-agent-state";
 
 export interface SidebarGroupItem {
   serverId: string;
@@ -62,7 +63,8 @@ export function selectSidebarGroupVisibility<T extends SidebarGroupItem>(
 
   items.forEach((item, index) => {
     const inBaseline =
-      index < limit || (policy.kind === "workspaces" && policy.getStatusBucket(item) !== "done");
+      index < limit ||
+      (policy.kind === "workspaces" && !isIdleSidebarBucket(policy.getStatusBucket(item)));
     if (inBaseline) {
       baseline.push(item);
     } else if (leadingItem === null && isOpenWorkspace(item, selection)) {

@@ -1246,6 +1246,7 @@ export const es: TranslationResources = {
       readyToReview: "Para revisar",
       working: "En ejecución",
       done: "Terminado",
+      blocked: "Bloqueado",
     },
     display: {
       showBackground: "Mostrar espacios en segundo plano",

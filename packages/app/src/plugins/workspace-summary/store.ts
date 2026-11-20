@@ -6,6 +6,7 @@ import type {
   PluginWorkspaceSummaryItemState,
   PluginWorkspaceStatus,
   PluginWorkspaceSummaryEntry,
+  PluginWorkspaceWorkState,
   PluginWorkspaceSummaryEntryProps,
 } from "@getpaseo/plugin/client";
 import type { ComponentType } from "react";
@@ -50,15 +51,16 @@ function cleanState(patch: PluginWorkspaceSummaryItemState): PluginWorkspaceSumm
   if (patch.key !== undefined) state.key = String(patch.key);
   if (patch.panelId !== undefined) state.panelId = patch.panelId.trim() || undefined;
   if (patch.workState !== undefined) {
-    state.workState =
-      patch.workState === "waiting" || patch.workState === "working" || patch.workState === "done"
-        ? patch.workState
-        : undefined;
+    state.workState = WORK_STATES.has(patch.workState as PluginWorkspaceWorkState)
+      ? patch.workState
+      : undefined;
   }
   if (patch.status !== undefined) state.status = cleanStatus(patch.status);
   if (patch.entries !== undefined) state.entries = cleanEntries(patch.entries);
   return state;
 }
+
+const WORK_STATES = new Set<PluginWorkspaceWorkState>(["waiting", "blocked", "working", "done"]);
 
 const STATUS_STATES = new Set<PluginWorkspaceStatus["state"]>([
   "working",

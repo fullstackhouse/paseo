@@ -346,6 +346,7 @@ function dotColorStyle(bucket: Exclude<SidebarStateBucket, "running">) {
     case "attention":
       return styles.dotAttention;
     case "done":
+    case "blocked":
       return styles.dotDone;
   }
 }

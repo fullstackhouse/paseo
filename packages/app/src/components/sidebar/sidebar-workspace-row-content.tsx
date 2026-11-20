@@ -230,13 +230,15 @@ function WorkspaceStatusIndicator({
     );
   }
 
-  if (bucket === "done") {
+  if (bucket === "done" || bucket === "blocked") {
     // An idle row still gets a dot rather than an empty slot. Nested rows are marked as
     // workspaces by indentation alone, and with nothing in the leading slot the rail has no
     // edge to read against — a workspace carrying its own glyph starts looking like a project
     // header. The dot is muted to half opacity so it holds the rail without reporting status.
+    // Blocked asks nothing of you either, so it shares Done's dot; status grouping puts it under its
+    // own header, and the row's accessibility label names it.
     return reserveIdleSpace ? (
-      <View style={styles.workspaceStatusDot} testID="workspace-status-indicator-done">
+      <View style={styles.workspaceStatusDot} testID={`workspace-status-indicator-${bucket}`}>
         <View style={styles.idleStatusDot} />
       </View>
     ) : null;
@@ -271,6 +273,7 @@ function getStatusDotColorStyle(bucket: SidebarStateBucket) {
     case "attention":
       return styles.statusDotAttention;
     case "done":
+    case "blocked":
       return null;
   }
 }

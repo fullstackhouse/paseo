@@ -3,26 +3,41 @@ import {
   workspaceSummaryStore,
   type WorkspaceSummaryItem,
 } from "@/plugins/workspace-summary/store";
-import type { WorkspaceDescriptor } from "@/stores/session-store";
+import type { SidebarStateBucket } from "@/utils/sidebar-agent-state";
 
 /** What plugins say about an idle workspace's work, folded across their summary items. */
-export type ReportedWork = "needs_you" | "working" | "done";
+export type ReportedWork = "needs_you" | "blocked" | "working" | "done";
 
 export type ReportedWorkLookup = (serverId: string, workspaceId: string) => ReportedWork | null;
 
-/** Something waiting on the human wins, then any work still going; done only when nothing else is reported. */
+/** Most to least telling: done only when nothing else is reported. */
+const REPORTED_WORK_RANK: readonly ReportedWork[] = ["needs_you", "working", "blocked", "done"];
+
+function reportedWorkOf(item: WorkspaceSummaryItem): ReportedWork | null {
+  if (item.needsYou || item.workState === "waiting") return "needs_you";
+  return item.workState ?? null;
+}
+
+/**
+ * Something waiting on the human wins, then any work still going, then work waiting on something
+ * else (other workspaces, a reviewer, CI); done only when nothing else is reported.
+ */
 export function foldReportedWork(items: readonly WorkspaceSummaryItem[]): ReportedWork | null {
   let result: ReportedWork | null = null;
   for (const item of items) {
-    if (item.needsYou || item.workState === "waiting") return "needs_you";
-    if (item.workState === "working") result = "working";
-    else if (item.workState === "done" && result === null) result = "done";
+    const reported = reportedWorkOf(item);
+    if (
+      reported !== null &&
+      (result === null || REPORTED_WORK_RANK.indexOf(reported) < REPORTED_WORK_RANK.indexOf(result))
+    ) {
+      result = reported;
+    }
   }
   return result;
 }
 
 interface TurnStatus {
-  status: WorkspaceDescriptor["status"];
+  status: SidebarStateBucket;
   /** Running only because an idle agent's background shells or monitors are live. */
   runningFromBackgroundWork?: boolean;
 }
@@ -33,9 +48,10 @@ interface StatusWithTime extends TurnStatus {
 
 const REPORTED_WORK_STATUS = {
   needs_you: "attention",
+  blocked: "blocked",
   working: "running",
   done: "done",
-} as const satisfies Record<ReportedWork, WorkspaceDescriptor["status"]>;
+} as const satisfies Record<ReportedWork, SidebarStateBucket>;
 
 /**
  * Whether the report, not the turn, decides the workspace's group. A running agent, a failure or a
