@@ -5,10 +5,11 @@ import { getAndroidVersionCode } from "~/android-version";
 import { getCanonicalRedirect } from "~/canonical-url";
 import { getLegacyDocsRedirect, resolveDocMarkdownPath } from "~/docs";
 import { splitLocalePath, withLocalePrefix } from "~/i18n";
+import { githubApiUrl, type GitHubApiEnvironment } from "~/github-cache";
 import { getLatestAndroidVersion } from "~/latest-release";
 import { buildLlmsTxt } from "~/llms";
 
-interface WebsiteEnv {
+interface WebsiteEnv extends GitHubApiEnvironment {
   WEBSITE_CACHE?: KVNamespace;
   PLUGINS_REGISTRY_URL?: string;
 }
@@ -108,7 +109,7 @@ export default {
     }
 
     if (url.pathname === "/android-version.txt") {
-      const version = await getLatestAndroidVersion({
+      const version = await getLatestAndroidVersion(githubApiUrl(env), {
         cache: env.WEBSITE_CACHE ?? null,
         waitUntil: (promise) => context.waitUntil(promise),
       });
