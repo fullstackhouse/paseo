@@ -339,10 +339,16 @@ the number of Git processes that have started but not exited. Every Git command 
 including initial workspace reads, filesystem-triggered refreshes, background checks, and explicit
 requests.
 
-Work a client is waiting on goes first. A snapshot request (`checkout_status`, PR status) takes the
-next workspace-refresh slot ahead of background refreshes, and runs its Git commands at high
-priority. Without that, a daemon observing a hundred workspaces queued a status request behind
-every startup and watcher refresh for minutes.
+Git processes run in three priorities. **High**: work a client is waiting on, such as a snapshot
+request (`checkout_status`, PR status), worktree creation, or archiving. **Normal**: workspace
+refreshes. **Low**: the five-minute workspace reconciliation sweep, which reads every workspace
+(about 2,000 processes on a host with 200 workspaces). A snapshot request also takes the next
+workspace-refresh slot ahead of background refreshes. Without these priorities, a status request
+on a large host queued behind startup refreshes and every sweep for minutes.
+
+To give a whole operation, including the helpers it calls, one priority and a metrics label, wrap it
+in `runWithGitCommandContext` (`packages/server/src/utils/run-git-command.ts`). Commands without a
+label show as `unattributed` in the `git` runtime metrics.
 
 Environment variables override `config.json`:
 

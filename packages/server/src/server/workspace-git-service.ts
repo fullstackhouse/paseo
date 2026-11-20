@@ -3221,9 +3221,11 @@ export class WorkspaceGitServiceImpl implements WorkspaceGitService {
           }
           const refresh = () => this.refreshSnapshot(target, request, runRefreshGitCommand);
           // A client is waiting: its git processes also skip ahead of background git work.
-          return admission.priority === "interactive"
-            ? runWithGitCommandPriority("high", refresh)
-            : refresh();
+          // Set explicitly so a refresh started inside a low-priority sweep doesn't inherit it.
+          return runWithGitCommandPriority(
+            admission.priority === "interactive" ? "high" : "normal",
+            refresh,
+          );
         });
         if (!admittedSnapshot) {
           break;
