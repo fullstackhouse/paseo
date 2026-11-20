@@ -44,13 +44,22 @@ const META = `<meta http-equiv="Content-Security-Policy" content="${POLICY}">`;
 // So the prologue isn't found, it's supplied: our doctype, then the policy, then
 // the file verbatim. The file's own doctype becomes a stray DOCTYPE token, which
 // the parser ignores wherever it appears. Standards mode is guaranteed, the policy
-// is always the first element and therefore always in the head, and no part of the
-// document has to be parsed to place it.
+// always lands in the head, and no part of the document has to be parsed to
+// place it.
 const PROLOGUE = `<!doctype html>${META}`;
 
 // Left where it is, a BOM would sit mid-document and render as a zero-width space.
 const BOM = "\uFEFF";
 
-export function withPreviewCsp(html: string): string {
-  return PROLOGUE + (html.startsWith(BOM) ? html.slice(BOM.length) : html);
+// A srcdoc frame resolves relative URLs against its parent's URL, so on web
+// `href="#d1"` pointed at the Paseo app itself and clicking it blanked the preview.
+// Pinning the base to the frame's own URL keeps a fragment link a same-document
+// jump, and any other relative link fails to resolve and goes nowhere. The base
+// precedes the policy so `base-uri 'none'` does not refuse it. Native needs no
+// base: its WebView document is already `about:blank` (see html-preview.tsx).
+const SRCDOC_BASE = '<base href="about:srcdoc">';
+
+export function withPreviewCsp(html: string, options: { srcdoc?: boolean } = {}): string {
+  const prologue = options.srcdoc ? PROLOGUE.replace(META, SRCDOC_BASE + META) : PROLOGUE;
+  return prologue + (html.startsWith(BOM) ? html.slice(BOM.length) : html);
 }
