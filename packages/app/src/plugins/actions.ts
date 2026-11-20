@@ -19,6 +19,7 @@ export interface PluginNavigation {
     screenId: string;
     params: PluginScreenParams;
     workspaceId: string;
+    location: PluginPanelLocation;
   }): void;
   openWorkspacePanel(pluginId: string, panelId: string, location: PluginPanelLocation): void;
   openAgentPanel(
@@ -34,9 +35,9 @@ export function createPluginCapabilities(
   navigation: PluginNavigation,
 ): PluginCommandCapabilities {
   function openScreen(input: unknown) {
-    const { screenId, params, workspaceId } = parsePluginOpenScreenInput(plugin, input);
+    const { screenId, params, workspaceId, location } = parsePluginOpenScreenInput(plugin, input);
     if (workspaceId) {
-      navigation.openScreenTab({ pluginId: plugin.id, screenId, params, workspaceId });
+      navigation.openScreenTab({ pluginId: plugin.id, screenId, params, workspaceId, location });
       return;
     }
     navigation.openSurface(plugin.id, screenId, params);

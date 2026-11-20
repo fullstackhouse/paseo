@@ -65,6 +65,11 @@ export interface PluginScreenTarget {
   readonly serverId?: string;
   /** Opens the screen as a tab in this workspace instead of over the app. Older hosts ignore it. */
   readonly workspaceId?: string;
+  /**
+   * Where the `workspaceId` tab opens: `"workspace"` (default) or `"explorer"`, the sidebar beside
+   * the conversation. Ignored without `workspaceId`. Older hosts ignore it and use the workspace.
+   */
+  readonly location?: PluginPanelLocation;
 }
 
 /** String keys and values: params travel in the screen's URL. */
@@ -75,6 +80,11 @@ export interface PluginOpenScreenInput {
   params?: PluginScreenParams;
   /** Opens the screen as a tab in this workspace instead of over the app. Older hosts ignore it. */
   workspaceId?: string;
+  /**
+   * Where the `workspaceId` tab opens: `"workspace"` (default) or `"explorer"`, the sidebar beside
+   * the conversation. Ignored without `workspaceId`. Older hosts ignore it and use the workspace.
+   */
+  location?: PluginPanelLocation;
 }
 
 export interface PluginScreenLocation {

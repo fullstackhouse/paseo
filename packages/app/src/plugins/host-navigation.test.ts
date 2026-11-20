@@ -21,6 +21,10 @@ describe("plugin host navigation", () => {
       findPlugin: ({ serverId, pluginId }) =>
         plugins.find((plugin) => plugin.serverId === serverId && plugin.id === pluginId) ?? null,
       openScreen: (input) => screens.push(input),
+      showExplorer: ({ serverId, workspaceId }) => ({
+        mode: "pane",
+        paneId: `explorer:${serverId}:${workspaceId}`,
+      }),
       createBrowser: ({ initialUrl }) => {
         browsers.push(initialUrl);
         return { browserId: `browser-${browsers.length}` };
@@ -67,6 +71,30 @@ describe("plugin host navigation", () => {
           screenId: "review",
           params: { runId: "r1" },
         },
+      },
+    ]);
+  });
+
+  it("opens a screen tab in the workspace's Explorer sidebar when asked", () => {
+    const { navigation, destinations } = setup();
+    navigation.openPluginScreen!({
+      pluginId: "inbox",
+      screenId: "review",
+      params: { runId: "r1" },
+      workspaceId: "one",
+      location: "explorer",
+    });
+    expect(destinations).toEqual([
+      {
+        serverId: "selected",
+        workspaceId: "one",
+        target: {
+          kind: "plugin_screen",
+          pluginId: "inbox",
+          screenId: "review",
+          params: { runId: "r1" },
+        },
+        placement: { mode: "pane", paneId: "explorer:selected:one" },
       },
     ]);
   });
