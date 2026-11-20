@@ -353,6 +353,10 @@ themselves). Daemon-initiated fan-out must run in the background lane: one resca
 queues over 1,000 commands, and in the normal lane every command a cold diff runs waited behind
 them. Set the lane on the runner with `createRunGitCommand(provenance, { priority })`, or around a
 whole operation with `runWithGitCommandPriority`.
+A snapshot request a client waits on (`checkout_status`, PR status) also takes the next
+workspace-refresh slot ahead of background refreshes and runs its Git commands in the `high` lane
+(FSH). Without that, a daemon observing a hundred workspaces queued a status request behind every
+startup and watcher refresh for minutes.
 
 Environment variables override `config.json`:
 

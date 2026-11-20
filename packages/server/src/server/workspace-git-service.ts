@@ -78,6 +78,12 @@ import {
 } from "./forge-web.js";
 import type { SshHostnameResolver } from "../utils/ssh-hostname.js";
 import { checkoutLiteFromGitSnapshot } from "./workspace-registry-model.js";
+import {
+  type AdmissionPriority,
+  type AdmissionTicket,
+  higherPriority,
+  PriorityAdmission,
+} from "./priority-admission.js";
 import { createWatcherLivenessCanary } from "./watcher-liveness-canary.js";
 
 const WORKSPACE_GIT_WATCH_DEBOUNCE_MS = 1_000;
@@ -379,6 +385,8 @@ interface WorkspaceGitRefreshRequest {
   reason: string;
   queueIfBusy: boolean;
   movedRemoteRefs: Set<string>;
+  /** Interactive work is something a client is waiting on; it is admitted before background work. */
+  priority: AdmissionPriority;
 }
 
 interface ScheduledWorkspaceGitRefreshOptions {
@@ -401,6 +409,8 @@ type WorkspaceGitRefreshState =
       promise: Promise<WorkspaceGitRuntimeSnapshot>;
       request: WorkspaceGitRefreshRequest;
       queued: WorkspaceGitRefreshRequest | null;
+      /** This run's admission slot request; raised to interactive when a client joins it. */
+      admission: AdmissionTicket;
     };
 
 interface WorkspaceGitServiceDependencies {
@@ -671,10 +681,7 @@ export class WorkspaceGitServiceImpl implements WorkspaceGitService {
   private readonly fileObserver: FileObserver;
   private readonly deps: WorkspaceGitServiceDependencies;
   private readonly forgeResolver: ForgeResolver;
-  private readonly workspaceRefreshLimit = pLimit({
-    concurrency: WORKSPACE_GIT_REFRESH_CONCURRENCY,
-    rejectOnClear: true,
-  });
+  private readonly workspaceRefreshLimit = new PriorityAdmission(WORKSPACE_GIT_REFRESH_CONCURRENCY);
   private readonly workspaceObservationSetupLimit = pLimit({
     concurrency: WORKSPACE_GIT_OBSERVATION_SETUP_CONCURRENCY,
     rejectOnClear: true,
@@ -1078,7 +1085,7 @@ export class WorkspaceGitServiceImpl implements WorkspaceGitService {
     return snapshot.git.remoteUrl;
   }
 
-  async refresh(cwd: string, _options?: { priority?: "normal" | "high" }): Promise<void> {
+  async refresh(cwd: string, options?: { priority?: "normal" | "high" }): Promise<void> {
     this.assertNotDisposed();
     cwd = resolve(cwd);
     const target = this.ensureWorkspaceTarget(cwd);
@@ -1094,6 +1101,7 @@ export class WorkspaceGitServiceImpl implements WorkspaceGitService {
       reason: "refresh",
       queueIfBusy: false,
       movedRemoteRefs: new Set(),
+      priority: options?.priority === "high" ? "interactive" : "background",
     });
     this.scheduleWorkspaceObservationSetup(target);
   }
@@ -1163,7 +1171,7 @@ export class WorkspaceGitServiceImpl implements WorkspaceGitService {
     if (this.disposePromise) return this.disposePromise;
     this.disposed = true;
     this.disposeController.abort(new WorkspaceGitServiceDisposedError());
-    this.workspaceRefreshLimit.clearQueue();
+    this.workspaceRefreshLimit.clear();
     this.workspaceObservationSetupLimit.clearQueue();
 
     for (const target of this.workspaceTargets.values()) {
@@ -1383,6 +1391,7 @@ export class WorkspaceGitServiceImpl implements WorkspaceGitService {
         reason: "initial",
         queueIfBusy: false,
         movedRemoteRefs: new Set(),
+        priority: "background",
       });
     });
   }
@@ -1924,6 +1933,7 @@ export class WorkspaceGitServiceImpl implements WorkspaceGitService {
             reason: "working-tree-watch-fallback",
             queueIfBusy: true,
             movedRemoteRefs: new Set(),
+            priority: "background",
           });
           if (target.repoRoot === null && workspaceTarget.latestGit?.isGit === true) {
             workspaceTarget.observationSetupComplete = false;
@@ -3053,6 +3063,7 @@ export class WorkspaceGitServiceImpl implements WorkspaceGitService {
             reason: "git-metadata-watch-fallback",
             queueIfBusy: true,
             movedRemoteRefs: new Set(),
+            priority: "background",
           });
         }),
       );
@@ -3398,6 +3409,10 @@ export class WorkspaceGitServiceImpl implements WorkspaceGitService {
       return Promise.resolve(target.latestSnapshot ?? buildNotGitSnapshot(target.cwd));
     }
     if (target.refreshState.status === "in-flight") {
+      if (request.priority === "interactive") {
+        // A client now waits on this run; if it is still queued for a slot, let it go first.
+        target.refreshState.admission.priority = "interactive";
+      }
       const active = target.refreshState.request;
       const addsWork =
         (request.force && !active.force) ||
@@ -3416,7 +3431,8 @@ export class WorkspaceGitServiceImpl implements WorkspaceGitService {
       return Promise.resolve(target.latestSnapshot);
     }
 
-    const promise = this.runWorkspaceRefreshLoop(target, request).finally(() => {
+    const admission: AdmissionTicket = { priority: request.priority };
+    const promise = this.runWorkspaceRefreshLoop(target, request, admission).finally(() => {
       this.pendingRefreshes.delete(promise);
       const state = target.refreshState;
       if (state.status === "in-flight" && state.promise === promise) {
@@ -3429,6 +3445,7 @@ export class WorkspaceGitServiceImpl implements WorkspaceGitService {
       promise,
       request,
       queued: null,
+      admission,
     };
 
     return promise;
@@ -3452,6 +3469,7 @@ export class WorkspaceGitServiceImpl implements WorkspaceGitService {
       reason: options?.reason ?? defaultReason,
       queueIfBusy: force && options?.afterInFlight === true,
       movedRemoteRefs: new Set(),
+      priority: "interactive",
     };
   }
 
@@ -3481,6 +3499,7 @@ export class WorkspaceGitServiceImpl implements WorkspaceGitService {
       reason: options?.reason ?? "watch",
       queueIfBusy: options?.queueIfBusy ?? true,
       movedRemoteRefs: new Set(options?.movedRemoteRefs),
+      priority: "background",
     };
   }
 
@@ -3520,12 +3539,14 @@ export class WorkspaceGitServiceImpl implements WorkspaceGitService {
           : pending.reason,
       queueIfBusy: pending.queueIfBusy || request.queueIfBusy,
       movedRemoteRefs,
+      priority: higherPriority(pending.priority, request.priority),
     };
   }
 
   private async runWorkspaceRefreshLoop(
     target: WorkspaceGitTarget,
     initialRequest: WorkspaceGitRefreshRequest,
+    admission: AdmissionTicket,
   ): Promise<WorkspaceGitRuntimeSnapshot> {
     let request = initialRequest;
     let snapshot = target.latestSnapshot ?? buildNotGitSnapshot(target.cwd);
@@ -3542,12 +3563,7 @@ export class WorkspaceGitServiceImpl implements WorkspaceGitService {
         });
       }
       try {
-        // Demand refreshes keep the caller's lane, so a user action running at
-        // "high" is not demoted.
-        const runRefreshGitCommand = createRunGitCommand(`workspace-refresh:${request.reason}`, {
-          priority: request.origin === "observation" ? "background" : undefined,
-        });
-        const admittedSnapshot = await this.workspaceRefreshLimit(() => {
+        const admittedSnapshot = await this.workspaceRefreshLimit.run(admission, () => {
           if (
             target.closed ||
             target.folderMissing ||
@@ -3555,6 +3571,17 @@ export class WorkspaceGitServiceImpl implements WorkspaceGitService {
           ) {
             return null;
           }
+          // Demand refreshes keep the caller's lane, so a user action running at "high" is not
+          // demoted. FSH: a client waiting on this run (interactive admission, possibly raised
+          // after a watcher started it) runs its git processes at high priority.
+          const runRefreshGitCommand = createRunGitCommand(`workspace-refresh:${request.reason}`, {
+            priority:
+              admission.priority === "interactive"
+                ? "high"
+                : request.origin === "observation"
+                  ? "background"
+                  : undefined,
+          });
           return this.refreshSnapshot(target, request, runRefreshGitCommand);
         });
         if (target.folderMissing) {
@@ -3590,6 +3617,10 @@ export class WorkspaceGitServiceImpl implements WorkspaceGitService {
       request = state.queued;
       state.queued = null;
       state.request = request;
+      // Never lowered: whoever joined this run waits for its successors too.
+      if (request.priority === "interactive") {
+        admission.priority = "interactive";
+      }
     }
 
     if (failure) {
