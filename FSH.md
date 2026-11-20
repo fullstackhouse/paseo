@@ -95,6 +95,7 @@ temporary by design: every patch is meant to go upstream and then drop out of `f
 - FSH-only (upstreamable): git status and PR status requests from the app skip ahead of background git refreshes, in both the workspace-refresh queue and the git process scheduler. With about 100 observed workspaces they used to wait behind every startup and watcher refresh, taking 45s to 5 minutes; now about 4s
 - FSH-only (upstreamable): website e2e serves GitHub release and repo fixtures from `e2e/registry-server.mjs` through an optional `GITHUB_API_URL` override, so CI no longer gets 500s when shared runners hit GitHub's unauthenticated rate limit
 - FSH-only (upstreamable): creating a worktree workspace no longer waits for the source checkout's git status. When you picked no branch and the status hasn't loaded, the daemon resolves the default base itself. That status request took up to five minutes on a busy daemon while the create itself took seconds
+- FSH-only (upstreamable): while a workspace is being created, the New workspace screen shows **Start another**. It clears the form for the next workspace and lets the first one finish in the background without navigating to it; it appears in the sidebar when ready
 
 Keep this list in sync with what's merged into `fsh`.
 

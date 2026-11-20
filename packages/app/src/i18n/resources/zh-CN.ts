@@ -1469,6 +1469,7 @@ export const zhCN: TranslationResources = {
     title: "新建 workspace",
     recentProjects: "最近的项目",
     create: "创建",
+    startAnother: "再创建一个",
     isolation: {
       local: "项目目录",
       worktree: "新建 worktree",

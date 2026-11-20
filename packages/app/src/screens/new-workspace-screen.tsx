@@ -126,6 +126,7 @@ import {
 } from "./new-workspace/existing-worktrees";
 import { useNewWorkspaceForm } from "./new-workspace/form";
 import { ImportSessionButton } from "./new-workspace/import-session-button";
+import { StartAnotherButton } from "./new-workspace/start-another-button";
 import { RecentProjectCards } from "./new-workspace/recent-project-cards";
 import type { RecentProjectChoice } from "./new-workspace/project-picker";
 import { useImportSession } from "@/hooks/use-import-session";
@@ -192,6 +193,12 @@ interface NewWorkspaceScreenProps {
   projectId?: string;
   displayName?: string;
   draftId?: string;
+  /** Remount a fresh form; whatever this one is creating finishes in the background. */
+  onStartAnother?: (next: {
+    serverId: string;
+    sourceDirectory?: string;
+    projectId?: string;
+  }) => void;
 }
 
 // A terminal launch sends argv, not a message: there is nothing to attach and
@@ -908,6 +915,7 @@ export function NewWorkspaceScreen({
   projectId,
   displayName: displayNameProp,
   draftId,
+  onStartAnother,
 }: NewWorkspaceScreenProps) {
   const queryClient = useQueryClient();
   const { t } = useTranslation();
@@ -961,7 +969,13 @@ export function NewWorkspaceScreen({
   const isolationPickerAnchorRef = useRef<View>(null);
   const hostPickerAnchorRef = useRef<View | null>(null);
   const isDraftHandoffActive = useIsNewWorkspaceDraftHandoffActive({ draftId, selectedServerId });
-  const isStillOnCreateScreen = useNewWorkspaceScreenPresence();
+  const isScreenPresent = useNewWorkspaceScreenPresence();
+  // Set by "Start another": the in-flight creation must not navigate once the user moved on.
+  const detachedRef = useRef(false);
+  const isStillOnCreateScreen = useCallback(
+    () => !detachedRef.current && isScreenPresent(),
+    [isScreenPresent],
+  );
   const isScreenFocused = useIsFocused();
   const projectPickHandlerId = useId();
 
@@ -1536,6 +1550,20 @@ export function NewWorkspaceScreen({
     workingDirectory,
   ]);
 
+  const handleStartAnother = useStartAnother({
+    onStartAnother,
+    detachedRef,
+    pendingAction,
+    creationDraftId: creationIdentity.draftId,
+    draftKey,
+    clearDraft: chatDraft.clear,
+    draftContextScopeKey,
+    leaveFullscreen,
+    selectedServerId,
+    selectedSourceDirectory,
+    selectedProject,
+  });
+
   const agentControlsWithDisabled = useMemo(
     () =>
       composerState
@@ -1733,6 +1761,7 @@ export function NewWorkspaceScreen({
         onImportSession={importSession.open}
       >
         {composer}
+        <StartAnotherButton compact={isCompact} onPress={handleStartAnother} />
         {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
       </NewWorkspaceLayout>
       {importSession.sheet}
@@ -1797,6 +1826,71 @@ function usePluginSetup(input: {
   );
   useLayoutEffect(() => setup.syncInputs(inputs));
   return { setup, pluginProject, canCreateWorktree, isPending: locked };
+}
+
+/**
+ * "Start another" while a creation is in flight: detach it so it finishes in the background
+ * without navigating, hand its text to the creation, and remount a fresh form. Null while idle.
+ */
+function useStartAnother(input: {
+  onStartAnother: NewWorkspaceScreenProps["onStartAnother"];
+  detachedRef: { current: boolean };
+  pendingAction: "chat" | "empty" | "terminal" | null;
+  creationDraftId: string;
+  draftKey: string;
+  clearDraft: (lifecycle: "sent" | "abandoned") => void;
+  draftContextScopeKey: string;
+  leaveFullscreen: () => void;
+  selectedServerId: string;
+  selectedSourceDirectory: string | null;
+  selectedProject: HostProjectListItem | null;
+}): (() => void) | null {
+  const {
+    onStartAnother,
+    detachedRef,
+    pendingAction,
+    creationDraftId,
+    draftKey,
+    clearDraft,
+    draftContextScopeKey,
+    leaveFullscreen,
+    selectedServerId,
+    selectedSourceDirectory,
+    selectedProject,
+  } = input;
+  const handle = useCallback(() => {
+    if (!onStartAnother) return;
+    detachedRef.current = true;
+    if (pendingAction === "chat") {
+      captureWorkspaceDraftCleanup({
+        draftId: creationDraftId,
+        draftKey,
+        clearDraft,
+        draftContextScopeKey,
+      })();
+    }
+    leaveFullscreen();
+    onStartAnother({
+      serverId: selectedServerId,
+      sourceDirectory: selectedSourceDirectory ?? undefined,
+      projectId: selectedProject
+        ? (getHostProjectId(selectedProject, selectedServerId) ?? undefined)
+        : undefined,
+    });
+  }, [
+    clearDraft,
+    creationDraftId,
+    detachedRef,
+    draftContextScopeKey,
+    draftKey,
+    leaveFullscreen,
+    onStartAnother,
+    pendingAction,
+    selectedProject,
+    selectedServerId,
+    selectedSourceDirectory,
+  ]);
+  return pendingAction && onStartAnother ? handle : null;
 }
 
 /** Terminal and chat launches edit in separate sessions; the screen follows the mounted one. */
