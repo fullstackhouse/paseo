@@ -200,24 +200,47 @@ export function gitMoveFacts(facts: BranchFactsInput | null, t: Translate): stri
 type PermissionRequest = Pick<AgentPermissionRequest, "kind" | "detail" | "actions">;
 
 /**
- * What a tool permission would do, in one line: the command, path, query or URL. Null when one line
- * can't say it (an edit's diff, a write's content), so the request has to be read in the agent.
+ * What a tool permission would do, in one line: the command (with its directory when that isn't the
+ * workspace's), path, query or URL. Null when one line can't say it (an edit's diff, a write's
+ * content), so the request has to be read in the agent.
  */
-export function permissionSubject(request: PermissionRequest): string | null {
+export function permissionSubject(
+  request: PermissionRequest,
+  workspaceCwd: string | null = null,
+): string | null {
   const detail = request.detail;
   if (!detail) return null;
+  let subject: string | undefined;
   switch (detail.type) {
     case "shell":
-      return detail.command;
+      subject =
+        detail.cwd && detail.cwd !== workspaceCwd
+          ? `${detail.command} (in ${detail.cwd})`
+          : detail.command;
+      if (!detail.command.trim()) subject = undefined;
+      break;
     case "read":
-      return detail.filePath;
+      subject = detail.filePath;
+      break;
     case "search":
-      return detail.query;
+      subject = detail.query;
+      break;
     case "fetch":
-      return detail.url;
+      subject = detail.url;
+      break;
     default:
-      return null;
+      subject = undefined;
   }
+  return subject?.trim() ? subject : null;
+}
+
+/** The facts under a permission: what it does, then why the agent asks (Codex puts the reason here). */
+export function permissionFacts(
+  request: Pick<AgentPermissionRequest, "kind" | "detail" | "actions" | "description">,
+  workspaceCwd: string | null,
+): string | null {
+  const parts = [permissionSubject(request, workspaceCwd), request.description?.trim()];
+  return parts.filter(Boolean).join(" · ") || null;
 }
 
 /** Answer on Overview only when the one line shows everything being approved. */

@@ -6,6 +6,7 @@ import {
   branchFacts,
   canAnswerPermissionInPlace,
   permissionActions,
+  permissionFacts,
   permissionResponse,
   permissionSubject,
   deriveCodeRow,
@@ -256,6 +257,23 @@ describe("permissions on Overview", () => {
     expect(
       permissionSubject({ kind: "tool", detail: { type: "fetch", url: "https://x.test" } }),
     ).toBe("https://x.test");
+  });
+
+  it("names the directory when a command runs outside the workspace", () => {
+    const elsewhere = {
+      kind: "tool",
+      detail: { type: "shell", command: "rm -rf build", cwd: "/tmp" },
+    } as const;
+    expect(permissionSubject(elsewhere, "/repo")).toBe("rm -rf build (in /tmp)");
+    expect(permissionSubject(elsewhere, "/tmp")).toBe("rm -rf build");
+    expect(permissionSubject({ kind: "tool", detail: { type: "shell", command: " " } })).toBe(null);
+  });
+
+  it("shows why the agent asks next to what it would do", () => {
+    expect(permissionFacts({ ...shell, description: "Needs network access" }, null)).toBe(
+      "npm run db:migrate · Needs network access",
+    );
+    expect(permissionFacts({ kind: "tool", description: "Edit a.ts" }, null)).toBe("Edit a.ts");
   });
 
   it("answers in place only when that line shows everything being approved", () => {

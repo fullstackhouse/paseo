@@ -58,8 +58,8 @@ import {
   overviewSubtitle,
   partitionSummaryItems,
   permissionActions,
+  permissionFacts,
   permissionResponse,
-  permissionSubject,
   pullRequestFacts,
   showNowLine,
   type WorkspaceStateWord,
@@ -649,17 +649,14 @@ interface MoveViewInput {
 function permissionMoveView(
   agentId: string,
   permission: AgentPermissionRequest | null,
-  { t, serverId, agentLabel }: MoveViewInput,
+  { t, serverId, agentLabel, facts: workspace }: MoveViewInput,
 ): MoveView {
+  const workspaceCwd = workspace?.cwd ?? null;
   return {
     icon: <ThemedShield size={ICON_SIZE} uniProps={warningColorMapping} />,
     tone: "warn",
     title: permission?.title ?? permission?.name ?? t("panels.overview.permissionTitle"),
-    facts:
-      (permission && permissionSubject(permission)) ||
-      permission?.description ||
-      agentLabel ||
-      undefined,
+    facts: (permission && permissionFacts(permission, workspaceCwd)) || agentLabel || undefined,
     action: t("panels.overview.reviewPermission"),
     run: () => navigateToAgent({ serverId, agentId }),
   };
