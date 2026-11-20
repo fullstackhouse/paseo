@@ -29,7 +29,6 @@ import { useForgeSearchQuery } from "@/git/use-forge-search-query";
 import { getForgePresentation } from "@/git/forge";
 import { useCheckoutPrStatusQuery } from "@/git/use-pr-status-query";
 import { useCheckoutStatusQuery } from "@/git/use-status-query";
-import { ensureCheckoutStatus } from "@/git/checkout-status-cache";
 import { useDaemonConfig } from "@/hooks/use-daemon-config";
 import { resolveTerminalProfiles } from "@getpaseo/protocol/terminal-profiles";
 import type { TerminalProfile } from "@getpaseo/protocol/messages";
@@ -1333,22 +1332,14 @@ export function NewWorkspaceScreen({
       }
       const connectedClient = withConnectedClient();
       const createsWorktree = !supportsWorkspaceMultiplicity || effectiveIsolation === "worktree";
-      const checkoutStatusForCreate = createsWorktree
-        ? await ensureCheckoutStatus({
-            queryClient,
-            client: connectedClient,
-            serverId: selectedServerId,
-            cwd: selectedSourceDirectory,
-          })
-        : null;
-      const checkoutRequest = checkoutStatusForCreate
-        ? checkoutRequestOrExplain(
-            () =>
-              setup.checkoutRequestFor(
-                selectedItem ?? defaultBasePickerItem(checkoutStatusForCreate),
-              ),
-            t,
-          )
+      // FSH: creation never waits on checkout status, which can take minutes on a busy daemon.
+      // With nothing picked and no status yet, a bare branch-off lets the daemon resolve the same
+      // default base `defaultBasePickerItem` describes.
+      const baseItem = selectedItem ?? (checkoutStatus ? defaultBasePickerItem(checkoutStatus) : null);
+      const checkoutRequest = createsWorktree
+        ? baseItem
+          ? checkoutRequestOrExplain(() => setup.checkoutRequestFor(baseItem), t)
+          : { action: "branch-off" as const }
         : undefined;
       const normalizedWorkspace = await createMultiplicityWorkspace({
         idempotencyKey: creationIdentity.draftId,
@@ -1373,11 +1364,11 @@ export function NewWorkspaceScreen({
       return normalizedWorkspace;
     },
     [
+      checkoutStatus,
       creationIdentity,
       creationResult,
       effectiveIsolation,
       mergeWorkspaces,
-      queryClient,
       selectedItem,
       selectedProject,
       selectedServerId,
