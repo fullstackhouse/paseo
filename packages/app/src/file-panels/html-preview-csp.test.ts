@@ -12,6 +12,15 @@ describe("withPreviewCsp", () => {
     expect(output.indexOf("Content-Security-Policy")).toBeLessThan(output.indexOf("<script>"));
   });
 
+  it("pins a srcdoc frame's base ahead of the policy", () => {
+    const output = withPreviewCsp("<h1>Plan</h1>", { srcdoc: true });
+
+    expect(output).toMatch(
+      /^<!doctype html><base href="about:srcdoc"><meta http-equiv="Content-Security-Policy"/,
+    );
+    expect(withPreviewCsp("<h1>Plan</h1>")).not.toContain("<base");
+  });
+
   it("keeps the original document intact", () => {
     const source = "<!doctype html><html><head></head><body><h1>Visual plan</h1></body></html>";
 
