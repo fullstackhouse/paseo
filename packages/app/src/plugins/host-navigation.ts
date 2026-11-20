@@ -8,6 +8,7 @@ import { getHostRuntimeStore } from "@/runtime/host-runtime";
 
 import { getIsElectron } from "@/constants/platform";
 import { createWorkspaceBrowser } from "@/desktop/browser/store";
+import { showWorkspaceExplorer } from "./explorer-placement";
 import { createPluginHostNavigation } from "./host-navigation-model";
 import { useSidebarViewStore } from "@/stores/sidebar-view-store";
 import { pluginRegistry } from "./registry";
@@ -47,6 +48,8 @@ export function usePluginHostNavigation(
             workspaces: useSessionStore.getState().sessions[targetServerId]?.workspaces,
             workspaceId,
           }),
+        showExplorer: ({ serverId: targetServerId, workspaceId }) =>
+          showWorkspaceExplorer(targetServerId, workspaceId),
       }),
     [serverId],
   );

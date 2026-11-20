@@ -6,7 +6,12 @@ import {
 } from "@/stores/workspace-layout-store";
 import { collectAllTabs } from "@/stores/workspace-layout-actions";
 import { openExplorerSidebarView, showExplorerSidebar } from "@/workspace-tabs/explorer-sidebar";
+import type {
+  ExplorerOnWorkspaceEnter,
+  ExplorerOnWorkspaceEnterTab,
+} from "@/hooks/use-settings/storage";
 import { useWorkspaceAttention } from "./attention";
+import { takeExplicitExplorerReveal } from "./explicit-reveal";
 import { useSessionStore } from "@/stores/session-store";
 import {
   decideExplorerAutoShow,
@@ -64,6 +69,47 @@ function showExplorerOnOverview(workspaceKey: string, hasOverview: boolean): voi
   });
 }
 
+/** What entering a workspace does to Explorer, once per entry. Exported for tests. */
+export function applyExplorerEntryDecision(input: {
+  serverId: string;
+  workspaceId: string;
+  workspaceKey: string;
+  setting: ExplorerOnWorkspaceEnter;
+  tabSetting: ExplorerOnWorkspaceEnterTab;
+  items: readonly AttentionItem[];
+}): void {
+  const { serverId, workspaceId, workspaceKey, setting, tabSetting, items } = input;
+  const store = useWorkspaceLayoutStore.getState();
+  store.autoOpenOverviewTab(workspaceKey);
+  // Entered by opening an Explorer tab: that tab stays selected; its items wait for the next entry.
+  if (takeExplicitExplorerReveal(workspaceKey)) return;
+  const decision = decideExplorerAutoShow({
+    setting,
+    items,
+    record: store.explorerAttentionByWorkspace[workspaceKey] ?? null,
+  });
+  const hasOverview = hasOverviewTab(workspaceKey);
+  if (decision.kind === "show") {
+    showExplorerOnOverview(workspaceKey, hasOverview);
+  } else if (decision.kind === "item") {
+    const tab = pickAttentionTab({
+      tabSetting,
+      item: decision.item,
+      hasOverview,
+      agentRunning: hasRunningAgent(
+        useSessionStore.getState().sessions[serverId]?.agents,
+        workspaceId,
+      ),
+    });
+    if (tab === "overview") showExplorerOnOverview(workspaceKey, hasOverview);
+    else showExplorerForAttention(workspaceKey, decision.item);
+    store.setExplorerAttention(workspaceKey, {
+      hidden: false,
+      seenKeys: items.map((item) => item.key),
+    });
+  }
+}
+
 /**
  * Desktop: shows Explorer on entering a workspace, per the "Open Explorer when entering a workspace"
  * setting. Returns the handler the Explorer toggle calls, so hiding it is remembered.
@@ -91,33 +137,14 @@ export function useExplorerAutoShow(input: {
     }
     if (!hydrated || isCompact || !workspaceKey || decidedForRef.current === workspaceKey) return;
     decidedForRef.current = workspaceKey;
-    const store = useWorkspaceLayoutStore.getState();
-    store.autoOpenOverviewTab(workspaceKey);
-    const decision = decideExplorerAutoShow({
+    applyExplorerEntryDecision({
+      serverId,
+      workspaceId,
+      workspaceKey,
       setting,
+      tabSetting,
       items: itemsRef.current,
-      record: store.explorerAttentionByWorkspace[workspaceKey] ?? null,
     });
-    const hasOverview = hasOverviewTab(workspaceKey);
-    if (decision.kind === "show") {
-      showExplorerOnOverview(workspaceKey, hasOverview);
-    } else if (decision.kind === "item") {
-      const tab = pickAttentionTab({
-        tabSetting,
-        item: decision.item,
-        hasOverview,
-        agentRunning: hasRunningAgent(
-          useSessionStore.getState().sessions[serverId]?.agents,
-          workspaceId,
-        ),
-      });
-      if (tab === "overview") showExplorerOnOverview(workspaceKey, hasOverview);
-      else showExplorerForAttention(workspaceKey, decision.item);
-      store.setExplorerAttention(workspaceKey, {
-        hidden: false,
-        seenKeys: itemsRef.current.map((item) => item.key),
-      });
-    }
   }, [
     hydrated,
     isCompact,

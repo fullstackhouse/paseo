@@ -4,6 +4,7 @@ import {
   useWorkspaceLayoutStore,
 } from "@/stores/workspace-layout-store";
 import { usePanelStore } from "@/stores/panel-store";
+import { takeExplicitExplorerReveal } from "@/workspace-attention/explicit-reveal";
 import { revealWorkspaceTab } from "./navigation";
 import { openWorkspaceTargetAtLocation } from "./open-beside";
 
@@ -130,3 +131,18 @@ it.each(["agent-list", "file-explorer"] as const)(
     expect(usePanelStore.getState().mobilePanel.target).toBe("agent");
   },
 );
+
+it("marks an Explorer reveal for the entry decision only when navigation enters the workspace", () => {
+  const store = useWorkspaceLayoutStore.getState();
+  const paneId = store.ensureExplorerSidebar(workspaceKey);
+  const tabId = store.openTab({
+    workspaceKey,
+    target: { kind: "files" },
+    intent: "background",
+    placement: paneId ? { mode: "pane", paneId } : undefined,
+  });
+  revealWorkspaceTab(workspaceKey, tabId);
+  expect(takeExplicitExplorerReveal(workspaceKey)).toBe(false);
+  revealWorkspaceTab(workspaceKey, tabId, { entering: true });
+  expect(takeExplicitExplorerReveal(workspaceKey)).toBe(true);
+});

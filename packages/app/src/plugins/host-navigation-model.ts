@@ -1,6 +1,7 @@
 import type { PluginSurfaceProps } from "@getpaseo/plugin/client";
 import type { NavigateToWorkspaceInput } from "@/stores/navigation-active-workspace-store";
 import { parseServerIdFromPathname } from "@/utils/host-routes";
+import type { WorkspaceTabPlacement } from "@/stores/workspace-layout-actions";
 import { isHttpUrl } from "@/utils/http-url";
 import { parsePluginOpenScreenInput } from "./surface-contribution";
 import type { InstalledPlugin } from "./types";
@@ -11,6 +12,8 @@ interface HostNavigationOwner {
   openAgent(input: { serverId: string; agentId: string }): string;
   openWorkspace(input: NavigateToWorkspaceInput): string;
   resolveWorkspace(input: { serverId: string; workspaceId: string }): string | null;
+  /** Shows the workspace's Explorer sidebar; the placement opens a tab in it. */
+  showExplorer(input: { serverId: string; workspaceId: string }): WorkspaceTabPlacement | undefined;
   createBrowser(input: { initialUrl: string }): { browserId: string };
   focusHost(serverId: string): void;
   findPlugin(input: { serverId: string; pluginId: string }): InstalledPlugin | null;
@@ -46,12 +49,17 @@ export function createPluginHostNavigation(
       const plugin = findScreen(input);
       if (!plugin)
         throw new Error(`Plugin screen is unavailable: ${input.pluginId}/${input.screenId}`);
-      const { screenId, params, workspaceId } = parsePluginOpenScreenInput(plugin, input);
+      const { screenId, params, workspaceId, location } = parsePluginOpenScreenInput(plugin, input);
       if (workspaceId) {
+        const placement =
+          location === "explorer"
+            ? owner.showExplorer({ serverId: plugin.serverId, workspaceId })
+            : undefined;
         owner.openWorkspace({
           serverId: plugin.serverId,
           workspaceId,
           target: { kind: "plugin_screen", pluginId: plugin.id, screenId, params },
+          ...(placement ? { placement } : {}),
         });
         return;
       }

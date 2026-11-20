@@ -1,4 +1,8 @@
-import type { PluginScreenLocation, PluginScreenParams } from "@getpaseo/plugin/client";
+import type {
+  PluginPanelLocation,
+  PluginScreenLocation,
+  PluginScreenParams,
+} from "@getpaseo/plugin/client";
 import {
   parsePluginScreenParams,
   parsePluginSurfaceRoute,
@@ -93,6 +97,8 @@ export function currentPluginScreen(
 /** An `openScreen` input past validation; `workspaceId` is set when the screen opens as a tab. */
 export interface PluginOpenScreenRequest extends PluginScreenLocation {
   workspaceId: string | null;
+  /** Which part of the workspace the tab opens in; meaningless without `workspaceId`. */
+  location: PluginPanelLocation;
 }
 
 /** Checks an `openScreen` input against the installation's screens. Throws when it is invalid. */
@@ -101,7 +107,7 @@ export function parsePluginOpenScreenInput(
   input: unknown,
 ): PluginOpenScreenRequest {
   if (typeof input !== "object" || input === null || !("screenId" in input)) {
-    throw new Error("openScreen takes { screenId, params?, workspaceId? }");
+    throw new Error("openScreen takes { screenId, params?, workspaceId?, location? }");
   }
   const { screenId } = input;
   if (typeof screenId !== "string" || !plugin.surfaces.some((surface) => surface.id === screenId)) {
@@ -112,10 +118,15 @@ export function parsePluginOpenScreenInput(
   if (workspaceId !== undefined && typeof workspaceId !== "string") {
     throw new Error("Plugin screen workspaceId must be a string");
   }
+  const location = "location" in input ? input.location : undefined;
+  if (location !== undefined && location !== "workspace" && location !== "explorer") {
+    throw new Error('Plugin screen location must be "workspace" or "explorer"');
+  }
   return {
     screenId,
     params: parsePluginScreenParams(params),
     workspaceId: workspaceId?.trim() || null,
+    location: location ?? "workspace",
   };
 }
 
