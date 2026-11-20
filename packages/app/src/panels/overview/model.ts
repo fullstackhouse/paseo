@@ -51,13 +51,15 @@ export type YourMoveRow =
 /**
  * Everything that waits on the human, in the attention ladder's order, then the git step.
  * While an agent runs only blocking items show: failing checks and git actions would race it.
- * Archive is only a move once the PR merged; before that it lives in the workspace header.
+ * Archive is only a move once the work shipped: the PR merged, or the status card says done (work whose
+ * PRs live in other repos has no branch PR to merge). Before that it lives in the workspace header.
  */
 export function deriveYourMove(input: {
   items: readonly AttentionItem[];
   agentRunning: boolean;
   gitPrimaryId: string | null;
   prMerged: boolean;
+  statusDone: boolean;
 }): YourMoveRow[] {
   const rows: YourMoveRow[] = [];
   for (const item of input.items) {
@@ -78,7 +80,7 @@ export function deriveYourMove(input: {
   const checks = input.items.find((item) => item.kind === "pr-checks-failed");
   if (checks) rows.push({ kind: "checks", key: checks.key });
   const archive = input.gitPrimaryId === "archive-workspace";
-  if (input.gitPrimaryId && (!archive || input.prMerged)) {
+  if (input.gitPrimaryId && (!archive || input.prMerged || input.statusDone)) {
     rows.push({ kind: "git", key: `git:${input.gitPrimaryId}` });
   }
   return rows;
@@ -118,6 +120,17 @@ export function isStatusOutdated(input: {
 }): boolean {
   if (input.agentRunning || input.lastPromptAt === null) return false;
   return input.lastPromptAt > input.updatedAt;
+}
+
+/** A current, unanswered status card that says the work is done. */
+export function isStatusDone(input: {
+  status: PluginWorkspaceStatus | null;
+  agentRunning: boolean;
+  lastPromptAt: number | null;
+}): boolean {
+  const { status } = input;
+  if (!status || status.state !== "done" || status.answered) return false;
+  return !isStatusOutdated({ updatedAt: status.updatedAt, ...input });
 }
 
 /** The goal says what the workspace is for; without one, the project at least says where it lives. */
