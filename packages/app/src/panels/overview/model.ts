@@ -129,24 +129,6 @@ export function showNowLine(status: Pick<PluginWorkspaceStatus, "now" | "state">
 }
 
 /**
- * The agent row earns its place only when it says something the title doesn't: the agent has its
- * own title, or several root agents share the workspace and the row tells which one this is.
- */
-export function shouldShowAgentRow(input: {
-  agentTitle: string | null;
-  workspaceName: string | null;
-  rootAgentCount: number;
-}): boolean {
-  if (!input.agentTitle) return false;
-  if (input.rootAgentCount > 1) return true;
-  return normalizeTitle(input.agentTitle) !== normalizeTitle(input.workspaceName ?? "");
-}
-
-function normalizeTitle(title: string): string {
-  return title.trim().toLowerCase();
-}
-
-/**
  * The one Code row worth showing, if any. The git move already names the PR (or, without one, the
  * branch), so the row would repeat it; a branch row with nothing to report is skipped too.
  */

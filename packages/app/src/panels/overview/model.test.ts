@@ -12,7 +12,6 @@ import {
   MAX_ENTRIES_PER_ITEM,
   overviewSubtitle,
   partitionSummaryItems,
-  shouldShowAgentRow,
   showNowLine,
 } from "./model";
 
@@ -213,36 +212,6 @@ describe("branch and git move facts", () => {
       pullRequest: { isMerged: false, checksStatus: "failure", reviewDecision: "pending" } as const,
     };
     expect(gitMoveFacts(facts, t)).toBe("checksFailing · reviewRequired · ↑2");
-  });
-});
-
-describe("shouldShowAgentRow", () => {
-  it("hides the row when the agent title repeats the workspace name", () => {
-    expect(
-      shouldShowAgentRow({
-        agentTitle: "Fix blank page ",
-        workspaceName: "fix blank page",
-        rootAgentCount: 1,
-      }),
-    ).toBe(false);
-  });
-
-  it("shows the row when the agent has its own title", () => {
-    expect(
-      shouldShowAgentRow({ agentTitle: "Review PR", workspaceName: "Fix", rootAgentCount: 1 }),
-    ).toBe(true);
-  });
-
-  it("shows the row when several root agents share the workspace", () => {
-    expect(shouldShowAgentRow({ agentTitle: "Fix", workspaceName: "Fix", rootAgentCount: 2 })).toBe(
-      true,
-    );
-  });
-
-  it("hides the row without an agent", () => {
-    expect(shouldShowAgentRow({ agentTitle: null, workspaceName: "Fix", rootAgentCount: 0 })).toBe(
-      false,
-    );
   });
 });
 

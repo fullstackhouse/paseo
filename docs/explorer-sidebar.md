@@ -156,27 +156,25 @@ content also requests timeline data. Inactive consumers read cached data without
 Discovery uses ordinary PR tabs and their existing once-per-workspace close opt-out.
 
 Overview is an Explorer-only singleton tab that summarizes the workspace on desktop
-(`packages/app/src/panels/overview-panel.tsx`). It reads top to bottom as title → goal → status → your move, and
-shows each fact once: no section label above the goal or status, no repeated title, branch or PR.
+(`packages/app/src/panels/overview-panel.tsx`). It answers four questions in order, and shows each fact once. The design
+is the storyboard in `.ai/prototypes/overview-v3/`.
 
-- **Header**: the workspace name, then the status card's goal as its subtitle (the project name without one). Rare
-  actions (Lineage details, Archive) sit in its ⋯ menu.
-- **Status**: the summary item that carries `status` (paseo-status) renders as a card: state, summary, and "Now" unless
-  the state is done. Its age shows only when the card is outdated: someone prompted an agent after its last update
-  and no agent is running now. `lastActivityAt` doesn't work for this; it moves on renames and mode or model changes.
-  Without a card, a single muted line.
-- **Your move**: the attention items as a list, one row per plugin `entries` item, then failing checks and the header's
-  primary git action, from the same `useGitActions` result so the two can't disagree. Only the first row has a button.
-  While an agent runs, only blocking items show. Archive is only a move once the PR merged. The git row carries the
-  PR's checks and review state.
-  A summary item with an `EntryComponent` renders its entries itself (`plugins/workspace-summary/entry-view.tsx`), so
-  an ask is answered in place: the first starts open with its actions, the rest expand inline.
-- **Agent and lineage**: the focused agent's row, only when its title differs from the workspace name or several root
-  agents share the workspace. Then lineage by workspace: the nearest ancestor's workspace and the workspaces the focused
-  agent started, each with one state word. The word comes from that workspace's status card, else from its agents
+- **What is this?** The workspace name, then the status card's goal as its subtitle (the project name without one).
+  No ⋯ menu: archive, editor and branch actions live in the workspace header and the sidebar.
+- **Where does it stand?** The summary item that carries `status` (paseo-status), as a block: a dot and state word, the
+  summary, and "Now" unless the state is done. When someone prompted an agent after the card's last update and no
+  agent runs now, the block dims and says so. Without a card, one muted line.
+- **What do I do?** Your move: the attention items, one row per plugin `entries` item, then failing checks and the
+  header's primary git action, from the same `useGitActions` result so the two can't disagree. The first item is a card
+  with its actions; the rest are one-line rows. A plain tool permission is answered in place with its own actions;
+  plans and questions open the agent. A summary item with an `EntryComponent` renders its entries itself
+  (`plugins/workspace-summary/entry-view.tsx`), so an ask is answered in place too. While an agent runs, only blocking
+  items show. Archive is only a move once the PR merged. With nothing to do, one calm line.
+- **Context**: one-line facts the blocks above don't say, under a rule, and nothing when there are none: From (the
+  nearest ancestor's workspace), Started (the workspaces the focused agent started), the PR or a branch with something
+  to report when the git move doesn't already name it, Agents when several root agents share the workspace, and plugin
+  facts. Each lineage row carries one state word, from that workspace's status card, else its agents
   (`overview/model.ts`).
-- **Code**: one row, the PR or else a branch with something to report, and none when the git move already names it.
-  Changes and the PR tab are in the same tab bar.
 
 Summary items route by shape (`partitionSummaryItems`): `status` → Status, `needsYou` or `entries` → Your move,
 anything else → More. Entering a workspace adds the tab once, first in the rail. Like Files and Changes it has no inline
