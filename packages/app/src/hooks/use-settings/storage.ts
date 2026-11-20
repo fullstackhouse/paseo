@@ -183,7 +183,7 @@ export const DEFAULT_CLIENT_SETTINGS: AppSettings = {
   filePanelAssociations: {},
   openInSidePane: DEFAULT_OPEN_IN_SIDE_PANE_PREFERENCES,
   pullRequestOpenLocation: "explorer",
-  explorerOnWorkspaceEnter: "needed",
+  explorerOnWorkspaceEnter: "always",
   explorerOnWorkspaceEnterTab: "overview",
 };
 
@@ -315,7 +315,7 @@ const StoredAppSettingsSchema = z
         legacyPullRequestsInSidePane: undefined,
       }),
     pullRequestOpenLocation: z.enum(["main", "side", "explorer"]).optional(),
-    explorerOnWorkspaceEnter: z.enum(["never", "needed", "always"]).catch("needed"),
+    explorerOnWorkspaceEnter: z.enum(["never", "needed", "always"]).catch("always"),
     explorerOnWorkspaceEnterTab: z.enum(["overview", "needed"]).catch("overview"),
     // COMPAT(explorerSidebarRouting): replaced by source-specific side-pane preferences in v0.6.
     openSupportingTabsInSidePanel: z.boolean().optional().catch(undefined),

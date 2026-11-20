@@ -23,6 +23,14 @@ const STEER_DEFAULT_MIGRATION = "steer-default";
  */
 const COLLAPSE_TOOL_CALLS_DEFAULT_MIGRATION = "collapse-tool-calls-default";
 
+/**
+ * Entering a workspace opened the Explorer only "when something needs you" by default, and that
+ * default was materialized into storage, so it cannot be told apart from a deliberate pick. This
+ * moves every existing install to "always" once; picking another value afterwards sticks. A fresh
+ * profile has nothing stale and keeps whatever its storage was seeded with.
+ */
+const EXPLORER_ALWAYS_DEFAULT_MIGRATION = "explorer-always-default";
+
 /** Existing mobile installs materialized the old 15px content default in storage. */
 const MOBILE_CONTENT_16_MIGRATION = "mobile-content-16";
 
@@ -72,6 +80,15 @@ export async function migrateAppSettings(
         ? migrated
         : { ...migrated, chatDisplay: "collapseToolCalls" };
     applied.add(COLLAPSE_TOOL_CALLS_DEFAULT_MIGRATION);
+    addedMigration = true;
+  }
+
+  if (!applied.has(EXPLORER_ALWAYS_DEFAULT_MIGRATION)) {
+    migrated =
+      migrationMarker === null || migrated.explorerOnWorkspaceEnter === "always"
+        ? migrated
+        : { ...migrated, explorerOnWorkspaceEnter: "always" };
+    applied.add(EXPLORER_ALWAYS_DEFAULT_MIGRATION);
     addedMigration = true;
   }
 
