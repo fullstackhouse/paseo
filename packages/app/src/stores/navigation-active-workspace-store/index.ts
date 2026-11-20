@@ -20,6 +20,8 @@ import { useSessionStore } from "@/stores/session-store";
 import { useWorkspaceLayoutStore } from "@/stores/workspace-layout-store";
 import { stripHostWorkspaceRouteEchoSearchFromBrowserUrlAfterCommit } from "@/utils/host-route-browser";
 import { navigateToHostWorkspaceRoute } from "@/navigation/workspace-route-navigation";
+import { resolveWorkspaceSelectionStatus } from "@/navigation/host-runtime-bootstrap";
+import { useHasHydratedWorkspaces, useWorkspaceExists } from "@/stores/session-store-hooks";
 
 export type { ActiveWorkspaceSelection } from "@/stores/last-workspace-selection";
 export type { NavigateToWorkspaceInput } from "./navigation";
@@ -64,6 +66,15 @@ export function getLastWorkspaceSelection(): ActiveWorkspaceSelection | null {
   return lastWorkspaceSelectionStore.getSelection();
 }
 
+/**
+ * Forgets the workspace the app reopened at startup, so a workspace that no longer exists on
+ * its host is not reopened on every launch. Returns false when the user has since navigated
+ * to another workspace.
+ */
+export function forgetRestoredWorkspaceSelection(selection: ActiveWorkspaceSelection): boolean {
+  return lastWorkspaceSelectionStore.forgetRestored(selection);
+}
+
 export function getIsLastWorkspaceSelectionHydrated(): boolean {
   return lastWorkspaceSelectionStore.isHydrated();
 }
@@ -87,12 +98,19 @@ export function useActiveWorkspaceSelection(): ActiveWorkspaceSelection | null {
   const selection = parseActiveWorkspaceSelection({ pathname: usePathname(), params });
   const serverId = selection?.serverId ?? null;
   const workspaceId = selection?.workspaceId ?? null;
+  // A workspace the host's list proves gone (archived elsewhere) stays on screen as
+  // "Workspace unavailable", and that screen forgets it. Remembering it again here would put
+  // it back, and the next launch would reopen the same dead end.
+  const hasHydratedWorkspaces = useHasHydratedWorkspaces(serverId);
+  const workspaceExists = useWorkspaceExists(serverId, workspaceId);
+  const isProvenMissing =
+    resolveWorkspaceSelectionStatus({ hasHydratedWorkspaces, workspaceExists }) === "missing";
   useEffect(() => {
-    if (!serverId || !workspaceId) {
+    if (!serverId || !workspaceId || isProvenMissing) {
       return;
     }
     lastWorkspaceSelectionStore.remember({ serverId, workspaceId });
-  }, [serverId, workspaceId]);
+  }, [isProvenMissing, serverId, workspaceId]);
   return selection;
 }
 

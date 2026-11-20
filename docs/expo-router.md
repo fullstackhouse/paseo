@@ -39,6 +39,15 @@ remembered workspace for that host after the remembered selection has hydrated
 and the workspace has not been proven missing. If there is no restorable
 workspace, it goes to global `/open-project`.
 
+The host index cannot wait for the workspace list, so on a cold start it reopens
+a workspace that may since have been archived on another device. The workspace
+screen then shows "Workspace unavailable" with **Home** and **New workspace**,
+and forgets the remembered selection so the next launch goes to `/open-project`.
+It does not redirect: a deep link or a reloaded web URL to that workspace must
+still show its screen. Only the selection read from storage at startup is
+forgotten. A workspace opened during the session may be missing only because its
+descriptor has not arrived yet.
+
 This restore is based on the last navigated workspace, not current connection
 status. Do not redirect to another online host just because the remembered host
 is still connecting or offline; the workspace screen owns that offline/loading
