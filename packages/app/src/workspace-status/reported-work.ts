@@ -11,7 +11,7 @@ export type ReportedWork = "needs_you" | "blocked" | "working" | "done";
 export type ReportedWorkLookup = (serverId: string, workspaceId: string) => ReportedWork | null;
 
 /** Most to least telling: done only when nothing else is reported. */
-const REPORTED_WORK_RANK: readonly ReportedWork[] = ["needs_you", "blocked", "working", "done"];
+const REPORTED_WORK_RANK: readonly ReportedWork[] = ["needs_you", "working", "blocked", "done"];
 
 function reportedWorkOf(item: WorkspaceSummaryItem): ReportedWork | null {
   if (item.needsYou || item.workState === "waiting") return "needs_you";
@@ -19,8 +19,8 @@ function reportedWorkOf(item: WorkspaceSummaryItem): ReportedWork | null {
 }
 
 /**
- * Something waiting on the human wins, then work waiting on something else (other workspaces, a
- * reviewer, CI), then any work still going; done only when nothing else is reported.
+ * Something waiting on the human wins, then any work still going, then work waiting on something
+ * else (other workspaces, a reviewer, CI); done only when nothing else is reported.
  */
 export function foldReportedWork(items: readonly WorkspaceSummaryItem[]): ReportedWork | null {
   let result: ReportedWork | null = null;

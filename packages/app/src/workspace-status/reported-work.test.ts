@@ -23,10 +23,10 @@ function item(fields: Partial<WorkspaceSummaryItem>): WorkspaceSummaryItem {
 const at = new Date("2026-11-12T10:00:00Z");
 
 describe("foldReportedWork", () => {
-  it("lets needs-you win, then blocked, then working, then done", () => {
+  it("lets needs-you win, then working, then blocked, then done", () => {
     expect(foldReportedWork([item({ workState: "blocked" })])).toBe("blocked");
-    expect(foldReportedWork([item({ workState: "working" }), item({ workState: "blocked" })])).toBe(
-      "blocked",
+    expect(foldReportedWork([item({ workState: "blocked" }), item({ workState: "working" })])).toBe(
+      "working",
     );
     expect(foldReportedWork([item({ workState: "blocked" }), item({ workState: "done" })])).toBe(
       "blocked",
