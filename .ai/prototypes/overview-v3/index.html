@@ -1,0 +1,617 @@
+<!doctype html>
+<html lang="en" class="dark" data-prototype-id="overview-v3">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Overview v3 — storyboard</title>
+<link rel="stylesheet" href="tokens.css" />
+<link rel="stylesheet" href="components.css" />
+<link rel="stylesheet" href="screens.css" />
+<link rel="stylesheet" href="prototype.css" />
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs><symbol id="ic-chevron-right" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></symbol><symbol id="ic-more" viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="5" cy="12" r="1.75"/><circle cx="12" cy="12" r="1.75"/><circle cx="19" cy="12" r="1.75"/></symbol><symbol id="ic-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></symbol><symbol id="ic-dash" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></symbol><symbol id="ic-files" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></symbol><symbol id="ic-diff" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M9 10h6"/><path d="M12 13V7"/><path d="M9 17h6"/></symbol><symbol id="ic-branch" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" x2="6" y1="3" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></symbol><symbol id="ic-pr" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 0 1 2 2v7"/><line x1="6" x2="6" y1="9" y2="21"/></symbol><symbol id="ic-merge" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 21V9a9 9 0 0 0 9 9"/></symbol><symbol id="ic-ask" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></symbol><symbol id="ic-fork" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><circle cx="18" cy="6" r="3"/><path d="M18 9v2c0 .6-.4 1-1 1H7c-.6 0-1-.4-1-1V9"/><path d="M12 12v3"/></symbol><symbol id="ic-up" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 9 9 4 4 9"/><path d="M20 20h-7a4 4 0 0 1-4-4V4"/></symbol><symbol id="ic-down" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 10 5 5-5 5"/><path d="M4 4v7a4 4 0 0 0 4 4h12"/></symbol><symbol id="ic-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></symbol><symbol id="ic-alert" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></symbol><symbol id="ic-archive" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="5" x="2" y="3" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/><path d="M10 12h4"/></symbol><symbol id="ic-agent" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v16"/><path d="M18.9 8 5.1 16"/><path d="m5.1 8 13.8 8"/></symbol><symbol id="ic-code" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></symbol><symbol id="ic-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></symbol><symbol id="ic-commit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><line x1="3" x2="9" y1="12" y2="12"/><line x1="15" x2="21" y1="12" y2="12"/></symbol><symbol id="ic-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></symbol><symbol id="ic-panel" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M15 3v18"/></symbol><symbol id="ic-folder" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></symbol><symbol id="ic-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></symbol><symbol id="ic-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol><symbol id="ic-sparkle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v3"/><path d="M12 18v3"/><path d="M3 12h3"/><path d="M18 12h3"/><path d="m5.6 5.6 2.1 2.1"/><path d="m16.3 16.3 2.1 2.1"/><path d="m5.6 18.4 2.1-2.1"/><path d="m16.3 7.7 2.1-2.1"/></symbol><symbol id="ic-gauge" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/></symbol></defs></svg>
+<div class="doc-toolbar">
+  <strong style="font-size:0.875rem">Overview v3 — storyboard</strong>
+  <nav class="screen-nav" aria-label="Screens"><a href="#s1">1 Merged</a><a href="#s2">2 Asks</a><a href="#s3">3 Working</a><a href="#s4">4 Blocked</a><a href="#s5">5 Ready</a><a href="#s6">6 Outdated</a><a href="#s7">7 No status</a><a href="#s8">8 Parent</a><a href="#s9">9 Two agents</a><a href="#s10">10 Failed · folder</a></nav>
+  <button class="btn btn-outline btn-sm" id="theme-toggle" type="button"><svg aria-hidden="true"><use href="#ic-sun"/></svg> Theme</button>
+</div>
+<div class="doc">
+<header class="doc-head">
+  <h1>Overview v3 — every state, both widths</h1>
+  <p class="muted" style="max-width:70ch;margin:0">Storyboard for <code class="t-mono">tasks/spec-overview-simplify.md</code>. Each section is one state, rendered at desktop (1280) and mobile (390) from one fixture set. All data is fictional. Read top to bottom; nothing needs clicking.</p>
+</header>
+
+<section class="screen" id="s1">
+  <div class="screen-meta">
+    <h2>1. PR merged, nothing left (the screenshot case)</h2>
+    <p>Jacek comes back to a workspace whose PR merged and wants to archive it.</p>
+    <div class="screen-refs"><span class="ref">S1</span><span class="ref">S2</span><span class="ref">S3</span></div>
+  </div>
+  <div class="sb-pair"><div class="frame sb-frame-desktop">
+    <div class="frame-bar"><div class="frame-dots"><i></i><i></i><i></i></div><span class="frame-url">Paseo</span><span class="sb-frame-label">desktop · 1280 · Explorer</span></div>
+    <div class="px-app">
+    <div class="px-nav"><div class="px-nav-p">orbit</div><div class="px-nav-w"></div><div class="px-nav-w w70"></div><div class="px-nav-p">atlas</div><div class="px-nav-w"></div><div class="px-nav-w w70"></div><div class="px-nav-p">notes</div><div class="px-nav-w"></div><div class="px-nav-w w70"></div></div>
+    <div class="px-chat"><div class="px-chat-head">Fix blank page on anchor navigation</div>
+    <div class="px-bubble px-bubble-me"></div><div class="px-bubble w80"></div><div class="px-bubble w60"></div><div class="px-bubble w70"></div>
+    <div class="px-composer"></div></div>
+    <aside class="px-explorer"><div class="px-tabs"><div class="px-tab is-on"><svg aria-hidden="true"><use href="#ic-dash"/></svg><span>Overview</span></div><div class="px-tab "><svg aria-hidden="true"><use href="#ic-files"/></svg><span>Files</span></div><div class="px-tab "><svg aria-hidden="true"><use href="#ic-diff"/></svg><span>Changes</span></div><div class="px-tab "><svg aria-hidden="true"><use href="#ic-pr"/></svg><span>PR</span></div><div class="px-tab "><svg aria-hidden="true"><use href="#ic-ask"/></svg><span>Asks</span></div><div class="px-tab "><svg aria-hidden="true"><use href="#ic-fork"/></svg><span>Lineage</span></div>
+    <span class="px-tabs-end"><svg aria-hidden="true"><use href="#ic-plus"/></svg><svg aria-hidden="true"><use href="#ic-panel"/></svg></span></div><div class="px-scroll"><div class="ov"><header class="ov-id">
+    <h1 class="ov-title">Fix blank page on anchor navigation</h1>
+    <p class="ov-goal ">Fix the blank HTML preview when you click an in-page anchor link.</p>
+  </header><section class="ov-story " role="button" aria-label="Open status">
+    <div class="ov-state t-ok"><i class="ov-dot "></i>Done<span class="ov-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span></div>
+    
+    <p class="ov-summary">PR #141 is merged. In-page anchor links no longer blank the web and desktop preview.</p>
+    
+  </section><section class="ov-move">
+    <div class="ov-move-label">Your move</div>
+    <div class="ov-item is-lead" style="--lead: var(--app-merged)">
+    <div class="ov-item-head">
+      <span class="ov-item-icon t-merged"><svg aria-hidden="true"><use href="#ic-archive"/></svg></span>
+      <div class="ov-item-text"><div class="ov-item-title">Ready to archive</div><div class="ov-item-sub">PR #141 merged · nothing uncommitted</div></div>
+    </div>
+    <div class="ov-actions"><button class="ov-btn is-primary ">Archive workspace</button></div>
+  </div>
+    
+  </section></div></div></aside>
+  </div>
+  </div><div class="frame sb-frame-mobile">
+    <div class="frame-bar"><div class="frame-dots"><i></i><i></i><i></i></div><span class="frame-url">Paseo</span><span class="sb-frame-label">mobile · 390 · sheet</span></div>
+    <div class="px-mobile"><div class="px-mobile-behind"><div class="px-chat"><div class="px-chat-head">Fix blank page on anchor navigation</div>
+    <div class="px-bubble px-bubble-me"></div><div class="px-bubble w80"></div><div class="px-bubble w60"></div><div class="px-bubble w70"></div>
+    <div class="px-composer"></div></div></div>
+      <div class="px-sheet"><div class="px-handle"></div><div class="px-sheet-title"><svg aria-hidden="true"><use href="#ic-dash"/></svg> Overview</div><div class="ov"><header class="ov-id">
+    <h1 class="ov-title">Fix blank page on anchor navigation</h1>
+    <p class="ov-goal ">Fix the blank HTML preview when you click an in-page anchor link.</p>
+  </header><section class="ov-story " role="button" aria-label="Open status">
+    <div class="ov-state t-ok"><i class="ov-dot "></i>Done<span class="ov-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span></div>
+    
+    <p class="ov-summary">PR #141 is merged. In-page anchor links no longer blank the web and desktop preview.</p>
+    
+  </section><section class="ov-move">
+    <div class="ov-move-label">Your move</div>
+    <div class="ov-item is-lead" style="--lead: var(--app-merged)">
+    <div class="ov-item-head">
+      <span class="ov-item-icon t-merged"><svg aria-hidden="true"><use href="#ic-archive"/></svg></span>
+      <div class="ov-item-text"><div class="ov-item-title">Ready to archive</div><div class="ov-item-sub">PR #141 merged · nothing uncommitted</div></div>
+    </div>
+    <div class="ov-actions"><button class="ov-btn is-primary ">Archive workspace</button></div>
+  </div>
+    
+  </section></div></div></div>
+  </div></div>
+  <div class="notes"><div class="note"><b>1</b><span>No ⋯ menu on Overview: archive, editor and branch actions already live in the workspace header and the sidebar. Four lines tell the whole story: title, goal, <b>Done</b> with its one-sentence summary, then the one button. No branch, PR row, agent row, context size or "updated" time: each repeated something above it or answered nothing.</span></div><div class="note"><b>2</b><span>The state word replaces the badge pill: a coloured dot and word read faster and cost no chrome.</span></div><div class="note"><b>3</b><span>The status block opens the Status tab (done list, next steps) — details live there, not here.</span></div></div>
+</section>
+
+<section class="screen" id="s2">
+  <div class="screen-meta">
+    <h2>2. Two decisions waiting — answer in place</h2>
+    <p>The agent left two decisions; Jacek answers the first without leaving Overview.</p>
+    <div class="screen-refs"><span class="ref">S3</span></div>
+  </div>
+  <div class="sb-pair"><div class="frame sb-frame-desktop">
+    <div class="frame-bar"><div class="frame-dots"><i></i><i></i><i></i></div><span class="frame-url">Paseo</span><span class="sb-frame-label">desktop · 1280 · Explorer</span></div>
+    <div class="px-app">
+    <div class="px-nav"><div class="px-nav-p">orbit</div><div class="px-nav-w"></div><div class="px-nav-w w70"></div><div class="px-nav-p">atlas</div><div class="px-nav-w"></div><div class="px-nav-w w70"></div><div class="px-nav-p">notes</div><div class="px-nav-w"></div><div class="px-nav-w w70"></div></div>
+    <div class="px-chat"><div class="px-chat-head">Payments: retry failed webhooks</div>
+    <div class="px-bubble px-bubble-me"></div><div class="px-bubble w80"></div><div class="px-bubble w60"></div><div class="px-bubble w70"></div>
+    <div class="px-composer"></div></div>
+    <aside class="px-explorer"><div class="px-tabs"><div class="px-tab is-on"><svg aria-hidden="true"><use href="#ic-dash"/></svg><span>Overview</span></div><div class="px-tab "><svg aria-hidden="true"><use href="#ic-files"/></svg><span>Files</span></div><div class="px-tab "><svg aria-hidden="true"><use href="#ic-diff"/></svg><span>Changes</span></div><div class="px-tab "><svg aria-hidden="true"><use href="#ic-pr"/></svg><span>PR</span></div><div class="px-tab "><svg aria-hidden="true"><use href="#ic-ask"/></svg><span>Asks</span></div><div class="px-tab "><svg aria-hidden="true"><use href="#ic-fork"/></svg><span>Lineage</span></div>
+    <span class="px-tabs-end"><svg aria-hidden="true"><use href="#ic-plus"/></svg><svg aria-hidden="true"><use href="#ic-panel"/></svg></span></div><div class="px-scroll"><div class="ov"><header class="ov-id">
+    <h1 class="ov-title">Payments: retry failed webhooks</h1>
+    <p class="ov-goal ">Retry failed payment webhooks with backoff instead of dropping them.</p>
+  </header><section class="ov-story " role="button" aria-label="Open status">
+    <div class="ov-state t-warn"><i class="ov-dot "></i>Waiting on you<span class="ov-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span></div>
+    
+    <p class="ov-summary">Retry queue built and tested (48/48). Two decisions left before the PR.</p>
+    
+  </section><section class="ov-move">
+    <div class="ov-move-label">Your move<span class="ov-n">2</span></div>
+    <div class="ov-item is-lead" style="--lead: var(--app-warn)">
+    <div class="ov-item-head">
+      <span class="ov-item-icon t-warn"><svg aria-hidden="true"><use href="#ic-ask"/></svg></span>
+      <div class="ov-item-text"><div class="ov-item-title">Backoff: exponential up to 1 h, or fixed 5 min?</div><div class="ov-item-sub">Exponential spreads load after an outage; fixed is easier to reason about.</div></div>
+    </div>
+    <div class="ov-actions"><button class="ov-btn is-primary ">Exponential<small>recommended</small></button><button class="ov-btn  ">Fixed 5 min</button><button class="ov-btn  is-ghost">Discuss…</button></div>
+  </div>
+    <div class="ov-next"><span class="t-warn"><svg aria-hidden="true"><use href="#ic-ask"/></svg></span><span>Open the PR against main or release/3.2?</span><span class="ov-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span></div>
+  </section><footer class="ov-ctx">
+    <div class="ov-ctx-row"><span class="ov-k">From</span><span class="ov-v">Payments roadmap Q4</span><span class="ov-w t-run">working</span><span class="ov-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span></div>
+    
+  </footer></div></div></aside>
+  </div>
+  </div><div class="frame sb-frame-mobile">
+    <div class="frame-bar"><div class="frame-dots"><i></i><i></i><i></i></div><span class="frame-url">Paseo</span><span class="sb-frame-label">mobile · 390 · sheet</span></div>
+    <div class="px-mobile"><div class="px-mobile-behind"><div class="px-chat"><div class="px-chat-head">Payments: retry failed webhooks</div>
+    <div class="px-bubble px-bubble-me"></div><div class="px-bubble w80"></div><div class="px-bubble w60"></div><div class="px-bubble w70"></div>
+    <div class="px-composer"></div></div></div>
+      <div class="px-sheet"><div class="px-handle"></div><div class="px-sheet-title"><svg aria-hidden="true"><use href="#ic-dash"/></svg> Overview</div><div class="ov"><header class="ov-id">
+    <h1 class="ov-title">Payments: retry failed webhooks</h1>
+    <p class="ov-goal ">Retry failed payment webhooks with backoff instead of dropping them.</p>
+  </header><section class="ov-story " role="button" aria-label="Open status">
+    <div class="ov-state t-warn"><i class="ov-dot "></i>Waiting on you<span class="ov-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span></div>
+    
+    <p class="ov-summary">Retry queue built and tested (48/48). Two decisions left before the PR.</p>
+    
+  </section><section class="ov-move">
+    <div class="ov-move-label">Your move<span class="ov-n">2</span></div>
+    <div class="ov-item is-lead" style="--lead: var(--app-warn)">
+    <div class="ov-item-head">
+      <span class="ov-item-icon t-warn"><svg aria-hidden="true"><use href="#ic-ask"/></svg></span>
+      <div class="ov-item-text"><div class="ov-item-title">Backoff: exponential up to 1 h, or fixed 5 min?</div><div class="ov-item-sub">Exponential spreads load after an outage; fixed is easier to reason about.</div></div>
+    </div>
+    <div class="ov-actions"><button class="ov-btn is-primary ">Exponential<small>recommended</small></button><button class="ov-btn  ">Fixed 5 min</button><button class="ov-btn  is-ghost">Discuss…</button></div>
+  </div>
+    <div class="ov-next"><span class="t-warn"><svg aria-hidden="true"><use href="#ic-ask"/></svg></span><span>Open the PR against main or release/3.2?</span><span class="ov-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span></div>
+  </section><footer class="ov-ctx">
+    <div class="ov-ctx-row"><span class="ov-k">From</span><span class="ov-v">Payments roadmap Q4</span><span class="ov-w t-run">working</span><span class="ov-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span></div>
+    
+  </footer></div></div></div>
+  </div></div>
+  <div class="notes"><div class="note"><b>1</b><span>The first ask is <b>answerable right here</b>: its options are the buttons, the recommended one filled. One click answers; <b>Discuss…</b> opens the ask to reply in words.</span></div><div class="note"><b>2</b><span>Later items collapse to one line each; pressing one opens it in place of the first.</span></div><div class="note"><b>3</b><span>Where this work came from moves to the context footer: useful, never in the way.</span></div></div>
+</section>
+
+<section class="screen" id="s3">
+  <div class="screen-meta">
+    <h2>3. Agent working, nothing needs you</h2>
+    <p>Jacek glances at a running workspace: is it moving, does it need him?</p>
+    <div class="screen-refs"><span class="ref">S2</span></div>
+  </div>
+  <div class="sb-pair"><div class="frame sb-frame-desktop">
+    <div class="frame-bar"><div class="frame-dots"><i></i><i></i><i></i></div><span class="frame-url">Paseo</span><span class="sb-frame-label">desktop · 1280 · Explorer</span></div>
+    <div class="px-app">
+    <div class="px-nav"><div class="px-nav-p">orbit</div><div class="px-nav-w"></div><div class="px-nav-w w70"></div><div class="px-nav-p">atlas</div><div class="px-nav-w"></div><div class="px-nav-w w70"></div><div class="px-nav-p">notes</div><div class="px-nav-w"></div><div class="px-nav-w w70"></div></div>
+    <div class="px-chat"><div class="px-chat-head">Search: trigram index for SKUs</div>
+    <div class="px-bubble px-bubble-me"></div><div class="px-bubble w80"></div><div class="px-bubble w60"></div><div class="px-bubble w70"></div>
+    <div class="px-composer"></div></div>
+    <aside class="px-explorer"><div class="px-tabs"><div class="px-tab is-on"><svg aria-hidden="true"><use href="#ic-dash"/></svg><span>Overview</span></div><div class="px-tab "><svg aria-hidden="true"><use href="#ic-files"/></svg><span>Files</span></div><div class="px-tab "><svg aria-hidden="true"><use href="#ic-diff"/></svg><span>Changes</span></div><div class="px-tab "><svg aria-hidden="true"><use href="#ic-pr"/></svg><span>PR</span></div><div class="px-tab "><svg aria-hidden="true"><use href="#ic-ask"/></svg><span>Asks</span></div><div class="px-tab "><svg aria-hidden="true"><use href="#ic-fork"/></svg><span>Lineage</span></div>
+    <span class="px-tabs-end"><svg aria-hidden="true"><use href="#ic-plus"/></svg><svg aria-hidden="true"><use href="#ic-panel"/></svg></span></div><div class="px-scroll"><div class="ov"><header class="ov-id">
+    <h1 class="ov-title">Search: trigram index for SKUs</h1>
+    <p class="ov-goal ">Make SKU search find partial matches in under 100 ms.</p>
+  </header><section class="ov-story " role="button" aria-label="Open status">
+    <div class="ov-state t-run"><i class="ov-dot is-pulse"></i>Working<span class="ov-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span></div>
+    
+    <p class="ov-summary">Index migration done. Rewriting the query planner to use it.</p>
+    <p class="ov-now"><b>Now</b>Running the integration tests (3 of 7 suites)</p>
+  </section><p class="ov-quiet"><svg aria-hidden="true"><use href="#ic-check"/></svg> Nothing needs you while the agent works.</p><footer class="ov-ctx">
+    <div class="ov-ctx-row"><span class="ov-k">PR</span><span class="ov-v">#902 feat(search): trigram index</span><span class="ov-w t-muted">draft · checks running</span><span class="ov-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span></div>
+    
+  </footer></div></div></aside>
+  </div>
+  </div><div class="frame sb-frame-mobile">
+    <div class="frame-bar"><div class="frame-dots"><i></i><i></i><i></i></div><span class="frame-url">Paseo</span><span class="sb-frame-label">mobile · 390 · sheet</span></div>
+    <div class="px-mobile"><div class="px-mobile-behind"><div class="px-chat"><div class="px-chat-head">Search: trigram index for SKUs</div>
+    <div class="px-bubble px-bubble-me"></div><div class="px-bubble w80"></div><div class="px-bubble w60"></div><div class="px-bubble w70"></div>
+    <div class="px-composer"></div></div></div>
+      <div class="px-sheet"><div class="px-handle"></div><div class="px-sheet-title"><svg aria-hidden="true"><use href="#ic-dash"/></svg> Overview</div><div class="ov"><header class="ov-id">
+    <h1 class="ov-title">Search: trigram index for SKUs</h1>
+    <p class="ov-goal ">Make SKU search find partial matches in under 100 ms.</p>
+  </header><section class="ov-story " role="button" aria-label="Open status">
+    <div class="ov-state t-run"><i class="ov-dot is-pulse"></i>Working<span class="ov-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span></div>
+    
+    <p class="ov-summary">Index migration done. Rewriting the query planner to use it.</p>
+    <p class="ov-now"><b>Now</b>Running the integration tests (3 of 7 suites)</p>
+  </section><p class="ov-quiet"><svg aria-hidden="true"><use href="#ic-check"/></svg> Nothing needs you while the agent works.</p><footer class="ov-ctx">
+    <div class="ov-ctx-row"><span class="ov-k">PR</span><span class="ov-v">#902 feat(search): trigram index</span><span class="ov-w t-muted">draft · checks running</span><span class="ov-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span></div>
+    
+  </footer></div></div></div>
+  </div></div>
+  <div class="notes"><div class="note"><b>1</b><span>The pulsing dot and <b>Now</b> line are the live part; the summary is the last checkpoint.</span></div><div class="note"><b>2</b><span>Your move shrinks to one calm line rather than vanishing, so "nothing needs you" is a fact you read, not an absence you infer.</span></div><div class="note"><b>3</b><span>The draft PR is context, not a move, while the agent works.</span></div></div>
+</section>
+
+<section class="screen" id="s4">
+  <div class="screen-meta">
+    <h2>4. Permission request plus failing checks</h2>
+    <p>A blocked agent and a red PR at once; Jacek unblocks the agent first.</p>
+    <div class="screen-refs"><span class="ref">S3</span><span class="ref">ladder</span></div>
+  </div>
+  <div class="sb-pair"><div class="frame sb-frame-desktop">
+    <div class="frame-bar"><div class="frame-dots"><i></i><i></i><i></i></div><span class="frame-url">Paseo</span><span class="sb-frame-label">desktop · 1280 · Explorer</span></div>
+    <div class="px-app">
+    <div class="px-nav"><div class="px-nav-p">orbit</div><div class="px-nav-w"></div><div class="px-nav-w w70"></div><div class="px-nav-p">atlas</div><div class="px-nav-w"></div><div class="px-nav-w w70"></div><div class="px-nav-p">notes</div><div class="px-nav-w"></div><div class="px-nav-w w70"></div></div>
+    <div class="px-chat"><div class="px-chat-head">Imports: CSV mapping wizard</div>
+    <div class="px-bubble px-bubble-me"></div><div class="px-bubble w80"></div><div class="px-bubble w60"></div><div class="px-bubble w70"></div>
+    <div class="px-composer"></div></div>
+    <aside class="px-explorer"><div class="px-tabs"><div class="px-tab is-on"><svg aria-hidden="true"><use href="#ic-dash"/></svg><span>Overview</span></div><div class="px-tab "><svg aria-hidden="true"><use href="#ic-files"/></svg><span>Files</span></div><div class="px-tab "><svg aria-hidden="true"><use href="#ic-diff"/></svg><span>Changes</span></div><div class="px-tab "><svg aria-hidden="true"><use href="#ic-pr"/></svg><span>PR</span></div><div class="px-tab "><svg aria-hidden="true"><use href="#ic-ask"/></svg><span>Asks</span></div><div class="px-tab "><svg aria-hidden="true"><use href="#ic-fork"/></svg><span>Lineage</span></div>
+    <span class="px-tabs-end"><svg aria-hidden="true"><use href="#ic-plus"/></svg><svg aria-hidden="true"><use href="#ic-panel"/></svg></span></div><div class="px-scroll"><div class="ov"><header class="ov-id">
+    <h1 class="ov-title">Imports: CSV mapping wizard</h1>
+    <p class="ov-goal ">Let users map CSV columns to fields before an import runs.</p>
+  </header><section class="ov-story " role="button" aria-label="Open status">
+    <div class="ov-state t-danger"><i class="ov-dot "></i>Blocked<span class="ov-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span></div>
+    
+    <p class="ov-summary">Wizard and preview are done. The migration for saved mappings needs your approval to run.</p>
+    
+  </section><section class="ov-move">
+    <div class="ov-move-label">Your move<span class="ov-n">2</span></div>
+    <div class="ov-item is-lead" style="--lead: var(--app-warn)">
+    <div class="ov-item-head">
+      <span class="ov-item-icon t-warn"><svg aria-hidden="true"><use href="#ic-shield"/></svg></span>
+      <div class="ov-item-text"><div class="ov-item-title">Allow the agent to run npm run db:migrate?</div><div class="ov-item-sub">Applies 2 migrations to the local dev database.</div></div>
+    </div>
+    <div class="ov-actions"><button class="ov-btn is-primary ">Allow</button><button class="ov-btn  ">Allow always</button><button class="ov-btn  is-ghost">Deny</button></div>
+  </div>
+    <div class="ov-next"><span class="t-danger"><svg aria-hidden="true"><use href="#ic-alert"/></svg></span><span>PR #915 checks failing</span><span class="ov-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span></div>
+  </section></div></div></aside>
+  </div>
+  </div><div class="frame sb-frame-mobile">
+    <div class="frame-bar"><div class="frame-dots"><i></i><i></i><i></i></div><span class="frame-url">Paseo</span><span class="sb-frame-label">mobile · 390 · sheet</span></div>
+    <div class="px-mobile"><div class="px-mobile-behind"><div class="px-chat"><div class="px-chat-head">Imports: CSV mapping wizard</div>
+    <div class="px-bubble px-bubble-me"></div><div class="px-bubble w80"></div><div class="px-bubble w60"></div><div class="px-bubble w70"></div>
+    <div class="px-composer"></div></div></div>
+      <div class="px-sheet"><div class="px-handle"></div><div class="px-sheet-title"><svg aria-hidden="true"><use href="#ic-dash"/></svg> Overview</div><div class="ov"><header class="ov-id">
+    <h1 class="ov-title">Imports: CSV mapping wizard</h1>
+    <p class="ov-goal ">Let users map CSV columns to fields before an import runs.</p>
+  </header><section class="ov-story " role="button" aria-label="Open status">
+    <div class="ov-state t-danger"><i class="ov-dot "></i>Blocked<span class="ov-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span></div>
+    
+    <p class="ov-summary">Wizard and preview are done. The migration for saved mappings needs your approval to run.</p>
+    
+  </section><section class="ov-move">
+    <div class="ov-move-label">Your move<span class="ov-n">2</span></div>
+    <div class="ov-item is-lead" style="--lead: var(--app-warn)">
+    <div class="ov-item-head">
+      <span class="ov-item-icon t-warn"><svg aria-hidden="true"><use href="#ic-shield"/></svg></span>
+      <div class="ov-item-text"><div class="ov-item-title">Allow the agent to run npm run db:migrate?</div><div class="ov-item-sub">Applies 2 migrations to the local dev database.</div></div>
+    </div>
+    <div class="ov-actions"><button class="ov-btn is-primary ">Allow</button><button class="ov-btn  ">Allow always</button><button class="ov-btn  is-ghost">Deny</button></div>
+  </div>
+    <div class="ov-next"><span class="t-danger"><svg aria-hidden="true"><use href="#ic-alert"/></svg></span><span>PR #915 checks failing</span><span class="ov-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span></div>
+  </section></div></div></div>
+  </div></div>
+  <div class="notes"><div class="note"><b>1</b><span>The permission is answered in place: Allow / Allow always / Deny.</span></div><div class="note"><b>2</b><span>Order: what blocks the agent first (permission, ask, failure), then the code steps (failing checks, merge, archive).</span></div><div class="note"><b>3</b><span>The count by <b>Your move</b> shows only with 2 or more items.</span></div></div>
+</section>
+
+<section class="screen" id="s5">
+  <div class="screen-meta">
+    <h2>5. Child workspace with a PR ready to merge</h2>
+    <p>Jacek opens one of the spec's implementation workspaces to merge it.</p>
+    <div class="screen-refs"><span class="ref">S3</span></div>
+  </div>
+  <div class="sb-pair"><div class="frame sb-frame-desktop">
+    <div class="frame-bar"><div class="frame-dots"><i></i><i></i><i></i></div><span class="frame-url">Paseo</span><span class="sb-frame-label">desktop · 1280 · Explorer</span></div>
+    <div class="px-app">
+    <div class="px-nav"><div class="px-nav-p">orbit</div><div class="px-nav-w"></div><div class="px-nav-w w70"></div><div class="px-nav-p">atlas</div><div class="px-nav-w"></div><div class="px-nav-w w70"></div><div class="px-nav-p">notes</div><div class="px-nav-w"></div><div class="px-nav-w w70"></div></div>
+    <div class="px-chat"><div class="px-chat-head">Billing 3: series picker</div>
+    <div class="px-bubble px-bubble-me"></div><div class="px-bubble w80"></div><div class="px-bubble w60"></div><div class="px-bubble w70"></div>
+    <div class="px-composer"></div></div>
+    <aside class="px-explorer"><div class="px-tabs"><div class="px-tab is-on"><svg aria-hidden="true"><use href="#ic-dash"/></svg><span>Overview</span></div><div class="px-tab "><svg aria-hidden="true"><use href="#ic-files"/></svg><span>Files</span></div><div class="px-tab "><svg aria-hidden="true"><use href="#ic-diff"/></svg><span>Changes</span></div><div class="px-tab "><svg aria-hidden="true"><use href="#ic-pr"/></svg><span>PR</span></div><div class="px-tab "><svg aria-hidden="true"><use href="#ic-ask"/></svg><span>Asks</span></div><div class="px-tab "><svg aria-hidden="true"><use href="#ic-fork"/></svg><span>Lineage</span></div>
+    <span class="px-tabs-end"><svg aria-hidden="true"><use href="#ic-plus"/></svg><svg aria-hidden="true"><use href="#ic-panel"/></svg></span></div><div class="px-scroll"><div class="ov"><header class="ov-id">
+    <h1 class="ov-title">Billing 3: series picker</h1>
+    <p class="ov-goal ">Let accountants pick the invoice number series when issuing an invoice.</p>
+  </header><section class="ov-story " role="button" aria-label="Open status">
+    <div class="ov-state t-ok"><i class="ov-dot "></i>Done<span class="ov-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span></div>
+    
+    <p class="ov-summary">Series picker shipped behind the invoice-series flag. Tests 112/112, QA screenshots in the PR.</p>
+    
+  </section><section class="ov-move">
+    <div class="ov-move-label">Your move</div>
+    <div class="ov-item is-lead" style="--lead: var(--app-ok)">
+    <div class="ov-item-head">
+      <span class="ov-item-icon t-ok"><svg aria-hidden="true"><use href="#ic-pr"/></svg></span>
+      <div class="ov-item-text"><div class="ov-item-title">PR #831 is ready to merge</div><div class="ov-item-sub">Checks passed · approved by Maya</div></div>
+    </div>
+    <div class="ov-actions"><button class="ov-btn is-primary ">Merge PR</button><button class="ov-btn  is-ghost">View PR</button></div>
+  </div>
+    
+  </section><footer class="ov-ctx">
+    <div class="ov-ctx-row"><span class="ov-k">From</span><span class="ov-v">Billing spec: invoices own numbering</span><span class="ov-w t-ok">done</span><span class="ov-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span></div>
+    
+  </footer></div></div></aside>
+  </div>
+  </div><div class="frame sb-frame-mobile">
+    <div class="frame-bar"><div class="frame-dots"><i></i><i></i><i></i></div><span class="frame-url">Paseo</span><span class="sb-frame-label">mobile · 390 · sheet</span></div>
+    <div class="px-mobile"><div class="px-mobile-behind"><div class="px-chat"><div class="px-chat-head">Billing 3: series picker</div>
+    <div class="px-bubble px-bubble-me"></div><div class="px-bubble w80"></div><div class="px-bubble w60"></div><div class="px-bubble w70"></div>
+    <div class="px-composer"></div></div></div>
+      <div class="px-sheet"><div class="px-handle"></div><div class="px-sheet-title"><svg aria-hidden="true"><use href="#ic-dash"/></svg> Overview</div><div class="ov"><header class="ov-id">
+    <h1 class="ov-title">Billing 3: series picker</h1>
+    <p class="ov-goal ">Let accountants pick the invoice number series when issuing an invoice.</p>
+  </header><section class="ov-story " role="button" aria-label="Open status">
+    <div class="ov-state t-ok"><i class="ov-dot "></i>Done<span class="ov-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span></div>
+    
+    <p class="ov-summary">Series picker shipped behind the invoice-series flag. Tests 112/112, QA screenshots in the PR.</p>
+    
+  </section><section class="ov-move">
+    <div class="ov-move-label">Your move</div>
+    <div class="ov-item is-lead" style="--lead: var(--app-ok)">
+    <div class="ov-item-head">
+      <span class="ov-item-icon t-ok"><svg aria-hidden="true"><use href="#ic-pr"/></svg></span>
+      <div class="ov-item-text"><div class="ov-item-title">PR #831 is ready to merge</div><div class="ov-item-sub">Checks passed · approved by Maya</div></div>
+    </div>
+    <div class="ov-actions"><button class="ov-btn is-primary ">Merge PR</button><button class="ov-btn  is-ghost">View PR</button></div>
+  </div>
+    
+  </section><footer class="ov-ctx">
+    <div class="ov-ctx-row"><span class="ov-k">From</span><span class="ov-v">Billing spec: invoices own numbering</span><span class="ov-w t-ok">done</span><span class="ov-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span></div>
+    
+  </footer></div></div></div>
+  </div></div>
+  <div class="notes"><div class="note"><b>1</b><span>The move carries the PR facts (checks, approval) so there is no separate PR row.</span></div><div class="note"><b>2</b><span><b>From</b> names the parent with its state word; pressing it opens that workspace.</span></div></div>
+</section>
+
+<section class="screen" id="s6">
+  <div class="screen-meta">
+    <h2>6. Status card older than the latest exchange</h2>
+    <p>Jacek replied to the agent; the card still says it waits on him.</p>
+    <div class="screen-refs"><span class="ref">Q1</span></div>
+  </div>
+  <div class="sb-pair"><div class="frame sb-frame-desktop">
+    <div class="frame-bar"><div class="frame-dots"><i></i><i></i><i></i></div><span class="frame-url">Paseo</span><span class="sb-frame-label">desktop · 1280 · Explorer</span></div>
+    <div class="px-app">
+    <div class="px-nav"><div class="px-nav-p">orbit</div><div class="px-nav-w"></div><div class="px-nav-w w70"></div><div class="px-nav-p">atlas</div><div class="px-nav-w"></div><div class="px-nav-w w70"></div><div class="px-nav-p">notes</div><div class="px-nav-w"></div><div class="px-nav-w w70"></div></div>
+    <div class="px-chat"><div class="px-chat-head">Docs: release notes for 3.2</div>
+    <div class="px-bubble px-bubble-me"></div><div class="px-bubble w80"></div><div class="px-bubble w60"></div><div class="px-bubble w70"></div>
+    <div class="px-composer"></div></div>
+    <aside class="px-explorer"><div class="px-tabs"><div class="px-tab is-on"><svg aria-hidden="true"><use href="#ic-dash"/></svg><span>Overview</span></div><div class="px-tab "><svg aria-hidden="true"><use href="#ic-files"/></svg><span>Files</span></div><div class="px-tab "><svg aria-hidden="true"><use href="#ic-diff"/></svg><span>Changes</span></div><div class="px-tab "><svg aria-hidden="true"><use href="#ic-pr"/></svg><span>PR</span></div><div class="px-tab "><svg aria-hidden="true"><use href="#ic-ask"/></svg><span>Asks</span></div><div class="px-tab "><svg aria-hidden="true"><use href="#ic-fork"/></svg><span>Lineage</span></div>
+    <span class="px-tabs-end"><svg aria-hidden="true"><use href="#ic-plus"/></svg><svg aria-hidden="true"><use href="#ic-panel"/></svg></span></div><div class="px-scroll"><div class="ov"><header class="ov-id">
+    <h1 class="ov-title">Docs: release notes for 3.2</h1>
+    <p class="ov-goal ">Write the 3.2 release notes from the merged PRs.</p>
+  </header><section class="ov-story is-stale" role="button" aria-label="Open status">
+    <div class="ov-state t-warn"><i class="ov-dot "></i>Waiting on you<span class="ov-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span></div>
+    <div class="ov-stale">You replied 2 h ago; the agent hasn't updated this since.</div>
+    <p class="ov-summary">Draft is in docs/releases/3.2.md. Waiting for you to confirm the highlights.</p>
+    <p class="ov-now"><b>Now</b>Waiting on your review</p>
+  </section><p class="ov-quiet"><svg aria-hidden="true"><use href="#ic-check"/></svg> Nothing needs you.</p><footer class="ov-ctx">
+    <div class="ov-ctx-row"><span class="ov-k">Branch</span><span class="ov-v">docs/release-3.2</span><span class="ov-w t-muted">↑2 · uncommitted changes</span><span class="ov-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span></div>
+    
+  </footer></div></div></aside>
+  </div>
+  </div><div class="frame sb-frame-mobile">
+    <div class="frame-bar"><div class="frame-dots"><i></i><i></i><i></i></div><span class="frame-url">Paseo</span><span class="sb-frame-label">mobile · 390 · sheet</span></div>
+    <div class="px-mobile"><div class="px-mobile-behind"><div class="px-chat"><div class="px-chat-head">Docs: release notes for 3.2</div>
+    <div class="px-bubble px-bubble-me"></div><div class="px-bubble w80"></div><div class="px-bubble w60"></div><div class="px-bubble w70"></div>
+    <div class="px-composer"></div></div></div>
+      <div class="px-sheet"><div class="px-handle"></div><div class="px-sheet-title"><svg aria-hidden="true"><use href="#ic-dash"/></svg> Overview</div><div class="ov"><header class="ov-id">
+    <h1 class="ov-title">Docs: release notes for 3.2</h1>
+    <p class="ov-goal ">Write the 3.2 release notes from the merged PRs.</p>
+  </header><section class="ov-story is-stale" role="button" aria-label="Open status">
+    <div class="ov-state t-warn"><i class="ov-dot "></i>Waiting on you<span class="ov-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span></div>
+    <div class="ov-stale">You replied 2 h ago; the agent hasn't updated this since.</div>
+    <p class="ov-summary">Draft is in docs/releases/3.2.md. Waiting for you to confirm the highlights.</p>
+    <p class="ov-now"><b>Now</b>Waiting on your review</p>
+  </section><p class="ov-quiet"><svg aria-hidden="true"><use href="#ic-check"/></svg> Nothing needs you.</p><footer class="ov-ctx">
+    <div class="ov-ctx-row"><span class="ov-k">Branch</span><span class="ov-v">docs/release-3.2</span><span class="ov-w t-muted">↑2 · uncommitted changes</span><span class="ov-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span></div>
+    
+  </footer></div></div></div>
+  </div></div>
+  <div class="notes"><div class="note"><b>1</b><span>The card is dimmed and says <b>why</b> it may be wrong, in words, instead of an age stamp on every card.</span></div><div class="note"><b>2</b><span>Age appears only here: on a current card it answers nothing.</span></div></div>
+</section>
+
+<section class="screen" id="s7">
+  <div class="screen-meta">
+    <h2>7. No goal, no status card</h2>
+    <p>A quick fix whose agent never reported; Jacek ships it.</p>
+    <div class="screen-refs"><span class="ref">empty-states</span></div>
+  </div>
+  <div class="sb-pair"><div class="frame sb-frame-desktop">
+    <div class="frame-bar"><div class="frame-dots"><i></i><i></i><i></i></div><span class="frame-url">Paseo</span><span class="sb-frame-label">desktop · 1280 · Explorer</span></div>
+    <div class="px-app">
+    <div class="px-nav"><div class="px-nav-p">orbit</div><div class="px-nav-w"></div><div class="px-nav-w w70"></div><div class="px-nav-p">atlas</div><div class="px-nav-w"></div><div class="px-nav-w w70"></div><div class="px-nav-p">notes</div><div class="px-nav-w"></div><div class="px-nav-w w70"></div></div>
+    <div class="px-chat"><div class="px-chat-head">Fix flaky login e2e</div>
+    <div class="px-bubble px-bubble-me"></div><div class="px-bubble w80"></div><div class="px-bubble w60"></div><div class="px-bubble w70"></div>
+    <div class="px-composer"></div></div>
+    <aside class="px-explorer"><div class="px-tabs"><div class="px-tab is-on"><svg aria-hidden="true"><use href="#ic-dash"/></svg><span>Overview</span></div><div class="px-tab "><svg aria-hidden="true"><use href="#ic-files"/></svg><span>Files</span></div><div class="px-tab "><svg aria-hidden="true"><use href="#ic-diff"/></svg><span>Changes</span></div><div class="px-tab "><svg aria-hidden="true"><use href="#ic-pr"/></svg><span>PR</span></div><div class="px-tab "><svg aria-hidden="true"><use href="#ic-ask"/></svg><span>Asks</span></div><div class="px-tab "><svg aria-hidden="true"><use href="#ic-fork"/></svg><span>Lineage</span></div>
+    <span class="px-tabs-end"><svg aria-hidden="true"><use href="#ic-plus"/></svg><svg aria-hidden="true"><use href="#ic-panel"/></svg></span></div><div class="px-scroll"><div class="ov"><header class="ov-id">
+    <h1 class="ov-title">Fix flaky login e2e</h1>
+    <p class="ov-goal is-fallback">orbit</p>
+  </header><p class="ov-quiet">The agent finished 3 min ago without a status report.</p><section class="ov-move">
+    <div class="ov-move-label">Your move</div>
+    <div class="ov-item is-lead" style="--lead: var(--app-accent)">
+    <div class="ov-item-head">
+      <span class="ov-item-icon t-muted"><svg aria-hidden="true"><use href="#ic-pr"/></svg></span>
+      <div class="ov-item-text"><div class="ov-item-title">3 commits on fix/login-e2e</div><div class="ov-item-sub">Pushed · no pull request yet</div></div>
+    </div>
+    <div class="ov-actions"><button class="ov-btn is-primary ">Create PR</button></div>
+  </div>
+    
+  </section></div></div></aside>
+  </div>
+  </div><div class="frame sb-frame-mobile">
+    <div class="frame-bar"><div class="frame-dots"><i></i><i></i><i></i></div><span class="frame-url">Paseo</span><span class="sb-frame-label">mobile · 390 · sheet</span></div>
+    <div class="px-mobile"><div class="px-mobile-behind"><div class="px-chat"><div class="px-chat-head">Fix flaky login e2e</div>
+    <div class="px-bubble px-bubble-me"></div><div class="px-bubble w80"></div><div class="px-bubble w60"></div><div class="px-bubble w70"></div>
+    <div class="px-composer"></div></div></div>
+      <div class="px-sheet"><div class="px-handle"></div><div class="px-sheet-title"><svg aria-hidden="true"><use href="#ic-dash"/></svg> Overview</div><div class="ov"><header class="ov-id">
+    <h1 class="ov-title">Fix flaky login e2e</h1>
+    <p class="ov-goal is-fallback">orbit</p>
+  </header><p class="ov-quiet">The agent finished 3 min ago without a status report.</p><section class="ov-move">
+    <div class="ov-move-label">Your move</div>
+    <div class="ov-item is-lead" style="--lead: var(--app-accent)">
+    <div class="ov-item-head">
+      <span class="ov-item-icon t-muted"><svg aria-hidden="true"><use href="#ic-pr"/></svg></span>
+      <div class="ov-item-text"><div class="ov-item-title">3 commits on fix/login-e2e</div><div class="ov-item-sub">Pushed · no pull request yet</div></div>
+    </div>
+    <div class="ov-actions"><button class="ov-btn is-primary ">Create PR</button></div>
+  </div>
+    
+  </section></div></div></div>
+  </div></div>
+  <div class="notes"><div class="note"><b>1</b><span>Without a goal the project name sits under the title, muted.</span></div><div class="note"><b>2</b><span>Without a status card, one plain sentence from Paseo's own state replaces the block.</span></div><div class="note"><b>3</b><span>The branch name appears once, inside the move it belongs to.</span></div></div>
+</section>
+
+<section class="screen" id="s8">
+  <div class="screen-meta">
+    <h2>8. Spec workspace that started four others</h2>
+    <p>Jacek checks how the work he split up is going.</p>
+    <div class="screen-refs"><span class="ref">S1</span></div>
+  </div>
+  <div class="sb-pair"><div class="frame sb-frame-desktop">
+    <div class="frame-bar"><div class="frame-dots"><i></i><i></i><i></i></div><span class="frame-url">Paseo</span><span class="sb-frame-label">desktop · 1280 · Explorer</span></div>
+    <div class="px-app">
+    <div class="px-nav"><div class="px-nav-p">orbit</div><div class="px-nav-w"></div><div class="px-nav-w w70"></div><div class="px-nav-p">atlas</div><div class="px-nav-w"></div><div class="px-nav-w w70"></div><div class="px-nav-p">notes</div><div class="px-nav-w"></div><div class="px-nav-w w70"></div></div>
+    <div class="px-chat"><div class="px-chat-head">Billing spec: invoices own numbering</div>
+    <div class="px-bubble px-bubble-me"></div><div class="px-bubble w80"></div><div class="px-bubble w60"></div><div class="px-bubble w70"></div>
+    <div class="px-composer"></div></div>
+    <aside class="px-explorer"><div class="px-tabs"><div class="px-tab is-on"><svg aria-hidden="true"><use href="#ic-dash"/></svg><span>Overview</span></div><div class="px-tab "><svg aria-hidden="true"><use href="#ic-files"/></svg><span>Files</span></div><div class="px-tab "><svg aria-hidden="true"><use href="#ic-diff"/></svg><span>Changes</span></div><div class="px-tab "><svg aria-hidden="true"><use href="#ic-pr"/></svg><span>PR</span></div><div class="px-tab "><svg aria-hidden="true"><use href="#ic-ask"/></svg><span>Asks</span></div><div class="px-tab "><svg aria-hidden="true"><use href="#ic-fork"/></svg><span>Lineage</span></div>
+    <span class="px-tabs-end"><svg aria-hidden="true"><use href="#ic-plus"/></svg><svg aria-hidden="true"><use href="#ic-panel"/></svg></span></div><div class="px-scroll"><div class="ov"><header class="ov-id">
+    <h1 class="ov-title">Billing spec: invoices own numbering</h1>
+    <p class="ov-goal ">Decide how invoice numbers work and split the build into workspaces.</p>
+  </header><section class="ov-story " role="button" aria-label="Open status">
+    <div class="ov-state t-ok"><i class="ov-dot "></i>Done<span class="ov-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span></div>
+    
+    <p class="ov-summary">Spec merged in PR #817. Four implementation workspaces started from it; one waits on you.</p>
+    
+  </section><section class="ov-move">
+    <div class="ov-move-label">Your move</div>
+    <div class="ov-item is-lead" style="--lead: var(--app-merged)">
+    <div class="ov-item-head">
+      <span class="ov-item-icon t-merged"><svg aria-hidden="true"><use href="#ic-archive"/></svg></span>
+      <div class="ov-item-text"><div class="ov-item-title">Ready to archive</div><div class="ov-item-sub">PR #817 merged · the children keep running</div></div>
+    </div>
+    <div class="ov-actions"><button class="ov-btn is-primary ">Archive workspace</button></div>
+  </div>
+    
+  </section><footer class="ov-ctx">
+    <div class="ov-ctx-row"><span class="ov-k">Started</span><span class="ov-v">4 workspaces</span><span class="ov-w t-warn">2 done · 1 working · 1 waiting on you</span><span class="ov-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span></div>
+    <div class="ov-ctx-kids"><div class="ov-ctx-row"><span class="ov-v">Billing 1+2: preview and prefill</span><span class="ov-w t-warn">waiting on you</span></div><div class="ov-ctx-row"><span class="ov-v">Billing 3: series picker</span><span class="ov-w t-run">working</span></div><div class="ov-ctx-row"><span class="ov-v">Billing 0a: tenant owns the sequence</span><span class="ov-w t-ok">done</span></div><div class="ov-ctx-row"><span class="ov-v">Billing: Issue button</span><span class="ov-w t-ok">done</span></div></div>
+  </footer></div></div></aside>
+  </div>
+  </div><div class="frame sb-frame-mobile">
+    <div class="frame-bar"><div class="frame-dots"><i></i><i></i><i></i></div><span class="frame-url">Paseo</span><span class="sb-frame-label">mobile · 390 · sheet</span></div>
+    <div class="px-mobile"><div class="px-mobile-behind"><div class="px-chat"><div class="px-chat-head">Billing spec: invoices own numbering</div>
+    <div class="px-bubble px-bubble-me"></div><div class="px-bubble w80"></div><div class="px-bubble w60"></div><div class="px-bubble w70"></div>
+    <div class="px-composer"></div></div></div>
+      <div class="px-sheet"><div class="px-handle"></div><div class="px-sheet-title"><svg aria-hidden="true"><use href="#ic-dash"/></svg> Overview</div><div class="ov"><header class="ov-id">
+    <h1 class="ov-title">Billing spec: invoices own numbering</h1>
+    <p class="ov-goal ">Decide how invoice numbers work and split the build into workspaces.</p>
+  </header><section class="ov-story " role="button" aria-label="Open status">
+    <div class="ov-state t-ok"><i class="ov-dot "></i>Done<span class="ov-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span></div>
+    
+    <p class="ov-summary">Spec merged in PR #817. Four implementation workspaces started from it; one waits on you.</p>
+    
+  </section><section class="ov-move">
+    <div class="ov-move-label">Your move</div>
+    <div class="ov-item is-lead" style="--lead: var(--app-merged)">
+    <div class="ov-item-head">
+      <span class="ov-item-icon t-merged"><svg aria-hidden="true"><use href="#ic-archive"/></svg></span>
+      <div class="ov-item-text"><div class="ov-item-title">Ready to archive</div><div class="ov-item-sub">PR #817 merged · the children keep running</div></div>
+    </div>
+    <div class="ov-actions"><button class="ov-btn is-primary ">Archive workspace</button></div>
+  </div>
+    
+  </section><footer class="ov-ctx">
+    <div class="ov-ctx-row"><span class="ov-k">Started</span><span class="ov-v">4 workspaces</span><span class="ov-w t-warn">2 done · 1 working · 1 waiting on you</span><span class="ov-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span></div>
+    <div class="ov-ctx-kids"><div class="ov-ctx-row"><span class="ov-v">Billing 1+2: preview and prefill</span><span class="ov-w t-warn">waiting on you</span></div><div class="ov-ctx-row"><span class="ov-v">Billing 3: series picker</span><span class="ov-w t-run">working</span></div><div class="ov-ctx-row"><span class="ov-v">Billing 0a: tenant owns the sequence</span><span class="ov-w t-ok">done</span></div><div class="ov-ctx-row"><span class="ov-v">Billing: Issue button</span><span class="ov-w t-ok">done</span></div></div>
+  </footer></div></div></div>
+  </div></div>
+  <div class="notes"><div class="note"><b>1</b><span><b>Started</b> sums the children in one line (counts by state); rows below are each child with its word, waiting-on-you first.</span></div><div class="note"><b>2</b><span>Past 4 children the list collapses behind "Show all".</span></div></div>
+</section>
+
+<section class="screen" id="s9">
+  <div class="screen-meta">
+    <h2>9. Several agents share the workspace</h2>
+    <p>A builder and a reviewer agent work in the same checkout.</p>
+    <div class="screen-refs"><span class="ref">Q3</span></div>
+  </div>
+  <div class="sb-pair"><div class="frame sb-frame-desktop">
+    <div class="frame-bar"><div class="frame-dots"><i></i><i></i><i></i></div><span class="frame-url">Paseo</span><span class="sb-frame-label">desktop · 1280 · Explorer</span></div>
+    <div class="px-app">
+    <div class="px-nav"><div class="px-nav-p">orbit</div><div class="px-nav-w"></div><div class="px-nav-w w70"></div><div class="px-nav-p">atlas</div><div class="px-nav-w"></div><div class="px-nav-w w70"></div><div class="px-nav-p">notes</div><div class="px-nav-w"></div><div class="px-nav-w w70"></div></div>
+    <div class="px-chat"><div class="px-chat-head">Onboarding: invite flow</div>
+    <div class="px-bubble px-bubble-me"></div><div class="px-bubble w80"></div><div class="px-bubble w60"></div><div class="px-bubble w70"></div>
+    <div class="px-composer"></div></div>
+    <aside class="px-explorer"><div class="px-tabs"><div class="px-tab is-on"><svg aria-hidden="true"><use href="#ic-dash"/></svg><span>Overview</span></div><div class="px-tab "><svg aria-hidden="true"><use href="#ic-files"/></svg><span>Files</span></div><div class="px-tab "><svg aria-hidden="true"><use href="#ic-diff"/></svg><span>Changes</span></div><div class="px-tab "><svg aria-hidden="true"><use href="#ic-pr"/></svg><span>PR</span></div><div class="px-tab "><svg aria-hidden="true"><use href="#ic-ask"/></svg><span>Asks</span></div><div class="px-tab "><svg aria-hidden="true"><use href="#ic-fork"/></svg><span>Lineage</span></div>
+    <span class="px-tabs-end"><svg aria-hidden="true"><use href="#ic-plus"/></svg><svg aria-hidden="true"><use href="#ic-panel"/></svg></span></div><div class="px-scroll"><div class="ov"><header class="ov-id">
+    <h1 class="ov-title">Onboarding: invite flow</h1>
+    <p class="ov-goal ">Let admins invite teammates by email with a role picked up front.</p>
+  </header><section class="ov-story " role="button" aria-label="Open status">
+    <div class="ov-state t-run"><i class="ov-dot is-pulse"></i>Working<span class="ov-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span></div>
+    
+    <p class="ov-summary">Invite API and email are done. Building the role picker.</p>
+    <p class="ov-now"><b>Now</b>Writing the role picker tests</p>
+  </section><p class="ov-quiet"><svg aria-hidden="true"><use href="#ic-check"/></svg> Nothing needs you while the agents work.</p><footer class="ov-ctx">
+    <div class="ov-ctx-row"><span class="ov-k">Agents</span><span class="ov-v">2 here</span><span class="ov-w t-muted">Builder · working, Reviewer · idle</span><span class="ov-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span></div>
+    
+  </footer></div></div></aside>
+  </div>
+  </div><div class="frame sb-frame-mobile">
+    <div class="frame-bar"><div class="frame-dots"><i></i><i></i><i></i></div><span class="frame-url">Paseo</span><span class="sb-frame-label">mobile · 390 · sheet</span></div>
+    <div class="px-mobile"><div class="px-mobile-behind"><div class="px-chat"><div class="px-chat-head">Onboarding: invite flow</div>
+    <div class="px-bubble px-bubble-me"></div><div class="px-bubble w80"></div><div class="px-bubble w60"></div><div class="px-bubble w70"></div>
+    <div class="px-composer"></div></div></div>
+      <div class="px-sheet"><div class="px-handle"></div><div class="px-sheet-title"><svg aria-hidden="true"><use href="#ic-dash"/></svg> Overview</div><div class="ov"><header class="ov-id">
+    <h1 class="ov-title">Onboarding: invite flow</h1>
+    <p class="ov-goal ">Let admins invite teammates by email with a role picked up front.</p>
+  </header><section class="ov-story " role="button" aria-label="Open status">
+    <div class="ov-state t-run"><i class="ov-dot is-pulse"></i>Working<span class="ov-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span></div>
+    
+    <p class="ov-summary">Invite API and email are done. Building the role picker.</p>
+    <p class="ov-now"><b>Now</b>Writing the role picker tests</p>
+  </section><p class="ov-quiet"><svg aria-hidden="true"><use href="#ic-check"/></svg> Nothing needs you while the agents work.</p><footer class="ov-ctx">
+    <div class="ov-ctx-row"><span class="ov-k">Agents</span><span class="ov-v">2 here</span><span class="ov-w t-muted">Builder · working, Reviewer · idle</span><span class="ov-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span></div>
+    
+  </footer></div></div></div>
+  </div></div>
+  <div class="notes"><div class="note"><b>1</b><span>Agents only appear when there is more than one: with one agent, the title already names the work.</span></div><div class="note"><b>2</b><span>The status describes the workspace, whoever wrote it last.</span></div></div>
+</section>
+
+<section class="screen" id="s10">
+  <div class="screen-meta">
+    <h2>10. Plain folder, agent failed</h2>
+    <p>A notes folder (no git); the agent hit its usage limit.</p>
+    <div class="screen-refs"><span class="ref">S2</span><span class="ref">S3</span></div>
+  </div>
+  <div class="sb-pair"><div class="frame sb-frame-desktop">
+    <div class="frame-bar"><div class="frame-dots"><i></i><i></i><i></i></div><span class="frame-url">Paseo</span><span class="sb-frame-label">desktop · 1280 · Explorer</span></div>
+    <div class="px-app">
+    <div class="px-nav"><div class="px-nav-p">orbit</div><div class="px-nav-w"></div><div class="px-nav-w w70"></div><div class="px-nav-p">atlas</div><div class="px-nav-w"></div><div class="px-nav-w w70"></div><div class="px-nav-p">notes</div><div class="px-nav-w"></div><div class="px-nav-w w70"></div></div>
+    <div class="px-chat"><div class="px-chat-head">notes</div>
+    <div class="px-bubble px-bubble-me"></div><div class="px-bubble w80"></div><div class="px-bubble w60"></div><div class="px-bubble w70"></div>
+    <div class="px-composer"></div></div>
+    <aside class="px-explorer"><div class="px-tabs"><div class="px-tab is-on"><svg aria-hidden="true"><use href="#ic-dash"/></svg><span>Overview</span></div><div class="px-tab "><svg aria-hidden="true"><use href="#ic-files"/></svg><span>Files</span></div><div class="px-tab "><svg aria-hidden="true"><use href="#ic-diff"/></svg><span>Changes</span></div><div class="px-tab "><svg aria-hidden="true"><use href="#ic-pr"/></svg><span>PR</span></div><div class="px-tab "><svg aria-hidden="true"><use href="#ic-ask"/></svg><span>Asks</span></div><div class="px-tab "><svg aria-hidden="true"><use href="#ic-fork"/></svg><span>Lineage</span></div>
+    <span class="px-tabs-end"><svg aria-hidden="true"><use href="#ic-plus"/></svg><svg aria-hidden="true"><use href="#ic-panel"/></svg></span></div><div class="px-scroll"><div class="ov"><header class="ov-id">
+    <h1 class="ov-title">notes</h1>
+    <p class="ov-goal ">Merge the meeting notes into one file per topic.</p>
+  </header><section class="ov-story " role="button" aria-label="Open status">
+    <div class="ov-state t-danger"><i class="ov-dot "></i>Failed<span class="ov-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span></div>
+    
+    <p class="ov-summary">The agent stopped: usage limit reached at 14:20. 9 of 14 notes merged.</p>
+    
+  </section><section class="ov-move">
+    <div class="ov-move-label">Your move</div>
+    <div class="ov-item is-lead" style="--lead: var(--app-danger)">
+    <div class="ov-item-head">
+      <span class="ov-item-icon t-danger"><svg aria-hidden="true"><use href="#ic-alert"/></svg></span>
+      <div class="ov-item-text"><div class="ov-item-title">The agent stopped with an error</div><div class="ov-item-sub">Usage limit reached · resets at 17:00</div></div>
+    </div>
+    <div class="ov-actions"><button class="ov-btn is-primary ">Open agent</button><button class="ov-btn  is-ghost">Retry</button></div>
+  </div>
+    
+  </section></div></div></aside>
+  </div>
+  </div><div class="frame sb-frame-mobile">
+    <div class="frame-bar"><div class="frame-dots"><i></i><i></i><i></i></div><span class="frame-url">Paseo</span><span class="sb-frame-label">mobile · 390 · sheet</span></div>
+    <div class="px-mobile"><div class="px-mobile-behind"><div class="px-chat"><div class="px-chat-head">notes</div>
+    <div class="px-bubble px-bubble-me"></div><div class="px-bubble w80"></div><div class="px-bubble w60"></div><div class="px-bubble w70"></div>
+    <div class="px-composer"></div></div></div>
+      <div class="px-sheet"><div class="px-handle"></div><div class="px-sheet-title"><svg aria-hidden="true"><use href="#ic-dash"/></svg> Overview</div><div class="ov"><header class="ov-id">
+    <h1 class="ov-title">notes</h1>
+    <p class="ov-goal ">Merge the meeting notes into one file per topic.</p>
+  </header><section class="ov-story " role="button" aria-label="Open status">
+    <div class="ov-state t-danger"><i class="ov-dot "></i>Failed<span class="ov-chev"><svg aria-hidden="true"><use href="#ic-chevron-right"/></svg></span></div>
+    
+    <p class="ov-summary">The agent stopped: usage limit reached at 14:20. 9 of 14 notes merged.</p>
+    
+  </section><section class="ov-move">
+    <div class="ov-move-label">Your move</div>
+    <div class="ov-item is-lead" style="--lead: var(--app-danger)">
+    <div class="ov-item-head">
+      <span class="ov-item-icon t-danger"><svg aria-hidden="true"><use href="#ic-alert"/></svg></span>
+      <div class="ov-item-text"><div class="ov-item-title">The agent stopped with an error</div><div class="ov-item-sub">Usage limit reached · resets at 17:00</div></div>
+    </div>
+    <div class="ov-actions"><button class="ov-btn is-primary ">Open agent</button><button class="ov-btn  is-ghost">Retry</button></div>
+  </div>
+    
+  </section></div></div></div>
+  </div></div>
+  <div class="notes"><div class="note"><b>1</b><span>No git means no code facts anywhere; nothing renders empty.</span></div><div class="note"><b>2</b><span>The failure is the move: open the agent to see the error, or retry.</span></div></div>
+</section>
+</div>
+<script>
+(function () { var btn = document.getElementById('theme-toggle'); btn.addEventListener('click', function () { document.documentElement.classList.toggle('dark'); }); })();
+</script>
+<script src="comments.js"></script>
+<script src="prototype.js"></script>
+</body>
+</html>
