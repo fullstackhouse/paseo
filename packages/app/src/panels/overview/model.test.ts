@@ -13,6 +13,7 @@ import {
   deriveWorkspaceStateWord,
   deriveYourMove,
   gitMoveFacts,
+  isStatusDone,
   isStatusOutdated,
   MAX_ENTRIES_PER_ITEM,
   overviewSubtitle,
@@ -87,6 +88,7 @@ describe("deriveYourMove", () => {
       agentRunning: false,
       gitPrimaryId: "commit",
       prMerged: false,
+      statusDone: false,
     });
     expect(rows.map((row) => row.kind)).toEqual([
       "permission",
@@ -103,6 +105,7 @@ describe("deriveYourMove", () => {
       agentRunning: true,
       gitPrimaryId: "commit",
       prMerged: false,
+      statusDone: false,
     });
     expect(rows.some((row) => row.kind === "checks" || row.kind === "git")).toBe(false);
   });
@@ -113,16 +116,34 @@ describe("deriveYourMove", () => {
       agentRunning: false,
       gitPrimaryId: null,
       prMerged: false,
+      statusDone: false,
     });
     expect(rows).toEqual([{ kind: "plugin", key: "x", item: expect.anything() }]);
   });
 
-  it("offers archive only once the PR merged", () => {
+  it("offers archive only once the PR merged or the status card says done", () => {
     const input = { items: [], agentRunning: false, gitPrimaryId: "archive-workspace" };
-    expect(deriveYourMove({ ...input, prMerged: false })).toEqual([]);
-    expect(deriveYourMove({ ...input, prMerged: true })).toEqual([
-      { kind: "git", key: "git:archive-workspace" },
-    ]);
+    const archive = [{ kind: "git", key: "git:archive-workspace" }];
+    expect(deriveYourMove({ ...input, prMerged: false, statusDone: false })).toEqual([]);
+    expect(deriveYourMove({ ...input, prMerged: true, statusDone: false })).toEqual(archive);
+    expect(deriveYourMove({ ...input, prMerged: false, statusDone: true })).toEqual(archive);
+  });
+});
+
+describe("isStatusDone", () => {
+  const done = { state: "done" as const, summary: "s", updatedAt: 100 };
+
+  it("is true for a current done card", () => {
+    expect(isStatusDone({ status: done, agentRunning: false, lastPromptAt: 50 })).toBe(true);
+    expect(isStatusDone({ status: done, agentRunning: false, lastPromptAt: null })).toBe(true);
+  });
+
+  it("is false without a card, for other states, answered or outdated cards", () => {
+    const at = { agentRunning: false, lastPromptAt: 50 };
+    expect(isStatusDone({ ...at, status: null })).toBe(false);
+    expect(isStatusDone({ ...at, status: { ...done, state: "working" } })).toBe(false);
+    expect(isStatusDone({ ...at, status: { ...done, answered: true } })).toBe(false);
+    expect(isStatusDone({ ...at, status: done, lastPromptAt: 150 })).toBe(false);
   });
 });
 

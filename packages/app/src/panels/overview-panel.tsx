@@ -13,6 +13,7 @@ import {
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import invariant from "tiny-invariant";
 import type { AgentPermissionAction, AgentPermissionRequest } from "@getpaseo/protocol/agent-types";
+import type { PluginWorkspaceStatus } from "@getpaseo/plugin/client";
 import { useAgentDescriptor } from "@/agent-presentation";
 import { Button } from "@/components/ui/button";
 import { StatusBadge, type StatusBadgeVariant } from "@/components/ui/status-badge";
@@ -53,6 +54,7 @@ import {
   deriveWorkspaceStateWord,
   deriveYourMove,
   gitMoveFacts,
+  isStatusDone,
   isStatusOutdated,
   overviewSubtitle,
   partitionSummaryItems,
@@ -131,7 +133,14 @@ function OverviewPanel(): ReactElement {
     icons: GIT_ACTION_ICONS,
   });
   const git = isGitWorkspace && gitStatusLoaded ? gitActions : null;
-  const moves = useYourMove({ serverId, workspaceId, agentRunning, facts, gitActions: git });
+  const moves = useYourMove({
+    serverId,
+    workspaceId,
+    agentRunning,
+    facts,
+    gitActions: git,
+    status: status?.status ?? null,
+  });
 
   return (
     // Themed insets sit on a View: contentContainerStyle drops them on web (docs/unistyles.md).
@@ -179,13 +188,22 @@ function useYourMove(input: {
   agentRunning: boolean;
   facts: WorkspaceFacts | null;
   gitActions: GitActions | null;
+  status: PluginWorkspaceStatus | null;
 }): YourMoveRow[] {
   const items = useWorkspaceAttention(input.serverId, input.workspaceId);
+  const lastPromptAt = useSessionStore((state) =>
+    selectLastPromptAt(state.sessions[input.serverId]?.agents, input.workspaceId),
+  );
   return deriveYourMove({
     items,
     agentRunning: input.agentRunning,
     gitPrimaryId: input.gitActions?.primary?.id ?? null,
     prMerged: Boolean(input.facts?.pullRequest?.isMerged),
+    statusDone: isStatusDone({
+      status: input.status,
+      agentRunning: input.agentRunning,
+      lastPromptAt,
+    }),
   });
 }
 
@@ -692,12 +710,16 @@ function gitMoveView(
 ): MoveView {
   const pr = facts?.pullRequest;
   const run = () => runGitAction(primary);
-  if (pr?.isMerged) {
+  // Archive is only a move once the work shipped: a merged PR, or a done status card (deriveYourMove).
+  if (pr?.isMerged || primary.id === "archive-workspace") {
     return {
       icon: <ThemedArchive size={ICON_SIZE} uniProps={mergedColorMapping} />,
       tone: "merged",
       title: t("panels.overview.readyToArchive"),
-      facts: pr.number ? t("panels.overview.prMergedTitle", { number: pr.number }) : undefined,
+      facts:
+        pr?.isMerged && pr.number
+          ? t("panels.overview.prMergedTitle", { number: pr.number })
+          : undefined,
       action: primary.label,
       run,
     };
