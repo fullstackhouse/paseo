@@ -23,6 +23,22 @@ function item(fields: Partial<WorkspaceSummaryItem>): WorkspaceSummaryItem {
 const at = new Date("2026-11-12T10:00:00Z");
 
 describe("foldReportedWork", () => {
+  it("lets needs-you win, then blocked, then working, then done", () => {
+    expect(foldReportedWork([item({ workState: "blocked" })])).toBe("blocked");
+    expect(foldReportedWork([item({ workState: "working" }), item({ workState: "blocked" })])).toBe(
+      "blocked",
+    );
+    expect(foldReportedWork([item({ workState: "blocked" }), item({ workState: "done" })])).toBe(
+      "blocked",
+    );
+    expect(
+      foldReportedWork([
+        item({ workState: "blocked" }),
+        item({ pluginId: "asks", needsYou: true }),
+      ]),
+    ).toBe("needs_you");
+  });
+
   it("lets needs-you win, then working, then done", () => {
     expect(foldReportedWork([])).toBeNull();
     expect(foldReportedWork([item({ count: 1 })])).toBeNull();
@@ -60,10 +76,19 @@ describe("applyReportedWork", () => {
     );
   });
 
+  it("moves a finished turn waiting on other workspaces, a reviewer or CI to Blocked", () => {
+    expect(applyReportedWork({ status: "attention", enteredAt: at }, "blocked")).toEqual({
+      status: "blocked",
+      enteredAt: at,
+    });
+    expect(applyReportedWork({ status: "done", enteredAt: at }, "blocked").status).toBe("blocked");
+  });
+
   it("never overrides live state", () => {
     for (const status of ["running", "failed", "needs_input"] as const) {
       const base = { status, enteredAt: at };
       expect(applyReportedWork(base, "done")).toBe(base);
+      expect(applyReportedWork(base, "blocked")).toBe(base);
     }
   });
 

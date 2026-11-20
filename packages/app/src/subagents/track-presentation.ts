@@ -45,11 +45,11 @@ export function buildSubagentRowPresentationData(row: SubagentRow): SubagentRowP
   };
 }
 
-type ActiveStatusBucket = Exclude<SidebarStateBucket, "done">;
+type ActiveStatusBucket = Exclude<SidebarStateBucket, "done" | "blocked">;
 
-/** The sidebar's list order, minus the state that earns no mark. */
+/** The sidebar's list order, minus done (no mark) and blocked (workspaces only). */
 const ACTIVE_STATUS_BUCKET_ORDER = STATUS_BUCKET_ORDER.filter(
-  (bucket): bucket is ActiveStatusBucket => bucket !== "done",
+  (bucket): bucket is ActiveStatusBucket => bucket !== "done" && bucket !== "blocked",
 );
 
 /** One state the pill reports, and how many children are in it. */

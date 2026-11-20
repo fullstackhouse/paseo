@@ -1239,6 +1239,7 @@ export const fr: TranslationResources = {
       readyToReview: "À relire",
       working: "En cours",
       done: "Terminé",
+      blocked: "Bloqué",
     },
     display: {
       showBackground: "Afficher les espaces en arrière-plan",

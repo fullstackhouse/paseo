@@ -78,6 +78,11 @@ describe("aggregateSidebarStateBuckets", () => {
     expect(aggregateSidebarStateBuckets(["attention", "running"])).toBe("running");
   });
 
+  it("ranks blocked below ready-to-review and above done", () => {
+    expect(aggregateSidebarStateBuckets(["blocked", "attention"])).toBe("attention");
+    expect(aggregateSidebarStateBuckets(["done", "blocked", "done"])).toBe("blocked");
+  });
+
   it("prefers ready-to-review over done", () => {
     expect(aggregateSidebarStateBuckets(["done", "attention", "done"])).toBe("attention");
   });

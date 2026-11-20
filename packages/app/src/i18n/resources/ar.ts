@@ -1210,6 +1210,7 @@ export const ar: TranslationResources = {
       readyToReview: "جاهزة للمراجعة",
       working: "قيد العمل",
       done: "تم",
+      blocked: "معلّقة",
     },
     display: {
       showBackground: "إظهار مساحات العمل في الخلفية",

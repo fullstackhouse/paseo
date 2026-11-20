@@ -1236,6 +1236,7 @@ export const ptBR: TranslationResources = {
       readyToReview: "Para revisar",
       working: "Em execução",
       done: "Concluído",
+      blocked: "Bloqueado",
     },
     display: {
       showBackground: "Mostrar espaços em segundo plano",
