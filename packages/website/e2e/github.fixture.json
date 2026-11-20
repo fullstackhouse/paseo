@@ -1,0 +1,18 @@
+{
+  "repo": { "stargazers_count": 4200 },
+  "releases": [
+    {
+      "tag_name": "v0.16.2",
+      "prerelease": false,
+      "draft": false,
+      "assets": [
+        { "name": "Paseo-0.16.2-arm64.dmg" },
+        { "name": "Paseo-0.16.2-x64.dmg" },
+        { "name": "Paseo-x86_64.AppImage" },
+        { "name": "Paseo-Setup-0.16.2-x64.exe" },
+        { "name": "Paseo-Setup-0.16.2-arm64.exe" },
+        { "name": "paseo-v0.16.2-android.apk" }
+      ]
+    }
+  ]
+}

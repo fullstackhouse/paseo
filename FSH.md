@@ -93,6 +93,7 @@ temporary by design: every patch is meant to go upstream and then drop out of `f
 - FSH-only (upstreamable): the HTML file preview inlines the `.css` stylesheets and `.js`/`.mjs` scripts a page links from its own folder, so a page split across files (design storyboards, `index.html` + `styles.css`) renders styled instead of as bare markup. Hidden files, other file types, symlinks that resolve outside the folder, and remote URLs are not inlined; the preview's CSP is unchanged
 - FSH-only (upstreamable): a search field at the top of Settings finds sections and individual settings ("code font", "scrollback", "restart daemon") in the app's language and opens the section. The searchable settings are a list in `packages/app/src/screens/settings/search/settings-search-index.ts`; add new setting rows there
 - FSH-only (upstreamable): git status and PR status requests from the app skip ahead of background git refreshes, in both the workspace-refresh queue and the git process scheduler. With about 100 observed workspaces they used to wait behind every startup and watcher refresh, taking 45s to 5 minutes; now about 4s
+- FSH-only (upstreamable): website e2e serves GitHub release and repo fixtures from `e2e/registry-server.mjs` through an optional `GITHUB_API_URL` override, so CI no longer gets 500s when shared runners hit GitHub's unauthenticated rate limit
 
 Keep this list in sync with what's merged into `fsh`.
 

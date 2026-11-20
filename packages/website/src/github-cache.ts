@@ -1,5 +1,14 @@
 export const GITHUB_CACHE_TTL_MS = 5 * 60 * 1000;
 
+export interface GitHubApiEnvironment {
+  GITHUB_API_URL?: string;
+}
+
+/** E2E tests point `GITHUB_API_URL` at a local stub; production calls the public API. */
+export function githubApiUrl(env: GitHubApiEnvironment): string {
+  return env.GITHUB_API_URL ?? "https://api.github.com";
+}
+
 export interface WebsiteCacheContext {
   cache: KVNamespace | null;
   waitUntil: (promise: Promise<unknown>) => void;
