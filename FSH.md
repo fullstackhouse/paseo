@@ -99,6 +99,7 @@ temporary by design: every patch is meant to go upstream and then drop out of `f
 - FSH-only (upstreamable): the five-minute workspace reconciliation sweep runs its git processes at a new low priority, labelled `workspace-reconciliation:full` in metrics. On a host with 200 workspaces each sweep is about 2,000 processes, and status requests from the app used to stall 45–60s behind it
 - FSH-only (upstreamable): bare `file://` URLs in Markdown (chat, asks, plugin Markdown) are links, like bare `http(s)://` URLs, and open at the line in a `#L42` or `:42` suffix. Before, `file:///Users/…/index.html` in prose stayed plain text unless written as `[label](file:///…)`
 - FSH-only (upstreamable): the home screen leads with a **New workspace** tile once any host has a project, opening the New workspace screen. Before, the home screen only offered setup tiles, so a returning user had to open the sidebar to start work. First runs still see only the setup tiles
+- FSH-only (upstreamable): opening the app no longer lands on **Workspace unavailable** when the last workspace you used was archived on another device. Once the host's workspace list shows it gone, the app forgets it and opens the project screen. A notification or agent link to an archived workspace still offers **Restore**
 
 Keep this list in sync with what's merged into `fsh`.
 

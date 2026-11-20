@@ -64,6 +64,18 @@ export function getLastWorkspaceSelection(): ActiveWorkspaceSelection | null {
   return lastWorkspaceSelectionStore.getSelection();
 }
 
+function getRestoredWorkspaceSelection(): ActiveWorkspaceSelection | null {
+  return lastWorkspaceSelectionStore.getRestoredSelection();
+}
+
+/**
+ * Forgets the workspace the app reopened at startup, when it no longer exists on its host.
+ * Returns false when the user has since navigated to another workspace.
+ */
+export function forgetRestoredWorkspaceSelection(selection: ActiveWorkspaceSelection): boolean {
+  return lastWorkspaceSelectionStore.forgetRestored(selection);
+}
+
 export function getIsLastWorkspaceSelectionHydrated(): boolean {
   return lastWorkspaceSelectionStore.isHydrated();
 }
@@ -101,6 +113,15 @@ export function useLastWorkspaceSelection(): ActiveWorkspaceSelection | null {
     lastWorkspaceSelectionStore.subscribe,
     getLastWorkspaceSelection,
     getLastWorkspaceSelection,
+  );
+}
+
+/** The selection read from storage at startup, until the user navigates to another workspace. */
+export function useRestoredWorkspaceSelection(): ActiveWorkspaceSelection | null {
+  return useSyncExternalStore(
+    lastWorkspaceSelectionStore.subscribe,
+    getRestoredWorkspaceSelection,
+    getRestoredWorkspaceSelection,
   );
 }
 

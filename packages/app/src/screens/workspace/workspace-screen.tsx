@@ -166,6 +166,7 @@ import {
   type WorkspaceRouteState,
 } from "@/screens/workspace/workspace-route-state";
 import { renderWorkspaceRouteGate } from "@/screens/workspace/workspace-route-state-views";
+import { useLeaveRestoredMissingWorkspace } from "@/screens/workspace/use-leave-restored-missing-workspace";
 import { useWorkspaceRecovery } from "@/workspace-recovery/use-workspace-recovery";
 import type { WorkspaceRecoveryModel } from "@/workspace-recovery/model";
 import {
@@ -1273,11 +1274,18 @@ function WorkspaceScreenContent({
   const hasHydratedAgents = useSessionStore(
     (state) => state.sessions[normalizedServerId]?.hasHydratedAgents ?? false,
   );
-  const workspaceRouteState = useResolvedWorkspaceRouteState({
+  const resolvedWorkspaceRouteState = useResolvedWorkspaceRouteState({
     serverId: normalizedServerId,
     workspace: workspaceDescriptor,
     hasHydratedWorkspaces,
     recovery: workspaceRecovery.state,
+  });
+  const workspaceRouteState = useLeaveRestoredMissingWorkspace({
+    serverId: normalizedServerId,
+    workspaceId: normalizedWorkspaceId,
+    state: resolvedWorkspaceRouteState,
+    isRouteFocused,
+    hasPendingOpenTarget: pendingOpenTarget !== null,
   });
   const workspaceHeaderCheckoutState = buildWorkspaceHeaderCheckoutState({
     isCheckoutStatusLoading,

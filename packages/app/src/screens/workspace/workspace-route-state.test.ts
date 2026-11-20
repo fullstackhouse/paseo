@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { WorkspaceDescriptor } from "@/stores/session-store";
 import type { WorkspaceRecoveryModel } from "@/workspace-recovery/model";
-import { resolveWorkspaceRouteState } from "./workspace-route-state";
+import {
+  resolveWorkspaceRouteState,
+  shouldLeaveRestoredMissingWorkspace,
+} from "./workspace-route-state";
 
 function createWorkspaceDescriptor(): WorkspaceDescriptor {
   return {
@@ -171,5 +174,46 @@ describe("resolveWorkspaceRouteState", () => {
         recovery: recoverable,
       }),
     ).toEqual({ kind: "ready" });
+  });
+});
+
+describe("shouldLeaveRestoredMissingWorkspace", () => {
+  const missing = { kind: "missing", hostName: "Laptop" } as const;
+  const leaveInput = {
+    state: missing,
+    isRouteFocused: true,
+    isRestoredSelection: true,
+    hasPendingOpenTarget: false,
+  };
+
+  it("leaves the workspace reopened at startup once the host proves it missing", () => {
+    expect(shouldLeaveRestoredMissingWorkspace(leaveInput)).toBe(true);
+  });
+
+  it("stays while the workspace list is still loading", () => {
+    expect(
+      shouldLeaveRestoredMissingWorkspace({
+        ...leaveInput,
+        state: { kind: "loading", hostName: "Laptop" },
+      }),
+    ).toBe(false);
+  });
+
+  it("stays on a workspace the user navigated to in this session", () => {
+    expect(shouldLeaveRestoredMissingWorkspace({ ...leaveInput, isRestoredSelection: false })).toBe(
+      false,
+    );
+  });
+
+  it("stays when a notification or agent link targets the workspace", () => {
+    expect(shouldLeaveRestoredMissingWorkspace({ ...leaveInput, hasPendingOpenTarget: true })).toBe(
+      false,
+    );
+  });
+
+  it("stays on a retained workspace screen that is not focused", () => {
+    expect(shouldLeaveRestoredMissingWorkspace({ ...leaveInput, isRouteFocused: false })).toBe(
+      false,
+    );
   });
 });

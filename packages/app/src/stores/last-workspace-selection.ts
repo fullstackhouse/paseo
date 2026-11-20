@@ -23,6 +23,13 @@ function normalizeWorkspaceSelection(input: unknown): ActiveWorkspaceSelection |
   return result.success ? result.data : null;
 }
 
+function isSameSelection(
+  a: ActiveWorkspaceSelection | null,
+  b: ActiveWorkspaceSelection | null,
+): boolean {
+  return a !== null && b !== null && a.serverId === b.serverId && a.workspaceId === b.workspaceId;
+}
+
 function parseStoredWorkspaceSelection(stored: string | null): ActiveWorkspaceSelection | null {
   if (!stored) {
     return null;
@@ -36,6 +43,10 @@ function parseStoredWorkspaceSelection(stored: string | null): ActiveWorkspaceSe
 
 export function createLastWorkspaceSelectionStore(storage: LastWorkspaceSelectionStorage) {
   let selection: ActiveWorkspaceSelection | null = null;
+  // The selection read from storage at startup, until the user navigates elsewhere.
+  // Only this one may be forgotten when it turns out to be gone: any other selection
+  // was navigated to in this session, and its workspace may simply not have arrived yet.
+  let restoredSelection: ActiveWorkspaceSelection | null = null;
   let hydrated = false;
   let hydrationPromise: Promise<void> | null = null;
   let revision = 0;
@@ -52,13 +63,11 @@ export function createLastWorkspaceSelectionStore(storage: LastWorkspaceSelectio
     if (!normalized) {
       return;
     }
-    if (
-      selection?.serverId === normalized.serverId &&
-      selection.workspaceId === normalized.workspaceId
-    ) {
+    if (isSameSelection(selection, normalized)) {
       return;
     }
     selection = normalized;
+    restoredSelection = null;
     revision += 1;
     notifyListeners();
     // workspaceId is opaque; do not parse this persisted selection back into a path.
@@ -75,6 +84,7 @@ export function createLastWorkspaceSelectionStore(storage: LastWorkspaceSelectio
       .then((stored) => {
         if (revision === hydrationRevision) {
           selection = parseStoredWorkspaceSelection(stored);
+          restoredSelection = selection;
           if (stored !== null && selection === null) {
             void storage.clear().catch(() => {});
           }
@@ -93,7 +103,22 @@ export function createLastWorkspaceSelectionStore(storage: LastWorkspaceSelectio
     return hydrationPromise;
   }
 
+  /** Forgets the selection restored from storage, if `target` is still that selection. */
+  function forgetRestored(target: ActiveWorkspaceSelection): boolean {
+    if (!isSameSelection(restoredSelection, target) || !isSameSelection(selection, target)) {
+      return false;
+    }
+    selection = null;
+    restoredSelection = null;
+    revision += 1;
+    notifyListeners();
+    void storage.clear().catch(() => {});
+    return true;
+  }
+
   return {
+    forgetRestored,
+    getRestoredSelection: () => restoredSelection,
     getSelection: () => selection,
     hydrate,
     isHydrated: () => hydrated,
