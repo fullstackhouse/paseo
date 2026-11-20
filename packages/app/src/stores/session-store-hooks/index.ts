@@ -25,6 +25,7 @@ import {
 } from "./selectors";
 import { useSessionStore, type WorkspaceDescriptor } from "../session-store";
 import type { DesktopBadgeWorkspaceStatus } from "@/utils/desktop-badge-state";
+import { useReportedWorkLookup } from "@/workspace-status/reported-work";
 
 // These are the ONLY supported ways to read workspaces from the session store.
 // Do not write raw `useSessionStore` selectors that return the workspaces Map, a session object,
@@ -177,9 +178,10 @@ export function useHasWorkspaces(serverId: string | null): boolean {
 }
 
 export function useWorkspaceStatusesForBadges(): DesktopBadgeWorkspaceStatus[] {
+  const reportedWork = useReportedWorkLookup();
   return useStoreWithEqualityFn(
     useSessionStore,
-    (state) => selectWorkspaceStatusesForBadges(state),
+    (state) => selectWorkspaceStatusesForBadges(state, reportedWork),
     workspaceEqualityFns.deep,
   );
 }

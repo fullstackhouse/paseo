@@ -818,6 +818,49 @@ describe("selectWorkspaceStatusesForBadges", () => {
 
     tracked.stop();
   });
+
+  it("regroups idle workspaces by what plugins report, so Blocked and Done stop counting", () => {
+    const blocked = createWorkspace({ id: "blocked", status: "attention" });
+    const done = createWorkspace({ id: "done", status: "attention" });
+    const waiting = createWorkspace({ id: "waiting", status: "done" });
+    const running = createWorkspace({ id: "running", status: "running" });
+    const devServer = {
+      ...createWorkspace({ id: "dev-server", status: "running" }),
+      runningFromBackgroundWork: true,
+    };
+    initializeWorkspaces([blocked, done, waiting, running, devServer]);
+    const reported = {
+      blocked: "blocked",
+      done: "done",
+      waiting: "needs_you",
+      running: "blocked",
+      "dev-server": "needs_you",
+    } as const;
+
+    const statuses = selectWorkspaceStatusesForBadges(
+      useSessionStore.getState(),
+      (serverId, workspaceId) =>
+        serverId === SERVER_ID ? reported[workspaceId as keyof typeof reported] : null,
+    );
+
+    expect(statuses).toEqual(["blocked", "done", "attention", "running", "attention"]);
+  });
+
+  it("lets a root agent mid-turn win over a report, as the sidebar does", () => {
+    const workspace = createWorkspace({ id: "w", status: "done" });
+    const state = {
+      sessions: {
+        [SERVER_ID]: {
+          workspaces: new Map([[workspace.id, workspace]]),
+          workspaceAgentActivity: new Map([
+            [workspace.id, { agentId: "a", status: "running" as const, enteredAt: new Date() }],
+          ]),
+        },
+      },
+    };
+
+    expect(selectWorkspaceStatusesForBadges(state, () => "needs_you")).toEqual(["running"]);
+  });
 });
 
 it("a prompt changes only its project's structure and output preserves both project identities", () => {

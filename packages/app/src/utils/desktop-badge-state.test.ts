@@ -14,6 +14,7 @@ describe("desktop-badge-state", () => {
   it("ignores running and done workspace statuses", () => {
     expect(isWorkspaceActionableForDesktopBadge("running")).toBe(false);
     expect(isWorkspaceActionableForDesktopBadge("done")).toBe(false);
+    expect(isWorkspaceActionableForDesktopBadge("blocked")).toBe(false);
   });
 
   it("returns undefined when no visible workspaces need attention", () => {
