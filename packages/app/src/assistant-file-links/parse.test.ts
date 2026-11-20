@@ -101,7 +101,17 @@ describe("parseFileProtocolUrl", () => {
     });
   });
 
+  it.each([
+    ["file:///Users/test/app.tsx:42", "/Users/test/app.tsx", 42, undefined],
+    ["file:///Users/test/app.tsx:42:7", "/Users/test/app.tsx", 42, undefined],
+    ["file:///Users/test/app.tsx:12-20", "/Users/test/app.tsx", 12, 20],
+    ["file:///C:/Users/test/app.tsx:3", "C:/Users/test/app.tsx", 3, undefined],
+  ])("reads a :line suffix from %s", (url, path, lineStart, lineEnd) => {
+    expect(parseFileProtocolUrl(url)).toEqual({ raw: url, path, lineStart, lineEnd });
+  });
+
   it("rejects non-file URLs and invalid ranges", () => {
+    expect(parseFileProtocolUrl("file:///Users/test/app.tsx:20-12")).toBeNull();
     expect(parseFileProtocolUrl("https://example.com/test.ts#L10")).toBeNull();
     expect(parseFileProtocolUrl("file:///Users/test/project/src/app.tsx#L20-L12")).toBeNull();
   });

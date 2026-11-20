@@ -42,7 +42,8 @@ const URL_BOUNDARY =
   "\\u2018\\u2019\\u201C\\u201D\\u2026\\u3000-\\u3003\\u3008-\\u3011\\u3014-\\u301F\\uFF01-\\uFF0F\\uFF1A-\\uFF20\\uFF3B-\\uFF40\\uFF5B-\\uFF65";
 const URL_CHARACTER = String.raw`[^\s<>()"'\x60${URL_BOUNDARY}]`;
 const URL_GROUP = String.raw`\(${URL_CHARACTER}*\)`;
-const BARE_URL = String.raw`(?:https?|file)://(?:${URL_CHARACTER}|${URL_GROUP})*(?:[^\s<>()"'\x60.,;:!?${URL_BOUNDARY}]|${URL_GROUP})`;
+// A scheme must start a word: `profile://x` and `git+file://x` are not file URLs.
+const BARE_URL = String.raw`(?<![a-zA-Z0-9\x2b.-])(?:https?|file)://(?:${URL_CHARACTER}|${URL_GROUP})*(?:[^\s<>()"'\x60.,;:!?${URL_BOUNDARY}]|${URL_GROUP})`;
 
 const TEXT_PATTERN = createTextPattern(PROSE_PATH);
 // One entry per distinct workspace forge remote; reuse keeps the engine's regex identity stable.

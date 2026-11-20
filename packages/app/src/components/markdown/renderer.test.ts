@@ -573,7 +573,53 @@ describe("bare URL sentence punctuation", () => {
       prepared.linkRecognition.text,
       prepared.linkRecognition.inlineCode,
     );
-    expect(JSON.stringify(tree)).toContain(`"url":"${url}"`);
+    expect(tree.children?.[0]?.children?.at(-1)).toEqual({
+      type: "Link",
+      attributes: expect.objectContaining({ url }),
+      children: [{ type: "Text", content: url }],
+    });
+  });
+
+  it.each(["profile://settings", "git+file:///repo", "xhttp://example.com"])(
+    "does not link a scheme inside a longer word: %s",
+    async (token) => {
+      const prepared = prepareMarkdownSource(`See ${token} now`);
+      const tree = recognizeTextLinks(
+        await parseMarkdown(prepared.render(), { latexMath: false }),
+        prepared.linkRecognition.text,
+        prepared.linkRecognition.inlineCode,
+      );
+      expect(tree.children?.[0]?.children).toEqual([{ type: "Text", content: `See ${token} now` }]);
+    },
+  );
+
+  it.each([
+    ["[label](file:///Users/test/a.html)", "label"],
+    ["<file:///Users/test/a.html>", "file:///Users/test/a.html"],
+  ])("keeps an authored file link single: %s", async (source, text) => {
+    const prepared = prepareMarkdownSource(source);
+    const tree = recognizeTextLinks(
+      await parseMarkdown(prepared.render(), { latexMath: false }),
+      prepared.linkRecognition.text,
+      prepared.linkRecognition.inlineCode,
+    );
+    expect(tree.children?.[0]?.children).toEqual([
+      {
+        type: "Link",
+        attributes: expect.objectContaining({ url: "file:///Users/test/a.html" }),
+        children: [{ type: "Text", content: text }],
+      },
+    ]);
+  });
+
+  it("does not link a file URL inside a fenced code block", async () => {
+    const prepared = prepareMarkdownSource("```\nfile:///Users/test/a.html\n```");
+    const tree = recognizeTextLinks(
+      await parseMarkdown(prepared.render(), { latexMath: false }),
+      prepared.linkRecognition.text,
+      prepared.linkRecognition.inlineCode,
+    );
+    expect(JSON.stringify(tree)).not.toContain('"type":"Link"');
   });
 
   it.each(["[Authored](https://example.com/a.)", "<https://example.com/a.>"])(
