@@ -39,6 +39,7 @@ export function ArchivedWorkspacePreview({
         normalizedServerId: serverId,
         normalizedWorkspaceId: workspaceId,
         host: "sheet",
+        readOnly: true,
         onOpenTab: ignore,
         onOpenPreferredTarget: ignore,
         onCloseCurrentTab: ignore,

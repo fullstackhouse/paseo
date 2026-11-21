@@ -28,6 +28,7 @@ export interface BuildWorkspacePaneContentModelInput {
   normalizedServerId: string;
   normalizedWorkspaceId: string;
   host: PaneHost;
+  readOnly?: boolean;
   onOpenTab: (target: WorkspaceTabDescriptor["target"]) => void;
   onOpenPreferredTarget: (
     target: WorkspaceTabDescriptor["target"],
@@ -46,6 +47,7 @@ export function buildWorkspacePaneContentModel({
   normalizedServerId,
   normalizedWorkspaceId,
   host,
+  readOnly,
   onOpenTab,
   onOpenPreferredTarget,
   onOpenTargetToSide,
@@ -64,6 +66,7 @@ export function buildWorkspacePaneContentModel({
       serverId: normalizedServerId,
       workspaceId: normalizedWorkspaceId,
       host,
+      ...(readOnly ? { readOnly } : {}),
       tabId: tab.tabId,
       target: tab.target,
       state: tab.state,
@@ -112,6 +115,7 @@ export function WorkspacePaneContent({
       serverId: paneContextValue.serverId,
       workspaceId: paneContextValue.workspaceId,
       host: paneContextValue.host,
+      readOnly: paneContextValue.readOnly,
       tabId: paneContextValue.tabId,
       target: paneContextValue.target,
       state: paneContextValue.state,
@@ -132,6 +136,7 @@ export function WorkspacePaneContent({
       openTab,
       openPreferredTarget,
       openTargetToSide,
+      paneContextValue.readOnly,
       paneContextValue.serverId,
       panelRevision,
       paneContextValue.tabId,

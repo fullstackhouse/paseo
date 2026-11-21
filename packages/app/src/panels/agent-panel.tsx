@@ -1096,8 +1096,10 @@ const ChatAgentReadyContent = memo(function ChatAgentReadyContent({
   onOpenWorkspaceFile?: (request: WorkspaceFileOpenRequest) => void;
 }) {
   const { t } = useTranslation();
+  const paneContext = usePaneContext();
   // The workspace sheet is for looking; Open as tab brings the agent back with its composer.
-  const showsComposer = usePaneContext().host !== "sheet";
+  const showsComposer = paneContext.host !== "sheet";
+  const readOnly = paneContext.readOnly === true;
   // The dock lays out fullscreen for the same session the composer edits in.
   const composerEditingSession = useComposerEditingSession("chat");
   const isComposerFullscreen = useComposerFullscreen(composerEditingSession);
@@ -1112,7 +1114,7 @@ const ChatAgentReadyContent = memo(function ChatAgentReadyContent({
   });
   const hasPluginComposerPills = useHasPluginComposerPills(serverId, workspaceId, agentId);
   const [composerTrackExtraHeight, setComposerTrackExtraHeight] = useState(0);
-  const hasActiveComposer = !agentState.archivedAt && !isArchivingCurrentAgent;
+  const hasActiveComposer = !readOnly && !agentState.archivedAt && !isArchivingCurrentAgent;
   const parentAgentId = useParentAgentId(serverId, agentId);
   // With a composer the parent is a pill above it; without one, the box takes the composer's place.
   const parentPillAgentId = showsComposer ? parentAgentId : null;
@@ -1206,6 +1208,7 @@ const ChatAgentReadyContent = memo(function ChatAgentReadyContent({
           routeBottomAnchorRequest={routeBottomAnchorRequest}
           hasAppliedAuthoritativeHistory={hasAppliedAuthoritativeHistory}
           hasActiveComposer={hasActiveComposer}
+          readOnly={readOnly}
           hasVisibleAgentTracks={hasVisibleAgentTracks}
           composerTrackExtraHeight={composerTrackExtraHeight}
           toast={toastApi}
@@ -1375,6 +1378,7 @@ const AgentStreamSection = memo(function AgentStreamSection({
   routeBottomAnchorRequest,
   hasAppliedAuthoritativeHistory,
   hasActiveComposer,
+  readOnly,
   hasVisibleAgentTracks,
   composerTrackExtraHeight,
   toast,
@@ -1388,6 +1392,7 @@ const AgentStreamSection = memo(function AgentStreamSection({
   routeBottomAnchorRequest: RouteBottomAnchorRequest;
   hasAppliedAuthoritativeHistory: boolean;
   hasActiveComposer: boolean;
+  readOnly: boolean;
   hasVisibleAgentTracks: boolean;
   composerTrackExtraHeight: number;
   toast: ReturnType<typeof useToastHost>["api"];
@@ -1461,7 +1466,8 @@ const AgentStreamSection = memo(function AgentStreamSection({
       toast={toast}
       pendingMessageSubmissions={pendingMessageSubmissions}
       turnPresentation={turnPresentation}
-      onOpenWorkspaceFile={onOpenWorkspaceFile}
+      readOnly={readOnly}
+      onOpenWorkspaceFile={readOnly ? undefined : onOpenWorkspaceFile}
     />
   );
 });

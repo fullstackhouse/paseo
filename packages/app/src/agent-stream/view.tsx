@@ -727,7 +727,7 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
             images={item.images}
             attachments={item.attachments}
             timestamp={item.timestamp.getTime()}
-            capabilities={context.capabilities}
+            capabilities={readOnly ? undefined : context.capabilities}
             client={client}
             isFirstInGroup={layoutItem.isFirstInUserGroup}
             isLastInGroup={layoutItem.isLastInUserGroup}
@@ -749,6 +749,7 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
       },
       [
         context.capabilities,
+        readOnly,
         agentId,
         client,
         getCollapsedTurn,
