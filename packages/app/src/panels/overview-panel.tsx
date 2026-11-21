@@ -3,17 +3,22 @@ import { Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import {
   Archive,
+  Bot,
   ChevronRight,
   CircleAlert,
+  CircleDashed,
+  FolderOpen,
   GitBranch,
+  GitPullRequest,
   LayoutDashboard,
   MessageCircleQuestion,
   ShieldQuestion,
+  User,
 } from "lucide-react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import invariant from "tiny-invariant";
 import type { AgentPermissionAction, AgentPermissionRequest } from "@getpaseo/protocol/agent-types";
-import type { PluginWorkspaceStatus } from "@getpaseo/plugin/client";
+import type { PluginWorkspaceBlocker, PluginWorkspaceStatus } from "@getpaseo/plugin/client";
 import { useAgentDescriptor } from "@/agent-presentation";
 import { Button } from "@/components/ui/button";
 import { StatusBadge, type StatusBadgeVariant } from "@/components/ui/status-badge";
@@ -46,6 +51,7 @@ import {
 import { isWorkspaceRootAgent } from "@/subagents/workspace-root-policy";
 import { useLineageFocus } from "@/subagents/lineage-focus";
 import { navigateToAgent } from "@/utils/navigate-to-agent";
+import { openExternalUrl } from "@/utils/open-external-url";
 import { formatTimeAgo } from "@/utils/time";
 import { normalizeWorkspaceOpaqueId } from "@/utils/workspace-identity";
 import { useWorkspaceAttention } from "@/workspace-attention/attention";
@@ -54,6 +60,8 @@ import { showExplorerForAttention } from "@/workspace-attention/auto-show";
 import { openExplorerSidebarView } from "@/workspace-tabs/explorer-sidebar";
 import { buildWorkspaceTabPersistenceKey } from "@/workspace-tabs/model";
 import {
+  blockerKey,
+  blockerTarget,
   branchFacts,
   canAnswerPermissionInPlace,
   compactMoveWord,
@@ -71,6 +79,7 @@ import {
   permissionFacts,
   permissionResponse,
   pullRequestFacts,
+  statusBlockers,
   type WorkspaceStateWord,
   type YourMoveRow,
 } from "./overview/model";
@@ -82,6 +91,11 @@ const ThemedArchive = withUnistyles(Archive);
 const ThemedAsk = withUnistyles(MessageCircleQuestion);
 const ThemedShield = withUnistyles(ShieldQuestion);
 const ThemedAlert = withUnistyles(CircleAlert);
+const ThemedPullRequest = withUnistyles(GitPullRequest);
+const ThemedBot = withUnistyles(Bot);
+const ThemedFolder = withUnistyles(FolderOpen);
+const ThemedUser = withUnistyles(User);
+const ThemedCircleDashed = withUnistyles(CircleDashed);
 const mutedColorMapping = (theme: Theme) => ({ color: theme.colors.foregroundMuted });
 const extraMutedColorMapping = (theme: Theme) => ({ color: theme.colors.foregroundExtraMuted });
 const warningColorMapping = (theme: Theme) => ({ color: theme.colors.statusWarning });
@@ -171,6 +185,7 @@ function OverviewPanel(): ReactElement {
           agentRunning={agentRunning}
           workspaceKey={workspaceKey}
         />
+        <BlockedBy item={status} serverId={serverId} />
         <YourMove
           rows={moves}
           serverId={serverId}
@@ -377,6 +392,106 @@ function dotStyle(state: StatusTone) {
   if (state === "blocked") return styles.dotDanger;
   if (state === "done") return styles.dotOk;
   return styles.dotMuted;
+}
+
+/** What a blocked status waits on, under its card: each row opens the PR, agent or workspace. */
+function BlockedBy({
+  item,
+  serverId,
+}: {
+  item: WorkspaceSummaryItem | null;
+  serverId: string;
+}): ReactElement | null {
+  const blockers = statusBlockers(item?.status ?? null);
+  if (blockers.length === 0) return null;
+  return (
+    <Section title="panels.overview.blockedBy">
+      {blockers.map((blocker) => (
+        <BlockerRow key={blockerKey(blocker)} blocker={blocker} serverId={serverId} />
+      ))}
+    </Section>
+  );
+}
+
+function BlockerRow({
+  blocker,
+  serverId,
+}: {
+  blocker: PluginWorkspaceBlocker;
+  serverId: string;
+}): ReactElement {
+  const target = blockerTarget(blocker);
+  const open = useCallback(() => {
+    if (!target) return;
+    if (target.kind === "agent") navigateToAgent({ serverId, agentId: target.agentId });
+    else if (target.kind === "workspace") {
+      navigateToWorkspace({ serverId, workspaceId: target.workspaceId });
+    } else void openExternalUrl(target.url);
+  }, [serverId, target]);
+  const content = (
+    <>
+      <BlockerIcon kind={blocker.kind} />
+      <Text style={styles.nextTitle} numberOfLines={1}>
+        {blocker.label}
+      </Text>
+      {blocker.detail ? (
+        <Text style={wordStyle(blockerTone(blocker.tone))} numberOfLines={1}>
+          {blocker.detail}
+        </Text>
+      ) : null}
+      {target ? (
+        <ThemedChevronRight size={SMALL_ICON_SIZE} uniProps={extraMutedColorMapping} />
+      ) : null}
+    </>
+  );
+  const testID = `overview-blocker-${blocker.kind}`;
+  if (!target) {
+    return (
+      <View style={styles.next} testID={testID}>
+        {content}
+      </View>
+    );
+  }
+  return (
+    <PressHighlight
+      accessibilityRole={target.kind === "url" ? "link" : "button"}
+      accessibilityLabel={[blocker.label, blocker.detail].filter(Boolean).join(", ")}
+      onPress={open}
+      style={styles.next}
+      highlightStyle={styles.pressed}
+      testID={testID}
+    >
+      {content}
+    </PressHighlight>
+  );
+}
+
+function BlockerIcon({ kind }: { kind: PluginWorkspaceBlocker["kind"] }): ReactElement {
+  switch (kind) {
+    case "pr":
+      return <ThemedPullRequest size={ICON_SIZE} uniProps={mutedColorMapping} />;
+    case "agent":
+      return <ThemedBot size={ICON_SIZE} uniProps={mutedColorMapping} />;
+    case "workspace":
+      return <ThemedFolder size={ICON_SIZE} uniProps={mutedColorMapping} />;
+    case "person":
+      return <ThemedUser size={ICON_SIZE} uniProps={mutedColorMapping} />;
+    default:
+      return <ThemedCircleDashed size={ICON_SIZE} uniProps={mutedColorMapping} />;
+  }
+}
+
+function blockerTone(tone: PluginWorkspaceBlocker["tone"]): Tone {
+  switch (tone) {
+    case "success":
+      return "ok";
+    case "warning":
+      return "warn";
+    case "danger":
+      return "danger";
+    default:
+      return "muted";
+  }
 }
 
 // ── 3. What do I do ──────────────────────────────────────────────────────

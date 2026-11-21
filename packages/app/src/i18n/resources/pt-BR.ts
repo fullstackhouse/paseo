@@ -2254,6 +2254,7 @@ export const ptBR: TranslationResources = {
         answered: "Respondido",
       },
       yourMove: "Sua vez",
+      blockedBy: "Bloqueado por",
       permissionTitle: "Pedido de permissão",
       open: "Abrir",
       prMergedTitle: "PR #{{number}} mesclado",
