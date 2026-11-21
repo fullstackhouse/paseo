@@ -24,7 +24,12 @@ export type WorkspaceRouteState =
       hostName: string;
       recovery: Extract<WorkspaceRecoveryModel, { kind: "recoverable" }>;
     }
-  | { kind: "recoveryUnavailable"; hostName: string; message: string }
+  | {
+      kind: "recoveryUnavailable";
+      hostName: string;
+      message: string;
+      recreate: Extract<WorkspaceRecoveryModel, { kind: "unavailable" }>["recreate"];
+    }
   | { kind: "recoveryInspectionFailed"; hostName: string; error: string };
 
 export function resolveWorkspaceRouteState(input: {
@@ -79,12 +84,14 @@ export function resolveWorkspaceRouteState(input: {
         kind: "recoveryUnavailable",
         hostName: input.hostName,
         message: input.recovery.recovery.message,
+        recreate: input.recovery.recreate,
       };
     case "unsupportedAction":
       return {
         kind: "recoveryUnavailable",
         hostName: input.hostName,
         message: "Update Paseo to recover this workspace.",
+        recreate: null,
       };
     case "inspectionFailed":
       return {

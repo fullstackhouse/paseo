@@ -60,6 +60,15 @@ export function useWorkspaceRecovery(input: {
     },
   });
 
+  const recreateMutation = useMutation({
+    mutationFn: async () => {
+      if (!client || !isConnected) {
+        throw new Error("The host disconnected before the workspace could be recovered.");
+      }
+      await client.recreateWorkspace(input.workspaceId);
+    },
+  });
+
   const state = useMemo(
     () =>
       resolveWorkspaceRecoveryModel({
@@ -77,6 +86,10 @@ export function useWorkspaceRecovery(input: {
           pending: restoreMutation.isPending,
           error: restoreMutation.isError ? toErrorMessage(restoreMutation.error) : null,
         },
+        recreate: {
+          pending: recreateMutation.isPending,
+          error: recreateMutation.isError ? toErrorMessage(recreateMutation.error) : null,
+        },
       }),
     [
       client,
@@ -89,6 +102,9 @@ export function useWorkspaceRecovery(input: {
       restoreMutation.error,
       restoreMutation.isError,
       restoreMutation.isPending,
+      recreateMutation.error,
+      recreateMutation.isError,
+      recreateMutation.isPending,
       serverInfo,
       supportsRecovery,
     ],
@@ -97,9 +113,12 @@ export function useWorkspaceRecovery(input: {
   const restore = useCallback(() => {
     restoreMutation.mutate();
   }, [restoreMutation]);
+  const recreate = useCallback(() => {
+    recreateMutation.mutate();
+  }, [recreateMutation]);
   const retryInspection = useCallback(() => {
     void inspection.refetch();
   }, [inspection]);
 
-  return { state, restore, retryInspection };
+  return { state, restore, recreate, retryInspection };
 }

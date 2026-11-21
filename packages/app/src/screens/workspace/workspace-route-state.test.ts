@@ -134,12 +134,14 @@ describe("resolveWorkspaceRouteState", () => {
             reason: "workspace_directory_missing",
             message: "The workspace directory cannot be recreated.",
           },
+          recreate: null,
         },
       }),
     ).toEqual({
       kind: "recoveryUnavailable",
       hostName: "Laptop",
       message: "The workspace directory cannot be recreated.",
+      recreate: null,
     });
 
     expect(
@@ -153,6 +155,7 @@ describe("resolveWorkspaceRouteState", () => {
       kind: "recoveryUnavailable",
       hostName: "Laptop",
       message: "Update Paseo to recover this workspace.",
+      recreate: null,
     });
   });
 

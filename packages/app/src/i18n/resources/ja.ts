@@ -476,6 +476,9 @@ export const ja: TranslationResources = {
         restoringTitle: "ワークスペースを復元中",
         restoringAction: "復元中...",
         unavailableTitle: "ワークスペースを利用できません",
+        recreateDescription:
+          "同じ場所に空のフォルダーを作成して再び開けます。エージェントの会話は残りますが、ファイルは戻りません。",
+        recreateAction: "空のフォルダーを再作成",
         checkFailedTitle: "ワークスペースを確認できませんでした",
       },
     },

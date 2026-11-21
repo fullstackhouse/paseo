@@ -25,12 +25,15 @@ export type WorkspaceRecoveryModel =
   | {
       kind: "unavailable";
       recovery: Extract<AuthoritativeWorkspaceRecoveryState, { kind: "unavailable" }>;
+      // Making an empty folder at the workspace's path, when the host offers it.
+      recreate: { phase: "ready" | "restoring" | "failed"; error: string | null } | null;
     }
   | { kind: "inspectionFailed"; error: string };
 
 export interface WorkspaceRecoveryController {
   state: WorkspaceRecoveryModel;
   restore: () => void;
+  recreate: () => void;
   retryInspection: () => void;
 }
 
@@ -71,6 +74,7 @@ export function resolveWorkspaceRecoveryModel(input: {
     data: AuthoritativeWorkspaceRecoveryState | undefined;
   };
   restore: { pending: boolean; error: string | null };
+  recreate: { pending: boolean; error: string | null };
 }): WorkspaceRecoveryModel {
   const supportedRecovery = getSupportedRecovery(input.inspection.data);
   if (input.restore.pending && supportedRecovery) {
@@ -97,7 +101,13 @@ export function resolveWorkspaceRecoveryModel(input: {
     return { kind: "inspectionFailed", error: input.inspection.error };
   }
   if (input.inspection.data?.kind === "unavailable") {
-    return { kind: "unavailable", recovery: input.inspection.data };
+    return {
+      kind: "unavailable",
+      recovery: input.inspection.data,
+      recreate: input.inspection.data.canRecreate
+        ? { phase: resolveRecoveryPhase(input.recreate), error: input.recreate.error }
+        : null,
+    };
   }
   if (input.inspection.data?.kind === "recoverable" && !supportedRecovery) {
     return { kind: "unsupportedAction", action: input.inspection.data.action };

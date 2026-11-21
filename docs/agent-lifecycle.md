@@ -275,7 +275,12 @@ Workspace archive is a separate lifecycle. Archiving or removing a worktree can 
 agent record without setting the agent's `archivedAt`, while its `workspaceId` still points at the
 archived workspace. History navigation must not infer workspace lifecycle from `agent.archivedAt`
 or mutate either lifecycle. The workspace route asks the daemon for authoritative recovery state;
-only the route's explicit Unarchive or Restore action changes the archived workspace.
+only the route's explicit Unarchive, Restore or Recreate empty folder action changes the archived
+workspace. Restore rebuilds a worktree from git: its saved branch, or a new branch of that name from
+the base when the branch was deleted. When git can't rebuild it (a plain folder, or a worktree whose
+source repository is gone) the daemon offers Recreate empty folder instead, as a separate action
+rather than the recovery itself, because the source may only be on a drive that isn't connected. It
+is withheld when the folder's parent is also missing, so it never writes to an unmounted mount point.
 
 Archive replies once the records are archived. Removing the backing worktree (`worktree.teardown`
 commands in place, `git worktree remove`, `rm`, `git worktree prune`) then runs on a per-repository

@@ -126,16 +126,66 @@ describe("workspace recovery", () => {
     expect(unarchived).toEqual([workspace.workspaceId]);
   });
 
-  test("does not offer recovery for a missing non-worktree directory", async () => {
-    const workspace = createWorkspace({ kind: "directory", branch: null });
-    const { service } = createHarness({ workspace });
+  test("recreates a missing plain folder as an empty folder only when asked", async () => {
+    const tempDir = realpathSync(mkdtempSync(join(tmpdir(), "paseo-recover-folder-")));
+    tempDirectories.push(tempDir);
+    const workspace = createWorkspace({
+      kind: "directory",
+      branch: null,
+      worktreeRoot: null,
+      isPaseoOwnedWorktree: false,
+      mainRepoRoot: null,
+      cwd: join(tempDir, "scratch"),
+    });
+    const { service, unarchived } = createHarness({
+      workspace,
+      project: createProject({ kind: "non_git", rootPath: join(tempDir, "scratch") }),
+      directories: [tempDir],
+      worktreesRoot: join(tempDir, "worktrees"),
+    });
 
     await expect(service.inspect(workspace.workspaceId)).resolves.toEqual({
       kind: "unavailable",
       workspaceId: workspace.workspaceId,
       reason: "workspace_directory_missing",
-      message: "The archived workspace directory no longer exists and cannot be recreated.",
+      message: "The archived workspace folder no longer exists, and git can't restore it.",
+      canRecreate: true,
     });
+    await expect(service.restore(workspace.workspaceId)).rejects.toThrow(/git can't restore it/);
+    expect(existsSync(workspace.cwd)).toBe(false);
+
+    await expect(service.restore(workspace.workspaceId, { recreate: true })).resolves.toEqual({
+      workspaceId: workspace.workspaceId,
+      action: "recreate",
+    });
+    expect(statSync(workspace.cwd).isDirectory()).toBe(true);
+    expect(unarchived).toEqual([workspace.workspaceId]);
+  });
+
+  test("keeps a plain folder archived when the folder that contained it is missing too", async () => {
+    const workspace = createWorkspace({
+      kind: "directory",
+      branch: null,
+      worktreeRoot: null,
+      isPaseoOwnedWorktree: false,
+      mainRepoRoot: null,
+      cwd: "/Volumes/unplugged/scratch",
+    });
+    const { service, unarchived } = createHarness({
+      workspace,
+      project: createProject({ kind: "non_git", rootPath: "/Volumes/unplugged/scratch" }),
+    });
+
+    await expect(service.inspect(workspace.workspaceId)).resolves.toMatchObject({
+      kind: "unavailable",
+      reason: "workspace_directory_missing",
+      canRecreate: false,
+    });
+    await expect(service.restore(workspace.workspaceId, { recreate: true })).rejects.toThrow(
+      /git can't restore it/,
+    );
+    expect(existsSync("/Volumes/unplugged")).toBe(false);
+    expect(unarchived).toEqual([]);
   });
 
   test("uses the persisted source repository instead of the owning project to restore an exact subdirectory", async () => {
@@ -256,8 +306,12 @@ describe("workspace recovery", () => {
     ).toBe(false);
   });
 
-  test("keeps the workspace archived when its persisted source repository is missing", async () => {
-    const workspace = createWorkspace({ mainRepoRoot: "/missing-source" });
+  test("keeps a worktree archived while its source repository is missing, offering an empty folder", async () => {
+    const workspace = createWorkspace({
+      cwd: "/worktrees/1a2b3c4d/trigger",
+      worktreeRoot: "/worktrees/1a2b3c4d/trigger",
+      mainRepoRoot: "/missing-source",
+    });
     const { service, unarchived } = createHarness({
       workspace,
       directories: ["/project"],
@@ -268,6 +322,7 @@ describe("workspace recovery", () => {
       workspaceId: workspace.workspaceId,
       reason: "project_directory_missing",
       message: "The source repository needed to restore this worktree no longer exists.",
+      canRecreate: true,
     });
     await expect(service.restore(workspace.workspaceId)).rejects.toThrow(
       "The source repository needed to restore this worktree no longer exists.",
@@ -516,4 +571,57 @@ test("restores a user-created worktree at its recorded path outside Paseo's root
     }).trim(),
   ).toBe("external-feature");
   expect(unarchived).toEqual([workspace.workspaceId]);
+});
+
+test("restores a Paseo worktree whose record lost its worktree fields", async () => {
+  const fixture = await createBaseRecoveryFixture("refs/heads/main");
+  await fixture.archiveAndRemove();
+  // An older daemon's reconciliation saved the deleted worktree as a plain folder.
+  await fixture.registry.update(fixture.workspace.workspaceId, (workspace) => ({
+    ...workspace,
+    kind: "directory",
+    branch: null,
+    worktreeRoot: null,
+    isPaseoOwnedWorktree: false,
+    mainRepoRoot: null,
+  }));
+
+  await expect(fixture.service.inspect(fixture.workspace.workspaceId)).resolves.toMatchObject({
+    kind: "recoverable",
+    action: "restore",
+    branch: null,
+  });
+  await expect(fixture.service.restore(fixture.workspace.workspaceId)).resolves.toEqual({
+    workspaceId: fixture.workspace.workspaceId,
+    action: "restore",
+  });
+  expect(
+    execFileSync("git", ["rev-parse", "HEAD"], {
+      cwd: fixture.workspace.cwd,
+      encoding: "utf8",
+    }).trim(),
+  ).toBe(
+    execFileSync("git", ["rev-parse", "main"], { cwd: fixture.repoDir, encoding: "utf8" }).trim(),
+  );
+  expect((await fixture.registry.get(fixture.workspace.workspaceId))?.archivedAt).toBeNull();
+});
+
+test("restores a worktree whose branch was deleted as a new branch of that name from its base", async () => {
+  const fixture = await createBaseRecoveryFixture("refs/heads/main");
+  await fixture.archiveAndRemove();
+  execFileSync("git", ["branch", "-D", "feature"], { cwd: fixture.repoDir, stdio: "pipe" });
+
+  await expect(fixture.service.inspect(fixture.workspace.workspaceId)).resolves.toMatchObject({
+    kind: "recoverable",
+    action: "restore",
+    branch: null,
+  });
+  await expect(fixture.service.restore(fixture.workspace.workspaceId)).resolves.toEqual({
+    workspaceId: fixture.workspace.workspaceId,
+    action: "restore",
+  });
+  expect(
+    await getCheckoutStatus(fixture.workspace.cwd, { paseoHome: fixture.paseoHome }),
+  ).toMatchObject({ currentBranch: "feature", aheadBehind: { ahead: 0, behind: 0 } });
+  expect(existsSync(join(fixture.workspace.cwd, "feature.txt"))).toBe(false);
 });
