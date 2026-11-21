@@ -40,6 +40,7 @@ import type {
   WorkspaceDescriptorPayload,
   WorkspaceProjectDescriptorPayload,
   ProjectLastAgentSetup,
+  WorkspaceManualGroup,
 } from "@getpaseo/protocol/messages";
 import {
   normalizeWorkspaceOpaqueId,
@@ -126,6 +127,8 @@ export interface WorkspaceDescriptor {
   // Set while snoozed; snoozedUntil null means until the user wakes it.
   snoozedAt?: string | null;
   snoozedUntil?: string | null;
+  /** The sidebar group the user moved this idle workspace to, until a turn or a newer agent status. */
+  manualGroup?: WorkspaceManualGroup | null;
   labels?: string[];
   status: WorkspaceDescriptorPayload["status"];
   /** Running only because an idle agent's background shells or monitors are live. */
@@ -138,6 +141,19 @@ export interface WorkspaceDescriptor {
   githubRuntime?: WorkspaceDescriptorPayload["githubRuntime"];
   forge?: WorkspaceDescriptorPayload["forge"];
   project?: ProjectPlacementPayload;
+}
+
+/** Where the user put the workspace by hand: snoozed, or moved to a sidebar group. FSH-only. */
+function normalizeWorkspaceAttentionFields(
+  payload: WorkspaceDescriptorPayload,
+): Pick<WorkspaceDescriptor, "snoozedAt" | "snoozedUntil" | "manualGroup"> {
+  return {
+    // COMPAT(workspaceSnooze): hosts without snooze omit both.
+    snoozedAt: payload.snoozedAt ?? null,
+    snoozedUntil: payload.snoozedUntil ?? null,
+    // COMPAT(workspaceManualGroup): hosts without manual groups omit it.
+    manualGroup: payload.manualGroup ?? null,
+  };
 }
 
 export function normalizeWorkspaceDescriptor(
@@ -171,9 +187,7 @@ export function normalizeWorkspaceDescriptor(
     name: payload.name,
     title: payload.title ?? null,
     pinnedAt: payload.pinnedAt ?? null,
-    // COMPAT(workspaceSnooze): hosts without snooze omit both.
-    snoozedAt: payload.snoozedAt ?? null,
-    snoozedUntil: payload.snoozedUntil ?? null,
+    ...normalizeWorkspaceAttentionFields(payload),
     // COMPAT(workspaceLabels): old daemons omit assignments.
     labels: payload.labels ?? [],
     status: payload.status,

@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
+import type { GitActionId } from "@/git/policy";
 import type { WorkspaceSummaryItem } from "@/plugins/workspace-summary/store";
 import type { Agent } from "@/stores/session-store";
 import type { AttentionItem } from "@/workspace-attention/model";
 import {
   branchFacts,
   canAnswerPermissionInPlace,
+  compactMoveWord,
   permissionActions,
   permissionFacts,
   permissionResponse,
@@ -89,6 +91,8 @@ describe("deriveYourMove", () => {
       items,
       agentRunning: false,
       gitPrimaryId: "commit",
+      canArchive: true,
+      isWorktree: true,
       prMerged: false,
       statusDone: false,
     });
@@ -106,6 +110,8 @@ describe("deriveYourMove", () => {
       items,
       agentRunning: true,
       gitPrimaryId: "commit",
+      canArchive: true,
+      isWorktree: true,
       prMerged: false,
       statusDone: false,
     });
@@ -117,6 +123,8 @@ describe("deriveYourMove", () => {
       items: [{ kind: "plugin", key: "x", item: summaryItem({ needsYou: true }) }],
       agentRunning: false,
       gitPrimaryId: null,
+      canArchive: false,
+      isWorktree: true,
       prMerged: false,
       statusDone: false,
     });
@@ -124,11 +132,70 @@ describe("deriveYourMove", () => {
   });
 
   it("offers archive only once the PR merged or the status card says done", () => {
-    const input = { items: [], agentRunning: false, gitPrimaryId: "archive-workspace" };
-    const archive = [{ kind: "git", key: "git:archive-workspace" }];
+    const input = {
+      items: [],
+      agentRunning: false,
+      gitPrimaryId: "archive-workspace" as const,
+      canArchive: true,
+      isWorktree: true,
+    };
+    const archive = [{ kind: "git", key: "git:archive-workspace", actionId: "archive-workspace" }];
     expect(deriveYourMove({ ...input, prMerged: false, statusDone: false })).toEqual([]);
     expect(deriveYourMove({ ...input, prMerged: true, statusDone: false })).toEqual(archive);
     expect(deriveYourMove({ ...input, prMerged: false, statusDone: true })).toEqual(archive);
+  });
+
+  describe("once the work shipped", () => {
+    const base = {
+      items: [],
+      agentRunning: false,
+      canArchive: true,
+      isWorktree: true,
+      prMerged: false,
+      statusDone: true,
+    };
+    const archive = [{ kind: "git", key: "git:archive-workspace", actionId: "archive-workspace" }];
+    const step = (actionId: GitActionId) => [{ kind: "git", key: `git:${actionId}`, actionId }];
+
+    it("replaces a leftover sync step with archive", () => {
+      for (const id of ["pull", "push", "pull-and-push", "merge-from-base"] as const) {
+        expect(deriveYourMove({ ...base, gitPrimaryId: id })).toEqual(archive);
+      }
+      expect(
+        deriveYourMove({ ...base, gitPrimaryId: "pull", statusDone: false, prMerged: true }),
+      ).toEqual(archive);
+    });
+
+    it("keeps commit and PR steps", () => {
+      for (const id of [
+        "commit",
+        "merge-pr-squash",
+        "enable-pr-auto-merge-squash",
+        "pr",
+      ] as const) {
+        expect(deriveYourMove({ ...base, gitPrimaryId: id })).toEqual(step(id));
+      }
+      expect(deriveYourMove({ ...base, gitPrimaryId: "commit", prMerged: true })).toEqual(
+        step("commit"),
+      );
+    });
+
+    it("adds no archive where the branch has no git step", () => {
+      expect(deriveYourMove({ ...base, gitPrimaryId: null })).toEqual([]);
+    });
+
+    it("keeps the step when it isn't shipped or archive can't run", () => {
+      const pull = step("pull-and-push");
+      const input = { ...base, gitPrimaryId: "pull-and-push" as const };
+      expect(deriveYourMove({ ...input, statusDone: false })).toEqual(pull);
+      expect(deriveYourMove({ ...input, canArchive: false })).toEqual(pull);
+    });
+
+    it("offers archive in a regular checkout only after a merge", () => {
+      const input = { ...base, gitPrimaryId: "pull" as const, isWorktree: false };
+      expect(deriveYourMove(input)).toEqual(step("pull"));
+      expect(deriveYourMove({ ...input, statusDone: false, prMerged: true })).toEqual(archive);
+    });
   });
 });
 
@@ -326,7 +393,7 @@ describe("permissions on Overview", () => {
 describe("openMoveKey", () => {
   const rows = [
     { kind: "checks", key: "a" },
-    { kind: "git", key: "b" },
+    { kind: "git", key: "b", actionId: "commit" },
   ] as const;
 
   it("opens the lead row until the human chooses", () => {
@@ -359,7 +426,7 @@ describe("pinOpenMove", () => {
       entry: { id, title: id },
     }) as const;
   const permission = { kind: "permission", key: "perm", agentId: "x" } as const;
-  const git = { kind: "git", key: "git:create-pr" } as const;
+  const git = { kind: "git", key: "git:pr", actionId: "pr" } as const;
 
   it("keeps the ask being answered open when a move arrives above it", () => {
     const pinned = pinOpenMove([ask("a")], undefined);
@@ -381,5 +448,16 @@ describe("pinOpenMove", () => {
 
   it("pins the next lead ask once the pinned one is answered", () => {
     expect(pinOpenMove([ask("b")], "asks:a")).toBe("asks:b");
+  });
+});
+
+describe("compactMoveWord", () => {
+  it("names the action on a git row, whose title is only the branch or PR", () => {
+    expect(compactMoveWord("git", "Create PR")).toBe("Create PR");
+  });
+
+  it("adds nothing to rows whose title already says what to do", () => {
+    expect(compactMoveWord("checks", "Fix checks")).toBeNull();
+    expect(compactMoveWord("permission", "Review")).toBeNull();
   });
 });

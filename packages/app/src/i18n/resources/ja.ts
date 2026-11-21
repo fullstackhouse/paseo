@@ -1402,6 +1402,9 @@ export const ja: TranslationResources = {
         archiving: "アーカイブ中...",
         hiding: "非表示にしています...",
       },
+      move: {
+        title: "移動先",
+      },
       snooze: {
         title: "スヌーズ",
         continueToggle: "終了時に作業を再開",

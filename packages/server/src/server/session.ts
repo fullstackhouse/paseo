@@ -11,6 +11,7 @@ import type {
   SessionEventSubscription,
   UsageReportEntry,
   ProviderUsage,
+  WorkspaceManualGroup,
 } from "@getpaseo/protocol/messages";
 import { relative } from "node:path";
 import { isAbsolute } from "node:path";
@@ -3173,6 +3174,8 @@ export class Session {
         return this.handleWorkspaceSnoozeSetRequest(msg);
       case "workspace.attention.report.request":
         return this.handleWorkspaceAttentionReportRequest(msg);
+      case "workspace.group.set.request":
+        return this.handleWorkspaceGroupSetRequest(msg);
       default:
         return undefined;
     }
@@ -4141,6 +4144,49 @@ export class Session {
         snoozedAt: null,
         snoozedUntil: null,
         error: getErrorMessageOr(error, "Failed to snooze workspace"),
+      });
+    }
+  }
+
+  private async handleWorkspaceGroupSetRequest(
+    request: Extract<SessionInboundMessage, { type: "workspace.group.set.request" }>,
+  ): Promise<void> {
+    const { workspaceId, group, requestId } = request;
+    const logContext = { workspaceId, group, requestId };
+    this.sessionLogger.info(logContext, "session: workspace.group.set.request");
+    const emitResponse = (input: {
+      accepted: boolean;
+      manualGroup: WorkspaceManualGroup | null;
+      error: string | null;
+    }) => {
+      this.emit({
+        type: "workspace.group.set.response",
+        payload: { requestId, workspaceId, ...input },
+      });
+    };
+    try {
+      const nowIso = new Date().toISOString();
+      const manualGroup = group ? { group, setAt: nowIso } : null;
+      const updated = await this.workspaceRegistry.update(workspaceId, (existing) => ({
+        ...existing,
+        manualGroup,
+        updatedAt: nowIso,
+      }));
+      if (!updated) {
+        emitResponse({ accepted: false, manualGroup: null, error: "Workspace not found" });
+        return;
+      }
+      emitResponse({ accepted: true, manualGroup, error: null });
+      await this.emitWorkspaceUpdatesForWorkspaceIds([workspaceId]);
+    } catch (error) {
+      this.sessionLogger.error(
+        { ...logContext, err: error },
+        "session: workspace.group.set.request error",
+      );
+      emitResponse({
+        accepted: false,
+        manualGroup: null,
+        error: getErrorMessageOr(error, "Failed to move workspace"),
       });
     }
   }
@@ -5950,6 +5996,7 @@ export class Session {
       snoozedAt: workspace.snoozedAt,
       snoozedUntil: workspace.snoozedUntil,
       snoozeWakePrompt: workspace.snoozeWakePrompt,
+      manualGroup: workspace.manualGroup,
       ...(workspace.labels && workspace.labels.length > 0 ? { labels: workspace.labels } : {}),
       background: workspace.background,
       archivingAt: null,

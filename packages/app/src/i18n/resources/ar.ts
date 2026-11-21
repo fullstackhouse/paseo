@@ -1388,6 +1388,9 @@ export const ar: TranslationResources = {
         archiving: "أرشفة...",
         hiding: "إخفاء...",
       },
+      move: {
+        title: "نقل إلى",
+      },
       snooze: {
         title: "تأجيل",
         continueToggle: "متابعة العمل عند انتهائه",

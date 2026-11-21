@@ -56,18 +56,20 @@ async function waitForSidebarWorkspace(page: import("@playwright/test").Page, wo
   return row;
 }
 
-async function openWorkspaceReadAction(
+/** Move to replaced Mark as read / unread: Done reads the workspace, Ready to review marks it unread. */
+async function moveWorkspaceTo(
   page: import("@playwright/test").Page,
   workspaceId: string,
-  action: "read" | "unread",
+  group: "attention" | "done",
 ) {
   const workspaceKey = `${getServerId()}:${workspaceId}`;
   const row = await waitForSidebarWorkspace(page, workspaceId);
   await row.hover();
   await page.getByTestId(`sidebar-workspace-kebab-${workspaceKey}`).click();
-  const item = page.getByTestId(`sidebar-workspace-menu-mark-as-${action}-${workspaceKey}`);
+  await page.getByTestId(`sidebar-workspace-menu-move-${workspaceKey}`).click();
+  const item = page.getByTestId(`workspace-move-${group}`);
   await expect(item).toBeVisible({ timeout: 30_000 });
-  return item;
+  await item.click();
 }
 
 async function openWorkspaceHoverCard(page: import("@playwright/test").Page, workspaceId: string) {
@@ -455,7 +457,7 @@ test.describe("Sidebar workspace list", () => {
     }
   });
 
-  test("marks a finished workspace unread until it is marked read", async ({ page }) => {
+  test("moves a finished workspace to Ready to review and back to Done", async ({ page }) => {
     const workspace = await seedMockAgentWorkspace({
       repoPrefix: "sidebar-mark-unread-",
       title: "Mark unread",
@@ -470,13 +472,12 @@ test.describe("Sidebar workspace list", () => {
 
       const row = await waitForSidebarWorkspace(page, workspace.workspaceId);
       await expect(row.getByTestId("workspace-status-indicator-done")).toBeVisible();
-      await (await openWorkspaceReadAction(page, workspace.workspaceId, "unread")).click();
-      await openWorkspaceReadAction(page, workspace.workspaceId, "read");
 
-      await page.keyboard.press("Escape");
-      await openWorkspaceFromSidebar(page, workspace.workspaceId);
-      await (await openWorkspaceReadAction(page, workspace.workspaceId, "read")).click();
-      await openWorkspaceReadAction(page, workspace.workspaceId, "unread");
+      await moveWorkspaceTo(page, workspace.workspaceId, "attention");
+      await expect(row.getByTestId("workspace-status-indicator-attention")).toBeVisible();
+
+      await moveWorkspaceTo(page, workspace.workspaceId, "done");
+      await expect(row.getByTestId("workspace-status-indicator-done")).toBeVisible();
     } finally {
       await workspace.cleanup();
     }

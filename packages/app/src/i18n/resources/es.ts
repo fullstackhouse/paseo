@@ -1424,6 +1424,9 @@ export const es: TranslationResources = {
         archiving: "Archivando...",
         hiding: "Ocultación...",
       },
+      move: {
+        title: "Mover a",
+      },
       snooze: {
         title: "Posponer",
         continueToggle: "Continuar el trabajo al terminar",

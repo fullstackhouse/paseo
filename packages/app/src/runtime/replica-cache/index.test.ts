@@ -338,7 +338,22 @@ describe("ReplicaCache", () => {
     expect((await reader.readWorkspace(SERVER_ID, workspace.id))?.workspace).toEqual(workspace);
   });
 
-  it.each(["createdAt", "lastUserMessageAt"])(
+  it("keeps a workspace moved by hand in its group across cache reopen", async () => {
+    const storage = new MemoryStorage();
+    const writer = createCache(storage);
+    const baseline = directory();
+    const manualGroup = { group: "blocked" as const, setAt: "2026-11-20T09:00:00.000Z" };
+    const workspace = normalizeWorkspaceDescriptor({ ...workspacePayload(), manualGroup });
+    baseline.workspaces.set(workspace.id, workspace);
+    commitDirectory(writer, SERVER_ID, baseline);
+    await writer.flush();
+    const reader = createCache(storage);
+    expect(
+      (await reader.readDirectory(SERVER_ID)).workspaces.get(workspace.id)?.manualGroup,
+    ).toEqual(manualGroup);
+  });
+
+  it.each(["createdAt", "lastUserMessageAt", "manualGroup"])(
     "refetches workspaces cached without %s",
     async (field) => {
       const cached = await cacheWithoutBackgroundVisibility();
