@@ -277,8 +277,8 @@ archived workspace. History navigation must not infer workspace lifecycle from `
 or mutate either lifecycle. The workspace route asks the daemon for authoritative recovery state;
 only the route's explicit Unarchive, Restore or Recreate empty folder action changes the archived
 workspace. Restore rebuilds a worktree from git: its saved branch, or a new branch of that name from
-the base when git proves the branch is gone (no local branch, no origin tracking ref, and origin
-reports none). A fetch that fails offline is not proof, so restore keeps the saved branch and shows
+the base when git proves the branch is gone (no local branch, and origin reports none; a leftover
+origin tracking ref doesn't count). A fetch that fails offline is not proof, so restore keeps the saved branch and shows
 the error. When a plain folder is missing, the daemon offers Recreate empty folder as a separate
 action, not as the recovery itself, because the folder may only be on a drive that isn't connected.
 It is withheld when the folder's parent is missing too. Worktrees never get it: unarchiving one at

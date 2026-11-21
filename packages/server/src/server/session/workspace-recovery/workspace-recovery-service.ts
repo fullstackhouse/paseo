@@ -322,24 +322,29 @@ function createRecoverableState(
 }
 
 /**
- * True only when git proves the branch is gone: no local branch, no origin tracking ref,
- * and origin either doesn't exist or reports no such branch. A fetch that fails offline
- * or on auth is not proof, so the saved branch is kept and its restore reports the error.
+ * True only when git proves the branch is gone: no local branch, and origin either
+ * doesn't exist or reports no such branch. Origin is asked even when a tracking ref
+ * remains, since one outlives a branch deleted after its PR merged until a pruning
+ * fetch. A failed check (offline, auth) is not proof: the saved branch is kept and its
+ * restore reports the error.
  */
 async function isBranchGone(repoRoot: string, branch: string): Promise<boolean> {
   try {
-    for (const ref of [`refs/heads/${branch}`, `refs/remotes/origin/${branch}`]) {
-      const shown = await runGitCommand(["show-ref", "--verify", "--quiet", ref], {
-        cwd: repoRoot,
-        acceptExitCodes: [0, 1],
-      });
-      if (shown.exitCode === 0) return false;
-    }
+    const local = await runGitCommand(["show-ref", "--verify", "--quiet", `refs/heads/${branch}`], {
+      cwd: repoRoot,
+      acceptExitCodes: [0, 1],
+    });
+    if (local.exitCode === 0) return false;
     const remotes = await runGitCommand(["remote"], { cwd: repoRoot });
     if (!remotes.stdout.split("\n").includes("origin")) return true;
     const listed = await runGitCommand(
       ["ls-remote", "--exit-code", "--heads", "origin", `refs/heads/${branch}`],
-      { cwd: repoRoot, acceptExitCodes: [0, 2], timeout: 15_000 },
+      {
+        cwd: repoRoot,
+        acceptExitCodes: [0, 2],
+        timeout: 15_000,
+        envOverlay: { GIT_TERMINAL_PROMPT: "0" },
+      },
     );
     return listed.exitCode === 2;
   } catch {

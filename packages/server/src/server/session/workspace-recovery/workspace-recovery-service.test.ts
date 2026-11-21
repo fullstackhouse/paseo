@@ -679,3 +679,36 @@ test("restores a branch origin reports deleted as a new branch of that name from
   ).toMatchObject({ currentBranch: "feature" });
   expect(existsSync(join(fixture.workspace.cwd, "feature.txt"))).toBe(false);
 });
+
+test("restores a merged branch whose stale origin tracking ref outlived it", async () => {
+  const fixture = await createBaseRecoveryFixture("refs/heads/main");
+  const remote = join(fixture.tempDir, "remote.git");
+  execFileSync("git", ["init", "--bare", remote], { stdio: "pipe" });
+  execFileSync("git", ["remote", "add", "origin", remote], { cwd: fixture.repoDir });
+  execFileSync("git", ["push", "origin", "main", "feature"], {
+    cwd: fixture.repoDir,
+    stdio: "pipe",
+  });
+  await fixture.archiveAndRemove();
+  // The PR merged: origin deleted the branch, the local branch went too, and no pruning
+  // fetch has run, so refs/remotes/origin/feature is still there.
+  execFileSync("git", ["push", remote, "--delete", "feature"], {
+    cwd: fixture.repoDir,
+    stdio: "pipe",
+  });
+  execFileSync("git", ["branch", "-D", "feature"], { cwd: fixture.repoDir });
+  execFileSync("git", ["rev-parse", "--verify", "refs/remotes/origin/feature"], {
+    cwd: fixture.repoDir,
+    stdio: "pipe",
+  });
+
+  await expect(fixture.service.inspect(fixture.workspace.workspaceId)).resolves.toMatchObject({
+    action: "restore",
+    branch: null,
+  });
+  await fixture.service.restore(fixture.workspace.workspaceId);
+  expect(
+    await getCheckoutStatus(fixture.workspace.cwd, { paseoHome: fixture.paseoHome }),
+  ).toMatchObject({ currentBranch: "feature" });
+  expect(existsSync(join(fixture.workspace.cwd, "feature.txt"))).toBe(false);
+});
