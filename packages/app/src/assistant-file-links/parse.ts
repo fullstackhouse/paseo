@@ -240,7 +240,7 @@ export function classifyAssistantFileLink(
     };
   }
 
-  if (/\s/.test(trimmed)) {
+  if (/\s/.test(trimmed) && !isRootedPathWithSpaces(trimmed)) {
     return null;
   }
 
@@ -552,6 +552,25 @@ function isAllowedAbsolutePath(pathValue: string, workspaceRoot?: string): boole
   const comparePrefix = compareWorkspaceRoot === "/" ? "/" : `${compareWorkspaceRoot}/`;
 
   return comparePath === compareWorkspaceRoot || comparePath.startsWith(comparePrefix);
+}
+
+/**
+ * Whitespace usually means a command or a sentence, so it rules a token out.
+ * A path rooted at `/`, `~/` or a drive that ends in a file name is still a
+ * path when a folder name has a space (`~/Dropbox/my notes/plan.pdf`). A space
+ * before another root or a flag means several arguments, which stay text.
+ */
+function isRootedPathWithSpaces(value: string): boolean {
+  if (/[\r\n\t]/.test(value) || /\s(?:[/~-]|[A-Za-z]:[\\/])/.test(value)) {
+    return false;
+  }
+  if (!/^(?:\/|~[\\/]|[A-Za-z]:[\\/])/.test(value)) {
+    return false;
+  }
+  const withoutHash = value.split("#")[0] ?? "";
+  const path = parseInlinePathToken(withoutHash)?.path ?? withoutHash;
+  const fileName = path.replace(/\\/g, "/").split("/").pop();
+  return !!fileName && /^[^.\s][^/]*\.[A-Za-z0-9]{1,8}$/.test(fileName);
 }
 
 function isHomeRelativePath(pathValue: string): boolean {

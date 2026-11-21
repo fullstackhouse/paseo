@@ -99,6 +99,7 @@ temporary by design: every patch is meant to go upstream and then drop out of `f
 - FSH-only (upstreamable): the five-minute workspace reconciliation sweep runs its git processes at a new low priority, labelled `workspace-reconciliation:full` in metrics. On a host with 200 workspaces each sweep is about 2,000 processes, and status requests from the app used to stall 45–60s behind it
 - FSH-only (upstreamable): bare `file://` URLs in Markdown (chat, asks, plugin Markdown) are links, like bare `http(s)://` URLs, and open at the line in a `#L42` or `:42` suffix. Before, `file:///Users/…/index.html` in prose stayed plain text unless written as `[label](file:///…)`
 - FSH-only (upstreamable): the home screen leads with a **New workspace** tile once any host has a project, opening the New workspace screen. Before, the home screen only offered setup tiles, so a returning user had to open the sidebar to start work. First runs still see only the setup tiles
+- FSH-only (upstreamable): inline-code paths with spaces in a folder or file name (`~/Dropbox/my notes/plan.pdf`) are file links when they start at `/`, `~/` or a drive and end in a file name. Any whitespace used to rule a token out, so such paths stayed plain text. Commands and lists of paths (`cat ~/a.md`, `~/a.md ~/b.md`, `/x.sh --watch`) stay text
 
 Keep this list in sync with what's merged into `fsh`.
 
