@@ -1488,6 +1488,19 @@ export const es: TranslationResources = {
       composerStateRequired: "Se requiere el estado del compositor",
       selectModel: "Selecciona un modelo",
     },
+    initialBranch: {
+      title: "Este repositorio aún no tiene commits",
+      message: "Un worktree parte de una rama, y este repositorio todavía no tiene ninguna.",
+      createDetail:
+        "Crea {{branch}} con un primer commit vacío y luego inicia el worktree desde ella.",
+      createDetailWithPush:
+        "Crea {{branch}} con un primer commit vacío, envíala a {{remote}} y luego inicia el worktree desde ella.",
+      localDetail:
+        "O empieza en el checkout local. No necesita ningún commit y tu primer commit irá a {{branch}}.",
+      create: "Crear {{branch}}",
+      creating: "Creando {{branch}}…",
+      useLocalCheckout: "Usar checkout local",
+    },
     tooltips: {
       project: "Choose the project",
       host: "Choose the host",

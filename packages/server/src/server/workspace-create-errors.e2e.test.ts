@@ -1,5 +1,6 @@
 import { test, expect } from "vitest";
-import { mkdtempSync, rmSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { mkdtempSync, realpathSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -74,5 +75,61 @@ test("workspace creation replay rejects a checkout removed after completion", as
     await client.close().catch(() => undefined);
     await daemon.close();
     rmSync(directory, { recursive: true, force: true });
+  }
+}, 180000);
+
+// A clone of an empty remote has no branch to cut a worktree from. The client is told why, asks
+// the user, creates the first branch, and the same request then succeeds.
+test("workspace creation in an empty repository succeeds once its first branch exists", async () => {
+  const daemon = await createTestPaseoDaemon();
+  const root = realpathSync(mkdtempSync(path.join(tmpdir(), "workspace-empty-repo-")));
+  const remote = path.join(root, "remote.git");
+  const checkout = path.join(root, "checkout");
+  execFileSync("git", ["init", "--bare", "-b", "main", remote]);
+  execFileSync("git", ["clone", remote, checkout], { stdio: "ignore" });
+  execFileSync("git", ["config", "user.email", "test@example.com"], { cwd: checkout });
+  execFileSync("git", ["config", "user.name", "Test"], { cwd: checkout });
+  const client = new DaemonClient({
+    url: `ws://127.0.0.1:${daemon.port}/ws`,
+    appVersion: "0.1.82",
+  });
+  try {
+    await client.connect();
+    const added = await client.addProject(checkout);
+    expect(added.error).toBeNull();
+    const request = {
+      source: {
+        kind: "worktree" as const,
+        projectId: added.project!.projectId,
+        cwd: checkout,
+        worktreeSlug: "first",
+      },
+      idempotencyKey: "empty-repo",
+    };
+
+    const rejected = await client.createWorkspace(request);
+    expect(rejected.workspace).toBeNull();
+    expect(rejected.errorCode).toBe("repository_has_no_commits");
+
+    const plan = await client.createInitialBranch(checkout, { dryRun: true });
+    expect(plan).toMatchObject({ success: true, branch: "main", pushedTo: "origin" });
+    const created = await client.createInitialBranch(checkout);
+    expect(created).toMatchObject({
+      success: true,
+      branch: "main",
+      pushedTo: "origin",
+      error: null,
+    });
+    expect(
+      execFileSync("git", ["--git-dir", remote, "log", "--format=%s", "main"]).toString(),
+    ).toBe("Initial commit\n");
+
+    const retried = await client.createWorkspace(request);
+    expect(retried.error).toBeNull();
+    expect(retried.workspace).not.toBeNull();
+  } finally {
+    await client.close().catch(() => undefined);
+    await daemon.close();
+    rmSync(root, { recursive: true, force: true });
   }
 }, 180000);

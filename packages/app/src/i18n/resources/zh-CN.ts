@@ -1441,6 +1441,17 @@ export const zhCN: TranslationResources = {
       composerStateRequired: "Composer 状态必填",
       selectModel: "请选择模型",
     },
+    initialBranch: {
+      title: "此仓库还没有任何提交",
+      message: "worktree 需要从一个分支开始，而此仓库还没有分支。",
+      createDetail: "用一个空的初始提交创建 {{branch}}，然后从它开始 worktree。",
+      createDetailWithPush:
+        "用一个空的初始提交创建 {{branch}} 并推送到 {{remote}}，然后从它开始 worktree。",
+      localDetail: "或者在本地检出中开始。不需要提交，你的第一个提交会落在 {{branch}} 上。",
+      create: "创建 {{branch}}",
+      creating: "正在创建 {{branch}}…",
+      useLocalCheckout: "使用本地检出",
+    },
     tooltips: {
       project: "Choose the project",
       host: "Choose the host",

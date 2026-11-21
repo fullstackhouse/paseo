@@ -1459,6 +1459,19 @@ export const ko: TranslationResources = {
       composerStateRequired: "작성기 상태가 필요합니다",
       selectModel: "모델을 선택하세요",
     },
+    initialBranch: {
+      title: "이 저장소에는 아직 커밋이 없습니다",
+      message: "worktree는 브랜치에서 시작하는데, 이 저장소에는 아직 브랜치가 없습니다.",
+      createDetail:
+        "빈 첫 커밋으로 {{branch}} 브랜치를 만든 뒤 그 브랜치에서 worktree를 시작합니다.",
+      createDetailWithPush:
+        "빈 첫 커밋으로 {{branch}} 브랜치를 만들어 {{remote}}에 푸시한 뒤 그 브랜치에서 worktree를 시작합니다.",
+      localDetail:
+        "또는 로컬 체크아웃에서 시작하세요. 커밋이 필요 없고 첫 커밋은 {{branch}}에 들어갑니다.",
+      create: "{{branch}} 만들기",
+      creating: "{{branch}} 만드는 중…",
+      useLocalCheckout: "로컬 체크아웃 사용",
+    },
     tooltips: {
       project: "Choose the project",
       host: "Choose the host",
