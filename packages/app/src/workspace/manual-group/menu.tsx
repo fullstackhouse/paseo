@@ -27,9 +27,28 @@ export function useWorkspaceMoveTarget(
   supported: boolean,
 ): MoveTarget | null {
   const current = useWorkspaceStatus(serverId ?? "", workspaceId ?? "");
+  const turnStatus = useWorkspaceFields(
+    serverId ?? "",
+    workspaceId ?? "",
+    (workspace) => workspace.status,
+  );
+  const runningFromBackgroundWork = useWorkspaceFields(
+    serverId ?? "",
+    workspaceId ?? "",
+    (workspace) => workspace.runningFromBackgroundWork,
+  );
   return useMemo(
-    () => resolveMoveTarget({ serverId, workspaceId, supported, current }),
-    [current, serverId, supported, workspaceId],
+    () =>
+      resolveMoveTarget({
+        serverId,
+        workspaceId,
+        supported,
+        turn: turnStatus
+          ? { status: turnStatus, runningFromBackgroundWork: runningFromBackgroundWork === true }
+          : null,
+        current,
+      }),
+    [current, runningFromBackgroundWork, serverId, supported, turnStatus, workspaceId],
   );
 }
 
