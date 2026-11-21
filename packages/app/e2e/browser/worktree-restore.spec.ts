@@ -117,6 +117,9 @@ test.describe("Worktree restore", () => {
       timeout: 30_000,
     });
     await expect(page.getByTestId("workspace-recovery-action")).toHaveText("Restore");
+    // The agent shows read-only under the banner, before anything is restored.
+    await expect(page.getByTestId("archived-workspace-preview")).toBeVisible();
+    await expect(page.getByRole("textbox", { name: "Message agent..." })).toHaveCount(0);
     return seeded;
   }
 

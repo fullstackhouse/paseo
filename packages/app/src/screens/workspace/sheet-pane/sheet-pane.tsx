@@ -153,9 +153,10 @@ export function SheetPane({ sheet, onClose, onBack, opener = null, isTop }: Shee
 
 /**
  * The agent of the sheet on top is viewed, alongside the pane under it: its timeline catches up
- * and stays live. The workspace only publishes the agents of its panes.
+ * and stays live. The workspace only publishes the agents of its panes, so any agent shown
+ * outside one (a sheet, an archived workspace's preview) registers here.
  */
-function useViewedSheetAgent({
+export function useViewedSheetAgent({
   sourceId,
   serverId,
   agentId,

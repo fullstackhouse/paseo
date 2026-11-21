@@ -296,7 +296,9 @@ Auto-archive after a PR merge (`autoArchiveAfterMerge`) skips a workspace while 
 has a run in flight, because workspace archive closes every agent in it. The skip is not retried:
 the workspace stays until you archive it or its git snapshot changes again.
 
-History navigation opens the selected agent without changing either archive state. Workspace
+History navigation opens the selected agent without changing either archive state. While its
+workspace is archived, the agent shows read-only (the sheet pane host, no composer) under a banner
+carrying the recovery actions, so its conversation is readable before deciding to restore. Workspace
 **Restore** recovers only the workspace; the selected archived agent stays open with its callout.
 The agent's **Unarchive** runs the provider's native unarchive hook before interactive resume and
 history hydration. Other archived agents stay archived.
