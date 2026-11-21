@@ -101,6 +101,20 @@ export function openMoveKey(
 }
 
 /**
+ * What the host remembers as `chosen` after rendering `rows`. Once an ask is shown open it is pinned,
+ * so a move arriving above it doesn't collapse the ask the human is answering (and drop their
+ * half-written reply). Rows that can't expand are never pinned: an ask arriving above one still opens.
+ */
+export function pinOpenMove(
+  rows: readonly YourMoveRow[],
+  chosen: string | null | undefined,
+): string | null | undefined {
+  const key = openMoveKey(rows, chosen);
+  const open = rows.find((row) => row.key === key);
+  return open?.kind === "entry" && open.item.EntryComponent ? key : chosen;
+}
+
+/**
  * Where each plugin summary item renders: an item with a status is the Status card; one that can
  * need the human (`needsYou`, `entries`) belongs to Your move; anything else is a context footer fact.
  */

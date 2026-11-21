@@ -17,6 +17,7 @@ import {
   isStatusOutdated,
   MAX_ENTRIES_PER_ITEM,
   openMoveKey,
+  pinOpenMove,
   overviewSubtitle,
   partitionSummaryItems,
 } from "./model";
@@ -336,12 +337,6 @@ describe("openMoveKey", () => {
     expect(openMoveKey(rows, "b")).toBe("b");
   });
 
-  it("keeps the pinned row open when a move arrives above it", () => {
-    const pinned = openMoveKey(rows, undefined);
-    const withNewLead = [{ kind: "permission", key: "new", agentId: "x" }, ...rows] as const;
-    expect(openMoveKey(withNewLead, pinned)).toBe("a");
-  });
-
   it("keeps every row closed after the human closes the open one", () => {
     expect(openMoveKey(rows, null)).toBeNull();
   });
@@ -352,5 +347,39 @@ describe("openMoveKey", () => {
 
   it("has nothing to open without rows", () => {
     expect(openMoveKey([], undefined)).toBeNull();
+  });
+});
+
+describe("pinOpenMove", () => {
+  const ask = (id: string) =>
+    ({
+      kind: "entry",
+      key: `asks:${id}`,
+      item: summaryItem({ EntryComponent: () => null }),
+      entry: { id, title: id },
+    }) as const;
+  const permission = { kind: "permission", key: "perm", agentId: "x" } as const;
+  const git = { kind: "git", key: "git:create-pr" } as const;
+
+  it("keeps the ask being answered open when a move arrives above it", () => {
+    const pinned = pinOpenMove([ask("a")], undefined);
+    expect(pinned).toBe("asks:a");
+    expect(openMoveKey([permission, ask("a")], pinOpenMove([permission, ask("a")], pinned))).toBe(
+      "asks:a",
+    );
+  });
+
+  it("never pins a row that can't expand, so a later ask above it still opens", () => {
+    const pinned = pinOpenMove([git], undefined);
+    expect(pinned).toBeUndefined();
+    expect(openMoveKey([ask("a"), git], pinOpenMove([ask("a"), git], pinned))).toBe("asks:a");
+  });
+
+  it("keeps every row closed after the human closes the open one", () => {
+    expect(pinOpenMove([ask("a")], null)).toBeNull();
+  });
+
+  it("pins the next lead ask once the pinned one is answered", () => {
+    expect(pinOpenMove([ask("b")], "asks:a")).toBe("asks:b");
   });
 });
