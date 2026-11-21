@@ -7,6 +7,7 @@ import { useStoreWithEqualityFn } from "zustand/traditional";
 import { useSessionStore, type Agent } from "@/stores/session-store";
 import { refreshProviderSubagents, useProviderSubagentStore } from "./provider-store";
 import type { ProviderSubagentDescriptorPayload } from "@getpaseo/protocol/messages";
+import { isFinishedSubagent } from "./archive-finished";
 
 export interface PaseoSubagentRow {
   kind: "paseo";
@@ -41,6 +42,15 @@ export interface ProviderSubagentRow {
 }
 
 export type SubagentRow = PaseoSubagentRow | ProviderSubagentRow;
+
+/**
+ * Unfinished children first, then finished ones, each oldest-first. A long session piles up
+ * finished fan-outs, and oldest-first alone buries the children still working under them.
+ */
+export function compareSubagentRows(left: SubagentRow, right: SubagentRow): number {
+  const finishedOrder = Number(isFinishedSubagent(left)) - Number(isFinishedSubagent(right));
+  return finishedOrder || left.createdAt.getTime() - right.createdAt.getTime();
+}
 
 type SessionStoreSnapshot = ReturnType<typeof useSessionStore.getState>;
 type ProviderSubagentStoreSnapshot = ReturnType<typeof useProviderSubagentStore.getState>;
@@ -95,7 +105,7 @@ export function selectSubagentsForParent(
     return EMPTY_SUBAGENT_ROWS;
   }
 
-  rows.sort((left, right) => left.createdAt.getTime() - right.createdAt.getTime());
+  rows.sort(compareSubagentRows);
   return rows;
 }
 
@@ -164,7 +174,7 @@ export function selectProviderSubagentsForParent(
       createdAt: new Date(subagent.createdAt),
     });
   }
-  rows.sort((left, right) => left.createdAt.getTime() - right.createdAt.getTime());
+  rows.sort(compareSubagentRows);
   return rows;
 }
 
@@ -201,7 +211,7 @@ export function useSubagentsForParent(params: SelectSubagentsParams): SubagentRo
     if (params.providerParentSubagentId) return providerRows;
     if (providerRows.length === 0) return paseoRows;
     const rows = [...paseoRows, ...providerRows];
-    rows.sort((left, right) => left.createdAt.getTime() - right.createdAt.getTime());
+    rows.sort(compareSubagentRows);
     return rows;
   }, [params.providerParentSubagentId, paseoRows, providerRows]);
 }
