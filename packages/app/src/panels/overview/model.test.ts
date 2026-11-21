@@ -336,6 +336,12 @@ describe("openMoveKey", () => {
     expect(openMoveKey(rows, "b")).toBe("b");
   });
 
+  it("keeps the pinned row open when a move arrives above it", () => {
+    const pinned = openMoveKey(rows, undefined);
+    const withNewLead = [{ kind: "permission", key: "new", agentId: "x" }, ...rows] as const;
+    expect(openMoveKey(withNewLead, pinned)).toBe("a");
+  });
+
   it("keeps every row closed after the human closes the open one", () => {
     expect(openMoveKey(rows, null)).toBeNull();
   });

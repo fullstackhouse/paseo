@@ -87,8 +87,9 @@ export function deriveYourMove(input: {
 }
 
 /**
- * The one Your move row shown open. `chosen` is the human's last toggle: a key they opened, or null
- * after closing it. Until they choose, and once their row is gone (answered), the lead row is open.
+ * The one Your move row shown open. `chosen` is the row last shown open (the host pins it), or null
+ * after the human closed it. With nothing pinned, and once that row is gone (answered), the lead row
+ * is open.
  */
 export function openMoveKey(
   rows: readonly YourMoveRow[],

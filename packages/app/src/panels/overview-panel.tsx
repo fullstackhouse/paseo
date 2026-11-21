@@ -407,6 +407,9 @@ function YourMove({
   const [chosen, setChosen] = useState<string | null | undefined>(undefined);
   if (rows.length === 0) return null;
   const openKey = openMoveKey(rows, chosen);
+  // Pin the row once it is shown open, so a move arriving above it doesn't collapse the ask the
+  // human is answering (and drop their half-written reply).
+  if (openKey !== null && chosen !== null && openKey !== chosen) setChosen(openKey);
   return (
     <Section title="panels.overview.yourMove" count={rows.length > 1 ? rows.length : undefined}>
       {rows.map((row, index) => {
