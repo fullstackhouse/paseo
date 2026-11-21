@@ -221,6 +221,32 @@ describe("classifyAssistantFileLink", () => {
       ),
     ).toBeNull();
   });
+
+  it("classifies rooted paths whose folders contain spaces as files", () => {
+    for (const [value, path, lineStart] of [
+      ["~/Dropbox/my notes/plan.pdf", "~/Dropbox/my notes/plan.pdf", undefined],
+      ["/Users/test/My Docs/report final.md:12", "/Users/test/My Docs/report final.md", 12],
+      ["C:\\Users\\test\\My Docs\\plan.txt", "C:/Users/test/My Docs/plan.txt", undefined],
+    ] as const) {
+      expect(classifyAssistantFileLink(value, { workspaceRoot: "/Users/test/project" })).toEqual({
+        kind: "directFile",
+        target: expect.objectContaining({ path, lineStart }),
+      });
+    }
+  });
+
+  it("keeps spaced text that is not one rooted file path as text", () => {
+    for (const value of [
+      "cat ~/notes/plan.md",
+      "/usr/bin/env node",
+      "~/a/one.md ~/b/two.md",
+      "/tmp/build.sh --watch",
+      "~/Dropbox/my notes",
+      "/tmp/a.md and the rest",
+    ]) {
+      expect(classifyAssistantFileLink(value, { workspaceRoot: "/Users/test/project" })).toBeNull();
+    }
+  });
 });
 
 describe("parseAssistantFileLink", () => {
