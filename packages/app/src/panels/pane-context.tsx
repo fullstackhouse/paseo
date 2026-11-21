@@ -10,6 +10,9 @@ export interface PaneContextValue {
   serverId: string;
   workspaceId: string;
   host: PaneHost;
+  // Shown for reading only, outside any workspace layout (an archived workspace's agent):
+  // no composer, tracks, fork or rewind.
+  readOnly?: boolean;
   tabId: string;
   target: WorkspaceTabTarget;
   state?: JsonValue;

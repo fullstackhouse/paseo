@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { WorkspaceDescriptor } from "@/stores/session-store";
 import type { WorkspaceRecoveryModel } from "@/workspace-recovery/model";
-import { resolveWorkspaceRouteState } from "./workspace-route-state";
+import { resolveArchivedPreviewAgentId, resolveWorkspaceRouteState } from "./workspace-route-state";
 
 function createWorkspaceDescriptor(): WorkspaceDescriptor {
   return {
@@ -174,5 +174,57 @@ describe("resolveWorkspaceRouteState", () => {
         recovery: recoverable,
       }),
     ).toEqual({ kind: "ready" });
+  });
+});
+
+describe("resolveArchivedPreviewAgentId", () => {
+  const agent = { kind: "agent" as const, agentId: "agent-1" };
+  const unavailable = {
+    kind: "recoveryUnavailable" as const,
+    hostName: "Laptop",
+    message: "Gone",
+    recreate: null,
+  };
+
+  it("previews the agent an archived workspace was opened on", () => {
+    expect(resolveArchivedPreviewAgentId(unavailable, agent)).toBe("agent-1");
+    expect(
+      resolveArchivedPreviewAgentId(
+        {
+          kind: "archived",
+          hostName: "Laptop",
+          recovery: {
+            kind: "recoverable",
+            recovery: {
+              kind: "recoverable",
+              workspaceId: "workspace-1",
+              workspaceName: "Feature",
+              action: "restore",
+              branch: "feature",
+            },
+            phase: "ready",
+            error: null,
+          },
+        },
+        agent,
+      ),
+    ).toBe("agent-1");
+  });
+
+  it("keeps the full-page states when there is no agent to show or the workspace is not archived", () => {
+    expect(resolveArchivedPreviewAgentId(unavailable, null)).toBeNull();
+    expect(resolveArchivedPreviewAgentId(unavailable, { kind: "draft", draftId: "d" })).toBeNull();
+    expect(
+      resolveArchivedPreviewAgentId({ kind: "loading", hostName: "Laptop" }, agent),
+    ).toBeNull();
+    expect(
+      resolveArchivedPreviewAgentId({ kind: "missing", hostName: "Laptop" }, agent),
+    ).toBeNull();
+    expect(
+      resolveArchivedPreviewAgentId(
+        { kind: "recoveryInspectionFailed", hostName: "Laptop", error: "x" },
+        agent,
+      ),
+    ).toBeNull();
   });
 });

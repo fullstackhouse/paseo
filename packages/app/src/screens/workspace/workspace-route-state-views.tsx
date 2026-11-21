@@ -23,10 +23,15 @@ interface WorkspaceRouteStateActions {
   onRetryRecoveryInspection: () => void;
 }
 
+// "banner" sits above an archived workspace's read-only conversation; "page" fills the screen.
+export type WorkspaceRouteGateLayout = "page" | "banner";
+
 export function renderWorkspaceRouteGate(input: {
   state: WorkspaceRouteState;
   actions: WorkspaceRouteStateActions;
+  layout?: WorkspaceRouteGateLayout;
 }): React.ReactNode {
+  const layout = input.layout ?? "page";
   switch (input.state.kind) {
     case "loading":
       return <WorkspaceConnecting hostName={input.state.hostName} />;
@@ -42,6 +47,7 @@ export function renderWorkspaceRouteGate(input: {
       return (
         <ArchivedWorkspaceRecovery
           state={input.state}
+          layout={layout}
           onRecover={input.actions.onRecoverWorkspace}
         />
       );
@@ -65,6 +71,7 @@ export function renderWorkspaceRouteGate(input: {
       if (input.state.recreate) {
         return (
           <WorkspaceRecreateOffer
+            layout={layout}
             message={input.state.message}
             recreate={input.state.recreate}
             onRecreate={input.actions.onRecreateWorkspace}
@@ -75,6 +82,7 @@ export function renderWorkspaceRouteGate(input: {
       return (
         <WorkspaceEmptyState
           titleKey="workspace.route.recovery.unavailableTitle"
+          layout={layout}
           description={input.state.message}
           onDismiss={input.actions.onDismissMissingWorkspace}
         />
@@ -122,9 +130,11 @@ function WorkspaceConnecting({ hostName }: { hostName: string }) {
 
 function ArchivedWorkspaceRecovery({
   state,
+  layout,
   onRecover,
 }: {
   state: Extract<WorkspaceRouteState, { kind: "archived" }>;
+  layout: WorkspaceRouteGateLayout;
   onRecover: () => void;
 }) {
   const { t } = useTranslation();
@@ -154,19 +164,24 @@ function ArchivedWorkspaceRecovery({
   }
 
   return (
-    <View style={styles.emptyState}>
+    <View style={containerStyle(layout)} testID="workspace-recovery-gate">
       {isRestoring ? (
         <ThemedLoadingSpinner size="small" uniProps={foregroundMutedColorMapping} />
       ) : null}
-      <View style={styles.textStack}>
-        <Text style={styles.title}>
+      <View style={textStackStyle(layout)}>
+        <Text style={[styles.title, layout === "banner" && styles.textStart]}>
           {isRestoring
             ? t("workspace.route.recovery.restoringTitle")
             : t("workspace.route.recovery.archivedTitle")}
         </Text>
-        <Text style={styles.description}>{description}</Text>
+        <Text style={[styles.description, layout === "banner" && styles.textStart]}>
+          {description}
+        </Text>
         {recovery.error ? (
-          <Text style={styles.error} testID="workspace-recovery-error">
+          <Text
+            style={[styles.error, layout === "banner" && styles.textStart]}
+            testID="workspace-recovery-error"
+          >
             {recovery.error}
           </Text>
         ) : null}
@@ -187,11 +202,13 @@ function ArchivedWorkspaceRecovery({
 }
 
 function WorkspaceRecreateOffer({
+  layout,
   message,
   recreate,
   onRecreate,
   onDismiss,
 }: {
+  layout: WorkspaceRouteGateLayout;
   message: string;
   recreate: NonNullable<Extract<WorkspaceRouteState, { kind: "recoveryUnavailable" }>["recreate"]>;
   onRecreate: () => void;
@@ -200,16 +217,23 @@ function WorkspaceRecreateOffer({
   const { t } = useTranslation();
   const isRecreating = recreate.phase === "restoring";
   return (
-    <View style={styles.emptyState}>
+    <View style={containerStyle(layout)} testID="workspace-recovery-gate">
       {isRecreating ? (
         <ThemedLoadingSpinner size="small" uniProps={foregroundMutedColorMapping} />
       ) : null}
-      <View style={styles.textStack}>
-        <Text style={styles.title}>{t("workspace.route.recovery.unavailableTitle")}</Text>
-        <Text style={styles.description}>{message}</Text>
-        <Text style={styles.description}>{t("workspace.route.recovery.recreateDescription")}</Text>
+      <View style={textStackStyle(layout)}>
+        <Text style={[styles.title, layout === "banner" && styles.textStart]}>
+          {t("workspace.route.recovery.unavailableTitle")}
+        </Text>
+        <Text style={[styles.description, layout === "banner" && styles.textStart]}>{message}</Text>
+        <Text style={[styles.description, layout === "banner" && styles.textStart]}>
+          {t("workspace.route.recovery.recreateDescription")}
+        </Text>
         {recreate.error ? (
-          <Text style={styles.error} testID="workspace-recovery-recreate-error">
+          <Text
+            style={[styles.error, layout === "banner" && styles.textStart]}
+            testID="workspace-recovery-recreate-error"
+          >
             {recreate.error}
           </Text>
         ) : null}
@@ -317,11 +341,13 @@ function WorkspaceUnreachable({
 
 function WorkspaceEmptyState({
   titleKey,
+  layout = "page",
   hostName,
   description,
   onDismiss,
 }: {
   titleKey: "workspace.route.needsHostUpgrade" | "workspace.route.recovery.unavailableTitle";
+  layout?: WorkspaceRouteGateLayout;
   hostName?: string;
   description?: string;
   onDismiss: () => void;
@@ -329,10 +355,12 @@ function WorkspaceEmptyState({
   const { t } = useTranslation();
 
   return (
-    <View style={styles.emptyState}>
-      <View style={styles.textStack}>
-        <Text style={styles.title}>{t(titleKey)}</Text>
-        <Text style={styles.description}>{description ?? hostName}</Text>
+    <View style={containerStyle(layout)}>
+      <View style={textStackStyle(layout)}>
+        <Text style={[styles.title, layout === "banner" && styles.textStart]}>{t(titleKey)}</Text>
+        <Text style={[styles.description, layout === "banner" && styles.textStart]}>
+          {description ?? hostName}
+        </Text>
       </View>
       <View style={styles.actions}>
         <Button variant="default" leftIcon={ArrowLeftToLine} onPress={onDismiss}>
@@ -343,7 +371,34 @@ function WorkspaceEmptyState({
   );
 }
 
+function containerStyle(layout: WorkspaceRouteGateLayout) {
+  return layout === "banner" ? styles.banner : styles.emptyState;
+}
+
+function textStackStyle(layout: WorkspaceRouteGateLayout) {
+  return layout === "banner" ? styles.bannerTextStack : styles.textStack;
+}
+
 const styles = StyleSheet.create((theme) => ({
+  banner: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: theme.spacing[3],
+    paddingHorizontal: theme.spacing[4],
+    paddingVertical: theme.spacing[3],
+    borderBottomWidth: theme.borderWidth[1],
+    borderBottomColor: theme.colors.border,
+    backgroundColor: theme.colors.surface1,
+  },
+  bannerTextStack: {
+    flex: 1,
+    minWidth: 240,
+    gap: theme.spacing[1],
+  },
+  textStart: {
+    textAlign: "left",
+  },
   emptyState: {
     flex: 1,
     alignItems: "center",

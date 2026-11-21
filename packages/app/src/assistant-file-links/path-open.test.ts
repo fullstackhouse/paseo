@@ -178,3 +178,34 @@ it("keeps a later selection when an earlier nested-file lookup finishes last", a
   await earlier;
   expect(opened).toEqual(["guide.md"]);
 });
+
+it("opens nothing when disabled, for a conversation shown outside its workspace", async () => {
+  const { createInlinePathOpener } = await import("./path-open");
+  const opened: string[] = [];
+  const probes: string[] = [];
+  const opener = createInlinePathOpener({
+    workspaceRoot: "/repo",
+    enabled: false,
+    client: {
+      listDirectory: async (_root: string, file: string) => {
+        probes.push(file);
+        return [];
+      },
+      getDirectorySuggestions: async () => ({ entries: [], error: null }),
+    },
+    openFile: (location) => {
+      opened.push(location.path);
+    },
+    openDirectory: (directory) => {
+      opened.push(directory);
+    },
+    openOutsideDirectory: (directory) => {
+      opened.push(directory);
+    },
+  });
+  await opener.open({ raw: "src/components/", path: "/repo/src/components/" }, "preferred");
+  await opener.open({ raw: "./README.md", path: "/repo/README.md" }, "preferred");
+  await opener.open({ raw: "/elsewhere/dir/", path: "/elsewhere/dir/" }, "preferred");
+  expect(opened).toEqual([]);
+  expect(probes).toEqual([]);
+});

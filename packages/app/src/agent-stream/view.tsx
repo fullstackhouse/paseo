@@ -262,6 +262,8 @@ export interface AgentStreamViewProps {
   toast?: ToastApi | null;
   onOpenWorkspaceFile?: (request: WorkspaceFileOpenRequest) => void;
   readOnly?: boolean;
+  /** False keeps file and folder paths inert (a conversation shown outside its workspace). */
+  opensWorkspacePaths?: boolean;
   historyPagination?: {
     hasOlder: boolean;
     isLoadingOlder: boolean;
@@ -359,6 +361,7 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
       toast,
       onOpenWorkspaceFile,
       readOnly = false,
+      opensWorkspacePaths,
       historyPagination,
     },
     ref,
@@ -467,12 +470,20 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
         createInlinePathOpener({
           workspaceRoot,
           resolveRelativeFiles: true,
+          enabled: opensWorkspacePaths,
           client,
           openFile: openInlineFile,
           openDirectory: openInlineDirectory,
           openOutsideDirectory: openInlineOutsideDirectory,
         }),
-      [workspaceRoot, client, openInlineFile, openInlineDirectory, openInlineOutsideDirectory],
+      [
+        workspaceRoot,
+        client,
+        opensWorkspacePaths,
+        openInlineFile,
+        openInlineDirectory,
+        openInlineOutsideDirectory,
+      ],
     );
     useEffect(() => {
       if (!isActive) inlinePathOpener.cancel();
@@ -723,7 +734,7 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
             images={item.images}
             attachments={item.attachments}
             timestamp={item.timestamp.getTime()}
-            capabilities={context.capabilities}
+            capabilities={readOnly ? undefined : context.capabilities}
             client={client}
             isFirstInGroup={layoutItem.isFirstInUserGroup}
             isLastInGroup={layoutItem.isLastInUserGroup}
@@ -734,7 +745,7 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
           />
         );
       },
-      [context.capabilities, agentId, client, pendingClientMessageIds, resolvedServerId],
+      [context.capabilities, readOnly, agentId, client, pendingClientMessageIds, resolvedServerId],
     );
 
     const renderAssistantMessageItem = useCallback(

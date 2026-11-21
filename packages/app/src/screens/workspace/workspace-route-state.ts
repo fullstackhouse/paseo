@@ -1,6 +1,7 @@
 import type { HostRuntimeConnectionStatus } from "@/runtime/host-runtime";
 import type { WorkspaceDescriptor } from "@/stores/session-store";
 import type { WorkspaceRecoveryModel } from "@/workspace-recovery/model";
+import type { WorkspaceTabTarget } from "@/workspace-tabs/model";
 
 export type WorkspaceRouteState =
   | { kind: "ready" }
@@ -100,4 +101,17 @@ export function resolveWorkspaceRouteState(input: {
         error: input.recovery.error,
       };
   }
+}
+
+/**
+ * The agent an archived workspace shows read-only under its recovery banner: the agent the
+ * workspace was opened on (from History), while recovery is offered or unavailable.
+ */
+export function resolveArchivedPreviewAgentId(
+  state: WorkspaceRouteState,
+  pendingOpenTarget: WorkspaceTabTarget | null,
+): string | null {
+  if (pendingOpenTarget?.kind !== "agent") return null;
+  if (state.kind !== "archived" && state.kind !== "recoveryUnavailable") return null;
+  return pendingOpenTarget.agentId;
 }

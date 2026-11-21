@@ -165,10 +165,12 @@ import {
   type WorkspaceHeaderCheckoutState,
 } from "@/screens/workspace/workspace-header-source";
 import {
+  resolveArchivedPreviewAgentId,
   resolveWorkspaceRouteState,
   type WorkspaceRouteState,
 } from "@/screens/workspace/workspace-route-state";
 import { renderWorkspaceRouteGate } from "@/screens/workspace/workspace-route-state-views";
+import { ArchivedWorkspacePreview } from "@/screens/workspace/archived-workspace-preview";
 import { useWorkspaceRecovery } from "@/workspace-recovery/use-workspace-recovery";
 import type { WorkspaceRecoveryModel } from "@/workspace-recovery/model";
 import {
@@ -862,6 +864,32 @@ function WorkspacePanelSurface({
         </SheetHostScope>
       </NewTabLauncherProvider>
     </WorkspaceComposerEditingSessionsProvider>
+  );
+}
+
+// An archived workspace opened on one of its agents (from History) shows that agent's
+// conversation read-only, with the recovery actions in a banner above it.
+function renderWorkspaceGate(input: {
+  state: WorkspaceRouteState;
+  actions: Parameters<typeof renderWorkspaceRouteGate>[0]["actions"];
+  serverId: string;
+  workspaceId: string;
+  previewAgentId: string | null;
+}): ReactNode {
+  if (!input.previewAgentId) {
+    return renderWorkspaceRouteGate({ state: input.state, actions: input.actions });
+  }
+  return (
+    <ArchivedWorkspacePreview
+      serverId={input.serverId}
+      workspaceId={input.workspaceId}
+      agentId={input.previewAgentId}
+      banner={renderWorkspaceRouteGate({
+        state: input.state,
+        actions: input.actions,
+        layout: "banner",
+      })}
+    />
   );
 }
 
@@ -3257,16 +3285,20 @@ function WorkspaceScreenContent({
 
   const containerStyle = [styles.container, styles.containerWorkspaceBackground];
 
-  const workspaceScreenGate = renderWorkspaceRouteGate({
+  const workspaceRouteGateActions = {
+    onRetryHost: handleRetryHost,
+    onManageHost: handleManageHost,
+    onDismissMissingWorkspace: handleDismissMissingWorkspace,
+    onRecoverWorkspace: workspaceRecovery.restore,
+    onRecreateWorkspace: workspaceRecovery.recreate,
+    onRetryRecoveryInspection: workspaceRecovery.retryInspection,
+  };
+  const workspaceScreenGate = renderWorkspaceGate({
     state: workspaceRouteState,
-    actions: {
-      onRetryHost: handleRetryHost,
-      onManageHost: handleManageHost,
-      onDismissMissingWorkspace: handleDismissMissingWorkspace,
-      onRecoverWorkspace: workspaceRecovery.restore,
-      onRecreateWorkspace: workspaceRecovery.recreate,
-      onRetryRecoveryInspection: workspaceRecovery.retryInspection,
-    },
+    actions: workspaceRouteGateActions,
+    serverId: normalizedServerId,
+    workspaceId: normalizedWorkspaceId,
+    previewAgentId: resolveArchivedPreviewAgentId(workspaceRouteState, pendingOpenTarget),
   });
   const gatedWorkspaceScreen = renderWorkspaceScreenGateShell({
     gate: workspaceScreenGate,

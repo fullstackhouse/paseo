@@ -1098,13 +1098,15 @@ const ChatAgentReadyContent = memo(function ChatAgentReadyContent({
   onOpenWorkspaceFile?: (request: WorkspaceFileOpenRequest) => void;
 }) {
   const { t } = useTranslation();
+  const paneContext = usePaneContext();
   // The workspace sheet is for looking; Open as tab brings the agent back with its composer.
-  const paneHost = usePaneContext().host;
+  const paneHost = paneContext.host;
+  const readOnly = paneContext.readOnly === true;
   const showsComposer = draft !== null || paneHost !== "sheet";
   // The dock lays out fullscreen for the same session the composer edits in.
   const composerEditingSession = useComposerEditingSession("chat");
   const isComposerFullscreen = useComposerFullscreen(composerEditingSession);
-  const hasActiveComposer = !agentState.archivedAt && !isArchivingCurrentAgent;
+  const hasActiveComposer = !readOnly && !agentState.archivedAt && !isArchivingCurrentAgent;
   const focusRestoredComposer = useStableEvent(() => {
     if (isPaneFocused && showsComposer && hasActiveComposer) {
       composerEditingSession.focus();
@@ -1230,6 +1232,7 @@ const ChatAgentReadyContent = memo(function ChatAgentReadyContent({
           }
           revealInitialHistory={hasCachedHistory || showHistorySyncError}
           hasActiveComposer={hasActiveComposer}
+          readOnly={readOnly}
           toast={toastApi}
           onOpenWorkspaceFile={onOpenWorkspaceFile}
         />
@@ -1414,6 +1417,7 @@ const AgentStreamSection = memo(function AgentStreamSection({
   isInitialHistoryLoading,
   revealInitialHistory,
   hasActiveComposer,
+  readOnly,
   toast,
   onOpenWorkspaceFile,
 }: {
@@ -1427,6 +1431,7 @@ const AgentStreamSection = memo(function AgentStreamSection({
   isInitialHistoryLoading: boolean;
   revealInitialHistory: boolean;
   hasActiveComposer: boolean;
+  readOnly: boolean;
   toast: ReturnType<typeof useToastHost>["api"];
   onOpenWorkspaceFile?: (request: WorkspaceFileOpenRequest) => void;
 }) {
@@ -1523,6 +1528,8 @@ const AgentStreamSection = memo(function AgentStreamSection({
       toast={toast}
       pendingMessageSubmissions={pendingMessageSubmissions}
       turnPresentation={turnPresentation}
+      readOnly={readOnly}
+      opensWorkspacePaths={!readOnly}
       onOpenWorkspaceFile={onOpenWorkspaceFile}
     />
   );

@@ -56,6 +56,9 @@ export function createInlinePathOpener(input: {
     getDirectorySuggestions: GetDirectorySuggestions;
   } | null;
   resolveRelativeFiles?: boolean;
+  // False for a conversation shown outside its workspace (an archived workspace's agent):
+  // every path stays inert, since opening one would write into a layout that isn't shown.
+  enabled?: boolean;
   openFile: (location: WorkspaceFileLocation, disposition: OpenFileDisposition) => void;
   openDirectory: (path: string) => void;
   openOutsideDirectory: (path: string) => void;
@@ -63,6 +66,7 @@ export function createInlinePathOpener(input: {
   let generation = 0;
   return {
     async open(target: InlinePathTarget, disposition: OpenFileDisposition) {
+      if (input.enabled === false) return;
       const ownGeneration = ++generation;
       const normalized = normalizeInlinePathTarget(target.path, input.workspaceRoot);
       if (!normalized) return;
