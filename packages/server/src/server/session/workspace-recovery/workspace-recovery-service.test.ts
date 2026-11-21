@@ -692,14 +692,18 @@ test("restores a merged branch whose stale origin tracking ref outlived it", asy
   await fixture.archiveAndRemove();
   // The PR merged: origin deleted the branch, the local branch went too, and no pruning
   // fetch has run, so refs/remotes/origin/feature is still there.
+  const featureHead = execFileSync("git", ["rev-parse", "feature"], {
+    cwd: fixture.repoDir,
+    encoding: "utf8",
+  }).trim();
   execFileSync("git", ["push", remote, "--delete", "feature"], {
     cwd: fixture.repoDir,
     stdio: "pipe",
   });
   execFileSync("git", ["branch", "-D", "feature"], { cwd: fixture.repoDir });
-  execFileSync("git", ["rev-parse", "--verify", "refs/remotes/origin/feature"], {
+  // Some git versions drop the tracking ref along with a push --delete; pin it.
+  execFileSync("git", ["update-ref", "refs/remotes/origin/feature", featureHead], {
     cwd: fixture.repoDir,
-    stdio: "pipe",
   });
 
   await expect(fixture.service.inspect(fixture.workspace.workspaceId)).resolves.toMatchObject({
