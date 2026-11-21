@@ -328,6 +328,83 @@ describe("selectSubagentsForParent", () => {
     expect(rows.map((row) => row.id)).toEqual(["first", "second", "third"]);
   });
 
+  it("lists unfinished children above finished ones, each oldest-first", () => {
+    setAgents([
+      makeAgent({ id: "parent" }),
+      makeAgent({
+        id: "old-done",
+        parentAgentId: "parent",
+        createdAt: new Date("2026-03-08T10:01:00.000Z"),
+      }),
+      makeAgent({
+        id: "new-running",
+        parentAgentId: "parent",
+        status: "running",
+        createdAt: new Date("2026-03-08T10:04:00.000Z"),
+      }),
+      makeAgent({
+        id: "new-errored",
+        parentAgentId: "parent",
+        status: "error",
+        createdAt: new Date("2026-03-08T10:03:00.000Z"),
+      }),
+      makeAgent({
+        id: "old-running",
+        parentAgentId: "parent",
+        status: "running",
+        createdAt: new Date("2026-03-08T10:02:00.000Z"),
+      }),
+    ]);
+
+    const rows = selectSubagentsForParent(
+      useSessionStore.getState(),
+      { serverId: SERVER_ID, parentAgentId: "parent" },
+      EMPTY_PENDING_ARCHIVE_IDS,
+    );
+
+    expect(rows.map((row) => row.id)).toEqual([
+      "old-running",
+      "new-running",
+      "old-done",
+      "new-errored",
+    ]);
+  });
+
+  it("lists running provider children above completed ones", () => {
+    const store = useProviderSubagentStore.getState();
+    const base = {
+      parentAgentId: "parent-a",
+      provider: "claude",
+      title: "general-purpose",
+      description: null,
+      updatedAt: "2026-03-08T10:05:00.000Z",
+    } as const;
+    for (const [id, status, minute] of [
+      ["lane-a", "completed", 1],
+      ["lane-b", "running", 3],
+      ["lane-c", "completed", 2],
+    ] as const) {
+      store.applyUpdate(SERVER_ID, {
+        kind: "upsert",
+        subagent: {
+          ...base,
+          id,
+          status,
+          createdAt: `2026-03-08T10:0${minute}:00.000Z`,
+          toolCallId: `call-${id}`,
+        },
+      });
+    }
+
+    const rows = selectProviderSubagentsForParent(
+      useProviderSubagentStore.getState(),
+      { serverId: SERVER_ID, parentAgentId: "parent-a" },
+      true,
+    );
+
+    expect(rows.map((row) => row.id)).toEqual(["lane-b", "lane-a", "lane-c"]);
+  });
+
   it("maps only row-rendered fields and does not expose onOpen", () => {
     const createdAt = new Date("2026-03-08T10:01:00.000Z");
     setAgents([
