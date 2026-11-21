@@ -428,17 +428,20 @@ function BlockerRow({
       navigateToWorkspace({ serverId, workspaceId: target.workspaceId });
     } else void openExternalUrl(target.url);
   }, [serverId, target]);
+  // Two lines: a PR title and its facts both need the width of the narrow Explorer column.
   const content = (
     <>
       <BlockerIcon kind={blocker.kind} />
-      <Text style={styles.nextTitle} numberOfLines={1}>
-        {blocker.label}
-      </Text>
-      {blocker.detail ? (
-        <Text style={wordStyle(blockerTone(blocker.tone))} numberOfLines={1}>
-          {blocker.detail}
+      <View style={styles.blockerText}>
+        <Text style={styles.blockerLabel} numberOfLines={1}>
+          {blocker.label}
         </Text>
-      ) : null}
+        {blocker.detail ? (
+          <Text style={blockerDetailStyle(blocker.tone)} numberOfLines={1}>
+            {blocker.detail}
+          </Text>
+        ) : null}
+      </View>
       {target ? (
         <ThemedChevronRight size={SMALL_ICON_SIZE} uniProps={extraMutedColorMapping} />
       ) : null}
@@ -447,7 +450,7 @@ function BlockerRow({
   const testID = `overview-blocker-${blocker.kind}`;
   if (!target) {
     return (
-      <View style={styles.next} testID={testID}>
+      <View style={styles.blocker} testID={testID}>
         {content}
       </View>
     );
@@ -457,7 +460,7 @@ function BlockerRow({
       accessibilityRole={target.kind === "url" ? "link" : "button"}
       accessibilityLabel={[blocker.label, blocker.detail].filter(Boolean).join(", ")}
       onPress={open}
-      style={styles.next}
+      style={styles.blocker}
       highlightStyle={styles.pressed}
       testID={testID}
     >
@@ -481,16 +484,16 @@ function BlockerIcon({ kind }: { kind: PluginWorkspaceBlocker["kind"] }): ReactE
   }
 }
 
-function blockerTone(tone: PluginWorkspaceBlocker["tone"]): Tone {
+function blockerDetailStyle(tone: PluginWorkspaceBlocker["tone"]) {
   switch (tone) {
     case "success":
-      return "ok";
+      return styles.blockerDetailOk;
     case "warning":
-      return "warn";
+      return styles.blockerDetailWarn;
     case "danger":
-      return "danger";
+      return styles.blockerDetailDanger;
     default:
-      return "muted";
+      return styles.blockerDetail;
   }
 }
 
@@ -1280,6 +1283,10 @@ const styles = StyleSheet.create((theme) => {
     backgroundColor: theme.colors.surface1,
   } as const;
   const summary = { fontSize: theme.fontSize.base, color: theme.colors.foreground } as const;
+  const blockerDetail = {
+    fontSize: theme.fontSize.sm,
+    color: theme.colors.foregroundMuted,
+  } as const;
   const contextRow = {
     flexDirection: "row",
     alignItems: "center",
@@ -1387,6 +1394,27 @@ const styles = StyleSheet.create((theme) => {
       fontSize: theme.fontSize.sm,
       color: theme.colors.foreground,
     },
+    blocker: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: theme.spacing[3],
+      paddingVertical: theme.spacing[1.5],
+      paddingHorizontal: theme.spacing[3],
+      borderRadius: theme.borderRadius.md,
+    },
+    blockerText: {
+      flex: 1,
+      minWidth: 0,
+      gap: theme.spacing[0.5],
+    },
+    blockerLabel: {
+      fontSize: theme.fontSize.sm,
+      color: theme.colors.foreground,
+    },
+    blockerDetail,
+    blockerDetailOk: { ...blockerDetail, color: theme.colors.statusSuccess },
+    blockerDetailWarn: { ...blockerDetail, color: theme.colors.statusWarning },
+    blockerDetailDanger: { ...blockerDetail, color: theme.colors.statusDanger },
     context: {
       gap: theme.spacing[0.5],
     },
