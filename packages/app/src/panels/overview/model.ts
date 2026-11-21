@@ -4,12 +4,23 @@ import type {
   AgentPermissionResponse,
 } from "@getpaseo/protocol/agent-types";
 import type { PluginWorkspaceStatus, PluginWorkspaceSummaryEntry } from "@getpaseo/plugin/client";
+import type { GitActionId } from "@/git/policy";
 import type { WorkspaceSummaryItem } from "@/plugins/workspace-summary/store";
 import type { Agent } from "@/stores/session-store";
 import type { AttentionItem } from "@/workspace-attention/model";
 
 /** Most rows a single plugin item adds to Your move; the rest are one press away in its panel. */
 export const MAX_ENTRIES_PER_ITEM = 5;
+
+const ARCHIVE_ACTION_ID: GitActionId = "archive-workspace";
+
+/** Git steps that only sync a branch. Once the work shipped, Archive replaces them; commit and PR steps stay. */
+const LEFTOVER_GIT_STEPS: ReadonlySet<GitActionId> = new Set([
+  "pull",
+  "push",
+  "pull-and-push",
+  "merge-from-base",
+]);
 
 export type WorkspaceStateWord =
   | "working"
@@ -46,18 +57,24 @@ export type YourMoveRow =
   | { kind: "plugin"; key: string; item: WorkspaceSummaryItem }
   | { kind: "failed"; key: string; agentId: string }
   | { kind: "checks"; key: string }
-  | { kind: "git"; key: string };
+  | { kind: "git"; key: string; actionId: GitActionId };
 
 /**
  * Everything that waits on the human, in the attention ladder's order, then the git step.
  * While an agent runs only blocking items show: failing checks and git actions would race it.
  * Archive is only a move once the work shipped: the PR merged, or the status card says done (work whose
  * PRs live in other repos has no branch PR to merge). Before that it lives in the workspace header.
+ * Once shipped it replaces a leftover sync step (a pull or push of a stale branch), never a commit or a
+ * PR step. Only in a worktree, or after a merge: a regular checkout doesn't offer Archive just because an
+ * agent finished, as in the header (git/policy.ts).
  */
 export function deriveYourMove(input: {
   items: readonly AttentionItem[];
   agentRunning: boolean;
-  gitPrimaryId: string | null;
+  gitPrimaryId: GitActionId | null;
+  /** The archive git action exists and is enabled (or running), whether or not it is the primary. */
+  canArchive: boolean;
+  isWorktree: boolean;
   prMerged: boolean;
   statusDone: boolean;
 }): YourMoveRow[] {
@@ -79,9 +96,16 @@ export function deriveYourMove(input: {
   if (input.agentRunning) return rows;
   const checks = input.items.find((item) => item.kind === "pr-checks-failed");
   if (checks) rows.push({ kind: "checks", key: checks.key });
-  const archive = input.gitPrimaryId === "archive-workspace";
-  if (input.gitPrimaryId && (!archive || input.prMerged || input.statusDone)) {
-    rows.push({ kind: "git", key: `git:${input.gitPrimaryId}` });
+  const shipped = input.prMerged || input.statusDone;
+  const archiveFits =
+    shipped &&
+    input.canArchive &&
+    (input.isWorktree || input.prMerged) &&
+    input.gitPrimaryId !== null &&
+    LEFTOVER_GIT_STEPS.has(input.gitPrimaryId);
+  const actionId = archiveFits ? ARCHIVE_ACTION_ID : input.gitPrimaryId;
+  if (actionId && (actionId !== ARCHIVE_ACTION_ID || shipped)) {
+    rows.push({ kind: "git", key: `git:${actionId}`, actionId });
   }
   return rows;
 }
