@@ -268,6 +268,12 @@ export interface PluginWorkspaceSummaryEntryProps extends PluginNavigableHostPro
   entryId: string;
   /** True for the Overview's first move: show it open, with its actions. */
   defaultExpanded: boolean;
+  /**
+   * Set by hosts that keep one entry open at a time: show the entry open when true, and report
+   * toggles through `onExpandedChange` instead of keeping local state. FSH-only.
+   */
+  expanded?: boolean;
+  onExpandedChange?(expanded: boolean): void;
 }
 
 export interface PluginWorkspaceSummaryItemRegistration {
