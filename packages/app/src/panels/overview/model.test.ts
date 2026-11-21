@@ -4,6 +4,8 @@ import type { WorkspaceSummaryItem } from "@/plugins/workspace-summary/store";
 import type { Agent } from "@/stores/session-store";
 import type { AttentionItem } from "@/workspace-attention/model";
 import {
+  blockerTarget,
+  statusBlockers,
   branchFacts,
   canAnswerPermissionInPlace,
   compactMoveWord,
@@ -459,5 +461,45 @@ describe("compactMoveWord", () => {
   it("adds nothing to rows whose title already says what to do", () => {
     expect(compactMoveWord("checks", "Fix checks")).toBeNull();
     expect(compactMoveWord("permission", "Review")).toBeNull();
+  });
+});
+
+describe("Blocked by", () => {
+  const blocked = {
+    state: "blocked" as const,
+    summary: "Waiting on the migration",
+    updatedAt: 1,
+    blockedBy: [
+      { kind: "pr" as const, label: "#42 Migrate", url: "https://github.com/a/b/pull/42" },
+    ],
+  };
+
+  it("lists blockers only on an unanswered blocked status", () => {
+    expect(statusBlockers(blocked)).toEqual(blocked.blockedBy);
+    expect(statusBlockers({ ...blocked, answered: true })).toEqual([]);
+    expect(statusBlockers({ ...blocked, state: "working" })).toEqual([]);
+    expect(statusBlockers(null)).toEqual([]);
+  });
+
+  it("lists the same blocker once", () => {
+    const pr = blocked.blockedBy[0]!;
+    expect(statusBlockers({ ...blocked, blockedBy: [pr, { ...pr, detail: "open" }] })).toEqual([
+      pr,
+    ]);
+  });
+
+  it("opens the agent, else its workspace, else the link", () => {
+    expect(
+      blockerTarget({ kind: "agent", label: "Fix", agentId: "a1", workspaceId: "w1" }),
+    ).toEqual({ kind: "agent", agentId: "a1" });
+    expect(blockerTarget({ kind: "workspace", label: "DB", workspaceId: "w1" })).toEqual({
+      kind: "workspace",
+      workspaceId: "w1",
+    });
+    expect(blockerTarget({ kind: "pr", label: "#1", url: "https://x.test/pull/1" })).toEqual({
+      kind: "url",
+      url: "https://x.test/pull/1",
+    });
+    expect(blockerTarget({ kind: "person", label: "Mo" })).toBeNull();
   });
 });

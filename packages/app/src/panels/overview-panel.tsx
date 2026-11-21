@@ -3,17 +3,22 @@ import { Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import {
   Archive,
+  Bot,
   ChevronRight,
   CircleAlert,
+  CircleDashed,
+  FolderOpen,
   GitBranch,
+  GitPullRequest,
   LayoutDashboard,
   MessageCircleQuestion,
   ShieldQuestion,
+  User,
 } from "lucide-react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import invariant from "tiny-invariant";
 import type { AgentPermissionAction, AgentPermissionRequest } from "@getpaseo/protocol/agent-types";
-import type { PluginWorkspaceStatus } from "@getpaseo/plugin/client";
+import type { PluginWorkspaceBlocker, PluginWorkspaceStatus } from "@getpaseo/plugin/client";
 import { useAgentDescriptor } from "@/agent-presentation";
 import { Button } from "@/components/ui/button";
 import { StatusBadge, type StatusBadgeVariant } from "@/components/ui/status-badge";
@@ -46,6 +51,7 @@ import {
 import { isWorkspaceRootAgent } from "@/subagents/workspace-root-policy";
 import { useLineageFocus } from "@/subagents/lineage-focus";
 import { navigateToAgent } from "@/utils/navigate-to-agent";
+import { openExternalUrl } from "@/utils/open-external-url";
 import { formatTimeAgo } from "@/utils/time";
 import { normalizeWorkspaceOpaqueId } from "@/utils/workspace-identity";
 import { useWorkspaceAttention } from "@/workspace-attention/attention";
@@ -54,6 +60,8 @@ import { showExplorerForAttention } from "@/workspace-attention/auto-show";
 import { openExplorerSidebarView } from "@/workspace-tabs/explorer-sidebar";
 import { buildWorkspaceTabPersistenceKey } from "@/workspace-tabs/model";
 import {
+  blockerKey,
+  blockerTarget,
   branchFacts,
   canAnswerPermissionInPlace,
   compactMoveWord,
@@ -71,6 +79,7 @@ import {
   permissionFacts,
   permissionResponse,
   pullRequestFacts,
+  statusBlockers,
   type WorkspaceStateWord,
   type YourMoveRow,
 } from "./overview/model";
@@ -82,6 +91,11 @@ const ThemedArchive = withUnistyles(Archive);
 const ThemedAsk = withUnistyles(MessageCircleQuestion);
 const ThemedShield = withUnistyles(ShieldQuestion);
 const ThemedAlert = withUnistyles(CircleAlert);
+const ThemedPullRequest = withUnistyles(GitPullRequest);
+const ThemedBot = withUnistyles(Bot);
+const ThemedFolder = withUnistyles(FolderOpen);
+const ThemedUser = withUnistyles(User);
+const ThemedCircleDashed = withUnistyles(CircleDashed);
 const mutedColorMapping = (theme: Theme) => ({ color: theme.colors.foregroundMuted });
 const extraMutedColorMapping = (theme: Theme) => ({ color: theme.colors.foregroundExtraMuted });
 const warningColorMapping = (theme: Theme) => ({ color: theme.colors.statusWarning });
@@ -171,6 +185,7 @@ function OverviewPanel(): ReactElement {
           agentRunning={agentRunning}
           workspaceKey={workspaceKey}
         />
+        <BlockedBy item={status} serverId={serverId} />
         <YourMove
           rows={moves}
           serverId={serverId}
@@ -377,6 +392,109 @@ function dotStyle(state: StatusTone) {
   if (state === "blocked") return styles.dotDanger;
   if (state === "done") return styles.dotOk;
   return styles.dotMuted;
+}
+
+/** What a blocked status waits on, under its card: each row opens the PR, agent or workspace. */
+function BlockedBy({
+  item,
+  serverId,
+}: {
+  item: WorkspaceSummaryItem | null;
+  serverId: string;
+}): ReactElement | null {
+  const blockers = statusBlockers(item?.status ?? null);
+  if (blockers.length === 0) return null;
+  return (
+    <Section title="panels.overview.blockedBy">
+      {blockers.map((blocker) => (
+        <BlockerRow key={blockerKey(blocker)} blocker={blocker} serverId={serverId} />
+      ))}
+    </Section>
+  );
+}
+
+function BlockerRow({
+  blocker,
+  serverId,
+}: {
+  blocker: PluginWorkspaceBlocker;
+  serverId: string;
+}): ReactElement {
+  const target = blockerTarget(blocker);
+  const open = useCallback(() => {
+    if (!target) return;
+    if (target.kind === "agent") navigateToAgent({ serverId, agentId: target.agentId });
+    else if (target.kind === "workspace") {
+      navigateToWorkspace({ serverId, workspaceId: target.workspaceId });
+    } else void openExternalUrl(target.url);
+  }, [serverId, target]);
+  // Two lines: a PR title and its facts both need the width of the narrow Explorer column.
+  const content = (
+    <>
+      <BlockerIcon kind={blocker.kind} />
+      <View style={styles.blockerText}>
+        <Text style={styles.blockerLabel} numberOfLines={1}>
+          {blocker.label}
+        </Text>
+        {blocker.detail ? (
+          <Text style={blockerDetailStyle(blocker.tone)} numberOfLines={1}>
+            {blocker.detail}
+          </Text>
+        ) : null}
+      </View>
+      {target ? (
+        <ThemedChevronRight size={SMALL_ICON_SIZE} uniProps={extraMutedColorMapping} />
+      ) : null}
+    </>
+  );
+  const testID = `overview-blocker-${blocker.kind}`;
+  if (!target) {
+    return (
+      <View style={styles.blocker} testID={testID}>
+        {content}
+      </View>
+    );
+  }
+  return (
+    <PressHighlight
+      accessibilityRole={target.kind === "url" ? "link" : "button"}
+      accessibilityLabel={[blocker.label, blocker.detail].filter(Boolean).join(", ")}
+      onPress={open}
+      style={styles.blocker}
+      highlightStyle={styles.pressed}
+      testID={testID}
+    >
+      {content}
+    </PressHighlight>
+  );
+}
+
+function BlockerIcon({ kind }: { kind: PluginWorkspaceBlocker["kind"] }): ReactElement {
+  switch (kind) {
+    case "pr":
+      return <ThemedPullRequest size={ICON_SIZE} uniProps={mutedColorMapping} />;
+    case "agent":
+      return <ThemedBot size={ICON_SIZE} uniProps={mutedColorMapping} />;
+    case "workspace":
+      return <ThemedFolder size={ICON_SIZE} uniProps={mutedColorMapping} />;
+    case "person":
+      return <ThemedUser size={ICON_SIZE} uniProps={mutedColorMapping} />;
+    default:
+      return <ThemedCircleDashed size={ICON_SIZE} uniProps={mutedColorMapping} />;
+  }
+}
+
+function blockerDetailStyle(tone: PluginWorkspaceBlocker["tone"]) {
+  switch (tone) {
+    case "success":
+      return styles.blockerDetailOk;
+    case "warning":
+      return styles.blockerDetailWarn;
+    case "danger":
+      return styles.blockerDetailDanger;
+    default:
+      return styles.blockerDetail;
+  }
 }
 
 // ── 3. What do I do ──────────────────────────────────────────────────────
@@ -1165,6 +1283,10 @@ const styles = StyleSheet.create((theme) => {
     backgroundColor: theme.colors.surface1,
   } as const;
   const summary = { fontSize: theme.fontSize.base, color: theme.colors.foreground } as const;
+  const blockerDetail = {
+    fontSize: theme.fontSize.sm,
+    color: theme.colors.foregroundMuted,
+  } as const;
   const contextRow = {
     flexDirection: "row",
     alignItems: "center",
@@ -1272,6 +1394,27 @@ const styles = StyleSheet.create((theme) => {
       fontSize: theme.fontSize.sm,
       color: theme.colors.foreground,
     },
+    blocker: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: theme.spacing[3],
+      paddingVertical: theme.spacing[1.5],
+      paddingHorizontal: theme.spacing[3],
+      borderRadius: theme.borderRadius.md,
+    },
+    blockerText: {
+      flex: 1,
+      minWidth: 0,
+      gap: theme.spacing[0.5],
+    },
+    blockerLabel: {
+      fontSize: theme.fontSize.sm,
+      color: theme.colors.foreground,
+    },
+    blockerDetail,
+    blockerDetailOk: { ...blockerDetail, color: theme.colors.statusSuccess },
+    blockerDetailWarn: { ...blockerDetail, color: theme.colors.statusWarning },
+    blockerDetailDanger: { ...blockerDetail, color: theme.colors.statusDanger },
     context: {
       gap: theme.spacing[0.5],
     },

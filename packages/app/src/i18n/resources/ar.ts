@@ -2217,6 +2217,7 @@ export const ar: TranslationResources = {
         answered: "تم الرد",
       },
       yourMove: "دورك",
+      blockedBy: "محظور بسبب",
       permissionTitle: "طلب إذن",
       open: "فتح",
       prMergedTitle: "تم دمج PR #{{number}}",

@@ -5,11 +5,13 @@ import type {
   PluginWorkspaceSummaryItemRegistration,
   PluginWorkspaceSummaryItemState,
   PluginWorkspaceStatus,
+  PluginWorkspaceBlocker,
   PluginWorkspaceSummaryEntry,
   PluginWorkspaceWorkState,
   PluginWorkspaceSummaryEntryProps,
 } from "@getpaseo/plugin/client";
 import type { ComponentType } from "react";
+import { isHttpUrl } from "@/utils/http-url";
 
 export interface WorkspaceSummaryItem extends PluginWorkspaceSummaryItemState {
   /** Distinguishes two registrations of the same item; never reused. */
@@ -84,6 +86,53 @@ function cleanStatus(status: PluginWorkspaceStatus | null): PluginWorkspaceStatu
   if (goal) clean.goal = goal;
   const now = typeof status.now === "string" ? status.now.trim() : "";
   if (now) clean.now = now;
+  // Blockers only mean something on a blocked status.
+  const blockedBy = status.state === "blocked" ? cleanBlockers(status.blockedBy) : [];
+  if (blockedBy.length > 0) clean.blockedBy = blockedBy;
+  return clean;
+}
+
+const BLOCKER_KINDS = new Set<PluginWorkspaceBlocker["kind"]>([
+  "pr",
+  "agent",
+  "workspace",
+  "person",
+  "other",
+]);
+const BLOCKER_TONES = new Set<NonNullable<PluginWorkspaceBlocker["tone"]>>([
+  "success",
+  "warning",
+  "danger",
+  "muted",
+]);
+/** More than this reads as a list to scroll, not a reason; the plugin's own tab has the rest. */
+const MAX_BLOCKERS = 8;
+
+function optionalText(value: unknown): string | undefined {
+  const text = typeof value === "string" ? value.trim() : "";
+  return text || undefined;
+}
+
+/** Drops malformed blockers one by one, and links that aren't http(s). */
+function cleanBlockers(blockers: unknown): PluginWorkspaceBlocker[] {
+  if (!Array.isArray(blockers)) return [];
+  const clean: PluginWorkspaceBlocker[] = [];
+  for (const blocker of blockers as Partial<PluginWorkspaceBlocker>[]) {
+    const label = optionalText(blocker?.label);
+    if (!label || !blocker.kind || !BLOCKER_KINDS.has(blocker.kind)) continue;
+    const entry: PluginWorkspaceBlocker = { kind: blocker.kind, label };
+    const detail = optionalText(blocker.detail);
+    if (detail) entry.detail = detail;
+    const url = optionalText(blocker.url);
+    if (url && isHttpUrl(url)) entry.url = url;
+    const agentId = optionalText(blocker.agentId);
+    if (agentId) entry.agentId = agentId;
+    const workspaceId = optionalText(blocker.workspaceId);
+    if (workspaceId) entry.workspaceId = workspaceId;
+    if (blocker.tone && BLOCKER_TONES.has(blocker.tone)) entry.tone = blocker.tone;
+    clean.push(entry);
+    if (clean.length === MAX_BLOCKERS) break;
+  }
   return clean;
 }
 
