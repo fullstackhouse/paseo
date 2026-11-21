@@ -50,6 +50,7 @@ import { buildWorkspaceTabPersistenceKey } from "@/workspace-tabs/model";
 import {
   branchFacts,
   canAnswerPermissionInPlace,
+  compactMoveWord,
   deriveCodeRow,
   deriveWorkspaceStateWord,
   deriveYourMove,
@@ -497,6 +498,7 @@ function MoveRow({
   const view = useMoveView(row, { serverId, workspaceKey, facts, gitActions });
   if (!view) return null;
   if (!lead) {
+    const word = compactMoveWord(row.kind, view.action);
     return (
       <PressHighlight
         accessibilityRole="button"
@@ -510,6 +512,11 @@ function MoveRow({
         <Text style={styles.nextTitle} numberOfLines={1}>
           {view.title}
         </Text>
+        {word ? (
+          <Text style={styles.word} numberOfLines={1}>
+            {word}
+          </Text>
+        ) : null}
         <ThemedChevronRight size={SMALL_ICON_SIZE} uniProps={extraMutedColorMapping} />
       </PressHighlight>
     );

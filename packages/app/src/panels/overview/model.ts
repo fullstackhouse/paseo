@@ -87,6 +87,14 @@ export function deriveYourMove(input: {
 }
 
 /**
+ * The word a compact (non-lead) Your move row trails with. A git row's title is only the PR or
+ * branch, so without its action ("Create PR", "Push") it reads as a plain link.
+ */
+export function compactMoveWord(kind: YourMoveRow["kind"], action: string): string | null {
+  return kind === "git" ? action : null;
+}
+
+/**
  * The one Your move row shown open. `chosen` is the human's last toggle: a key they opened, or null
  * after closing it. Until they choose, and once their row is gone (answered), the lead row is open.
  */
