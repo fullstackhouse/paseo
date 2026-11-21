@@ -4,7 +4,12 @@ import { useSessionStore, type WorkspaceDescriptor } from "@/stores/session-stor
 import type { WorkspaceAgentActivity } from "@/utils/workspace-agent-activity";
 import { resolveWorkspaceMapKeyByIdentity } from "@/utils/workspace-identity";
 import type { SidebarStateBucket } from "@/utils/sidebar-agent-state";
-import { applyReportedWork, useReportedWorkLookup, type ReportedWorkLookup } from "./reported-work";
+import {
+  applyManualGroup,
+  applyReportedWork,
+  useReportedWorkLookup,
+  type ReportedWorkLookup,
+} from "./reported-work";
 
 interface EffectiveWorkspaceStatus {
   status: SidebarStateBucket;
@@ -21,9 +26,16 @@ export function deriveEffectiveWorkspaceStatus(input: {
   /** Experimental: plugin-reported work regroups idle workspaces. */
   reportedWork?: ReportedWorkLookup;
 }): EffectiveWorkspaceStatus {
-  return applyReportedWork(
-    deriveTurnWorkspaceStatus(input),
+  const turn = deriveTurnWorkspaceStatus(input);
+  const reported = applyReportedWork(
+    turn,
     input.reportedWork?.(input.serverId, input.workspace.id),
+  );
+  return applyManualGroup(
+    turn,
+    reported,
+    input.workspace.manualGroup,
+    input.reportedWork?.updatedAt?.(input.serverId, input.workspace.id),
   );
 }
 

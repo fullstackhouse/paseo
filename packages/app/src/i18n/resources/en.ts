@@ -1396,6 +1396,9 @@ export const en = {
         archiving: "Archiving...",
         hiding: "Hiding...",
       },
+      move: {
+        title: "Move to",
+      },
       snooze: {
         title: "Snooze",
         continueToggle: "Continue work when it ends",

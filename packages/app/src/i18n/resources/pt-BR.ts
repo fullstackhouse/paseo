@@ -1414,6 +1414,9 @@ export const ptBR: TranslationResources = {
         archiving: "Arquivando...",
         hiding: "Ocultando...",
       },
+      move: {
+        title: "Mover para",
+      },
       snooze: {
         title: "Adiar",
         continueToggle: "Continuar o trabalho ao terminar",

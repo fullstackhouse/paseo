@@ -16,6 +16,7 @@ import {
   MoreVertical,
   AlarmClock,
   AlarmClockOff,
+  ArrowRightLeft,
   Pencil,
   Pin,
   PinOff,
@@ -60,6 +61,11 @@ import {
   type SnoozeTarget,
 } from "@/workspace/snooze/menu";
 import { useHostFeature } from "@/runtime/host-features";
+import {
+  useWorkspaceMoveMenuPages,
+  useWorkspaceMoveTarget,
+  WORKSPACE_MOVE_PAGE_ID,
+} from "@/workspace/manual-group/menu";
 import { useSessionStore } from "@/stores/session-store";
 
 const foregroundColorMapping = (theme: Theme) => ({ color: theme.colors.foreground });
@@ -78,6 +84,7 @@ const ThemedPinOff = withUnistyles(PinOff);
 const ThemedTag = withUnistyles(Tag);
 const ThemedAlarmClock = withUnistyles(AlarmClock);
 const ThemedAlarmClockOff = withUnistyles(AlarmClockOff);
+const ThemedArrowRightLeft = withUnistyles(ArrowRightLeft);
 
 const copyLeadingIcon = <ThemedCopy size={14} uniProps={foregroundMutedColorMapping} />;
 const renameLeadingIcon = <ThemedPencil size={14} uniProps={foregroundMutedColorMapping} />;
@@ -90,6 +97,7 @@ const pinLeadingIcon = <ThemedPin size={14} uniProps={foregroundMutedColorMappin
 const unpinLeadingIcon = <ThemedPinOff size={14} uniProps={foregroundMutedColorMapping} />;
 const snoozeLeadingIcon = <ThemedAlarmClock size={14} uniProps={foregroundMutedColorMapping} />;
 const wakeLeadingIcon = <ThemedAlarmClockOff size={14} uniProps={foregroundMutedColorMapping} />;
+const moveLeadingIcon = <ThemedArrowRightLeft size={14} uniProps={foregroundMutedColorMapping} />;
 
 const triggerIconProps = densityIconProps("sm", foregroundMutedColorMapping);
 const triggerIconHoveredProps = densityIconProps("sm", foregroundColorMapping);
@@ -160,7 +168,13 @@ function useWorkspaceMenuPages(
   const labelPages = useWorkspaceLabelMenuPages(labelTarget);
   const { target } = useWorkspaceSnoozeTarget(serverId, workspaceId);
   const snoozePages = useWorkspaceSnoozeMenuPages(target);
-  return useMemo(() => [...labelPages, ...snoozePages], [labelPages, snoozePages]);
+  const canMove = useHostFeature(serverId, "workspaceManualGroup");
+  const moveTarget = useWorkspaceMoveTarget(serverId, workspaceId, canMove);
+  const movePages = useWorkspaceMoveMenuPages(moveTarget);
+  return useMemo(
+    () => [...movePages, ...labelPages, ...snoozePages],
+    [labelPages, movePages, snoozePages],
+  );
 }
 
 function WorkspaceMenuItem({
@@ -205,6 +219,8 @@ function SidebarWorkspaceMenuItems({
     [],
   );
   const { target: snoozeTarget, isSnoozed } = useWorkspaceSnoozeTarget(serverId, workspaceId);
+  const canMove = useHostFeature(serverId, "workspaceManualGroup");
+  const moveTarget = useWorkspaceMoveTarget(serverId, workspaceId, canMove);
 
   return (
     <>
@@ -238,7 +254,19 @@ function SidebarWorkspaceMenuItems({
           {t("sidebar.workspace.actions.rename")}
         </WorkspaceMenuItem>
       ) : null}
-      {onMarkAsRead ? (
+      {moveTarget ? (
+        <DropdownMenuSubTrigger
+          id={WORKSPACE_MOVE_PAGE_ID}
+          leading={moveLeadingIcon}
+          testID={`sidebar-workspace-menu-move-${workspaceKey}`}
+        >
+          {t("sidebar.workspace.move.title")}
+        </DropdownMenuSubTrigger>
+      ) : null}
+      {/* COMPAT(workspaceManualGroup): hosts that can't store a move keep Mark as read / unread.
+          Move to replaces both: Done reads it, Ready to review puts it back. Where Move to isn't
+          offered (live state, such as a failed turn) the read items stay. */}
+      {onMarkAsRead && !moveTarget ? (
         <WorkspaceMenuItem
           surface={surface}
           testID={`sidebar-workspace-menu-mark-as-read-${workspaceKey}`}
@@ -248,7 +276,7 @@ function SidebarWorkspaceMenuItems({
           Mark as read
         </WorkspaceMenuItem>
       ) : null}
-      {onMarkAsUnread ? (
+      {onMarkAsUnread && !moveTarget ? (
         <WorkspaceMenuItem
           surface={surface}
           testID={`sidebar-workspace-menu-mark-as-unread-${workspaceKey}`}
