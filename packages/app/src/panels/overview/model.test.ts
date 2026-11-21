@@ -88,6 +88,7 @@ describe("deriveYourMove", () => {
       items,
       agentRunning: false,
       gitPrimaryId: "commit",
+      canArchive: true,
       prMerged: false,
       statusDone: false,
     });
@@ -105,6 +106,7 @@ describe("deriveYourMove", () => {
       items,
       agentRunning: true,
       gitPrimaryId: "commit",
+      canArchive: true,
       prMerged: false,
       statusDone: false,
     });
@@ -116,6 +118,7 @@ describe("deriveYourMove", () => {
       items: [{ kind: "plugin", key: "x", item: summaryItem({ needsYou: true }) }],
       agentRunning: false,
       gitPrimaryId: null,
+      canArchive: false,
       prMerged: false,
       statusDone: false,
     });
@@ -123,11 +126,33 @@ describe("deriveYourMove", () => {
   });
 
   it("offers archive only once the PR merged or the status card says done", () => {
-    const input = { items: [], agentRunning: false, gitPrimaryId: "archive-workspace" };
-    const archive = [{ kind: "git", key: "git:archive-workspace" }];
+    const input = {
+      items: [],
+      agentRunning: false,
+      gitPrimaryId: "archive-workspace",
+      canArchive: true,
+    };
+    const archive = [{ kind: "git", key: "git:archive-workspace", actionId: "archive-workspace" }];
     expect(deriveYourMove({ ...input, prMerged: false, statusDone: false })).toEqual([]);
     expect(deriveYourMove({ ...input, prMerged: true, statusDone: false })).toEqual(archive);
     expect(deriveYourMove({ ...input, prMerged: false, statusDone: true })).toEqual(archive);
+  });
+
+  it("offers archive over a leftover git step once the work shipped", () => {
+    const input = {
+      items: [],
+      agentRunning: false,
+      gitPrimaryId: "pull-and-push",
+      prMerged: false,
+    };
+    const archive = [{ kind: "git", key: "git:archive-workspace", actionId: "archive-workspace" }];
+    expect(deriveYourMove({ ...input, canArchive: true, statusDone: true })).toEqual(archive);
+    expect(deriveYourMove({ ...input, canArchive: true, statusDone: false })).toEqual([
+      { kind: "git", key: "git:pull-and-push", actionId: "pull-and-push" },
+    ]);
+    expect(deriveYourMove({ ...input, canArchive: false, statusDone: true })).toEqual([
+      { kind: "git", key: "git:pull-and-push", actionId: "pull-and-push" },
+    ]);
   });
 });
 
@@ -325,7 +350,7 @@ describe("permissions on Overview", () => {
 describe("openMoveKey", () => {
   const rows = [
     { kind: "checks", key: "a" },
-    { kind: "git", key: "b" },
+    { kind: "git", key: "b", actionId: "commit" },
   ] as const;
 
   it("opens the lead row until the human chooses", () => {

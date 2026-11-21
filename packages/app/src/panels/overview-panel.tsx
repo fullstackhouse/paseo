@@ -20,7 +20,12 @@ import { StatusBadge, type StatusBadgeVariant } from "@/components/ui/status-bad
 import { PressHighlight } from "@/components/ui/press-highlight";
 import { ScrollView } from "@/components/ui/scroll-view";
 import { GIT_ACTION_ICONS } from "@/git/action-icons";
-import { useGitActionRunner, useGitActions, type GitActions } from "@/git/use-actions";
+import {
+  type GitAction,
+  useGitActionRunner,
+  useGitActions,
+  type GitActions,
+} from "@/git/use-actions";
 import { usePaneContext } from "@/panels/pane-context";
 import { definePanel, type PanelPresentation } from "@/panels/panel-registry";
 import {
@@ -195,10 +200,12 @@ function useYourMove(input: {
   const lastPromptAt = useSessionStore((state) =>
     selectLastPromptAt(state.sessions[input.serverId]?.agents, input.workspaceId),
   );
+  const archive = input.gitActions && findGitAction(input.gitActions, "archive-workspace");
   return deriveYourMove({
     items,
     agentRunning: input.agentRunning,
     gitPrimaryId: input.gitActions?.primary?.id ?? null,
+    canArchive: Boolean(archive && !archive.disabled),
     prMerged: Boolean(input.facts?.pullRequest?.isMerged),
     statusDone: isStatusDone({
       status: input.status,
@@ -661,8 +668,10 @@ function useMoveView(
         return pluginMoveView(row, input);
       case "checks":
         return checksMoveView(input);
-      case "git":
-        return gitActions?.primary ? gitMoveView(gitActions.primary, runGitAction, input) : null;
+      case "git": {
+        const action = gitActions && findGitAction(gitActions, row.actionId);
+        return action ? gitMoveView(action, runGitAction, input) : null;
+      }
     }
   }, [agent.label, facts, gitActions, permission, row, runGitAction, serverId, t, workspaceKey]);
 }
@@ -738,15 +747,20 @@ function checksMoveView({ t, workspaceKey, facts }: MoveViewInput): MoveView {
   };
 }
 
+function findGitAction(gitActions: GitActions, id: string): GitAction | null {
+  if (gitActions.primary?.id === id) return gitActions.primary;
+  return gitActions.secondary.find((action) => action.id === id) ?? null;
+}
+
 function gitMoveView(
-  primary: NonNullable<GitActions["primary"]>,
-  runGitAction: (action: NonNullable<GitActions["primary"]>) => void,
+  primary: GitAction,
+  runGitAction: (action: GitAction) => void,
   { t, facts }: MoveViewInput,
 ): MoveView {
   const pr = facts?.pullRequest;
   const run = () => runGitAction(primary);
   // Archive is only a move once the work shipped: a merged PR, or a done status card (deriveYourMove).
-  if (pr?.isMerged || primary.id === "archive-workspace") {
+  if (primary.id === "archive-workspace") {
     return {
       icon: <ThemedArchive size={ICON_SIZE} uniProps={mergedColorMapping} />,
       tone: "merged",
@@ -754,7 +768,7 @@ function gitMoveView(
       facts:
         pr?.isMerged && pr.number
           ? t("panels.overview.prMergedTitle", { number: pr.number })
-          : undefined,
+          : branchFacts(facts, t) || undefined,
       action: primary.label,
       run,
     };
