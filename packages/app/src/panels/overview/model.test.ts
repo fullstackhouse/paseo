@@ -6,6 +6,7 @@ import type { AttentionItem } from "@/workspace-attention/model";
 import {
   branchFacts,
   canAnswerPermissionInPlace,
+  compactMoveWord,
   permissionActions,
   permissionFacts,
   permissionResponse,
@@ -412,5 +413,16 @@ describe("openMoveKey", () => {
 
   it("has nothing to open without rows", () => {
     expect(openMoveKey([], undefined)).toBeNull();
+  });
+});
+
+describe("compactMoveWord", () => {
+  it("names the action on a git row, whose title is only the branch or PR", () => {
+    expect(compactMoveWord("git", "Create PR")).toBe("Create PR");
+  });
+
+  it("adds nothing to rows whose title already says what to do", () => {
+    expect(compactMoveWord("checks", "Fix checks")).toBeNull();
+    expect(compactMoveWord("permission", "Review")).toBeNull();
   });
 });
