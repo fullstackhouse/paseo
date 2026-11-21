@@ -53,6 +53,7 @@ import {
   deriveCodeRow,
   deriveWorkspaceStateWord,
   deriveYourMove,
+  openMoveKey,
   gitMoveFacts,
   isStatusDone,
   isStatusOutdated,
@@ -402,7 +403,10 @@ function YourMove({
   facts: WorkspaceFacts | null;
   gitActions: GitActions | null;
 }): ReactElement | null {
+  // One row open at a time: opening an ask closes the one that was open.
+  const [chosen, setChosen] = useState<string | null | undefined>(undefined);
   if (rows.length === 0) return null;
+  const openKey = openMoveKey(rows, chosen);
   return (
     <Section title="panels.overview.yourMove" count={rows.length > 1 ? rows.length : undefined}>
       {rows.map((row, index) => {
@@ -421,17 +425,48 @@ function YourMove({
         // A plugin that renders its own entries (Asks) is answered in place, not in its tab.
         if (row.kind !== "entry" || !row.item.EntryComponent) return move;
         return (
-          <WorkspaceSummaryEntryView
+          <EntryMove
             key={row.key}
-            item={row.item}
-            entryId={row.entry.id}
-            defaultExpanded={lead}
+            row={row}
+            lead={lead}
+            open={row.key === openKey}
+            onOpenChange={setChosen}
           >
             {move}
-          </WorkspaceSummaryEntryView>
+          </EntryMove>
         );
       })}
     </Section>
+  );
+}
+
+function EntryMove({
+  row,
+  lead,
+  open,
+  onOpenChange,
+  children,
+}: {
+  row: Extract<YourMoveRow, { kind: "entry" }>;
+  lead: boolean;
+  open: boolean;
+  onOpenChange: (key: string | null) => void;
+  children: ReactElement;
+}): ReactElement {
+  const onExpandedChange = useCallback(
+    (expanded: boolean) => onOpenChange(expanded ? row.key : null),
+    [onOpenChange, row.key],
+  );
+  return (
+    <WorkspaceSummaryEntryView
+      item={row.item}
+      entryId={row.entry.id}
+      defaultExpanded={lead}
+      expanded={open}
+      onExpandedChange={onExpandedChange}
+    >
+      {children}
+    </WorkspaceSummaryEntryView>
   );
 }
 

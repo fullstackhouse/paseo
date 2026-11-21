@@ -16,6 +16,7 @@ import {
   isStatusDone,
   isStatusOutdated,
   MAX_ENTRIES_PER_ITEM,
+  openMoveKey,
   overviewSubtitle,
   partitionSummaryItems,
 } from "./model";
@@ -318,5 +319,32 @@ describe("permissions on Overview", () => {
       selectedActionId: "reject",
       message: "Denied by user",
     });
+  });
+});
+
+describe("openMoveKey", () => {
+  const rows = [
+    { kind: "checks", key: "a" },
+    { kind: "git", key: "b" },
+  ] as const;
+
+  it("opens the lead row until the human chooses", () => {
+    expect(openMoveKey(rows, undefined)).toBe("a");
+  });
+
+  it("keeps only the row the human opened open", () => {
+    expect(openMoveKey(rows, "b")).toBe("b");
+  });
+
+  it("keeps every row closed after the human closes the open one", () => {
+    expect(openMoveKey(rows, null)).toBeNull();
+  });
+
+  it("falls back to the lead row once the chosen row is gone", () => {
+    expect(openMoveKey(rows, "answered")).toBe("a");
+  });
+
+  it("has nothing to open without rows", () => {
+    expect(openMoveKey([], undefined)).toBeNull();
   });
 });
