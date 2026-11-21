@@ -235,6 +235,26 @@ export interface PluginWorkspaceStatus {
   now?: string;
   /** When the status was last written, in epoch milliseconds. */
   updatedAt: number;
+  /**
+   * What a blocked workspace waits on, listed under the Status card. FSH-only; older hosts drop it.
+   * Send it only while `state` is `blocked`.
+   */
+  blockedBy?: PluginWorkspaceBlocker[];
+}
+
+/** One thing a blocked workspace waits on. Pressing it opens `agentId`, else `workspaceId`, else `url`. */
+export interface PluginWorkspaceBlocker {
+  kind: "pr" | "agent" | "workspace" | "person" | "other";
+  /** What it is, such as "#42 Fix the login redirect", an agent's title, or a name. */
+  label: string;
+  /** Short facts, such as "open · checks failing". */
+  detail?: string;
+  /** An http(s) link, opened externally. */
+  url?: string;
+  agentId?: string;
+  workspaceId?: string;
+  /** Colors `detail`. */
+  tone?: "success" | "warning" | "danger" | "muted";
 }
 
 export interface PluginWorkspaceSummaryEntry {

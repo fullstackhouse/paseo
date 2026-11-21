@@ -89,6 +89,53 @@ describe("WorkspaceSummaryStore", () => {
     expect(store.forWorkspace("s", "w")[0]?.status).toBeNull();
   });
 
+  it("keeps well-formed blockers on a blocked status only", () => {
+    const store = new WorkspaceSummaryStore();
+    const item = store.add(owner, {
+      id: "status",
+      workspaceId: "w",
+      title: "Status",
+      status: {
+        state: "blocked",
+        summary: "Waiting",
+        updatedAt: 1,
+        blockedBy: [
+          {
+            kind: "pr",
+            label: " #42 Fix ",
+            detail: "open · checks failing",
+            url: "https://github.com/a/b/pull/42",
+            tone: "danger",
+          },
+          { kind: "agent", label: "Migrate", agentId: "a1", workspaceId: "w2", tone: "bogus" },
+          { kind: "other", label: "Bad link", url: "javascript:alert(1)" },
+          { kind: "ticket", label: "Unknown kind" },
+          { kind: "person", label: " " },
+        ] as never,
+      },
+    });
+    expect(store.forWorkspace("s", "w")[0]?.status?.blockedBy).toEqual([
+      {
+        kind: "pr",
+        label: "#42 Fix",
+        detail: "open · checks failing",
+        url: "https://github.com/a/b/pull/42",
+        tone: "danger",
+      },
+      { kind: "agent", label: "Migrate", agentId: "a1", workspaceId: "w2" },
+      { kind: "other", label: "Bad link" },
+    ]);
+    item.update({
+      status: {
+        state: "working",
+        summary: "x",
+        updatedAt: 2,
+        blockedBy: [{ kind: "person", label: "Mo" }],
+      },
+    });
+    expect(store.forWorkspace("s", "w")[0]?.status?.blockedBy).toBeUndefined();
+  });
+
   it("drops entries without an id or title", () => {
     const store = new WorkspaceSummaryStore();
     store.add(owner, {

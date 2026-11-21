@@ -2331,6 +2331,7 @@ export const ja: TranslationResources = {
         answered: "回答済み",
       },
       yourMove: "あなたの番",
+      blockedBy: "ブロック要因",
       permissionTitle: "権限リクエスト",
       open: "開く",
       prMergedTitle: "PR #{{number}} マージ済み",

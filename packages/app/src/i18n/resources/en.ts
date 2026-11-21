@@ -2335,6 +2335,7 @@ export const en = {
         answered: "Answered",
       },
       yourMove: "Your move",
+      blockedBy: "Blocked by",
       permissionTitle: "Permission request",
       open: "Open",
       prMergedTitle: "PR #{{number}} merged",

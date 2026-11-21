@@ -2358,6 +2358,7 @@ export const fr: TranslationResources = {
         answered: "Répondu",
       },
       yourMove: "À vous",
+      blockedBy: "Bloqué par",
       permissionTitle: "Demande d’autorisation",
       open: "Ouvrir",
       prMergedTitle: "PR #{{number}} fusionnée",

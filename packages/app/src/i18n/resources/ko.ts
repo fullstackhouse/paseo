@@ -2318,6 +2318,7 @@ export const ko: TranslationResources = {
         answered: "응답함",
       },
       yourMove: "내 차례",
+      blockedBy: "차단 요인",
       permissionTitle: "권한 요청",
       open: "열기",
       prMergedTitle: "PR #{{number}} 병합됨",

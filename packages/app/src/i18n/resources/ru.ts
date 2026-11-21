@@ -2345,6 +2345,7 @@ export const ru: TranslationResources = {
         answered: "Отвечено",
       },
       yourMove: "Ваш ход",
+      blockedBy: "Заблокировано",
       permissionTitle: "Запрос разрешения",
       open: "Открыть",
       prMergedTitle: "PR #{{number}} слит",
