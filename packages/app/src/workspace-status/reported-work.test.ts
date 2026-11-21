@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { WorkspaceSummaryItem } from "@/plugins/workspace-summary/store";
 import {
+  applyManualGroup,
   applyReportedWork,
   createReportedWorkLookup,
   foldReportedWork,
@@ -137,5 +138,61 @@ describe("isStatusDecidedByReport", () => {
     expect(
       isStatusDecidedByReport({ status: "running", runningFromBackgroundWork: false }, "done"),
     ).toBe(false);
+  });
+});
+
+describe("applyManualGroup", () => {
+  const movedAt = "2026-11-12T10:00:00.000Z";
+  const moved = (group: "attention" | "done" | "blocked") => ({ group, setAt: movedAt });
+
+  it("puts an idle workspace in the group it was moved to, over the turn and the report", () => {
+    const turn = { status: "attention" as const, enteredAt: at };
+    expect(applyManualGroup(turn, turn, moved("done"), null)).toEqual({
+      status: "done",
+      enteredAt: at,
+    });
+    const reported = applyReportedWork(turn, "working");
+    expect(applyManualGroup(turn, reported, moved("blocked"), null).status).toBe("blocked");
+    const read = { status: "done" as const, enteredAt: at };
+    expect(applyManualGroup(read, read, moved("attention"), null).status).toBe("attention");
+  });
+
+  it("never overrides live state", () => {
+    for (const status of ["running", "failed", "needs_input"] as const) {
+      const base = { status, enteredAt: at };
+      expect(applyManualGroup(base, base, moved("done"), null)).toBe(base);
+    }
+    const devServer = {
+      status: "running" as const,
+      runningFromBackgroundWork: true,
+      enteredAt: at,
+    };
+    expect(applyManualGroup(devServer, devServer, moved("done"), null).status).toBe("done");
+  });
+
+  it("ends once an agent status is written after the move", () => {
+    const turn = { status: "attention" as const, enteredAt: at };
+    const before = Date.parse(movedAt) - 1;
+    const after = Date.parse(movedAt) + 1;
+    expect(applyManualGroup(turn, turn, moved("done"), before).status).toBe("done");
+    expect(applyManualGroup(turn, turn, moved("done"), after)).toBe(turn);
+  });
+
+  it("keeps the current status without a move", () => {
+    const turn = { status: "attention" as const, enteredAt: at };
+    expect(applyManualGroup(turn, turn, null, null)).toBe(turn);
+  });
+});
+
+describe("createReportedWorkLookup updatedAt", () => {
+  it("gives the newest agent status time per workspace", () => {
+    const status = (updatedAt: number) => ({ state: "done" as const, summary: "s", updatedAt });
+    const lookup = createReportedWorkLookup([
+      item({ workspaceId: "a", status: status(10) }),
+      item({ workspaceId: "a", pluginId: "other", status: status(30) }),
+      item({ workspaceId: "b", workState: "working" }),
+    ]);
+    expect(lookup.updatedAt?.("s", "a")).toBe(30);
+    expect(lookup.updatedAt?.("s", "b")).toBeNull();
   });
 });

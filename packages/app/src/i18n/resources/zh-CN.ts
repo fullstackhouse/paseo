@@ -1429,6 +1429,9 @@ export const zhCN: TranslationResources = {
         archiving: "正在归档...",
         hiding: "正在隐藏...",
       },
+      move: {
+        title: "移动到",
+      },
       snooze: {
         title: "暂缓",
         continueToggle: "结束后继续工作",

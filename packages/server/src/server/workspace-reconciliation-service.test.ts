@@ -1361,6 +1361,7 @@ describe("WorkspaceReconciliationService", () => {
       displayName: "orphan",
       background: false,
       title: null,
+      manualGroup: null,
       pinnedAt: null,
       snoozedAt: null,
       snoozedUntil: null,

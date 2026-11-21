@@ -1469,6 +1469,9 @@ export const fr: TranslationResources = {
         archiving: "Archivage…",
         hiding: "Masquage…",
       },
+      move: {
+        title: "Déplacer vers",
+      },
       snooze: {
         title: "Mettre en veille",
         continueToggle: "Reprendre le travail à la fin",

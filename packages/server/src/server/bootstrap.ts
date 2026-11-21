@@ -189,6 +189,7 @@ import { WorkspaceArchiveOperations } from "./workspace-archive-operations.js";
 import { resolvePaseoWorktreesBaseRoot } from "../utils/worktree.js";
 import { setupAutoArchiveOnMerge } from "./auto-archive-on-merge/index.js";
 import { setupWorkspaceSnoozeWaker } from "./workspace-snooze/index.js";
+import { setupWorkspaceManualGroupClearer } from "./workspace-manual-group/index.js";
 import { setupProjectLastAgentSetupRecorder } from "./project-last-agent-setup.js";
 import { continueSnoozedWorkspace } from "./workspace-snooze/continue.js";
 import type { SnoozedPermissionBehavior } from "@getpaseo/protocol/messages";
@@ -1280,6 +1281,12 @@ export async function createPaseoDaemon(
     onProjectUpdate: (update) => wsServer?.publishProjectUpdate(update),
   });
 
+  const workspaceManualGroupClearer = setupWorkspaceManualGroupClearer({
+    agentManager,
+    workspaceRegistry,
+    logger,
+  });
+
   const workspaceSnoozeWaker = setupWorkspaceSnoozeWaker({
     workspaceRegistry,
     logger,
@@ -2142,6 +2149,7 @@ export async function createPaseoDaemon(
     unsubscribeIdleRuntimeCleanup();
     await idleRuntimeCleanup.close();
     workspaceSnoozeWaker.close();
+    workspaceManualGroupClearer.close();
     projectLastAgentSetupRecorder.close();
     // Freeze both ingress and registration before taking the agent closure snapshot.
     wsServer?.prepareForShutdown();

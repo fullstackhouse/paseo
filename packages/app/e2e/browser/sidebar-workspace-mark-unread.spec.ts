@@ -50,10 +50,15 @@ async function openWorkspace(page: Page, workspaceId: string) {
   await expect(page).toHaveURL(new RegExp(`/workspace/${workspaceId}`));
 }
 
+// Move to replaced Mark as read / unread: Done reads the workspace, Ready to review marks it unread.
 async function chooseReadAction(page: Page, workspaceId: string, action: "read" | "unread") {
+  const workspaceKey = `${getServerId()}:${workspaceId}`;
   await workspaceRow(page, workspaceId).hover();
-  await page.getByTestId(`sidebar-workspace-kebab-${getServerId()}:${workspaceId}`).click();
-  const item = page.getByRole("menuitem", { name: `Mark as ${action}`, exact: true });
+  await page.getByTestId(`sidebar-workspace-kebab-${workspaceKey}`).click();
+  await page.getByTestId(`sidebar-workspace-menu-move-${workspaceKey}`).click();
+  const item = page.getByTestId(
+    action === "read" ? "workspace-move-done" : "workspace-move-attention",
+  );
   await expect(item).toBeVisible();
   await item.click();
 }

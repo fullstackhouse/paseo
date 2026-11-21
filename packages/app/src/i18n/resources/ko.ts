@@ -1446,6 +1446,9 @@ export const ko: TranslationResources = {
         archiving: "보관하는 중...",
         hiding: "숨기는 중...",
       },
+      move: {
+        title: "이동",
+      },
       snooze: {
         title: "다시 알림",
         continueToggle: "끝나면 작업 이어서 진행",

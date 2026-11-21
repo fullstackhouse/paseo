@@ -1458,6 +1458,9 @@ export const ru: TranslationResources = {
         archiving: "Архивирование...",
         hiding: "Скрытие...",
       },
+      move: {
+        title: "Переместить в",
+      },
       snooze: {
         title: "Отложить",
         continueToggle: "Продолжить работу по окончании",

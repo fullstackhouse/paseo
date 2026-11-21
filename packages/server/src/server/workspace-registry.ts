@@ -5,7 +5,9 @@ import type { Logger } from "pino";
 import { z } from "zod";
 import {
   ProjectLastAgentSetupSchema,
+  WorkspaceManualGroupSchema,
   type ProjectLastAgentSetup,
+  type WorkspaceManualGroup,
 } from "@getpaseo/protocol/messages";
 
 import { writeJsonFileAtomic } from "./atomic-file.js";
@@ -130,6 +132,11 @@ const PersistedWorkspaceRecordSchema = z.object({
   snoozeWakePrompt: z
     .string()
     .nullable()
+    .optional()
+    .transform((value) => value ?? null),
+  // COMPAT(workspaceManualGroup): FSH-only. The sidebar group the user moved the workspace to by hand,
+  // until one of its agents starts a turn.
+  manualGroup: WorkspaceManualGroupSchema.nullable()
     .optional()
     .transform((value) => value ?? null),
   labels: z.array(z.string()).optional(),
@@ -756,6 +763,7 @@ export function createPersistedWorkspaceRecord(input: {
   snoozedAt?: string | null;
   snoozedUntil?: string | null;
   snoozeWakePrompt?: string | null;
+  manualGroup?: WorkspaceManualGroup | null;
   labels?: string[];
   metadata?: Record<string, JsonValue>;
   untrustedSource?: UntrustedWorkspaceSource;
@@ -778,6 +786,7 @@ export function createPersistedWorkspaceRecord(input: {
     snoozedAt: input.snoozedAt ?? null,
     snoozedUntil: input.snoozedUntil ?? null,
     snoozeWakePrompt: input.snoozeWakePrompt ?? null,
+    manualGroup: input.manualGroup ?? null,
   });
 }
 

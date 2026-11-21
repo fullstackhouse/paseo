@@ -7,6 +7,7 @@ import {
   ForgeWebSchema,
   ProjectLastAgentSetupSchema,
   WorkspaceGitHubRuntimePayloadSchema,
+  WorkspaceManualGroupSchema,
 } from "@getpaseo/protocol/messages";
 import { AgentProviderSchema } from "@getpaseo/protocol/provider-manifest";
 import type { PluginTimelineData } from "@getpaseo/plugin";
@@ -328,6 +329,8 @@ const StoredWorkspaceSchema = z.strictObject({
   // Required so rows cached before snooze existed invalidate the workspace cursor.
   snoozedAt: z.string().nullable(),
   snoozedUntil: z.string().nullable(),
+  // Required so rows cached before Move to existed invalidate the workspace cursor.
+  manualGroup: WorkspaceManualGroupSchema.nullable(),
   // Optional because entries written before labels existed have none. A cached workspace that
   // dropped them painted its row without its chips and stayed that way: the directory cursor is
   // current on reconnect, so the daemon has nothing newer to send back.
@@ -762,6 +765,7 @@ function serializeWorkspace(workspace: WorkspaceDescriptor): StoredWorkspace {
     pinnedAt: workspace.pinnedAt ?? null,
     snoozedAt: workspace.snoozedAt ?? null,
     snoozedUntil: workspace.snoozedUntil ?? null,
+    manualGroup: workspace.manualGroup ?? null,
     labels: workspace.labels,
     status: workspace.status,
     runningFromBackgroundWork: workspace.runningFromBackgroundWork ?? false,

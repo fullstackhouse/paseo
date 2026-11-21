@@ -1157,6 +1157,25 @@ export const WorkspaceSnoozeSetRequestSchema = z.object({
   requestId: z.string(),
 });
 
+// COMPAT(workspaceManualGroup): FSH-only, added after v0.15.4, remove gate after 2027-05-21.
+// The sidebar group the user moved an idle workspace to by hand. It holds until an agent in the
+// workspace starts a turn (the daemon clears it then) or a newer agent status arrives (clients ignore it then).
+export const WorkspaceManualGroupNameSchema = z.enum(["attention", "done", "blocked"]);
+
+export const WorkspaceManualGroupSchema = z.object({
+  group: WorkspaceManualGroupNameSchema,
+  setAt: z.string(),
+});
+
+// COMPAT(workspaceManualGroup): FSH-only, added after v0.15.4, remove gate after 2027-05-21.
+// `group: null` clears the move.
+export const WorkspaceGroupSetRequestSchema = z.object({
+  type: z.literal("workspace.group.set.request"),
+  workspaceId: z.string(),
+  group: WorkspaceManualGroupNameSchema.nullable(),
+  requestId: z.string(),
+});
+
 // COMPAT(workspaceAttentionReport): FSH-only, added after v0.15.4, remove gate after 2027-05-17.
 // A plugin says the workspace needs the human (an ask waits on them, the agent's work is done).
 // A snoozed workspace treats it like a permission prompt; an awake one ignores it.
@@ -2464,6 +2483,19 @@ export const WorkspaceSnoozeSetResponseSchema = z.object({
   payload: WorkspaceSnoozeSetResponsePayloadSchema,
 });
 
+export const WorkspaceGroupSetResponsePayloadSchema = z.object({
+  requestId: z.string(),
+  workspaceId: z.string(),
+  accepted: z.boolean(),
+  manualGroup: WorkspaceManualGroupSchema.nullable(),
+  error: z.string().nullable(),
+});
+
+export const WorkspaceGroupSetResponseSchema = z.object({
+  type: z.literal("workspace.group.set.response"),
+  payload: WorkspaceGroupSetResponsePayloadSchema,
+});
+
 export const WorkspaceAttentionReportResponsePayloadSchema = z.object({
   requestId: z.string(),
   workspaceId: z.string(),
@@ -3750,6 +3782,7 @@ export const SessionInboundMessageSchema = z.discriminatedUnion("type", [
   WorkspaceBaseBranchSetRequestSchema,
   WorkspaceBackgroundSetRequestSchema,
   WorkspaceSnoozeSetRequestSchema,
+  WorkspaceGroupSetRequestSchema,
   WorkspaceAttentionReportRequestSchema,
   WorkspaceLabelListRequestSchema,
   WorkspaceLabelAssignmentSetRequestSchema,
@@ -4230,6 +4263,8 @@ export const ServerInfoStatusPayloadSchema = z
         workspaceSnoozeWakePrompt: z.boolean().optional(),
         // COMPAT(workspaceAttentionReport): FSH-only, added after v0.15.4, remove gate after 2027-05-17.
         workspaceAttentionReport: z.boolean().optional(),
+        // COMPAT(workspaceManualGroup): FSH-only, added after v0.15.4, remove gate after 2027-05-21.
+        workspaceManualGroup: z.boolean().optional(),
         // COMPAT(scheduleRunAttention): FSH-only, added after v0.15.4, remove gate after 2027-05-16.
         scheduleRunAttention: z.boolean().optional(),
         // COMPAT(skillManagement): added in v0.4.0, remove gate after 2027-08-16.
@@ -4706,6 +4741,8 @@ export const WorkspaceDescriptorPayloadSchema = z
     snoozedUntil: z.string().nullable().optional(),
     // COMPAT(workspaceSnoozeWakePrompt): set while a timed snooze will prompt its agent on waking.
     snoozeWakePrompt: z.string().nullable().optional(),
+    // COMPAT(workspaceManualGroup): FSH-only, added after v0.15.4, remove optional after 2027-05-21.
+    manualGroup: WorkspaceManualGroupSchema.nullable().optional(),
     // COMPAT(workspaceLabels): added in v0.5.0, remove optional after 2027-08-14.
     labels: z.array(z.string()).optional(),
     metadata: EntityMetadataSchema.optional(),
@@ -8056,6 +8093,7 @@ export const SessionOutboundMessageSchema = z.discriminatedUnion("type", [
   WorkspaceBaseBranchSetResponseSchema,
   WorkspaceBackgroundSetResponseSchema,
   WorkspaceSnoozeSetResponseSchema,
+  WorkspaceGroupSetResponseSchema,
   WorkspaceAttentionReportResponseSchema,
   WorkspaceRecoveryInspectResponseSchema,
   WorkspaceRecoveryRestoreResponseSchema,
@@ -8282,6 +8320,9 @@ export type WorkspacePinSetResponse = z.infer<typeof WorkspacePinSetResponseSche
 export type WorkspacePinSetResponsePayload = z.infer<typeof WorkspacePinSetResponsePayloadSchema>;
 export type WorkspaceBackgroundSetResponse = z.infer<typeof WorkspaceBackgroundSetResponseSchema>;
 export type WorkspaceSnoozeSetResponse = z.infer<typeof WorkspaceSnoozeSetResponseSchema>;
+export type WorkspaceGroupSetResponse = z.infer<typeof WorkspaceGroupSetResponseSchema>;
+export type WorkspaceManualGroup = z.infer<typeof WorkspaceManualGroupSchema>;
+export type WorkspaceManualGroupName = z.infer<typeof WorkspaceManualGroupNameSchema>;
 export type WorkspaceAttentionReportResponse = z.infer<
   typeof WorkspaceAttentionReportResponseSchema
 >;
@@ -8481,6 +8522,7 @@ export type WorkspaceMetadataUpdateResponse = z.infer<typeof WorkspaceMetadataUp
 export type WorkspaceBaseBranchSetRequest = z.infer<typeof WorkspaceBaseBranchSetRequestSchema>;
 export type WorkspaceBackgroundSetRequest = z.infer<typeof WorkspaceBackgroundSetRequestSchema>;
 export type WorkspaceSnoozeSetRequest = z.infer<typeof WorkspaceSnoozeSetRequestSchema>;
+export type WorkspaceGroupSetRequest = z.infer<typeof WorkspaceGroupSetRequestSchema>;
 export type WorkspaceAttentionReportRequest = z.infer<typeof WorkspaceAttentionReportRequestSchema>;
 export type WorkspaceRecoveryInspectRequest = z.infer<typeof WorkspaceRecoveryInspectRequestSchema>;
 export type WorkspaceRecoveryRestoreRequest = z.infer<typeof WorkspaceRecoveryRestoreRequestSchema>;

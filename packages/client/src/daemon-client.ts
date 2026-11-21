@@ -27,7 +27,11 @@ import {
   type TimelineSubscription,
 } from "./connection/index.js";
 import { CreationClient } from "./creation/index.js";
-import type { CreationSnapshot } from "@getpaseo/protocol/messages";
+import type {
+  CreationSnapshot,
+  WorkspaceManualGroup,
+  WorkspaceManualGroupName,
+} from "@getpaseo/protocol/messages";
 import type { JsonValue } from "@getpaseo/protocol/agent-types";
 import type { z } from "zod";
 import type {
@@ -3874,6 +3878,30 @@ export class DaemonClient {
    * Snoozes until `until` (ISO), or indefinitely when null; `snoozed: false` wakes it.
    * `wakePrompt` is sent to the workspace's agent when a timed snooze ends.
    */
+  /**
+   * Moves an idle workspace to a sidebar group by hand, or clears the move with `null`. The move
+   * holds until an agent there starts a turn or reports a newer status.
+   */
+  async setWorkspaceGroup(
+    workspaceId: string,
+    group: WorkspaceManualGroupName | null,
+    options: { requestId?: string } = {},
+  ): Promise<WorkspaceManualGroup | null> {
+    // COMPAT(workspaceManualGroup): FSH-only, added after v0.15.4, remove gate after 2027-05-21.
+    if (this.lastServerInfoMessage?.features?.workspaceManualGroup !== true) {
+      throw new Error("Update the host to move workspaces between groups.");
+    }
+    const payload = await this.sendCorrelatedSessionRequest({
+      requestId: options.requestId,
+      message: { type: "workspace.group.set.request", workspaceId, group },
+      responseType: "workspace.group.set.response",
+    });
+    if (!payload.accepted) {
+      throw new Error(payload.error ?? "setWorkspaceGroup rejected");
+    }
+    return payload.manualGroup;
+  }
+
   async setWorkspaceSnoozed(
     workspaceId: string,
     snoozed: boolean,
