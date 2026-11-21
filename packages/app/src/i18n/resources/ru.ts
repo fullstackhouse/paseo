@@ -475,6 +475,9 @@ export const ru: TranslationResources = {
         restoringTitle: "Восстановление рабочего пространства",
         restoringAction: "Восстановление...",
         unavailableTitle: "Рабочая область недоступна",
+        recreateDescription:
+          "Можно снова открыть его в пустой папке на том же месте. Агенты сохранят свои разговоры; файлы не вернутся.",
+        recreateAction: "Создать пустую папку",
         checkFailedTitle: "Не удалось проверить рабочее пространство",
       },
     },

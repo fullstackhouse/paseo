@@ -3691,12 +3691,26 @@ export class DaemonClient {
   }
 
   async restoreWorkspace(workspaceId: string, requestId?: string): Promise<void> {
+    await this.requestWorkspaceRecovery({ workspaceId, requestId });
+  }
+
+  /** Unarchives a workspace that inspect reported `canRecreate` for, at an empty folder. */
+  async recreateWorkspace(workspaceId: string, requestId?: string): Promise<void> {
+    await this.requestWorkspaceRecovery({ workspaceId, requestId, recreate: true });
+  }
+
+  private async requestWorkspaceRecovery(input: {
+    workspaceId: string;
+    requestId?: string;
+    recreate?: boolean;
+  }): Promise<void> {
     const payload =
       await this.sendNamespacedCorrelatedSessionRequest<"workspace.recovery.restore.response">({
-        requestId,
+        requestId: input.requestId,
         message: {
           type: "workspace.recovery.restore.request",
-          workspaceId,
+          workspaceId: input.workspaceId,
+          ...(input.recreate ? { recreate: true } : {}),
         },
         timeout: 150_000,
       });

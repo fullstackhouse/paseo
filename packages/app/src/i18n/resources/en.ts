@@ -467,6 +467,9 @@ export const en = {
         restoringTitle: "Restoring workspace",
         restoringAction: "Restoring...",
         unavailableTitle: "Workspace unavailable",
+        recreateDescription:
+          "You can open it again at an empty folder in the same place. Its agents keep their conversations; its files don't come back.",
+        recreateAction: "Recreate empty folder",
         checkFailedTitle: "Couldn't check workspace",
       },
     },

@@ -471,6 +471,9 @@ export const ko: TranslationResources = {
         restoringTitle: "워크스페이스 복원 중",
         restoringAction: "복원 중...",
         unavailableTitle: "워크스페이스를 사용할 수 없습니다",
+        recreateDescription:
+          "같은 위치에 빈 폴더를 만들어 다시 열 수 있습니다. 에이전트의 대화는 유지되지만 파일은 돌아오지 않습니다.",
+        recreateAction: "빈 폴더 다시 만들기",
         checkFailedTitle: "워크스페이스를 확인하지 못했습니다",
       },
     },

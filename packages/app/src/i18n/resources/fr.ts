@@ -475,6 +475,9 @@ export const fr: TranslationResources = {
         restoringTitle: "Restauration de l’espace de travail",
         restoringAction: "Restauration…",
         unavailableTitle: "Espace de travail indisponible",
+        recreateDescription:
+          "Vous pouvez le rouvrir dans un dossier vide au même emplacement. Ses agents gardent leurs conversations ; ses fichiers ne reviennent pas.",
+        recreateAction: "Recréer un dossier vide",
         checkFailedTitle: "Impossible de vérifier l’espace de travail",
       },
     },
