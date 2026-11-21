@@ -81,6 +81,19 @@ describe("setupWorkspaceManualGroupClearer", () => {
     expect(await manualGroup("ws_other")).toEqual({ group: "blocked", setAt: EARLIER });
   });
 
+  test("leaves a workspace without a move untouched: no write, no mutation notice", async () => {
+    await registry.update("ws_other", (existing) => ({ ...existing, manualGroup: null }));
+    await clearer?.flush();
+    const notices: string[] = [];
+    const stop = registry.subscribeToMutations((mutation) => {
+      notices.push(JSON.stringify(mutation));
+    });
+    emit(state("running", "ws_other"));
+    await clearer?.flush();
+    stop();
+    expect(notices).toEqual([]);
+  });
+
   test("keeps a move made while the turn was already running until the next turn starts", async () => {
     emit(state("running"));
     await clearer?.flush();

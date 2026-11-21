@@ -4,10 +4,13 @@ import { useMutation } from "@tanstack/react-query";
 import type { WorkspaceManualGroupName } from "@getpaseo/protocol/messages";
 import { MenuItem, type MenuPageDefinition } from "@/components/ui/menu";
 import { useToast } from "@/contexts/toast-context";
-import { useWorkspaceReadState } from "@/hooks/use-workspace-read-state";
+import { useHostFeature } from "@/runtime/host-features";
 import { getHostRuntimeStore } from "@/runtime/host-runtime";
+import { useWorkspaceFields } from "@/stores/session-store-hooks";
+import { markWorkspaceUnread } from "@/workspace/mark-unread";
 import { useWorkspaceStatus } from "@/workspace-status";
 import type { SidebarStateBucket } from "@/utils/sidebar-agent-state";
+import { resolveMoveTarget, type MoveTarget } from "./target";
 
 /** The `MenuSubTrigger` on a workspace's menu that opens the Move to choices. */
 export const WORKSPACE_MOVE_PAGE_ID = "workspaceMove";
@@ -18,32 +21,16 @@ const GROUPS: readonly { group: WorkspaceManualGroupName; labelKey: string }[] =
   { group: "blocked", labelKey: "sidebar.statusBucket.blocked" },
 ];
 
-/** Live state decides the group by itself; a move can't change where it shows. */
-const LIVE_STATUSES = new Set<SidebarStateBucket>(["running", "failed", "needs_input"]);
-
-export interface MoveTarget {
-  serverId: string;
-  workspaceId: string;
-  /** Where the workspace shows now, so the page can mark it. */
-  current: SidebarStateBucket;
-}
-
-/**
- * The workspace to offer Move to for, or null: the host can't store a move, or the workspace is
- * in live state, where a move would change nothing.
- */
 export function useWorkspaceMoveTarget(
   serverId: string | undefined,
   workspaceId: string | undefined,
   supported: boolean,
 ): MoveTarget | null {
   const current = useWorkspaceStatus(serverId ?? "", workspaceId ?? "");
-  return useMemo(() => {
-    if (!supported || !serverId || !workspaceId || !current || LIVE_STATUSES.has(current)) {
-      return null;
-    }
-    return { serverId, workspaceId, current };
-  }, [current, serverId, supported, workspaceId]);
+  return useMemo(
+    () => resolveMoveTarget({ serverId, workspaceId, supported, current }),
+    [current, serverId, supported, workspaceId],
+  );
 }
 
 /** The Move to page behind a workspace's menu, shared by the kebab and the context menu. */
@@ -54,19 +41,30 @@ export function useWorkspaceMoveMenuPages(
   const toast = useToast();
   // The move also sets the read state underneath, so agent tabs and notifications agree with the
   // group: Done reads it, Ready to review marks it unread. These replace Mark as read / unread.
-  const { hasClearableAttention, canMarkUnread, clearAttention, markUnread } =
-    useWorkspaceReadState({
-      serverId: target?.serverId ?? "",
-      workspaceId: target?.workspaceId ?? "",
-    });
+  // Read from the raw turn status: a plugin report may decide the group, but the move overrides it.
+  const rawStatus = useWorkspaceFields(
+    target?.serverId ?? "",
+    target?.workspaceId ?? "",
+    (workspace) => workspace.status,
+  );
+  const supportsMarkUnread = useHostFeature(target?.serverId ?? "", "workspaceMarkUnread");
   const { mutate } = useMutation({
     mutationFn: async ({ group }: { group: WorkspaceManualGroupName }) => {
       if (!target) return;
       const client = getHostRuntimeStore().getClient(target.serverId);
       if (!client) throw new Error(t("sidebar.workspace.toasts.hostDisconnected"));
       await client.setWorkspaceGroup(target.workspaceId, group);
-      if (group === "done" && hasClearableAttention) await clearAttention();
-      if (group === "attention" && canMarkUnread) await markUnread();
+      // The move already landed; a read-state hiccup must not report it as failed.
+      try {
+        if (group === "done" && (rawStatus === "attention" || rawStatus === "failed")) {
+          await client.clearWorkspaceAttention(target.workspaceId);
+        }
+        if (group === "attention" && rawStatus === "done" && supportsMarkUnread) {
+          await markWorkspaceUnread(target.serverId, target.workspaceId);
+        }
+      } catch (error) {
+        console.warn("[workspace-move] read state not updated", error);
+      }
     },
     onError: (error) => {
       toast.error(

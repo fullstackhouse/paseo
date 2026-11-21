@@ -4,7 +4,7 @@ import type { WorkspaceRegistry } from "../workspace-registry.js";
 
 export interface WorkspaceManualGroupClearerOptions {
   agentManager: Pick<AgentManager, "subscribe">;
-  workspaceRegistry: Pick<WorkspaceRegistry, "update">;
+  workspaceRegistry: Pick<WorkspaceRegistry, "get" | "update">;
   logger: Logger;
   now?: () => number;
 }
@@ -17,10 +17,13 @@ export interface WorkspaceManualGroupClearer {
 
 /** Drops the sidebar group a user moved the workspace to. Returns whether there was one. */
 export async function clearWorkspaceManualGroup(input: {
-  registry: Pick<WorkspaceRegistry, "update">;
+  registry: Pick<WorkspaceRegistry, "get" | "update">;
   workspaceId: string;
   nowIso: string;
 }): Promise<boolean> {
+  // Every turn start lands here; most workspaces have no move, and an update would still notify
+  // every observing session.
+  if (!(await input.registry.get(input.workspaceId))?.manualGroup) return false;
   let cleared = false;
   await input.registry.update(input.workspaceId, (existing) => {
     if (!existing.manualGroup) return existing;

@@ -264,8 +264,9 @@ function SidebarWorkspaceMenuItems({
         </DropdownMenuSubTrigger>
       ) : null}
       {/* COMPAT(workspaceManualGroup): hosts that can't store a move keep Mark as read / unread.
-          Move to replaces both: Done reads it, Ready to review puts it back. */}
-      {onMarkAsRead && !canMove ? (
+          Move to replaces both: Done reads it, Ready to review puts it back. Where Move to isn't
+          offered (live state, such as a failed turn) the read items stay. */}
+      {onMarkAsRead && !moveTarget ? (
         <WorkspaceMenuItem
           surface={surface}
           testID={`sidebar-workspace-menu-mark-as-read-${workspaceKey}`}
@@ -275,7 +276,7 @@ function SidebarWorkspaceMenuItems({
           Mark as read
         </WorkspaceMenuItem>
       ) : null}
-      {onMarkAsUnread && !canMove ? (
+      {onMarkAsUnread && !moveTarget ? (
         <WorkspaceMenuItem
           surface={surface}
           testID={`sidebar-workspace-menu-mark-as-unread-${workspaceKey}`}
