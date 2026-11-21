@@ -16,7 +16,7 @@ string `params`) and open the plugin surface route; a plugin payload with an
 
 See [agent targets and deferred opens](expo-router.md#agent-targets) for route
 ownership and workspace recovery. Notification generation, presence, and push
-eligibility remain daemon concerns.
+eligibility remain daemon concerns. The [mobile attention proposal](refactors/2026-11-17-mobile-attention-delivery.md) specifies optional phone targeting for browser and desktop handoffs.
 
 ## Native delivery
 
