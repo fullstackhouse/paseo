@@ -3,16 +3,14 @@ import { View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { useViewedSheetAgent } from "@/screens/workspace/sheet-pane/sheet-pane";
 import {
-  buildWorkspacePaneContentModel,
+  buildArchivedAgentPreviewContentModel,
   WorkspacePaneContent,
 } from "@/screens/workspace/workspace-pane-content";
-
-function ignore() {}
 
 /**
  * An archived workspace's agent, read-only, under the recovery banner. It renders through
  * the "sheet" pane host, the read-only agent view without a composer, so its conversation
- * can be read before deciding whether to restore. Nothing in it can change the workspace.
+ * can be read before deciding whether to restore. Composer, tracks, fork and rewind are off.
  */
 export function ArchivedWorkspacePreview({
   serverId,
@@ -28,26 +26,7 @@ export function ArchivedWorkspacePreview({
   // Not a workspace tab, so the timeline is only fetched once this view registers the agent.
   useViewedSheetAgent({ sourceId: `archived-preview:${workspaceId}`, serverId, agentId });
   const content = useMemo(
-    () =>
-      buildWorkspacePaneContentModel({
-        tab: {
-          key: `archived-preview:${agentId}`,
-          tabId: `archived-preview:${agentId}`,
-          kind: "agent",
-          target: { kind: "agent", agentId },
-        },
-        normalizedServerId: serverId,
-        normalizedWorkspaceId: workspaceId,
-        host: "sheet",
-        readOnly: true,
-        onOpenTab: ignore,
-        onOpenPreferredTarget: ignore,
-        onCloseCurrentTab: ignore,
-        onRetargetCurrentTab: ignore,
-        onSetCurrentTabState: ignore,
-        onOpenWorkspaceFile: ignore,
-        onOpenImportSheet: ignore,
-      }),
+    () => buildArchivedAgentPreviewContentModel({ serverId, workspaceId, agentId }),
     [agentId, serverId, workspaceId],
   );
   return (

@@ -6,6 +6,7 @@ import React, { useEffect } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  buildArchivedAgentPreviewContentModel,
   buildWorkspacePaneContentModel,
   WorkspacePaneContent,
 } from "@/screens/workspace/workspace-pane-content";
@@ -213,5 +214,38 @@ describe("WorkspacePaneContent", () => {
     setRevisions({ [otherTab.tabId]: 1, [agentTab.tabId]: 1 });
     expect(snapshots).toHaveLength(2);
     expect(snapshots[1]?.paneContextValue.panelRevision).toBe(1);
+  });
+
+  it("shows an archived workspace's agent read-only in the sheet host, unlike a workspace pane", () => {
+    container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    act(() => {
+      root?.render(
+        <WorkspacePaneContent content={buildContent()} isPaneFocused isWorkspaceFocused />,
+      );
+    });
+    expect(snapshots[0]?.paneContextValue.readOnly).toBeUndefined();
+
+    act(() => {
+      root?.render(
+        <WorkspacePaneContent
+          content={buildArchivedAgentPreviewContentModel({
+            serverId: "server-a",
+            workspaceId: "workspace-a",
+            agentId: "agent-a",
+          })}
+          isPaneFocused={false}
+          isWorkspaceFocused
+        />,
+      );
+    });
+    const preview = snapshots.at(-1)?.paneContextValue;
+    expect(preview).toMatchObject({
+      host: "sheet",
+      readOnly: true,
+      target: { kind: "agent", agentId: "agent-a" },
+    });
   });
 });

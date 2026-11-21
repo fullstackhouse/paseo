@@ -1467,7 +1467,7 @@ const AgentStreamSection = memo(function AgentStreamSection({
       pendingMessageSubmissions={pendingMessageSubmissions}
       turnPresentation={turnPresentation}
       readOnly={readOnly}
-      onOpenWorkspaceFile={readOnly ? undefined : onOpenWorkspaceFile}
+      onOpenWorkspaceFile={onOpenWorkspaceFile}
     />
   );
 });

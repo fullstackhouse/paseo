@@ -11,7 +11,7 @@ export interface PaneContextValue {
   workspaceId: string;
   host: PaneHost;
   // Shown for reading only, outside any workspace layout (an archived workspace's agent):
-  // no composer, tracks, fork, rewind or links that open something in the workspace.
+  // no composer, tracks, fork or rewind.
   readOnly?: boolean;
   tabId: string;
   target: WorkspaceTabTarget;

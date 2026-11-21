@@ -82,6 +82,34 @@ export function buildWorkspacePaneContentModel({
   };
 }
 
+function ignore() {}
+
+/**
+ * An archived workspace's agent, for reading under its recovery banner: the read-only sheet
+ * host, and no callback that could open a tab or file in a workspace that isn't there.
+ */
+export function buildArchivedAgentPreviewContentModel(input: {
+  serverId: string;
+  workspaceId: string;
+  agentId: string;
+}): WorkspacePaneContentModel {
+  const tabId = `archived-preview:${input.agentId}`;
+  return buildWorkspacePaneContentModel({
+    tab: { key: tabId, tabId, kind: "agent", target: { kind: "agent", agentId: input.agentId } },
+    normalizedServerId: input.serverId,
+    normalizedWorkspaceId: input.workspaceId,
+    host: "sheet",
+    readOnly: true,
+    onOpenTab: ignore,
+    onOpenPreferredTarget: ignore,
+    onCloseCurrentTab: ignore,
+    onRetargetCurrentTab: ignore,
+    onSetCurrentTabState: ignore,
+    onOpenWorkspaceFile: ignore,
+    onOpenImportSheet: ignore,
+  });
+}
+
 export interface WorkspacePaneContentProps {
   content: WorkspacePaneContentModel;
   isWorkspaceFocused: boolean;
