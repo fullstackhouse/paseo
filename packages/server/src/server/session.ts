@@ -4283,7 +4283,9 @@ export class Session {
     request: Extract<SessionInboundMessage, { type: "workspace.recovery.restore.request" }>,
   ): Promise<void> {
     try {
-      await this.restoreWorkspaceAndEmit(request.workspaceId);
+      await this.restoreWorkspaceAndEmit(request.workspaceId, {
+        recreate: request.recreate === true,
+      });
       this.emit({
         type: "workspace.recovery.restore.response",
         payload: {
@@ -6274,8 +6276,11 @@ export class Session {
     };
   }
 
-  private async restoreWorkspaceAndEmit(workspaceId: string): Promise<void> {
-    await this.workspaceRecovery.restore(workspaceId);
+  private async restoreWorkspaceAndEmit(
+    workspaceId: string,
+    options?: { recreate: boolean },
+  ): Promise<void> {
+    await this.workspaceRecovery.restore(workspaceId, options);
     const workspace = await this.workspaceRegistry.get(workspaceId);
     if (!workspace) {
       throw new Error(`Recovered workspace record not found: ${workspaceId}`);

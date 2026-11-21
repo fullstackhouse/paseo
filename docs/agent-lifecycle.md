@@ -275,7 +275,14 @@ Workspace archive is a separate lifecycle. Archiving or removing a worktree can 
 agent record without setting the agent's `archivedAt`, while its `workspaceId` still points at the
 archived workspace. History navigation must not infer workspace lifecycle from `agent.archivedAt`
 or mutate either lifecycle. The workspace route asks the daemon for authoritative recovery state;
-only the route's explicit Unarchive or Restore action changes the archived workspace.
+only the route's explicit Unarchive, Restore or Recreate empty folder action changes the archived
+workspace. Restore rebuilds a worktree from git: its saved branch, or a new branch of that name from
+the base when git proves the branch is gone (no local branch, and origin reports none; a leftover
+origin tracking ref doesn't count). A fetch that fails offline is not proof, so restore keeps the saved branch and shows
+the error. When a plain folder is missing, the daemon offers Recreate empty folder as a separate
+action, not as the recovery itself, because the folder may only be on a drive that isn't connected.
+It is withheld when the folder's parent is missing too. Worktrees never get it: unarchiving one at
+an empty folder would replace its branch and source repository with a plain folder.
 
 Archive replies once the records are archived. Removing the backing worktree (`worktree.teardown`
 commands in place, `git worktree remove`, `rm`, `git worktree prune`) then runs on a per-repository
@@ -373,6 +380,8 @@ parentAgentId === thisAgent.id  AND  !archivedAt
 ```
 
 - **Provider subagents** are child executions owned by Claude, Codex, or OpenCode. They are not inserted into `AgentManager` as managed agents. Providers emit a separate descriptor and timeline stream through `agent.provider_subagents.*`; the client keeps that state outside the normal agent store and merges only the presentation rows into the track. A descriptor's optional `parentSubagentId` identifies its direct provider-subagent parent; an absent value identifies a direct child of the managed agent.
+
+Rows list unfinished children first and finished ones after, each oldest-first (`compareSubagentRows` in `select.ts`), so the children still working stay at the top of a long session's list. "Finished" is the same test **Archive finished** uses.
 
 Clicking either kind opens a workspace tab. On compact layouts it opens in a [sheet](explorer-sidebar.md#sheets) instead, replacing the subagents list in place (Back returns to the list); the sheet hides the composer and shows the agent's model and thinking as one line in its place (`PaneSubtitle`, the row provider subagents already use), and a Paseo subagent's sheet offers **Open as tab** (the full-screen glyph in the header) to get the composer back. A Paseo subagent tab is a normal interactive agent pane. A provider subagent tab is a read-only timeline pane with no composer, archive, detach, rewind, or fork actions. It shows its own direct children in a subagents track. Every subagent pane links back to its parent (`packages/app/src/subagents/parent/`): a pill above the composer when there is one, a parent box in the composer's place when there is not. Both panes use `AgentStreamView`, so message, reasoning, tool-call, and layout rendering stay identical.
 

@@ -3238,6 +3238,7 @@ function WorkspaceScreenContent({
       onManageHost: handleManageHost,
       onDismissMissingWorkspace: handleDismissMissingWorkspace,
       onRecoverWorkspace: workspaceRecovery.restore,
+      onRecreateWorkspace: workspaceRecovery.recreate,
       onRetryRecoveryInspection: workspaceRecovery.retryInspection,
     },
   });
