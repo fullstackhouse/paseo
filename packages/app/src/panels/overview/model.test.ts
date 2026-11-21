@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { GitActionId } from "@/git/policy";
 import type { WorkspaceSummaryItem } from "@/plugins/workspace-summary/store";
 import type { Agent } from "@/stores/session-store";
 import type { AttentionItem } from "@/workspace-attention/model";
@@ -89,6 +90,7 @@ describe("deriveYourMove", () => {
       agentRunning: false,
       gitPrimaryId: "commit",
       canArchive: true,
+      isWorktree: true,
       prMerged: false,
       statusDone: false,
     });
@@ -107,6 +109,7 @@ describe("deriveYourMove", () => {
       agentRunning: true,
       gitPrimaryId: "commit",
       canArchive: true,
+      isWorktree: true,
       prMerged: false,
       statusDone: false,
     });
@@ -119,6 +122,7 @@ describe("deriveYourMove", () => {
       agentRunning: false,
       gitPrimaryId: null,
       canArchive: false,
+      isWorktree: true,
       prMerged: false,
       statusDone: false,
     });
@@ -129,8 +133,9 @@ describe("deriveYourMove", () => {
     const input = {
       items: [],
       agentRunning: false,
-      gitPrimaryId: "archive-workspace",
+      gitPrimaryId: "archive-workspace" as const,
       canArchive: true,
+      isWorktree: true,
     };
     const archive = [{ kind: "git", key: "git:archive-workspace", actionId: "archive-workspace" }];
     expect(deriveYourMove({ ...input, prMerged: false, statusDone: false })).toEqual([]);
@@ -138,21 +143,57 @@ describe("deriveYourMove", () => {
     expect(deriveYourMove({ ...input, prMerged: false, statusDone: true })).toEqual(archive);
   });
 
-  it("offers archive over a leftover git step once the work shipped", () => {
-    const input = {
+  describe("once the work shipped", () => {
+    const base = {
       items: [],
       agentRunning: false,
-      gitPrimaryId: "pull-and-push",
+      canArchive: true,
+      isWorktree: true,
       prMerged: false,
+      statusDone: true,
     };
     const archive = [{ kind: "git", key: "git:archive-workspace", actionId: "archive-workspace" }];
-    expect(deriveYourMove({ ...input, canArchive: true, statusDone: true })).toEqual(archive);
-    expect(deriveYourMove({ ...input, canArchive: true, statusDone: false })).toEqual([
-      { kind: "git", key: "git:pull-and-push", actionId: "pull-and-push" },
-    ]);
-    expect(deriveYourMove({ ...input, canArchive: false, statusDone: true })).toEqual([
-      { kind: "git", key: "git:pull-and-push", actionId: "pull-and-push" },
-    ]);
+    const step = (actionId: GitActionId) => [{ kind: "git", key: `git:${actionId}`, actionId }];
+
+    it("replaces a leftover sync step with archive", () => {
+      for (const id of ["pull", "push", "pull-and-push", "merge-from-base"] as const) {
+        expect(deriveYourMove({ ...base, gitPrimaryId: id })).toEqual(archive);
+      }
+      expect(
+        deriveYourMove({ ...base, gitPrimaryId: "pull", statusDone: false, prMerged: true }),
+      ).toEqual(archive);
+    });
+
+    it("keeps commit and PR steps", () => {
+      for (const id of [
+        "commit",
+        "merge-pr-squash",
+        "enable-pr-auto-merge-squash",
+        "pr",
+      ] as const) {
+        expect(deriveYourMove({ ...base, gitPrimaryId: id })).toEqual(step(id));
+      }
+      expect(deriveYourMove({ ...base, gitPrimaryId: "commit", prMerged: true })).toEqual(
+        step("commit"),
+      );
+    });
+
+    it("adds no archive where the branch has no git step", () => {
+      expect(deriveYourMove({ ...base, gitPrimaryId: null })).toEqual([]);
+    });
+
+    it("keeps the step when it isn't shipped or archive can't run", () => {
+      const pull = step("pull-and-push");
+      const input = { ...base, gitPrimaryId: "pull-and-push" as const };
+      expect(deriveYourMove({ ...input, statusDone: false })).toEqual(pull);
+      expect(deriveYourMove({ ...input, canArchive: false })).toEqual(pull);
+    });
+
+    it("offers archive in a regular checkout only after a merge", () => {
+      const input = { ...base, gitPrimaryId: "pull" as const, isWorktree: false };
+      expect(deriveYourMove(input)).toEqual(step("pull"));
+      expect(deriveYourMove({ ...input, statusDone: false, prMerged: true })).toEqual(archive);
+    });
   });
 });
 

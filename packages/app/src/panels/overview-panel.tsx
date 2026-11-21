@@ -22,6 +22,7 @@ import { ScrollView } from "@/components/ui/scroll-view";
 import { GIT_ACTION_ICONS } from "@/git/action-icons";
 import {
   type GitAction,
+  type GitActionId,
   useGitActionRunner,
   useGitActions,
   type GitActions,
@@ -108,6 +109,7 @@ function selectWorkspaceFacts(workspace: WorkspaceDescriptor) {
     cwd: workspace.workspaceDirectory,
     // A plain folder has nothing to ship; checkouts and worktrees do, even before git status loads.
     isGitWorkspace: workspace.workspaceKind !== "directory",
+    isWorktree: workspace.workspaceKind === "worktree",
     branch: workspace.gitRuntime?.currentBranch ?? null,
     ahead: workspace.gitRuntime?.aheadOfOrigin ?? null,
     behind: workspace.gitRuntime?.behindOfOrigin ?? null,
@@ -205,7 +207,9 @@ function useYourMove(input: {
     items,
     agentRunning: input.agentRunning,
     gitPrimaryId: input.gitActions?.primary?.id ?? null,
-    canArchive: Boolean(archive && !archive.disabled),
+    // A running archive disables the action; keep its row so it doesn't flip back to the old step.
+    canArchive: Boolean(archive && (!archive.disabled || archive.status === "pending")),
+    isWorktree: Boolean(input.facts?.isWorktree),
     prMerged: Boolean(input.facts?.pullRequest?.isMerged),
     statusDone: isStatusDone({
       status: input.status,
@@ -747,20 +751,22 @@ function checksMoveView({ t, workspaceKey, facts }: MoveViewInput): MoveView {
   };
 }
 
-function findGitAction(gitActions: GitActions, id: string): GitAction | null {
+function findGitAction(gitActions: GitActions, id: GitActionId): GitAction | null {
   if (gitActions.primary?.id === id) return gitActions.primary;
   return gitActions.secondary.find((action) => action.id === id) ?? null;
 }
 
 function gitMoveView(
-  primary: GitAction,
+  action: GitAction,
   runGitAction: (action: GitAction) => void,
   { t, facts }: MoveViewInput,
 ): MoveView {
   const pr = facts?.pullRequest;
-  const run = () => runGitAction(primary);
+  const run = () => runGitAction(action);
   // Archive is only a move once the work shipped: a merged PR, or a done status card (deriveYourMove).
-  if (primary.id === "archive-workspace") {
+  if (action.id === "archive-workspace") {
+    // The Code row hides behind a git move, so an open PR is named here.
+    const openPr = pr && !pr.isMerged ? pullRequestTitle(pr) : "";
     return {
       icon: <ThemedArchive size={ICON_SIZE} uniProps={mergedColorMapping} />,
       tone: "merged",
@@ -768,17 +774,17 @@ function gitMoveView(
       facts:
         pr?.isMerged && pr.number
           ? t("panels.overview.prMergedTitle", { number: pr.number })
-          : branchFacts(facts, t) || undefined,
-      action: primary.label,
+          : [openPr, branchFacts(facts, t)].filter(Boolean).join(" · ") || undefined,
+      action: action.label,
       run,
     };
   }
   return {
-    icon: primary.icon ?? <ThemedGitBranch size={ICON_SIZE} uniProps={mutedColorMapping} />,
+    icon: action.icon ?? <ThemedGitBranch size={ICON_SIZE} uniProps={mutedColorMapping} />,
     tone: "ok",
     title: pr ? pullRequestTitle(pr) : (facts?.branch ?? t("panels.overview.noBranch")),
     facts: gitMoveFacts(facts, t) || undefined,
-    action: primary.label,
+    action: action.label,
     run,
   };
 }
