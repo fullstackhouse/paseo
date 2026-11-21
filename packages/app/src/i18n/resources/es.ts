@@ -514,6 +514,9 @@ export const es: TranslationResources = {
         restoringTitle: "Restaurando espacio de trabajo",
         restoringAction: "Restaurando...",
         unavailableTitle: "Espacio de trabajo no disponible",
+        recreateDescription:
+          "Puedes volver a abrirlo en una carpeta vacía en el mismo lugar. Sus agentes conservan sus conversaciones; sus archivos no vuelven.",
+        recreateAction: "Recrear carpeta vacía",
         checkFailedTitle: "No se pudo comprobar el espacio de trabajo",
       },
     },

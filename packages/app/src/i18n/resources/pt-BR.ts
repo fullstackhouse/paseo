@@ -513,6 +513,9 @@ export const ptBR: TranslationResources = {
         restoringTitle: "Restaurando workspace",
         restoringAction: "Restaurando...",
         unavailableTitle: "Workspace indisponível",
+        recreateDescription:
+          "Você pode abri-lo de novo em uma pasta vazia no mesmo lugar. Os agentes mantêm as conversas; os arquivos não voltam.",
+        recreateAction: "Recriar pasta vazia",
         checkFailedTitle: "Não foi possível verificar o workspace",
       },
     },

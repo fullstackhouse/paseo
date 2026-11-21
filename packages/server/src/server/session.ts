@@ -4800,7 +4800,9 @@ export class Session {
     request: Extract<SessionInboundMessage, { type: "workspace.recovery.restore.request" }>,
   ): Promise<void> {
     try {
-      await this.restoreWorkspaceAndEmit(request.workspaceId);
+      await this.restoreWorkspaceAndEmit(request.workspaceId, {
+        recreate: request.recreate === true,
+      });
       this.emit({
         type: "workspace.recovery.restore.response",
         payload: {
@@ -6861,10 +6863,13 @@ export class Session {
     return this.workspaceArchiveOperations.withCheckout(checkoutPath, run);
   }
 
-  private async restoreWorkspaceAndEmit(workspaceId: string): Promise<void> {
+  private async restoreWorkspaceAndEmit(
+    workspaceId: string,
+    options?: { recreate: boolean },
+  ): Promise<void> {
     await this.workspaceArchiveOperations.restore(workspaceId, () =>
       this.withWorkspaceCheckout(workspaceId, async () => {
-        await this.workspaceRecovery.restore(workspaceId);
+        await this.workspaceRecovery.restore(workspaceId, options);
         await this.publishRecoveredWorkspace(workspaceId);
       }),
     );

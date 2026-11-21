@@ -1252,6 +1252,9 @@ export const WorkspaceRecoveryRestoreRequestSchema = z.object({
   type: z.literal("workspace.recovery.restore.request"),
   workspaceId: z.string(),
   requestId: z.string(),
+  // Make an empty folder at the workspace's path when git can't restore it. Only valid
+  // when inspect reported `canRecreate`; older daemons ignore it and report the failure.
+  recreate: z.boolean().optional(),
 });
 
 // Undoes the latest archive of a workspace: cancels it if it is still running, otherwise
@@ -2547,6 +2550,7 @@ export const WorkspaceRecoveryStateSchema = z.discriminatedUnion("kind", [
     workspaceId: z.string(),
     reason: z.string(),
     message: z.string(),
+    canRecreate: z.boolean().optional(),
   }),
 ]);
 

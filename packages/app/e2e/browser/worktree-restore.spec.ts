@@ -448,9 +448,7 @@ test.describe("Worktree restore", () => {
     ).toBeVisible({ timeout: 30_000 });
   });
 
-  test("an unrecoverable missing workspace shows no misleading recovery action", async ({
-    page,
-  }) => {
+  test("a missing workspace git can't restore offers only an empty folder", async ({ page }) => {
     const project = await openProjectViaDaemon(worktreeClient, tempRepo.path);
     createdProjectIds.add(project.projectKey);
     const agent = await createIdleAgent(client, {
@@ -476,11 +474,14 @@ test.describe("Worktree restore", () => {
       });
       await expect(
         page.getByText(
-          "The archived workspace directory no longer exists and cannot be recreated.",
+          "The archived workspace folder no longer exists, and git can't restore it.",
           { exact: true },
         ),
       ).toBeVisible();
       await expect(page.getByTestId("workspace-recovery-action")).toHaveCount(0);
+      await expect(page.getByTestId("workspace-recovery-recreate")).toHaveText(
+        "Recreate empty folder",
+      );
     } finally {
       await rename(displacedProjectPath, tempRepo.path);
     }

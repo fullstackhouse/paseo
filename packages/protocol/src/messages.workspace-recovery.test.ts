@@ -132,4 +132,29 @@ describe("workspace recovery protocol", () => {
       },
     });
   });
+
+  test("carries the optional empty-folder offer and request alongside older peers", () => {
+    const unavailable = {
+      kind: "unavailable",
+      workspaceId: "wks_15a1b5630ebaab33",
+      reason: "workspace_directory_missing",
+      message: "The archived workspace folder no longer exists, and git can't restore it.",
+    };
+    for (const state of [unavailable, { ...unavailable, canRecreate: true }]) {
+      expect(
+        SessionOutboundMessageSchema.parse({
+          type: "workspace.recovery.inspect.response",
+          payload: { requestId: "inspect-2", state },
+        }),
+      ).toMatchObject({ payload: { state } });
+    }
+    expect(
+      SessionInboundMessageSchema.parse({
+        type: "workspace.recovery.restore.request",
+        requestId: "restore-3",
+        workspaceId: "wks_15a1b5630ebaab33",
+        recreate: true,
+      }),
+    ).toMatchObject({ recreate: true });
+  });
 });

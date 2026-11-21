@@ -508,6 +508,9 @@ export const ar: TranslationResources = {
         restoringTitle: "جارٍ استعادة مساحة العمل",
         restoringAction: "جارٍ الاستعادة...",
         unavailableTitle: "مساحة العمل غير متاحة",
+        recreateDescription:
+          "يمكنك فتحها مجددًا في مجلد فارغ في المكان نفسه. يحتفظ وكلاؤها بمحادثاتهم؛ أما ملفاتها فلن تعود.",
+        recreateAction: "إنشاء مجلد فارغ",
         checkFailedTitle: "تعذر التحقق من مساحة العمل",
       },
     },

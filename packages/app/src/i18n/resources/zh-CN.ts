@@ -508,6 +508,9 @@ export const zhCN: TranslationResources = {
         restoringTitle: "正在恢复 workspace",
         restoringAction: "正在恢复...",
         unavailableTitle: "Workspace 不可用",
+        recreateDescription:
+          "你可以在原位置的空文件夹中重新打开它。其智能体保留对话，但文件不会恢复。",
+        recreateAction: "重新创建空文件夹",
         checkFailedTitle: "无法检查 workspace",
       },
     },

@@ -1,5 +1,5 @@
 import { Text, View } from "react-native";
-import { ArrowLeftToLine, RotateCw, Settings } from "lucide-react-native";
+import { ArrowLeftToLine, FolderPlus, RotateCw, Settings } from "lucide-react-native";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { Button } from "@/components/ui/button";
@@ -19,6 +19,7 @@ interface WorkspaceRouteStateActions {
   onManageHost: () => void;
   onDismissMissingWorkspace: () => void;
   onRecoverWorkspace: () => void;
+  onRecreateWorkspace: () => void;
   onRetryRecoveryInspection: () => void;
 }
 
@@ -61,6 +62,16 @@ export function renderWorkspaceRouteGate(input: {
         />
       );
     case "recoveryUnavailable":
+      if (input.state.recreate) {
+        return (
+          <WorkspaceRecreateOffer
+            message={input.state.message}
+            recreate={input.state.recreate}
+            onRecreate={input.actions.onRecreateWorkspace}
+            onDismiss={input.actions.onDismissMissingWorkspace}
+          />
+        );
+      }
       return (
         <WorkspaceEmptyState
           titleKey="workspace.route.recovery.unavailableTitle"
@@ -169,6 +180,54 @@ function ArchivedWorkspaceRecovery({
           testID="workspace-recovery-action"
         >
           {isRestoring ? t("workspace.route.recovery.restoringAction") : actionLabel}
+        </Button>
+      </View>
+    </View>
+  );
+}
+
+function WorkspaceRecreateOffer({
+  message,
+  recreate,
+  onRecreate,
+  onDismiss,
+}: {
+  message: string;
+  recreate: NonNullable<Extract<WorkspaceRouteState, { kind: "recoveryUnavailable" }>["recreate"]>;
+  onRecreate: () => void;
+  onDismiss: () => void;
+}) {
+  const { t } = useTranslation();
+  const isRecreating = recreate.phase === "restoring";
+  return (
+    <View style={styles.emptyState}>
+      {isRecreating ? (
+        <ThemedLoadingSpinner size="small" uniProps={foregroundMutedColorMapping} />
+      ) : null}
+      <View style={styles.textStack}>
+        <Text style={styles.title}>{t("workspace.route.recovery.unavailableTitle")}</Text>
+        <Text style={styles.description}>{message}</Text>
+        <Text style={styles.description}>{t("workspace.route.recovery.recreateDescription")}</Text>
+        {recreate.error ? (
+          <Text style={styles.error} testID="workspace-recovery-recreate-error">
+            {recreate.error}
+          </Text>
+        ) : null}
+      </View>
+      <View style={styles.actions}>
+        <Button
+          variant="outline"
+          leftIcon={FolderPlus}
+          onPress={onRecreate}
+          disabled={isRecreating}
+          testID="workspace-recovery-recreate"
+        >
+          {isRecreating
+            ? t("workspace.route.recovery.restoringAction")
+            : t("workspace.route.recovery.recreateAction")}
+        </Button>
+        <Button variant="default" leftIcon={ArrowLeftToLine} onPress={onDismiss}>
+          {t("common.actions.back")}
         </Button>
       </View>
     </View>

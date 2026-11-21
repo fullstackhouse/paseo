@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { basename } from "node:path";
+import { mkdir } from "node:fs/promises";
+import { basename, dirname } from "node:path";
 
 import { resolveRepositoryDefaultBranch } from "../../../utils/checkout-git.js";
 import { createRealpathAwarePathMatcher } from "../../../utils/path.js";
@@ -22,14 +23,16 @@ import {
   type PersistedWorkspaceRecord,
 } from "../../workspace-registry.js";
 
-export type WorkspaceRecoveryAction = "unarchive" | "restore";
+// FSH: "recreate" makes an empty folder at the workspace's path. It is never offered as the
+// recovery: the caller asks for it from an unavailable state that allows it.
+export type WorkspaceRecoveryAction = "unarchive" | "restore" | "recreate";
 
 export type WorkspaceRecoveryState =
   | {
       kind: "recoverable";
       workspaceId: string;
       workspaceName: string;
-      action: WorkspaceRecoveryAction;
+      action: Exclude<WorkspaceRecoveryAction, "recreate">;
       branch: string | null;
     }
   | {
@@ -43,11 +46,18 @@ export type WorkspaceRecoveryState =
         | "workspace_directory_missing"
         | "worktree_branch_missing";
       message: string;
+      // FSH: an empty folder can be made at the workspace's path so its agents open again. Git
+      // can't rebuild the files, and the source may only be on a drive that isn't connected right
+      // now, so this waits for an explicit request.
+      canRecreate: boolean;
     };
 
 export interface WorkspaceRecoveryService {
   inspect(workspaceId: string): Promise<WorkspaceRecoveryState>;
-  restore(workspaceId: string): Promise<{ workspaceId: string; action: WorkspaceRecoveryAction }>;
+  restore(
+    workspaceId: string,
+    options?: { recreate?: boolean },
+  ): Promise<{ workspaceId: string; action: WorkspaceRecoveryAction }>;
 }
 
 type RecoveryPlan =
@@ -61,6 +71,8 @@ type RecoveryPlan =
       state: Extract<WorkspaceRecoveryState, { kind: "recoverable" }>;
       workspace: PersistedWorkspaceRecord;
       sourceRepoRoot: string;
+      /** FSH: git proves the saved branch is gone; restore it as a new branch from the base. */
+      branchGone: boolean;
     };
 
 type UnavailableRecoveryState = Extract<WorkspaceRecoveryState, { kind: "unavailable" }>;
@@ -93,6 +105,7 @@ export function createWorkspaceRecoveryService(deps: {
         workspaceId,
         reason: "workspace_not_found",
         message: "This workspace is no longer known to the host.",
+        canRecreate: false,
       };
     }
     if (!workspace.archivedAt) {
@@ -101,6 +114,7 @@ export function createWorkspaceRecoveryService(deps: {
         workspaceId,
         reason: "workspace_not_archived",
         message: "This workspace is not archived, but it is unavailable from the host.",
+        canRecreate: false,
       };
     }
 
@@ -111,6 +125,7 @@ export function createWorkspaceRecoveryService(deps: {
         workspaceId,
         reason: "project_not_found",
         message: "The project for this archived workspace no longer exists.",
+        canRecreate: false,
       };
     }
 
@@ -121,12 +136,28 @@ export function createWorkspaceRecoveryService(deps: {
       return createRecoveryPlan({ action: "unarchive", workspace });
     }
 
-    if (workspace.kind !== "worktree") {
+    // FSH: a worktree record can lose its worktree fields (reconciliation once rewrote archived
+    // worktrees as plain folders), so a Paseo-owned path in a git project also counts.
+    const isWorktree =
+      workspace.kind === "worktree" ||
+      (project.kind === "git" &&
+        (
+          await isPaseoOwnedWorktreeCwd(workspace.cwd, {
+            paseoHome: deps.paseoHome,
+            worktreesRoot: deps.worktreesRoot,
+          })
+        ).allowed);
+    if (!isWorktree) {
+      // FSH: an empty folder is offered only for a plain folder, and only while the folder that
+      // contained it exists: a missing parent usually means an unmounted drive, and creating the
+      // path would write onto the wrong disk. Worktrees never get one, since unarchiving an empty
+      // folder would erase their branch and source repository link.
       return {
         kind: "unavailable",
         workspaceId,
         reason: "workspace_directory_missing",
-        message: "The archived workspace directory no longer exists and cannot be recreated.",
+        message: "The archived workspace folder no longer exists, and git can't restore it.",
+        canRecreate: await deps.isDirectory(dirname(workspace.cwd)),
       };
     }
     // COMPAT(worktreeRestoreMissingMainRepoRoot): records created before v0.1.110
@@ -138,10 +169,16 @@ export function createWorkspaceRecoveryService(deps: {
         workspaceId,
         reason: "project_directory_missing",
         message: "The source repository needed to restore this worktree no longer exists.",
+        canRecreate: false,
       };
     }
 
-    return createRecoveryPlan({ action: "restore", workspace, sourceRepoRoot });
+    // FSH: a branch that git proves is gone (deleted after its PR merged) is restored as a new
+    // branch of the same name from the base. Anything less certain keeps the saved branch.
+    const checkout = parseWorkspaceHead(workspace);
+    const branchGone =
+      checkout.kind === "branch" && (await isBranchGone(sourceRepoRoot, checkout.branch));
+    return createRecoveryPlan({ action: "restore", workspace, sourceRepoRoot, branchGone });
   }
 
   async function inspect(workspaceId: string): Promise<WorkspaceRecoveryState> {
@@ -151,16 +188,27 @@ export function createWorkspaceRecoveryService(deps: {
 
   async function restore(
     workspaceId: string,
+    options?: { recreate?: boolean },
   ): Promise<{ workspaceId: string; action: WorkspaceRecoveryAction }> {
     const resolved = await resolveRecovery(workspaceId);
     if (resolved.kind === "unavailable") {
-      throw new Error(resolved.message);
+      const workspace = resolved.canRecreate ? await deps.getWorkspace(workspaceId) : null;
+      if (!options?.recreate || !workspace) {
+        throw new Error(resolved.message);
+      }
+      await mkdir(workspace.cwd);
+      await deps.unarchiveWorkspace(workspace);
+      return { workspaceId, action: "recreate" };
     }
 
     let workspaceToUnarchive = resolved.workspace;
     let recreated: { worktreePath: string; pluginId: string | null } | null = null;
     if (resolved.kind === "restore") {
-      recreated = await recreateArchivedWorktree(resolved.workspace, resolved.sourceRepoRoot);
+      recreated = await recreateArchivedWorktree(
+        resolved.workspace,
+        resolved.sourceRepoRoot,
+        resolved.branchGone,
+      );
       if ((resolved.workspace.worktreeManagerPluginId ?? null) !== recreated.pluginId) {
         const { worktreeManagerPluginId: _previous, ...withoutManager } = resolved.workspace;
         workspaceToUnarchive = recreated.pluginId
@@ -182,10 +230,18 @@ export function createWorkspaceRecoveryService(deps: {
   async function recreateArchivedWorktree(
     workspace: PersistedWorkspaceRecord,
     sourceRepoRoot: string,
+    branchGone: boolean,
   ): Promise<{ worktreePath: string; pluginId: string | null }> {
     let source: WorktreeSource;
     const checkout = parseWorkspaceHead(workspace);
-    if (checkout.kind === "branch") {
+    if (checkout.kind === "branch" && branchGone) {
+      source = {
+        kind: "restore-from-base",
+        // Reuse a deleted branch's name, so the restored workspace reads the same.
+        branchName: checkout.branch,
+        baseRef: await resolveRecoveryBase(sourceRepoRoot, workspace.baseBranch),
+      };
+    } else if (checkout.kind === "branch") {
       source = {
         kind: "restore",
         branchName: checkout.branch,
@@ -399,14 +455,20 @@ function parseWorkspaceHead(
 function createRecoveryPlan(
   input:
     | { action: "unarchive"; workspace: PersistedWorkspaceRecord }
-    | { action: "restore"; workspace: PersistedWorkspaceRecord; sourceRepoRoot: string },
+    | {
+        action: "restore";
+        workspace: PersistedWorkspaceRecord;
+        sourceRepoRoot: string;
+        branchGone: boolean;
+      },
 ): RecoveryPlan {
   const checkout = parseWorkspaceHead(input.workspace);
+  const branchGone = input.action === "restore" && input.branchGone;
   const state = {
     kind: "recoverable" as const,
     workspaceId: input.workspace.workspaceId,
     workspaceName: resolveWorkspaceDisplayName(input.workspace),
-    branch: checkout.kind === "branch" ? checkout.branch : null,
+    branch: checkout.kind === "branch" && !branchGone ? checkout.branch : null,
   };
   if (input.action === "restore") {
     return {
@@ -414,6 +476,7 @@ function createRecoveryPlan(
       state: { ...state, action: input.action },
       workspace: input.workspace,
       sourceRepoRoot: input.sourceRepoRoot,
+      branchGone: input.branchGone,
     };
   }
   return {
@@ -424,4 +487,34 @@ function createRecoveryPlan(
     },
     workspace: input.workspace,
   };
+}
+
+/**
+ * FSH: true only when git proves the branch is gone: no local branch, and origin either doesn't
+ * exist or reports no such branch. Origin is asked even when a tracking ref remains, since one
+ * outlives a branch deleted after its PR merged until a pruning fetch. A failed check (offline,
+ * auth) is not proof: the saved branch is kept and its restore reports the error.
+ */
+async function isBranchGone(repoRoot: string, branch: string): Promise<boolean> {
+  try {
+    const local = await runGitCommand(["show-ref", "--verify", "--quiet", `refs/heads/${branch}`], {
+      cwd: repoRoot,
+      acceptExitCodes: [0, 1],
+    });
+    if (local.exitCode === 0) return false;
+    const remotes = await runGitCommand(["remote"], { cwd: repoRoot });
+    if (!remotes.stdout.split("\n").includes("origin")) return true;
+    const listed = await runGitCommand(
+      ["ls-remote", "--exit-code", "--heads", "origin", `refs/heads/${branch}`],
+      {
+        cwd: repoRoot,
+        acceptExitCodes: [0, 2],
+        timeout: 15_000,
+        envOverlay: { GIT_TERMINAL_PROMPT: "0" },
+      },
+    );
+    return listed.exitCode === 2;
+  } catch {
+    return false;
+  }
 }
