@@ -7,6 +7,7 @@ temporary by design: every patch is meant to go upstream and then drop out of `f
 ## Patches on `fsh`
 
 - FSH-only (upstreamable): archiving a workspace replies once its records are archived; worktree teardown and deletion run in the background, one repo at a time. Creating or restoring a worktree at the same path waits for the pending removal. `paseo worktree archive` and the MCP `archive_workspace` tool still wait for the directory to be removed
+- FSH-only (upstreamable): workspace reconciliation leaves a workspace alone once it is archived. An archive that landed during its git read used to save the deleted worktree as a plain folder with no branch, and Restore then reported that the folder could not be recreated
 - FSH-only (upstreamable): an archived workspace stays out of the sidebar when its archive takes longer than the app's 60 s request timeout. Before, the app put the row back after the daemon had already removed it, and the row stayed until a daemon restart. The daemon also sends the removal to apps that caught up from a cached directory (#94)
 
 - FSH-only (upstreamable): a file tab's right-click menu has **Reveal in Finder** (Explorer / Files on other OSes) on desktop with a local daemon, next to **Copy file path**.

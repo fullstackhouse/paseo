@@ -411,7 +411,12 @@ export class WorkspaceReconciliationService {
     const workspaceCheckouts = await Promise.all(
       siblings.map(async (workspace) => {
         const current = await this.workspaceRegistry.get(workspace.workspaceId);
-        if (!current || current.cwd !== workspace.cwd || current.projectId !== workspace.projectId)
+        if (
+          !current ||
+          current.archivedAt ||
+          current.cwd !== workspace.cwd ||
+          current.projectId !== workspace.projectId
+        )
           return null;
         return { workspace: current, checkout: await readCheckout(current.cwd) };
       }),
@@ -461,7 +466,14 @@ export class WorkspaceReconciliationService {
           return;
         let fields: Partial<MutableWorkspacePlacement> | null = null;
         await this.workspaceRegistry.update(workspace.workspaceId, (current) => {
-          if (current.cwd !== workspace.cwd || current.projectId !== workspace.projectId)
+          // An archive that lands during the git read usually deletes the worktree, so
+          // the read sees no checkout. Keep the archived placement: recovery restores
+          // the worktree from it.
+          if (
+            current.archivedAt ||
+            current.cwd !== workspace.cwd ||
+            current.projectId !== workspace.projectId
+          )
             return current;
           const update = reconcileWorkspacePlacement({
             workspace: current,

@@ -634,15 +634,17 @@ describe("WorkspaceReconciliationService", () => {
     );
   });
 
-  test("preserves workspace archival that lands during boot reconciliation", async () => {
-    const workspaceRoot = realpathSync(mkdtempSync(path.join(tmpdir(), "reconcile-archive-race-")));
-    tempDirs.push(workspaceRoot);
+  test("keeps an archived worktree's placement when the archive lands during the git read", async () => {
+    const projectRoot = realpathSync(mkdtempSync(path.join(tmpdir(), "reconcile-archive-race-")));
+    tempDirs.push(projectRoot);
+    const worktreePath = path.join(projectRoot, "worktree");
+    mkdirSync(worktreePath);
     const { projects, workspaces, projectRegistry, workspaceRegistry } = createTestRegistries();
     projects.set(
       "p1",
       createPersistedProjectRecord({
         projectId: "p1",
-        rootPath: workspaceRoot,
+        rootPath: projectRoot,
         kind: "git",
         displayName: "archive-race",
         createdAt: timestamp,
@@ -654,10 +656,13 @@ describe("WorkspaceReconciliationService", () => {
       createPersistedWorkspaceRecord({
         workspaceId: "w1",
         projectId: "p1",
-        cwd: workspaceRoot,
-        kind: "local_checkout",
+        cwd: worktreePath,
+        kind: "worktree",
         displayName: "archive-race",
-        branch: "old-branch",
+        branch: "feature",
+        worktreeRoot: worktreePath,
+        isPaseoOwnedWorktree: true,
+        mainRepoRoot: projectRoot,
         createdAt: timestamp,
         updatedAt: timestamp,
       }),
@@ -670,13 +675,13 @@ describe("WorkspaceReconciliationService", () => {
       logger: createTestLogger(),
       workspaceGitService: {
         getCheckout: async (cwd) => {
-          readStarted.resolve();
-          await allowRead.promise;
-          return createCheckout(cwd, {
-            isGit: true,
-            currentBranch: "new-branch",
-            worktreeRoot: cwd,
-          });
+          if (cwd === worktreePath) {
+            readStarted.resolve();
+            await allowRead.promise;
+            // Archive removed the worktree, so the read finds no checkout.
+            return createCheckout(cwd);
+          }
+          return createCheckout(cwd, { isGit: true, currentBranch: "main", worktreeRoot: cwd });
         },
       },
     });
@@ -685,12 +690,17 @@ describe("WorkspaceReconciliationService", () => {
     await readStarted.promise;
     const archivedAt = "2025-01-02T00:00:00.000Z";
     await workspaceRegistry.archive("w1", archivedAt);
+    rmSync(worktreePath, { recursive: true });
     allowRead.resolve();
     await reconciliation;
 
     expect(workspaces.get("w1")).toMatchObject({
       archivedAt,
-      branch: "new-branch",
+      kind: "worktree",
+      branch: "feature",
+      worktreeRoot: worktreePath,
+      isPaseoOwnedWorktree: true,
+      mainRepoRoot: projectRoot,
     });
   });
 
