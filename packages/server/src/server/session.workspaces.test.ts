@@ -10511,3 +10511,80 @@ describe("a message to an agent in a snoozed workspace", () => {
     expect(workspaces.get("ws-1")?.snoozedAt).toBe("2026-03-01T12:00:00.000Z");
   });
 });
+
+test("workspace.group.set.request moves a workspace to a group and clears the move", async () => {
+  const emitted: SessionOutboundMessage[] = [];
+  const session = asTestSession(
+    createSessionForWorkspaceTests({ onMessage: (message) => emitted.push(message) }),
+  );
+  const workspace = createPersistedWorkspaceRecord({
+    workspaceId: "ws-1",
+    projectId: "proj-1",
+    cwd: REPO_CWD,
+    kind: "local_checkout",
+    displayName: "main",
+    createdAt: "2026-03-01T12:00:00.000Z",
+    updatedAt: "2026-03-01T12:00:00.000Z",
+  });
+  const workspaces = new Map([[workspace.workspaceId, workspace]]);
+  session.workspaceRegistry.list = async () => Array.from(workspaces.values());
+  session.workspaceRegistry.update = async (id, updater) => {
+    const existing = workspaces.get(id);
+    if (!existing) return null;
+    const updated = updater(existing);
+    workspaces.set(id, updated);
+    return updated;
+  };
+  await session.handleMessage({
+    type: "fetch_workspaces_request",
+    requestId: "sub-workspaces",
+    subscribe: { subscriptionId: "sub-workspaces" },
+  });
+
+  await session.handleMessage({
+    type: "workspace.group.set.request",
+    workspaceId: "ws-1",
+    group: "blocked",
+    requestId: "req-move",
+  });
+
+  const response = findByType(emitted, "workspace.group.set.response");
+  expect(response?.payload).toMatchObject({
+    requestId: "req-move",
+    workspaceId: "ws-1",
+    accepted: true,
+    manualGroup: { group: "blocked", setAt: expect.any(String) },
+    error: null,
+  });
+  expect(workspaces.get("ws-1")?.manualGroup).toEqual(response?.payload.manualGroup);
+  expect(findByType(emitted, "workspace_update")?.payload).toMatchObject({
+    kind: "upsert",
+    workspace: { id: "ws-1", manualGroup: { group: "blocked" } },
+  });
+
+  emitted.length = 0;
+  await session.handleMessage({
+    type: "workspace.group.set.request",
+    workspaceId: "ws-1",
+    group: null,
+    requestId: "req-clear",
+  });
+  expect(findByType(emitted, "workspace.group.set.response")?.payload).toMatchObject({
+    accepted: true,
+    manualGroup: null,
+  });
+  expect(workspaces.get("ws-1")?.manualGroup).toBeNull();
+
+  emitted.length = 0;
+  await session.handleMessage({
+    type: "workspace.group.set.request",
+    workspaceId: "ws-missing",
+    group: "done",
+    requestId: "req-missing",
+  });
+  expect(findByType(emitted, "workspace.group.set.response")?.payload).toMatchObject({
+    requestId: "req-missing",
+    accepted: false,
+    error: "Workspace not found",
+  });
+});
