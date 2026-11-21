@@ -306,7 +306,7 @@ describe("workspace recovery", () => {
     ).toBe(false);
   });
 
-  test("keeps a worktree archived while its source repository is missing, offering an empty folder", async () => {
+  test("never offers an empty folder for a worktree, even when its source repository is missing", async () => {
     const workspace = createWorkspace({
       cwd: "/worktrees/1a2b3c4d/trigger",
       worktreeRoot: "/worktrees/1a2b3c4d/trigger",
@@ -322,9 +322,9 @@ describe("workspace recovery", () => {
       workspaceId: workspace.workspaceId,
       reason: "project_directory_missing",
       message: "The source repository needed to restore this worktree no longer exists.",
-      canRecreate: true,
+      canRecreate: false,
     });
-    await expect(service.restore(workspace.workspaceId)).rejects.toThrow(
+    await expect(service.restore(workspace.workspaceId, { recreate: true })).rejects.toThrow(
       "The source repository needed to restore this worktree no longer exists.",
     );
     expect(unarchived).toEqual([]);
@@ -623,5 +623,59 @@ test("restores a worktree whose branch was deleted as a new branch of that name 
   expect(
     await getCheckoutStatus(fixture.workspace.cwd, { paseoHome: fixture.paseoHome }),
   ).toMatchObject({ currentBranch: "feature", aheadBehind: { ahead: 0, behind: 0 } });
+  expect(existsSync(join(fixture.workspace.cwd, "feature.txt"))).toBe(false);
+});
+
+for (const trackingRef of ["kept", "pruned"] as const) {
+  test(`keeps a branch git can't prove is gone when origin is unreachable (tracking ref ${trackingRef})`, async () => {
+    const fixture = await createBaseRecoveryFixture("refs/heads/main");
+    const remote = join(fixture.tempDir, "remote.git");
+    execFileSync("git", ["init", "--bare", remote], { stdio: "pipe" });
+    execFileSync("git", ["remote", "add", "origin", remote], { cwd: fixture.repoDir });
+    execFileSync("git", ["push", "origin", "feature"], { cwd: fixture.repoDir, stdio: "pipe" });
+    await fixture.archiveAndRemove();
+    execFileSync("git", ["branch", "-D", "feature"], { cwd: fixture.repoDir });
+    if (trackingRef === "pruned") {
+      execFileSync("git", ["update-ref", "-d", "refs/remotes/origin/feature"], {
+        cwd: fixture.repoDir,
+      });
+    }
+    execFileSync("git", ["remote", "set-url", "origin", join(fixture.tempDir, "offline.git")], {
+      cwd: fixture.repoDir,
+    });
+
+    await expect(fixture.service.inspect(fixture.workspace.workspaceId)).resolves.toMatchObject({
+      action: "restore",
+      branch: "feature",
+    });
+    await expect(fixture.service.restore(fixture.workspace.workspaceId)).rejects.toThrow();
+    expect(existsSync(fixture.workspace.cwd)).toBe(false);
+    expect((await fixture.registry.get(fixture.workspace.workspaceId))?.archivedAt).not.toBeNull();
+    expect(
+      execFileSync("git", ["branch", "--list", "feature"], {
+        cwd: fixture.repoDir,
+        encoding: "utf8",
+      }).trim(),
+    ).toBe("");
+  });
+}
+
+test("restores a branch origin reports deleted as a new branch of that name from its base", async () => {
+  const fixture = await createBaseRecoveryFixture("refs/heads/main");
+  const remote = join(fixture.tempDir, "remote.git");
+  execFileSync("git", ["init", "--bare", remote], { stdio: "pipe" });
+  execFileSync("git", ["remote", "add", "origin", remote], { cwd: fixture.repoDir });
+  execFileSync("git", ["push", "origin", "main"], { cwd: fixture.repoDir, stdio: "pipe" });
+  await fixture.archiveAndRemove();
+  execFileSync("git", ["branch", "-D", "feature"], { cwd: fixture.repoDir });
+
+  await expect(fixture.service.inspect(fixture.workspace.workspaceId)).resolves.toMatchObject({
+    action: "restore",
+    branch: null,
+  });
+  await fixture.service.restore(fixture.workspace.workspaceId);
+  expect(
+    await getCheckoutStatus(fixture.workspace.cwd, { paseoHome: fixture.paseoHome }),
+  ).toMatchObject({ currentBranch: "feature" });
   expect(existsSync(join(fixture.workspace.cwd, "feature.txt"))).toBe(false);
 });
