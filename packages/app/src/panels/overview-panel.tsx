@@ -61,6 +61,7 @@ import {
   deriveWorkspaceStateWord,
   deriveYourMove,
   openMoveKey,
+  pinOpenMove,
   gitMoveFacts,
   isStatusDone,
   isStatusOutdated,
@@ -418,7 +419,9 @@ function YourMove({
   // One row open at a time: opening an ask closes the one that was open.
   const [chosen, setChosen] = useState<string | null | undefined>(undefined);
   if (rows.length === 0) return null;
-  const openKey = openMoveKey(rows, chosen);
+  const pinned = pinOpenMove(rows, chosen);
+  if (pinned !== chosen) setChosen(pinned);
+  const openKey = openMoveKey(rows, pinned);
   return (
     <Section title="panels.overview.yourMove" count={rows.length > 1 ? rows.length : undefined}>
       {rows.map((row, index) => {

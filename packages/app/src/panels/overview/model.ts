@@ -119,8 +119,9 @@ export function compactMoveWord(kind: YourMoveRow["kind"], action: string): stri
 }
 
 /**
- * The one Your move row shown open. `chosen` is the human's last toggle: a key they opened, or null
- * after closing it. Until they choose, and once their row is gone (answered), the lead row is open.
+ * The one Your move row shown open. `chosen` is the row last shown open (the host pins it), or null
+ * after the human closed it. With nothing pinned, and once that row is gone (answered), the lead row
+ * is open.
  */
 export function openMoveKey(
   rows: readonly YourMoveRow[],
@@ -129,6 +130,20 @@ export function openMoveKey(
   if (chosen === null) return null;
   if (chosen !== undefined && rows.some((row) => row.key === chosen)) return chosen;
   return rows[0]?.key ?? null;
+}
+
+/**
+ * What the host remembers as `chosen` after rendering `rows`. Once an ask is shown open it is pinned,
+ * so a move arriving above it doesn't collapse the ask the human is answering (and drop their
+ * half-written reply). Rows that can't expand are never pinned: an ask arriving above one still opens.
+ */
+export function pinOpenMove(
+  rows: readonly YourMoveRow[],
+  chosen: string | null | undefined,
+): string | null | undefined {
+  const key = openMoveKey(rows, chosen);
+  const open = rows.find((row) => row.key === key);
+  return open?.kind === "entry" && open.item.EntryComponent ? key : chosen;
 }
 
 /**
