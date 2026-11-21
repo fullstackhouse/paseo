@@ -87,6 +87,19 @@ export function deriveYourMove(input: {
 }
 
 /**
+ * The one Your move row shown open. `chosen` is the human's last toggle: a key they opened, or null
+ * after closing it. Until they choose, and once their row is gone (answered), the lead row is open.
+ */
+export function openMoveKey(
+  rows: readonly YourMoveRow[],
+  chosen: string | null | undefined,
+): string | null {
+  if (chosen === null) return null;
+  if (chosen !== undefined && rows.some((row) => row.key === chosen)) return chosen;
+  return rows[0]?.key ?? null;
+}
+
+/**
  * Where each plugin summary item renders: an item with a status is the Status card; one that can
  * need the human (`needsYou`, `entries`) belongs to Your move; anything else is a context footer fact.
  */

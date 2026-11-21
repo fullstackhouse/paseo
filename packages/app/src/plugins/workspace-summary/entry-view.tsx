@@ -21,6 +21,8 @@ interface EntryViewProps {
   item: WorkspaceSummaryItem;
   entryId: string;
   defaultExpanded: boolean;
+  expanded: boolean;
+  onExpandedChange: (expanded: boolean) => void;
   /** Shown instead when the plugin is gone or its component throws. */
   children: ReactElement;
 }
@@ -29,6 +31,8 @@ function EntryBody({
   item,
   entryId,
   defaultExpanded,
+  expanded,
+  onExpandedChange,
   children: fallback,
   theme,
 }: EntryViewProps & { theme: PluginTheme }) {
@@ -47,15 +51,19 @@ function EntryBody({
       workspaceId: item.workspaceId,
       entryId,
       defaultExpanded,
+      expanded,
+      onExpandedChange,
     }),
     [
       compact,
       defaultExpanded,
       entryId,
+      expanded,
       hostLabel,
       item.serverId,
       item.workspaceId,
       navigation,
+      onExpandedChange,
       theme,
     ],
   );
