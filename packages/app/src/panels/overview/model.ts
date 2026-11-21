@@ -3,7 +3,11 @@ import type {
   AgentPermissionRequest,
   AgentPermissionResponse,
 } from "@getpaseo/protocol/agent-types";
-import type { PluginWorkspaceStatus, PluginWorkspaceSummaryEntry } from "@getpaseo/plugin/client";
+import type {
+  PluginWorkspaceBlocker,
+  PluginWorkspaceStatus,
+  PluginWorkspaceSummaryEntry,
+} from "@getpaseo/plugin/client";
 import type { GitActionId } from "@/git/policy";
 import type { WorkspaceSummaryItem } from "@/plugins/workspace-summary/store";
 import type { Agent } from "@/stores/session-store";
@@ -332,4 +336,37 @@ export function permissionResponse(action: AgentPermissionAction): AgentPermissi
   return action.behavior === "allow"
     ? { behavior: "allow", selectedActionId: action.id }
     : { behavior: "deny", selectedActionId: action.id, message: "Denied by user" };
+}
+
+export type BlockerTarget =
+  | { kind: "agent"; agentId: string }
+  | { kind: "workspace"; workspaceId: string }
+  | { kind: "url"; url: string };
+
+/** What pressing a Blocked by row opens: the agent, else its workspace, else the link. */
+export function blockerTarget(blocker: PluginWorkspaceBlocker): BlockerTarget | null {
+  if (blocker.agentId) return { kind: "agent", agentId: blocker.agentId };
+  if (blocker.workspaceId) return { kind: "workspace", workspaceId: blocker.workspaceId };
+  if (blocker.url) return { kind: "url", url: blocker.url };
+  return null;
+}
+
+/** Identifies a Blocked by row: what it opens, else its label. */
+export function blockerKey(blocker: PluginWorkspaceBlocker): string {
+  return `${blocker.kind}:${blocker.agentId ?? blocker.workspaceId ?? blocker.url ?? blocker.label}`;
+}
+
+/**
+ * The Blocked by rows, one per thing: only while the status card says blocked and the human hasn't
+ * answered it.
+ */
+export function statusBlockers(status: PluginWorkspaceStatus | null): PluginWorkspaceBlocker[] {
+  if (!status || status.state !== "blocked" || status.answered) return [];
+  const seen = new Set<string>();
+  return (status.blockedBy ?? []).filter((blocker) => {
+    const key = blockerKey(blocker);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }

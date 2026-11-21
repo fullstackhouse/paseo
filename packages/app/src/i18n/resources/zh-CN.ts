@@ -2194,6 +2194,7 @@ export const zhCN: TranslationResources = {
         answered: "已回复",
       },
       yourMove: "待你处理",
+      blockedBy: "阻塞于",
       permissionTitle: "权限请求",
       open: "打开",
       prMergedTitle: "PR #{{number}} 已合并",
