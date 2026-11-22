@@ -46,6 +46,7 @@ const INBOUND_PERMISSION = {
   "browser.live.frame_ack": "workspace.write",
   "browser.host.live.start.response": "workspace.write",
   "browser.host.live.stop.response": "workspace.write",
+  "browser.host.live.ended": "workspace.write",
   cancel_agent_request: ["workspace.write", "hub.execute"],
   capture_terminal_request: "workspace.read",
   "chat/create": "workspace.write",

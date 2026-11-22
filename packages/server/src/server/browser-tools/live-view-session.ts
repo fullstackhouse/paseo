@@ -97,7 +97,10 @@ export class SessionLiveViews {
       return;
     }
     this.streams.delete(request.streamId);
-    const { error } = await this.deps.broker.stopLiveView(request.streamId, this.deps.viewerId);
+    const { error } = await this.deps.broker.stopLiveView({
+      streamId: request.streamId,
+      viewerId: this.deps.viewerId,
+    });
     this.deps.emit({
       type: "browser.live.stop.response",
       payload: { requestId: request.requestId, streamId: request.streamId, error },
@@ -107,11 +110,15 @@ export class SessionLiveViews {
 
   public ack(message: FrameAck): void {
     if (!this.streams.has(message.streamId)) return;
-    this.deps.broker.ackLiveFrame(message.streamId, message.frameSeq, this.deps.viewerId);
+    this.deps.broker.ackLiveFrame({
+      streamId: message.streamId,
+      frameSeq: message.frameSeq,
+      viewerId: this.deps.viewerId,
+    });
   }
 
   private async stopStream(streamId: string): Promise<void> {
     if (!this.streams.delete(streamId)) return;
-    await this.deps.broker.stopLiveView(streamId, this.deps.viewerId);
+    await this.deps.broker.stopLiveView({ streamId, viewerId: this.deps.viewerId });
   }
 }

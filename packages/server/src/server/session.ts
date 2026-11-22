@@ -2503,10 +2503,18 @@ export class Session {
       msg.type === "browser.host.live.stop.response"
     ) {
       if (source)
-        this.browserToolsBroker?.receiveLiveResponse(
-          msg.payload,
-          this.delivery.subscriptionIds(source, "browser-host"),
-        );
+        this.browserToolsBroker?.receiveLiveResponse({
+          payload: msg.payload,
+          clientIds: this.delivery.subscriptionIds(source, "browser-host"),
+        });
+      return Promise.resolve();
+    }
+    if (msg.type === "browser.host.live.ended") {
+      if (source)
+        this.browserToolsBroker?.receiveLiveEnded({
+          payload: msg.payload,
+          clientIds: this.delivery.subscriptionIds(source, "browser-host"),
+        });
       return Promise.resolve();
     }
     if (msg.type === "browser.live.start.request") return this.getLiveViews().start(msg);
@@ -3399,11 +3407,11 @@ export class Session {
       return;
     }
     if (binaryFrame.kind === "browser_live") {
-      this.browserToolsBroker?.receiveLiveFrame(
-        binaryFrame.frame,
-        binaryFrame.bytes,
-        this.delivery.subscriptionIds(source, "browser-host"),
-      );
+      this.browserToolsBroker?.receiveLiveFrame({
+        header: binaryFrame.frame,
+        bytes: binaryFrame.bytes,
+        clientIds: this.delivery.subscriptionIds(source, "browser-host"),
+      });
       return;
     }
     this.terminalController.handleBinaryFrame(binaryFrame.frame, source);

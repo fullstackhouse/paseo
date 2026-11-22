@@ -8,6 +8,7 @@ import {
   type BrowserAutomationExecuteResponse,
 } from "@getpaseo/protocol/browser-automation/rpc-schemas";
 import type {
+  BrowserHostLiveEnded,
   BrowserHostLiveOutboundMessage,
   BrowserHostLiveStartResponse,
   BrowserHostLiveStopResponse,
@@ -356,10 +357,8 @@ export class BrowserToolsBroker {
     });
 
     if (this.liveViews.get(stream.streamId) !== stream) {
-      // Stopped while starting (viewer left or host gone). Make sure the host is not left streaming.
-      if (!response.error && this.clients.has(stream.hostClientId)) {
-        void this.sendStopToHost(stream, this.createRequestId());
-      }
+      // Stopped while starting (viewer left or host gone). The host may have started anyway.
+      this.stopOrphanedHostStream(stream);
       input.respond({
         ok: false,
         error: {
@@ -373,6 +372,8 @@ export class BrowserToolsBroker {
 
     if (response.error || !("viewport" in response) || !response.viewport) {
       this.liveViews.remove(stream.streamId);
+      // A timeout or lost answer does not mean the host never started; stopping is idempotent.
+      this.stopOrphanedHostStream(stream);
       input.respond({
         ok: false,
         error: response.error ?? {
@@ -393,10 +394,11 @@ export class BrowserToolsBroker {
     }
   }
 
-  public async stopLiveView(
-    streamId: string,
-    viewerId: string,
-  ): Promise<{ error: BrowserToolsErrorPayload | null }> {
+  public async stopLiveView(input: {
+    streamId: string;
+    viewerId: string;
+  }): Promise<{ error: BrowserToolsErrorPayload | null }> {
+    const { streamId, viewerId } = input;
     const stream = this.liveViews.get(streamId);
     if (!stream || stream.viewerId !== viewerId) {
       return {
@@ -416,7 +418,8 @@ export class BrowserToolsBroker {
   }
 
   /** Forwards the viewer's ack for the frame in flight; stale or foreign acks are dropped. */
-  public ackLiveFrame(streamId: string, frameSeq: number, viewerId: string): boolean {
+  public ackLiveFrame(input: { streamId: string; frameSeq: number; viewerId: string }): boolean {
+    const { streamId, frameSeq, viewerId } = input;
     const stream = this.liveViews.get(streamId);
     if (!stream || stream.viewerId !== viewerId || stream.inFlightFrameSeq !== frameSeq) {
       return false;
@@ -433,11 +436,12 @@ export class BrowserToolsBroker {
   }
 
   /** Relays a host's binary frame to the stream's viewer without decoding the image. */
-  public receiveLiveFrame(
-    header: BrowserLiveFrameHeader,
-    bytes: Uint8Array,
-    clientIds: readonly string[],
-  ): boolean {
+  public receiveLiveFrame(input: {
+    header: BrowserLiveFrameHeader;
+    bytes: Uint8Array;
+    clientIds: readonly string[];
+  }): boolean {
+    const { header, bytes, clientIds } = input;
     const stream = this.liveViews.get(header.streamId);
     if (!stream || !clientIds.includes(stream.hostClientId)) {
       return false;
@@ -450,15 +454,36 @@ export class BrowserToolsBroker {
     return true;
   }
 
-  public receiveLiveResponse(
-    payload: BrowserHostLiveResponsePayload,
-    clientIds: readonly string[],
-  ): boolean {
+  public receiveLiveResponse(input: {
+    payload: BrowserHostLiveResponsePayload;
+    clientIds: readonly string[];
+  }): boolean {
+    const { payload, clientIds } = input;
     const pending = this.pendingLive.get(payload.requestId);
     if (!pending || !clientIds.includes(pending.clientId)) {
       return false;
     }
     return settleLiveRequest(this.pendingLive, payload);
+  }
+
+  /** The host's screencast ended on its own (tab closed or gone); tell the viewer. */
+  public receiveLiveEnded(input: {
+    payload: BrowserHostLiveEnded["payload"];
+    clientIds: readonly string[];
+  }): boolean {
+    const stream = this.liveViews.get(input.payload.streamId);
+    if (!stream || !input.clientIds.includes(stream.hostClientId)) {
+      return false;
+    }
+    this.liveViews.remove(stream.streamId);
+    stream.sink.ended(
+      input.payload.error ?? {
+        code: "browser_tab_closed",
+        message: `The live view of browser tab ${stream.browserId} ended on the desktop.`,
+        retryable: false,
+      },
+    );
+    return true;
   }
 
   public getLiveViewCount(): number {
@@ -474,6 +499,12 @@ export class BrowserToolsBroker {
       message: `Browser tab ${browserId} was closed.`,
       retryable: false,
     });
+  }
+
+  private stopOrphanedHostStream(stream: BrowserLiveViewStream): void {
+    if (this.clients.has(stream.hostClientId)) {
+      void this.sendStopToHost(stream, this.createRequestId());
+    }
   }
 
   private relayLiveFrame(stream: BrowserLiveViewStream, frameSeq: number, bytes: Uint8Array): void {
