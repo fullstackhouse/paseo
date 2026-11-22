@@ -22,6 +22,28 @@ function assistant(id: string, timestamp: Date, text = id): StreamItem {
 }
 
 describe("deriveStreamTurnTiming", () => {
+  it("doesn't count an info notification that arrives after the turn as work", () => {
+    const userAt = new Date("2026-05-15T00:00:00.000Z");
+    const assistantAt = new Date("2026-05-15T00:00:07.000Z");
+    const handBackNote: StreamItem = {
+      kind: "notification",
+      sourceType: "notification",
+      id: "note",
+      level: "info",
+      message: "The user handed the browser tab back.",
+      timestamp: new Date("2026-05-15T00:10:00.000Z"),
+    };
+
+    const timing = deriveStreamTurnTiming({
+      isTurnActive: false,
+      activeTurnStartedAt: null,
+      tail: [user("u1", userAt), assistant("a1", assistantAt), handBackNote],
+      head: [],
+    });
+
+    assert.deepEqual(timing.byItemId.get("a1"), { completedAt: assistantAt, durationMs: 7000 });
+  });
+
   it("starts elapsed time from the submitted prompt", () => {
     const submittedAt = new Date("2026-05-15T00:00:00.000Z");
 

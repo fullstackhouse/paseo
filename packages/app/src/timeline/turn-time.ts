@@ -69,7 +69,9 @@ function walkTurns(
       lastItemAt = null;
       assistantIds = [];
     }
-    lastItemAt = item.timestamp;
+    // An info notification can land long after the turn, as when a browser tab is handed back.
+    const isAside = item.kind === "notification" && item.level === "info";
+    if (!isAside || !lastItemAt) lastItemAt = item.timestamp;
     if (item.kind === "assistant_message") {
       assistantIds.push(item.id);
     }
