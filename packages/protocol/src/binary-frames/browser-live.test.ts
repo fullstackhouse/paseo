@@ -53,6 +53,16 @@ describe("browser live binary frames", () => {
     });
   });
 
+  it("carries the tab's committed origin with the frame", () => {
+    const encoded = encodeBrowserLiveFrame({
+      streamId: "stream-1",
+      frameSeq: 1,
+      metadata: { ...metadata, origin: "https://app.example" },
+      jpeg,
+    });
+    expect(decodeBrowserLiveFrame(encoded)?.metadata.origin).toBe("https://app.example");
+  });
+
   it("ignores unknown metadata fields from newer senders", () => {
     const encoded = encodeBrowserLiveFrame({
       streamId: "s",

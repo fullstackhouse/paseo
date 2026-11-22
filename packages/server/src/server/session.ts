@@ -2284,7 +2284,7 @@ export class Session {
       this.sessionLogger.trace(
         {
           messageType: msg.type,
-          payloadBytes: JSON.stringify(msg).length,
+          ...payloadSizeForLog(msg),
         },
         "agent.session.inbound",
       );
@@ -2350,6 +2350,12 @@ export class Session {
         .releaseFamily("browser-host")
         .catch((error) =>
           this.sessionLogger.error({ err: error }, "Failed to release revoked browser hosting"),
+        );
+      // Stops the frames; control then runs out like any other disconnect.
+      void this.delivery
+        .releaseFamily("browser-live")
+        .catch((error) =>
+          this.sessionLogger.error({ err: error }, "Failed to release revoked live views"),
         );
     }
   }
@@ -2420,7 +2426,14 @@ export class Session {
         hostKind: request.hostKind,
         supportedCommands: request.supportedCommands,
         sendBrowserAutomationRequest: (message) => owner.emit(message),
-        ...(request.liveView ? { liveView: { send: (message) => owner.emit(message) } } : {}),
+        ...(request.liveView
+          ? {
+              liveView: {
+                send: (message) => owner.emit(message),
+                ...(request.liveViewInput ? { input: true } : {}),
+              },
+            }
+          : {}),
       });
       if (respond)
         this.emit({
@@ -2433,11 +2446,60 @@ export class Session {
     }
   }
 
+  private dispatchBrowserLiveMessage(
+    msg: SessionInboundMessage,
+    source?: object,
+  ): Promise<void> | undefined {
+    const hostClientIds = () =>
+      source ? this.delivery.subscriptionIds(source, "browser-host") : [];
+    switch (msg.type) {
+      case "browser.host.live.start.response":
+      case "browser.host.live.stop.response":
+      case "browser.host.live.take_control.response":
+      case "browser.host.live.send_input.response":
+      case "browser.host.live.release_control.response":
+        this.browserToolsBroker?.receiveLiveResponse({
+          payload: msg.payload,
+          clientIds: hostClientIds(),
+        });
+        return Promise.resolve();
+      case "browser.host.live.ended":
+        this.browserToolsBroker?.receiveLiveEnded({
+          payload: msg.payload,
+          clientIds: hostClientIds(),
+        });
+        return Promise.resolve();
+      case "browser.host.live.control_ended":
+        this.browserToolsBroker?.receiveControlEnded({
+          payload: msg.payload,
+          clientIds: hostClientIds(),
+        });
+        return Promise.resolve();
+      case "browser.live.start.request":
+        return this.getLiveViews().start(msg);
+      case "browser.live.stop.request":
+        return this.getLiveViews().stop(msg);
+      case "browser.live.take_control.request":
+        return this.getLiveViews().takeControl(msg);
+      case "browser.live.send_input.request":
+        return this.getLiveViews().sendInput(msg);
+      case "browser.live.release_control.request":
+        return this.getLiveViews().releaseControl(msg);
+      case "browser.live.frame_ack":
+        this.liveViews?.ack(msg);
+        return Promise.resolve();
+      default:
+        return undefined;
+    }
+  }
+
   private getLiveViews(): SessionLiveViews {
     if (!this.browserToolsBroker) throw new Error("Browser hosting is unavailable");
     this.liveViews ??= new SessionLiveViews({
       broker: this.browserToolsBroker,
       viewerId: this.sessionId,
+      // The principal and the app install, so control survives a reconnect as a new session.
+      ownerId: () => JSON.stringify([this.getHostSourceId(), this.clientId]),
       createStreamId: () => uuidv4(),
       begin: (stop) => this.delivery.begin("browser-live", undefined, stop),
       emit: (message) => this.emit(message),
@@ -2498,31 +2560,8 @@ export class Session {
         );
       return Promise.resolve();
     }
-    if (
-      msg.type === "browser.host.live.start.response" ||
-      msg.type === "browser.host.live.stop.response"
-    ) {
-      if (source)
-        this.browserToolsBroker?.receiveLiveResponse({
-          payload: msg.payload,
-          clientIds: this.delivery.subscriptionIds(source, "browser-host"),
-        });
-      return Promise.resolve();
-    }
-    if (msg.type === "browser.host.live.ended") {
-      if (source)
-        this.browserToolsBroker?.receiveLiveEnded({
-          payload: msg.payload,
-          clientIds: this.delivery.subscriptionIds(source, "browser-host"),
-        });
-      return Promise.resolve();
-    }
-    if (msg.type === "browser.live.start.request") return this.getLiveViews().start(msg);
-    if (msg.type === "browser.live.stop.request") return this.getLiveViews().stop(msg);
-    if (msg.type === "browser.live.frame_ack") {
-      this.liveViews?.ack(msg);
-      return Promise.resolve();
-    }
+    const live = this.dispatchBrowserLiveMessage(msg, source);
+    if (live) return live;
     if (msg.type === "subscription.release.request") {
       return this.delivery.release(msg.subscriptionId).then(() => {
         this.emit({
@@ -9110,7 +9149,7 @@ export class Session {
       this.sessionLogger.trace(
         {
           messageType: msg.type,
-          payloadBytes: JSON.stringify(msg).length,
+          ...payloadSizeForLog(msg),
         },
         "agent.session.outbound",
       );
@@ -9370,6 +9409,16 @@ function createHostSession(options: SessionOptions, session: Session): Connected
     session.getSessionId(),
     () => options.getConnectedHostBufferedAmount?.() ?? 0,
   );
+}
+
+// The size of an input would give away the length of a password.
+function payloadSizeForLog(message: SessionInboundMessage | SessionOutboundMessage): {
+  payloadBytes?: number;
+} {
+  const hidden =
+    message.type === "browser.live.send_input.request" ||
+    message.type === "browser.host.live.send_input.request";
+  return hidden ? {} : { payloadBytes: JSON.stringify(message).length };
 }
 
 function hostSource(options: SessionOptions): string {

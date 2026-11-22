@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { BrowserAutomationBrowserIdSchema } from "@getpaseo/protocol/browser-automation/rpc-schemas";
 import type { BrowserToolsBroker } from "./broker.js";
-import type { BrowserToolsResponsePayload } from "./errors.js";
+import type { BrowserToolsCallPayload, BrowserToolsResponsePayload } from "./errors.js";
 import type {
   PaseoToolConfig,
   PaseoToolExecutionContext,
@@ -769,17 +769,22 @@ function requireWorkspaceContext(context: {
 }
 
 function browserToolResult(params: {
-  payload: BrowserToolsResponsePayload;
+  payload: BrowserToolsCallPayload;
   context: { agentId?: string; cwd?: string; workspaceId?: string; browserId?: string };
 }): PaseoToolResult {
   const { payload, context } = params;
+  // Last, because clients read the first part as the command's own summary.
+  const noteContent = (payload.userNotes ?? []).map((text) => ({ type: "text" as const, text }));
+  // Repeated in structuredContent, which some providers show the model instead of the text.
+  const noteFields = payload.userNotes ? { userNotes: payload.userNotes } : {};
   if (payload.ok) {
     return {
-      content: browserToolSuccessContent(payload),
+      content: [...browserToolSuccessContent(payload), ...noteContent],
       structuredContent: {
         ok: true,
         result: browserToolStructuredResult(payload.result),
         ...(payload.dialogs ? { dialogs: payload.dialogs } : {}),
+        ...noteFields,
         context,
       },
     };
@@ -791,11 +796,13 @@ function browserToolResult(params: {
         type: "text",
         text: appendDialogSummary(summarizeBrowserError(payload.error), payload.dialogs),
       },
+      ...noteContent,
     ],
     structuredContent: {
       ok: false,
       error: payload.error,
       ...(payload.dialogs ? { dialogs: payload.dialogs } : {}),
+      ...noteFields,
       context,
     },
   };
@@ -875,6 +882,9 @@ function summarizeBrowserSuccess(
     }
     const tabLines = payload.result.tabs.map((tab) => {
       const active = tab.isActive ? " active" : "";
+      if (tab.humanControl) {
+        return `- browserId=${tab.browserId}${active} controlled by the user until hand-back`;
+      }
       return `- browserId=${tab.browserId}${active} title=${JSON.stringify(tab.title || "Untitled")} url=${tab.url}`;
     });
     return withDialogs(
@@ -1034,7 +1044,7 @@ function summarizeBrowserControlSuccess(
 }
 
 function summarizeBrowserError(
-  error: Extract<BrowserToolsResponsePayload, { ok: false }>["error"],
+  error: Extract<BrowserToolsCallPayload, { ok: false }>["error"],
 ): string {
   switch (error.code) {
     case "browser_disabled":

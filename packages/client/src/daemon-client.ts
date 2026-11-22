@@ -1967,6 +1967,43 @@ export class DaemonClient {
     });
   }
 
+  /** Requires server_info.features.browserLiveViewInput. Locks the watched tab against agents. */
+  takeBrowserLiveControl(
+    streamId: string,
+    requestId?: string,
+  ): Promise<CorrelatedResponsePayload<"browser.live.take_control.response">> {
+    return this.sendCorrelatedSessionRequest({
+      requestId,
+      message: { type: "browser.live.take_control.request", streamId },
+      responseType: "browser.live.take_control.response",
+    });
+  }
+
+  /** The input can be a secret: it is never logged, and never sent again on failure. */
+  sendBrowserLiveInput(
+    streamId: string,
+    input: Extract<SessionInboundMessage, { type: "browser.live.send_input.request" }>["input"],
+    requestId?: string,
+  ): Promise<CorrelatedResponsePayload<"browser.live.send_input.response">> {
+    return this.sendCorrelatedSessionRequest({
+      requestId,
+      message: { type: "browser.live.send_input.request", streamId, input },
+      responseType: "browser.live.send_input.response",
+    });
+  }
+
+  /** Hands the tab back to the agent. */
+  releaseBrowserLiveControl(
+    streamId: string,
+    requestId?: string,
+  ): Promise<CorrelatedResponsePayload<"browser.live.release_control.response">> {
+    return this.sendCorrelatedSessionRequest({
+      requestId,
+      message: { type: "browser.live.release_control.request", streamId },
+      responseType: "browser.live.release_control.response",
+    });
+  }
+
   /** Acks a rendered frame; the host sends the next frame only after this. */
   ackBrowserLiveFrame(streamId: string, frameSeq: number): void {
     this.sendSessionMessageStrict({ type: "browser.live.frame_ack", streamId, frameSeq });
@@ -1990,6 +2027,10 @@ export class DaemonClient {
         type:
           | "browser.host.live.start.response"
           | "browser.host.live.stop.response"
+          | "browser.host.live.take_control.response"
+          | "browser.host.live.send_input.response"
+          | "browser.host.live.release_control.response"
+          | "browser.host.live.control_ended"
           | "browser.host.live.ended";
       }
     >,

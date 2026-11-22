@@ -2124,7 +2124,13 @@ export class VoiceAssistantWebSocketServer {
         scheduleRunAttention: true,
         // COMPAT(browserLiveView): FSH-only, added after v0.15.4, remove gate after 2027-05-22.
         // COMPAT(browserLiveViewFlag): experimental opt-in added after v0.15.4, remove once live view ships on by default.
-        ...(this.daemonConfigStore.get().browserLiveView === true ? { browserLiveView: true } : {}),
+        ...(this.daemonConfigStore.get().browserLiveView === true
+          ? {
+              browserLiveView: true,
+              // COMPAT(browserLiveViewInput): FSH-only, added after v0.15.4, remove gate after 2027-05-22.
+              browserLiveViewInput: true,
+            }
+          : {}),
         // COMPAT(skillManagement): added in v0.4.0, remove gate after 2027-08-16.
         skillManagement: true,
         // COMPAT(idleRuntimeCleanupSetting): added in v0.13.0, remove gate after 2027-04-26.
