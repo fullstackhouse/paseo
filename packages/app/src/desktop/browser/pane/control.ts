@@ -37,11 +37,21 @@ export const INITIAL_CONTROL_STATE: BrowserControlState = {
 export interface BrowserControl {
   setStream(stream: BrowserLiveViewStreamInfo | null): void;
   setOrigin(origin: string | null): void;
+  streamEnded(code: string | null): void;
   take(): Promise<void>;
   send(input: BrowserLiveInput): Promise<void>;
   handBack(): Promise<void>;
   dispose(): void;
 }
+
+// Ends after which this device holds nothing: the tab, its desktop, or the setting is gone.
+const CONTROL_ENDING_CODES = new Set([
+  "browser_tab_closed",
+  "browser_tab_not_found",
+  "browser_no_host",
+  "browser_denied",
+  "browser_unsupported",
+]);
 
 export type BrowserControlAvailability = "update_host" | "update_desktop" | "unknown" | "ready";
 
@@ -89,6 +99,11 @@ export function createBrowserControl(input: {
         ...(held ? {} : { focus: null }),
         ...(state.held && !held ? { notice: "released" } : {}),
       });
+    },
+
+    streamEnded(code) {
+      if (!state.held || !code || !CONTROL_ENDING_CODES.has(code)) return;
+      update({ held: false, focus: null, notice: "released" });
     },
 
     setOrigin(origin) {

@@ -38,6 +38,8 @@ const NOTICE_KEYS: Record<string, string> = {
 interface ControlPanelProps {
   state: BrowserControlState;
   availability: BrowserControlAvailability;
+  /** False until a frame is on screen, so nobody controls a page they can't see. */
+  canTakeControl: boolean;
   onTake: () => void;
   onHandBack: () => void;
   onSend: (input: BrowserLiveInput) => void;
@@ -45,7 +47,7 @@ interface ControlPanelProps {
 
 /** Below the live view: where the page is, who controls it, and where typed text goes. */
 export function ControlPanel(props: ControlPanelProps) {
-  const { state, availability, onTake } = props;
+  const { state, availability, canTakeControl, onTake } = props;
   const { t } = useTranslation();
   const { origin, held, notice, busy, connected } = state;
   if (availability === "unknown" && !held) return null;
@@ -84,7 +86,7 @@ export function ControlPanel(props: ControlPanelProps) {
           <Text style={styles.hint}>{t("workspace.browser.liveView.control.takeHint")}</Text>
           <Button
             variant="default"
-            disabled={!connected}
+            disabled={!connected || !canTakeControl}
             loading={busy === "taking"}
             onPress={onTake}
             testID="browser-live-take-control"

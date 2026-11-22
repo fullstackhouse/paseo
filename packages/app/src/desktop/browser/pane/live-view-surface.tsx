@@ -79,6 +79,7 @@ function useBrowserLiveView(input: {
       onChange: (next) => {
         setState(next);
         if (next.status === "live") browserControl.setOrigin(next.frame.origin);
+        if (next.status === "ended") browserControl.streamEnded(next.code);
       },
       onStreamChange: browserControl.setStream,
     });
@@ -139,6 +140,7 @@ export function LiveViewSurface(props: {
       )}
       <ControlPanel
         state={control}
+        canTakeControl={state.status === "live"}
         availability={availability}
         onTake={take}
         onHandBack={handBack}

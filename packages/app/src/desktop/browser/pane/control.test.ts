@@ -130,6 +130,26 @@ describe("createBrowserControl", () => {
     expect(harness.state()).toMatchObject({ held: false, focus: null, notice: "released" });
   });
 
+  it.each([
+    "browser_tab_closed",
+    "browser_tab_not_found",
+    "browser_no_host",
+    "browser_denied",
+    "browser_unsupported",
+  ])("stops showing control when the stream ended with %s", async (code) => {
+    const harness = createHarness();
+    await harness.controlled();
+    harness.control.streamEnded(code);
+    expect(harness.state()).toMatchObject({ held: false, focus: null, notice: "released" });
+  });
+
+  it("keeps control through an end that doesn't say it is over", async () => {
+    const harness = createHarness();
+    await harness.controlled();
+    harness.control.streamEnded("connection");
+    expect(harness.state()).toMatchObject({ held: true, focus: FIELD });
+  });
+
   it("drops the field when the page moves to another origin", async () => {
     const harness = createHarness();
     await harness.controlled();
