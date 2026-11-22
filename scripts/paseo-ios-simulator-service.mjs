@@ -44,6 +44,11 @@ main().catch((error) => {
 
 process.on("SIGINT", () => void shutdown());
 process.on("SIGTERM", () => void shutdown());
+// `paseo script stop` closes the terminal: we get SIGHUP, and writing to it fails with EIO. Either
+// would end the process without cleanup and leave the simulator helper listening.
+process.on("SIGHUP", () => void shutdown());
+process.stdout.on("error", () => void shutdown());
+process.stderr.on("error", () => void shutdown());
 
 async function main() {
   startSimulatorVisibilityGuard();
