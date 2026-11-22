@@ -1,4 +1,3 @@
-import { AppearanceText as Text } from "@/appearance/text";
 import { useMemo, type ReactNode } from "react";
 import { View, type StyleProp, type ViewStyle } from "react-native";
 import { StyleSheet } from "react-native-unistyles";

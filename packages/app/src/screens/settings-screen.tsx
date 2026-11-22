@@ -1,6 +1,6 @@
 import { useSettingsContentPresented } from "@/navigation/settings-presentation";
 import { AppearanceText as Text } from "@/appearance/text";
-import { useHardwareKeyboardPresent } from "@/keyboard";
+import { hasActiveOverlay, useHardwareKeyboardPresent } from "@/keyboard";
 import { useAddHost } from "@/hosts/add-host";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { ComponentType, ReactNode } from "react";
@@ -52,7 +52,6 @@ import {
 import { DropdownTrigger } from "@/components/ui/dropdown-trigger";
 import { SearchField, type SearchFieldHandle } from "@/components/ui/search-field";
 import { findShortcutPlatform, isFindShortcut } from "@/pane-find";
-import { hasActiveWebOverlay } from "@/lib/overlay-root";
 import { isImeComposingKeyboardEvent } from "@/utils/keyboard-ime";
 import { ComboboxTrigger } from "@/components/ui/combobox-trigger";
 import { SidebarHeaderRow } from "@/components/sidebar/sidebar-header-row";
@@ -1008,7 +1007,7 @@ function SettingsSearchBar({
     useCallback(() => {
       if (!isWeb) return undefined;
       function onKeyDown(event: KeyboardEvent) {
-        if (event.defaultPrevented || hasActiveWebOverlay() || isImeComposingKeyboardEvent(event))
+        if (event.defaultPrevented || hasActiveOverlay() || isImeComposingKeyboardEvent(event))
           return;
         if (!isFindShortcut(event, findShortcutPlatform())) return;
         event.preventDefault();

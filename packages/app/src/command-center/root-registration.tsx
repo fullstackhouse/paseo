@@ -27,7 +27,6 @@ import { useImportSession } from "@/hooks/use-import-session";
 import { useKeyboardActionDispatcher } from "@/keyboard/keyboard-action-dispatcher-context";
 import { useHardwareKeyboardPresent } from "@/keyboard";
 import { resolveShortcutKeysForAction } from "@/keyboard/keyboard-shortcuts";
-import { useToast } from "@/contexts/toast-context";
 import { usePluginUpdateCheck } from "@/plugins/updates/use-plugin-update-check";
 import { useKeyboardShortcutsStore } from "@/stores/keyboard-shortcuts-store";
 import { usePanelStore } from "@/stores/panel-store";
@@ -147,7 +146,6 @@ export function CommandCenterRootActions() {
   const toggleMobileAgentList = usePanelStore((state) => state.toggleMobileAgentList);
   const toggleDesktopAgentList = usePanelStore((state) => state.toggleDesktopAgentList);
   const toggleAgentList = isCompact ? toggleMobileAgentList : toggleDesktopAgentList;
-  const toast = useToast();
   const pluginUpdateCheck = usePluginUpdateCheck();
   const pluginUpdatesAvailable = pluginUpdateCheck.available && !pluginUpdateCheck.checking;
   const runPluginUpdateCheck = pluginUpdateCheck.check;

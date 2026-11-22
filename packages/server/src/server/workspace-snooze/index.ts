@@ -24,7 +24,7 @@ export interface WakeWorkspaceInput {
 }
 
 export interface WorkspaceSnoozeWakerOptions {
-  workspaceRegistry: Pick<WorkspaceRegistry, "list" | "update" | "subscribeToMutations">;
+  workspaceRegistry: Pick<WorkspaceRegistry, "listAll" | "update" | "subscribeToMutations">;
   logger: Logger;
   now?: () => number;
   /** Called once per timed snooze that ends with a wake prompt, with the record as it was snoozed. */
@@ -91,7 +91,7 @@ export function setupWorkspaceSnoozeWaker(
 
   async function arm(): Promise<void> {
     const nowMs = now();
-    const workspaces = await options.workspaceRegistry.list();
+    const workspaces = await options.workspaceRegistry.listAll();
     let nextMs = Number.POSITIVE_INFINITY;
     for (const workspace of workspaces) {
       if (workspace.archivedAt || !workspace.snoozedAt || !workspace.snoozedUntil) continue;

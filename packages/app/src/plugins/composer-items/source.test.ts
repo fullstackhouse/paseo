@@ -373,6 +373,7 @@ describe("a Command Center item reaching an agent's composer by id", () => {
         openSurface() {},
         openWorkspacePanel() {},
         openAgentPanel() {},
+        openScreenTab() {},
       },
       reportError: (error) => reported.push(error),
     });

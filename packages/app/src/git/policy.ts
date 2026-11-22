@@ -395,7 +395,7 @@ function getPrimaryActionId(input: BuildGitActionsInput): GitActionId | null {
   }
   // A Paseo worktree with no commits of its own has nothing to update: its work is done or went
   // elsewhere, so Archive beats Update from base.
-  if (canMergeFromBase(input) && !input.isPaseoOwnedWorktree) {
+  if (canUpdateFromBase(input)) {
     return "merge-from-base";
   }
   if (input.githubFeaturesEnabled && input.hasPullRequest && input.pullRequestUrl) {
@@ -893,4 +893,9 @@ function isPullRequestMergeMethodAllowed(
     return true;
   }
   return capability.allowedMethods.includes(method);
+}
+
+// A Paseo worktree with no commits of its own has nothing to update (FSH).
+function canUpdateFromBase(input: BuildGitActionsInput): boolean {
+  return canMergeFromBase(input) && !input.isPaseoOwnedWorktree;
 }

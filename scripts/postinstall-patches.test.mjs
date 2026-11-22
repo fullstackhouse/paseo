@@ -425,7 +425,6 @@ test("patched @mattermost/react-native-paste-input Android PasteTextInput does n
 });
 
 test("Unistyles web mappings do not forward uniProps to the wrapped DOM component", async () => {
-  const { createRequire } = await import("node:module");
   const { runInNewContext } = await import("node:vm");
   const require = createRequire(import.meta.url);
   const React = require("react");

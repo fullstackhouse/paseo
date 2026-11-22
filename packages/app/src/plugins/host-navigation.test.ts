@@ -132,6 +132,7 @@ describe("plugin host navigation", () => {
       }),
     ).toThrow("must be a string");
     expect(screens).toEqual([]);
+  });
 
   it("focuses the destination host and clears filters that could hide its workspace", () => {
     useSidebarViewStore.setState({
@@ -269,6 +270,9 @@ describe("plugin host navigation", () => {
       openWorkspace: unavailable,
       createBrowser: unavailable,
       focusHost: (serverId) => focusedHosts.push(serverId),
+      showExplorer: () => undefined,
+      findPlugin: () => null,
+      openScreen: unavailable,
     });
     expect(() => navigation.openAgent({ agentId: "missing", focusHost: true })).toThrow(
       "Target unavailable",

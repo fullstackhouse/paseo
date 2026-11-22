@@ -655,7 +655,7 @@ describe("selectRecentProjects", () => {
         model: "opus",
         currentModeId: "auto",
         thinkingOptionId: "high",
-        features: [{ type: "toggle", id: "fast", label: "Fast", value: true }],
+        options: { fast: true },
         lastUserMessageAt: at("2026-01-03"),
       }),
       agent({
@@ -676,7 +676,7 @@ describe("selectRecentProjects", () => {
           modelId: "opus",
           modeId: "auto",
           thinkingOptionId: "high",
-          featureValues: { fast: true },
+          options: { fast: true },
         },
       },
     ]);
@@ -727,7 +727,7 @@ describe("selectRecentProjects", () => {
           modelId: "opus",
           modeId: "auto",
           thinkingOptionId: "",
-          featureValues: { fast: true },
+          options: { fast: true },
         },
       },
     ]);

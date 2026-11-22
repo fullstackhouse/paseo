@@ -25,11 +25,14 @@ export function createPluginWorkspaceSnapshot(
     parentAgent?: PluginWorkspaceSnapshot["parentAgent"];
   } = {},
 ): PluginWorkspaceSnapshot {
-  const indicator = deriveEffectiveWorkspaceStatus({
+  const sidebarStatus = deriveEffectiveWorkspaceStatus({
     ...context,
     workspace,
     serverId: hostId,
   }).status;
+  // FSH: the sidebar's Blocked group shows Done's idle dot; the plugin indicator has no Blocked.
+  const indicator: PluginWorkspaceSnapshot["indicator"] =
+    sidebarStatus === "blocked" ? "done" : sidebarStatus;
   const parentAgent = context.parentAgent ?? null;
   const cached = workspaceSnapshots.get(workspace)?.get(hostId);
   if (

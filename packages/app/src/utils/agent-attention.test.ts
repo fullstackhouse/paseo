@@ -86,7 +86,12 @@ describe("agent attention acknowledgement", () => {
     const { controller, state, calls } = setup();
     controller.update({ ...state, requiresAttention: true, attentionReason: "finished" });
     controller.focus();
-    controller.update({ ...state, requiresAttention: true, attentionReason: "finished", focusRequest: {} });
+    controller.update({
+      ...state,
+      requiresAttention: true,
+      attentionReason: "finished",
+      focusRequest: {},
+    });
     expect(calls).toEqual([]);
   });
 

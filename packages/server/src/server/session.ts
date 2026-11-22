@@ -919,7 +919,7 @@ export class Session {
   private readonly workspaceScripts: WorkspaceScriptsService;
   private readonly messageReceipts: Pick<MessageReceipts, "send">;
   private readonly agentMessages: AgentMessageDelivery;
-  private readonly sendPluginNotification: SessionOptions["sendPluginNotification"] | null;
+  private readonly sendPluginNotification: SessionOptions["sendPluginNotification"];
   private readonly reportWorkspaceAttention: SessionOptions["reportWorkspaceAttention"];
   private readonly createAgentLifecycleDispatch: CreateAgentLifecycleDispatch;
   private readonly creationService: Pick<CreationService, "create" | "subscribe">;
@@ -1009,7 +1009,7 @@ export class Session {
     this.paseoHome = paseoHome;
     this.messageReceipts = options.messageReceipts;
     this.agentMessages = options.agentMessages;
-    this.sendPluginNotification = options.sendPluginNotification ?? null;
+    this.sendPluginNotification = options.sendPluginNotification;
     this.reportWorkspaceAttention = options.reportWorkspaceAttention;
     this.creationService = options.creationService;
     this.projectIcons = new ProjectIconReader(paseoHome);
@@ -2208,7 +2208,6 @@ export class Session {
       this.onMessageToSource(source, message);
     }
   }
-
 
   private subscribeToAgentEvents(): void {
     if (this.unsubscribeAgentEvents) {
@@ -8508,7 +8507,10 @@ export class Session {
       // FSH: reply once the records are archived. Directory removal keeps running inside this
       // archive's queue item, so an undo still waits for it or cancels it before the point of no
       // return; only the reply stops waiting for `git worktree remove`, which can take 20-90 s.
-      const recordsArchived = Promise.withResolvers<"records-archived">();
+      let markRecordsArchived!: () => void;
+      const recordsArchived = new Promise<"records-archived">((settle) => {
+        markRecordsArchived = () => settle("records-archived");
+      });
       // Claim the archive queue before any await, so an undo sent right behind this request
       // queues after it and cancels it instead of running first.
       const archiving = this.workspaceArchiveOperations.archive(
@@ -8550,12 +8552,12 @@ export class Session {
               scope: { kind: "workspace", workspaceId: existing.workspaceId },
               requestId: request.requestId,
               signal,
-              onRecordsArchived: () => recordsArchived.resolve("records-archived"),
+              onRecordsArchived: () => markRecordsArchived(),
             },
           );
         },
       );
-      const outcome = await Promise.race([recordsArchived.promise, archiving]);
+      const outcome = await Promise.race([recordsArchived, archiving]);
       if (outcome === "records-archived") {
         void archiving.catch((error: unknown) => {
           this.sessionLogger.warn(

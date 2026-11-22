@@ -377,6 +377,11 @@ export class WorkspaceDirectory {
   // status never fans out to same-cwd siblings. A subagent in another workspace
   // is a root for that workspace. Same-workspace descendants contribute only
   // running activity to the nearest ancestor in that workspace.
+  /** FSH: an idle agent held running only by background work it doesn't wait on (shells). */
+  private isRunningOnlyFromShells(agent: AgentSnapshotPayload): boolean {
+    return agent.status !== "running" && this.deps.agentWaitsOnBackgroundWork?.(agent.id) !== true;
+  }
+
   private applyAgentBucketContributions(params: {
     activeAgents: AgentSnapshotPayload[];
     descriptorsByWorkspaceId: Map<string, WorkspaceDescriptorPayload>;
@@ -421,10 +426,7 @@ export class WorkspaceDirectory {
         existing.status = bucket;
       }
       if (bucket === "running") {
-        const fromShells =
-          isWorkspaceRoot &&
-          agent.status !== "running" &&
-          this.deps.agentWaitsOnBackgroundWork?.(agent.id) !== true;
+        const fromShells = isWorkspaceRoot && this.isRunningOnlyFromShells(agent);
         (fromShells ? shellOnlyWorkspaceIds : otherwiseRunningWorkspaceIds).add(workspaceId);
       }
     }

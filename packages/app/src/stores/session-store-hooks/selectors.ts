@@ -20,7 +20,6 @@ export interface SessionsSnapshot {
       workspaces: Map<string, WorkspaceDescriptor>;
       projects?: Map<string, ProjectDescriptor>;
       agents?: Map<string, Agent>;
-      workspaceAgentActivity?: ReadonlyMap<string, WorkspaceAgentActivity>;
     }
   >;
 }
@@ -314,7 +313,8 @@ export interface RecentAgentSetup {
   modelId: string;
   modeId: string;
   thinkingOptionId: string;
-  featureValues: Record<string, unknown>;
+  /** Provider options the agent ran with (feature toggles and selects). */
+  options: Record<string, unknown>;
 }
 
 export interface RecentProjectActivity {
@@ -335,16 +335,12 @@ function activityTime(item: { lastUserMessageAt: Date | null; createdAt: Date | 
 }
 
 function agentSetup(agent: Agent): RecentAgentSetup {
-  const featureValues: Record<string, unknown> = {};
-  for (const feature of agent.features ?? []) {
-    featureValues[feature.id] = feature.value;
-  }
   return {
     provider: agent.provider,
     modelId: agent.model ?? "",
     modeId: agent.currentModeId ?? "",
     thinkingOptionId: agent.thinkingOptionId ?? "",
-    featureValues,
+    options: { ...agent.options },
   };
 }
 
@@ -354,7 +350,7 @@ function savedAgentSetup(setup: ProjectLastAgentSetup): RecentAgentSetup {
     modelId: setup.model ?? "",
     modeId: setup.modeId ?? "",
     thinkingOptionId: setup.thinkingOptionId ?? "",
-    featureValues: { ...setup.featureValues },
+    options: { ...setup.featureValues },
   };
 }
 

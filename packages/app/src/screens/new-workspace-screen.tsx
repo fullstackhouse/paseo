@@ -265,6 +265,14 @@ function useWorkspaceIsolation(input: {
 }
 
 /** Create's checkout request, with the model's refusal said in the user's language. */
+/** The create request's base: the picked or default item, else a bare branch-off for the daemon. */
+function resolveCreateCheckoutRequest<T>(
+  baseItem: PickerItem | null,
+  requestFor: (item: PickerItem) => T,
+): T | { action: "branch-off" } {
+  return baseItem ? requestFor(baseItem) : { action: "branch-off" };
+}
+
 function checkoutRequestOrExplain(
   resolve: () => PickerCheckoutRequest | undefined,
   t: TFunction,
@@ -1349,11 +1357,10 @@ export function NewWorkspaceScreen({
       // FSH: creation never waits on checkout status, which can take minutes on a busy daemon.
       // With nothing picked and no status yet, a bare branch-off lets the daemon resolve the same
       // default base `defaultBasePickerItem` describes.
-      const baseItem = selectedItem ?? (checkoutStatus ? defaultBasePickerItem(checkoutStatus) : null);
       const checkoutRequest = createsWorktree
-        ? baseItem
-          ? checkoutRequestOrExplain(() => setup.checkoutRequestFor(baseItem), t)
-          : { action: "branch-off" as const }
+        ? resolveCreateCheckoutRequest(baseItem, (item) =>
+            checkoutRequestOrExplain(() => setup.checkoutRequestFor(item), t),
+          )
         : undefined;
       const normalizedWorkspace = await createMultiplicityWorkspace({
         idempotencyKey: creationIdentity.draftId,
@@ -1378,12 +1385,11 @@ export function NewWorkspaceScreen({
       return normalizedWorkspace;
     },
     [
-      checkoutStatus,
+      baseItem,
       creationIdentity,
       creationResult,
       effectiveIsolation,
       mergeWorkspaces,
-      selectedItem,
       selectedProject,
       selectedServerId,
       selectedSourceDirectory,
@@ -1657,9 +1663,9 @@ export function NewWorkspaceScreen({
   const chatComposerState = chatDraft.composerState;
   // A card picks its project and the setup its last agent ran with, which the card shows.
   const handleSelectRecentProject = useCallback(
-    (choice: RecentProjectChoice) => {
-      handleSelectProjectOption(choice.optionId);
-      if (choice.agentSetup) chatComposerState?.applyAgentSetup(choice.agentSetup);
+    (recent: RecentProjectChoice) => {
+      handleSelectProjectOption(recent.optionId);
+      if (recent.agentSetup) chatComposerState?.applyAgentSetup(recent.agentSetup);
     },
     [chatComposerState, handleSelectProjectOption],
   );

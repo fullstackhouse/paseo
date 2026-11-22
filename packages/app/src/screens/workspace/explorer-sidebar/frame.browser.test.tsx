@@ -22,7 +22,7 @@ it("measures dock allocation independently of the workspace owner", async () => 
     return (
       <View style={WORKSPACE_STYLE}>
         <View role="main" style={FILL} />
-        <ExplorerFrame presentation="dock" isWorkspaceActive isOpen persistenceKey="workspace">
+        <ExplorerFrame presentation="dock" isWorkspaceActive isOpen>
           <View role="complementary" style={FILL} />
         </ExplorerFrame>
       </View>

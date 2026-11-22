@@ -1101,12 +1101,16 @@ const ChatAgentReadyContent = memo(function ChatAgentReadyContent({
   const paneContext = usePaneContext();
   // The workspace sheet is for looking; Open as tab brings the agent back with its composer.
   const paneHost = paneContext.host;
-  const readOnly = paneContext.readOnly === true;
+  const readOnly = isReadOnlyPane(paneContext);
   const showsComposer = draft !== null || paneHost !== "sheet";
   // The dock lays out fullscreen for the same session the composer edits in.
   const composerEditingSession = useComposerEditingSession("chat");
   const isComposerFullscreen = useComposerFullscreen(composerEditingSession);
-  const hasActiveComposer = !readOnly && !agentState.archivedAt && !isArchivingCurrentAgent;
+  const hasActiveComposer = isComposerActive(
+    readOnly,
+    agentState.archivedAt,
+    isArchivingCurrentAgent,
+  );
   const focusRestoredComposer = useStableEvent(() => {
     if (isPaneFocused && showsComposer && hasActiveComposer) {
       composerEditingSession.focus();
@@ -1964,3 +1968,16 @@ const styles = StyleSheet.create((theme) => ({
     textAlign: "center",
   },
 }));
+
+/** FSH: an archived workspace's agent opens read-only, with no composer. */
+function isReadOnlyPane(paneContext: { readOnly?: boolean }): boolean {
+  return paneContext.readOnly === true;
+}
+
+function isComposerActive(
+  readOnly: boolean,
+  archivedAt: Date | null | undefined,
+  isArchiving: boolean,
+): boolean {
+  return !readOnly && !archivedAt && !isArchiving;
+}

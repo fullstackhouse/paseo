@@ -11164,7 +11164,8 @@ test.each([
     await manager.flush();
     unsubscribe();
 
-    const expectedLabels = { team: "ios" };
+    // FSH: the survivor keeps its former parent so Lineage can show it as Detached.
+    const expectedLabels = { team: "ios", [DETACHED_FROM_AGENT_ID_LABEL]: parent.id };
     const storedChild = await storage.get(child.id);
     expect(storedChild?.archivedAt).toBeUndefined();
     expect(storedChild?.labels).toEqual(expectedLabels);

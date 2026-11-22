@@ -367,7 +367,10 @@ test("a managed workspace restores its changed base after archival removes the c
   expect((await ctx.client.archiveWorkspace(workspace.id)).error).toBe(null);
   expect(existsSync(workspace.workspaceDirectory)).toBe(true);
   expect((await ctx.client.archiveWorkspace(joinedId)).error).toBe(null);
-  expect(existsSync(workspace.workspaceDirectory)).toBe(false);
+  // Archive replies before the worktree removal finishes (FSH).
+  await expect
+    .poll(() => existsSync(workspace.workspaceDirectory), { timeout: 15000, interval: 100 })
+    .toBe(false);
   await ctx.client.restoreWorkspace(joinedId);
   expect((await readPaseoWorktreeMetadata(workspace.workspaceDirectory))?.baseRef).toBe(
     "refs/heads/release",
@@ -384,7 +387,9 @@ test("an archived workspace keeps its base when a later workspace reuses its pat
   const first = (await ctx.client.createWorkspace({ source })).workspace;
   if (!first) throw new Error("Failed to create first workspace");
   expect((await ctx.client.archiveWorkspace(first.id)).error).toBe(null);
-  expect(existsSync(first.workspaceDirectory)).toBe(false);
+  await expect
+    .poll(() => existsSync(first.workspaceDirectory), { timeout: 15000, interval: 100 })
+    .toBe(false);
   const second = (await ctx.client.createWorkspace({ source })).workspace;
   if (!second) throw new Error("Failed to create second workspace");
   expect(second.workspaceDirectory).toBe(first.workspaceDirectory);
@@ -629,8 +634,11 @@ test.skipIf(process.platform === "win32")(
         workspaceActive: (await activeWorkspaceIds()).has(workspaceId),
         worktreeOnDisk: existsSync(worktreePath),
       }).toEqual({ error: null, workspaceActive: false, worktreeOnDisk: true });
+      // FSH: archive replies before teardown runs, so wait for it to start.
+      await expect.poll(() => existsSync(pidFile), { timeout: 10000 }).toBe(true);
       const sleepPid = Number(readFileSync(pidFile, "utf8").trim());
-      await expect.poll(() => isProcessRunning(sleepPid), { timeout: 5000 }).toBe(false);
+      await expect.poll(() => isProcessRunning(sleepPid), { timeout: 10000 }).toBe(false);
+      expect(existsSync(worktreePath)).toBe(true);
     } finally {
       if (existsSync(pidFile)) {
         const sleepPid = Number(readFileSync(pidFile, "utf8").trim());
@@ -653,8 +661,11 @@ test.skipIf(process.platform === "win32")(
     expect({
       error: archive.error,
       workspaceActive: (await activeWorkspaceIds()).has(workspaceId),
-      worktreeOnDisk: existsSync(worktreePath),
-    }).toEqual({ error: null, workspaceActive: false, worktreeOnDisk: false });
+    }).toEqual({ error: null, workspaceActive: false });
+    // FSH: archive replies before the worktree removal finishes.
+    await expect
+      .poll(() => existsSync(worktreePath), { timeout: 15000, interval: 100 })
+      .toBe(false);
   },
   60000,
 );
@@ -746,9 +757,7 @@ test.skipIf(process.platform === "win32" || process.getuid?.() === 0)(
     const retry = await ctx.client.archiveWorkspace(workspace.id);
 
     expect(retry.error).toBeNull();
-    await expect
-      .poll(() => existsSync(directory), { timeout: 15000, interval: 100 })
-      .toBe(false);
+    await expect.poll(() => existsSync(directory), { timeout: 15000, interval: 100 }).toBe(false);
   },
   60000,
 );

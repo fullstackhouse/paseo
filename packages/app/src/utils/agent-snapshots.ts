@@ -90,8 +90,13 @@ export function projectAgentSnapshot(agent: Agent): AgentSnapshotPayload {
     attentionTimestamp: agent.attentionTimestamp?.toISOString() ?? null,
     archivedAt: agent.archivedAt?.toISOString() ?? null,
     ...(agent.background ? { background: true } : {}),
-    interruptedAt: agent.interruptedAt?.toISOString() ?? null,
+    interruptedAt: serializeInterruptedAt(agent.interruptedAt),
   };
+}
+
+/** FSH: a daemon stop or crash cut the agent's turn short. */
+function serializeInterruptedAt(interruptedAt: Date | null | undefined): string | null {
+  return interruptedAt?.toISOString() ?? null;
 }
 
 export function normalizeAgentSnapshot(snapshot: AgentSnapshotPayload, serverId: string) {

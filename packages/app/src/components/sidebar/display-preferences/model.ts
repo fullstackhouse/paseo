@@ -126,7 +126,6 @@ export function useSidebarDisplayPreferences(): SidebarDisplayPreferences {
     [updateSettings, sidebarRowItems],
   );
 
-
   const setChecksDisplay = useCallback(
     (display: SidebarChecksDisplay) => {
       void updateSettings({ sidebarChecksDisplay: display });

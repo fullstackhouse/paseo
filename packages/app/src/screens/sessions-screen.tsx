@@ -17,7 +17,7 @@ import { type AgentHistoryHostError, useAgentHistory } from "@/hooks/use-agent-h
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { useImportSession } from "@/hooks/use-import-session";
 import { useHosts } from "@/runtime/host-runtime";
-import { useHasFinePointer } from "@/hooks/use-fine-pointer";
+import { usePointerCapabilities } from "@/hooks/pointer-capabilities";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { buildOpenProjectRoute } from "@/utils/host-routes";
 
@@ -67,7 +67,7 @@ function resolveEmptyText(input: {
 // browser is not compact, so width alone doesn't catch it. Native never has a fine pointer.
 function useShouldAutoFocusSearch(): boolean {
   const isCompact = useIsCompactFormFactor();
-  const hasFinePointer = useHasFinePointer();
+  const hasFinePointer = usePointerCapabilities().finePointer;
   return hasFinePointer && !isCompact;
 }
 

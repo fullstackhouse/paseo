@@ -413,10 +413,7 @@ export class AgentStorage {
       if (existing?.background) record.background = true;
       record.resumeOnStartup =
         existing?.resumeOnStartup && agent.lifecycle !== "idle" && agent.lifecycle !== "error";
-      // An interruption stays until the agent's next turn starts.
-      if (existing?.interruptedAt && agent.lifecycle !== "running") {
-        record.interruptedAt = existing.interruptedAt;
-      }
+      keepInterruption(record, existing, agent.lifecycle);
       return record;
     });
   }
@@ -604,4 +601,15 @@ function projectDirNameFromCwd(cwd: string): string {
     return sanitizedRoot || "root";
   }
   return prefix + withoutRoot.replace(/[\\/]+/g, "-");
+}
+
+/** FSH: an interruption stays until the agent's next turn starts. */
+function keepInterruption(
+  record: StoredAgentRecord,
+  existing: StoredAgentRecord | null | undefined,
+  lifecycle: string,
+): void {
+  if (existing?.interruptedAt && lifecycle !== "running") {
+    record.interruptedAt = existing.interruptedAt;
+  }
 }

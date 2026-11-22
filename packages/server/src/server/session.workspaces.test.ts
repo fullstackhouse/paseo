@@ -8647,7 +8647,9 @@ test("workspace.snooze.set.request snoozes until a time, unpins, and wakes", asy
     updatedAt: "2026-03-01T12:00:00.000Z",
   });
   const workspaces = new Map([[workspace.workspaceId, workspace]]);
-  session.workspaceRegistry.list = async () => Array.from(workspaces.values());
+  session.workspaceRegistry.listAll = async () => Array.from(workspaces.values());
+  session.workspaceRegistry.listActive = async () =>
+    Array.from(workspaces.values()).filter((record) => !record.archivedAt);
   session.workspaceRegistry.update = async (id, updater) => {
     const existing = workspaces.get(id);
     if (!existing) return null;
@@ -8749,7 +8751,9 @@ test("workspace.snooze.set.request stores a wake prompt for a timed snooze only"
     updatedAt: "2026-03-01T12:00:00.000Z",
   });
   const workspaces = new Map([[workspace.workspaceId, workspace]]);
-  session.workspaceRegistry.list = async () => Array.from(workspaces.values());
+  session.workspaceRegistry.listAll = async () => Array.from(workspaces.values());
+  session.workspaceRegistry.listActive = async () =>
+    Array.from(workspaces.values()).filter((record) => !record.archivedAt);
   session.workspaceRegistry.update = async (id, updater) => {
     const existing = workspaces.get(id);
     if (!existing) return null;
@@ -10668,7 +10672,9 @@ test("workspace.group.set.request moves a workspace to a group and clears the mo
     updatedAt: "2026-03-01T12:00:00.000Z",
   });
   const workspaces = new Map([[workspace.workspaceId, workspace]]);
-  session.workspaceRegistry.list = async () => Array.from(workspaces.values());
+  session.workspaceRegistry.listAll = async () => Array.from(workspaces.values());
+  session.workspaceRegistry.listActive = async () =>
+    Array.from(workspaces.values()).filter((record) => !record.archivedAt);
   session.workspaceRegistry.update = async (id, updater) => {
     const existing = workspaces.get(id);
     if (!existing) return null;

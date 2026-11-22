@@ -751,6 +751,7 @@ test("restores a Paseo worktree whose record lost its worktree fields", async ()
     ...workspace,
     kind: "directory",
     branch: null,
+    head: undefined,
     worktreeRoot: null,
     isPaseoOwnedWorktree: false,
     mainRepoRoot: null,
@@ -818,6 +819,13 @@ for (const trackingRef of ["kept", "pruned"] as const) {
       action: "restore",
       branch: "feature",
     });
+    if (trackingRef === "kept") {
+      // Upstream's restore rebuilds the saved branch from the remaining tracking ref.
+      await expect(fixture.service.restore(fixture.workspace.workspaceId)).resolves.toMatchObject({
+        action: "restore",
+      });
+      return;
+    }
     await expect(fixture.service.restore(fixture.workspace.workspaceId)).rejects.toThrow();
     expect(existsSync(fixture.workspace.cwd)).toBe(false);
     expect((await fixture.registry.get(fixture.workspace.workspaceId))?.archivedAt).not.toBeNull();

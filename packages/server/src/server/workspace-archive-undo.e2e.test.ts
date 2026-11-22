@@ -120,8 +120,10 @@ test.skipIf(process.platform === "win32")(
         directoryExists: existsSync(directory),
         agentArchived: await isAgentArchived(agentId),
       }).toEqual({
-        canceled: true,
-        archivedAt: null,
+        // FSH: the archive replies once its records are archived, before the undo arrives; the
+        // undo then cancels the directory removal still running in the same archive operation.
+        canceled: undefined,
+        archivedAt: expect.any(String),
         workspaceActive: true,
         directoryExists: true,
         agentArchived: false,
@@ -194,7 +196,8 @@ test.skipIf(process.platform === "win32")(
 
     const archived = await ctx.client.archiveWorkspace(workspaceId);
     expect(archived.error).toBeNull();
-    expect(existsSync(directory)).toBe(false);
+    // FSH: archive replies before the worktree removal finishes.
+    await expect.poll(() => existsSync(directory), { timeout: 15000, interval: 100 }).toBe(false);
     expect(await isAgentArchived(agentId)).toBe(true);
 
     await ctx.client.undoWorkspaceArchive(workspaceId);
@@ -231,7 +234,8 @@ test.skipIf(process.platform === "win32").each([
     const commit = readHead(["rev-parse", "HEAD"]);
     const branch = readHead(["rev-parse", "--abbrev-ref", "HEAD"]);
     expect((await ctx.client.archiveWorkspace(workspaceId)).error).toBeNull();
-    expect(existsSync(directory)).toBe(false);
+    // Archive replies before the worktree removal finishes (FSH).
+    await expect.poll(() => existsSync(directory), { timeout: 15000, interval: 100 }).toBe(false);
     git(repo.repoDir, ["reflog", "expire", "--expire=now", "--all"]);
     git(repo.repoDir, ["gc", "--prune=now"]);
     if (action === "undo") await ctx.client.undoWorkspaceArchive(workspaceId);
@@ -259,16 +263,19 @@ test.skipIf(process.platform === "win32")(
       repo.releaseTeardown();
 
       const [firstResponse, , secondResponse] = await Promise.all([first, undo, second]);
+      // FSH: the second archive replies before its worktree removal finishes.
+      await expect.poll(() => existsSync(directory), { timeout: 15000, interval: 100 }).toBe(false);
 
       expect({
-        firstCanceled: firstResponse.canceled,
+        firstCanceled: firstResponse.canceled ?? false,
         secondError: secondResponse.error,
         secondCanceled: secondResponse.canceled ?? false,
         workspaceActive: await isWorkspaceActive(workspaceId),
         directoryExists: existsSync(directory),
         agentArchived: await isAgentArchived(agentId),
       }).toEqual({
-        firstCanceled: true,
+        // The first archive replied before the undo canceled its removal.
+        firstCanceled: false,
         secondError: null,
         secondCanceled: false,
         workspaceActive: false,

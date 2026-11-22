@@ -272,7 +272,7 @@ test("marks eligible running agents interrupted on shutdown and after a crash, w
     expect((await storage.get("crashed"))?.interruptedAt).toEqual(expect.any(String));
     expect((await storage.get("crashed"))?.lastStatus).toBe("closed");
     expect((await storage.get("starting"))?.interruptedAt).toBeUndefined();
-    expect((await storage.list()).every((record) => !record.resumeOnStartup)).toBe(true);
+    expect((await storage.listAll()).every((record) => !record.resumeOnStartup)).toBe(true);
   } finally {
     await rm(root, { recursive: true, force: true });
   }

@@ -2745,7 +2745,7 @@ export class AgentManager {
    */
   async clearWorkspaceAgentsBackground(workspaceId: string): Promise<void> {
     const agentIds = new Set<string>();
-    for (const record of (await this.registry?.list()) ?? []) {
+    for (const record of (await this.registry?.listAll()) ?? []) {
       if (record.workspaceId === workspaceId && record.background) agentIds.add(record.id);
     }
     for (const agent of this.agents.values()) {
@@ -2766,7 +2766,7 @@ export class AgentManager {
       liveIds.add(agent.id);
       this.emitState(agent, { persist: false });
     }
-    for (const record of (await this.registry?.list()) ?? []) {
+    for (const record of (await this.registry?.listAll()) ?? []) {
       if (record.workspaceId !== workspaceId || record.internal || liveIds.has(record.id)) continue;
       this.dispatchStoredAgentState(record);
     }

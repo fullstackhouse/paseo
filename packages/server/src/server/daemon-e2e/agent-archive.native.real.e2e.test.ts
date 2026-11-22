@@ -61,7 +61,8 @@ async function expectContextAfterWorkspaceRestore(legacyNativeArchive: boolean):
     expect(first.finalText).toContain(token);
     const handle = manager.getAgent(agent.id)!.persistence!;
     await client.archiveWorkspace(agent.workspaceId!);
-    expect(existsSync(agent.cwd)).toBe(false);
+    // Archive replies before the worktree removal finishes (FSH).
+    await expect.poll(() => existsSync(agent.cwd), { timeout: 15000, interval: 100 }).toBe(false);
     // Older daemons marked Paseo archived while native archive failed against its writer.
     if (legacyNativeArchive) await provider.unarchiveNativeSession(handle);
     await client.restoreWorkspace(agent.workspaceId!);

@@ -105,7 +105,7 @@ describe("resolveRecentProjectChoices", () => {
     modelId: "opus",
     modeId: "auto",
     thinkingOptionId: "high",
-    featureValues: {},
+    options: {},
   };
   const recent = (projectId: string, lastUsedAt = 1, agentSetup: typeof setup | null = null) => ({
     projectId,

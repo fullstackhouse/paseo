@@ -182,14 +182,17 @@ export async function archiveByScope(
       archiveByScopeWithPriority(dependencies, request),
     );
   }
-  const recordsArchived = Promise.withResolvers<ArchiveResult>();
+  let resolveRecordsArchived!: (result: ArchiveResult) => void;
+  const recordsArchived = new Promise<ArchiveResult>((settle) => {
+    resolveRecordsArchived = settle;
+  });
   const full = runWithGitCommandPriority("high", () =>
     archiveByScopeWithPriority(dependencies, {
       ...request,
       directoryRemoval: "wait",
       onRecordsArchived: (result) => {
         request.onRecordsArchived?.(result);
-        recordsArchived.resolve(result);
+        resolveRecordsArchived(result);
       },
     }),
   );
@@ -199,7 +202,7 @@ export async function archiveByScope(
       "Worktree disk removal failed during archive; workspace already archived",
     );
   });
-  return Promise.race([recordsArchived.promise, full]);
+  return Promise.race([recordsArchived, full]);
 }
 
 async function archiveByScopeWithPriority(

@@ -3033,6 +3033,8 @@ export class VoiceAssistantWebSocketServer {
         agentId: agent.id,
         provider: agent.provider,
         reason: "finished",
+        // A wake re-announces the finish on purpose, so it skips the once-per-unread-finish dedupe.
+        attentionTimestamp: null,
       });
     }
     return { woke: true };

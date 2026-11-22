@@ -1888,6 +1888,7 @@ export class WorkspaceGitServiceImpl implements WorkspaceGitService {
       includeForge: false,
       reason: "workspace-folder-restored",
       queueIfBusy: true,
+      priority: "background",
       movedRemoteRefs: new Set(),
     });
     if (target.closed || this.workspaceTargets.get(target.cwd) !== target) {
@@ -3575,12 +3576,7 @@ export class WorkspaceGitServiceImpl implements WorkspaceGitService {
           // demoted. FSH: a client waiting on this run (interactive admission, possibly raised
           // after a watcher started it) runs its git processes at high priority.
           const runRefreshGitCommand = createRunGitCommand(`workspace-refresh:${request.reason}`, {
-            priority:
-              admission.priority === "interactive"
-                ? "high"
-                : request.origin === "observation"
-                  ? "background"
-                  : undefined,
+            priority: refreshGitPriority(admission, request),
           });
           return this.refreshSnapshot(target, request, runRefreshGitCommand);
         });
@@ -4586,4 +4582,13 @@ function computeGenericForgeNextInterval(
     baseInterval * 2 ** (consecutiveErrors - 1),
     FORGE_PR_STATUS_POLL_ERROR_BACKOFF_CAP_MS,
   );
+}
+
+// Demand refreshes keep the caller's lane (undefined). FSH: a client waiting on the run goes first.
+function refreshGitPriority(
+  admission: AdmissionTicket,
+  request: WorkspaceGitRefreshRequest,
+): GitProcessPriority | undefined {
+  if (admission.priority === "interactive") return "high";
+  return request.origin === "observation" ? "background" : undefined;
 }

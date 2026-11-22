@@ -1252,10 +1252,6 @@ function createAgentHandleFactory(
               sequence++;
               listener(message.payload.items);
             },
-            // Subscribing failed (refused, timed out); the subscription is over. The client logs it.
-            error: (error) => {
-              if (!released) options?.onError?.(error);
-            },
           });
           return () => {
             released = true;

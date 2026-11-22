@@ -57,6 +57,7 @@ function createServer(config: Partial<MutableDaemonConfig> = {}) {
   const agentManager = {
     setAgentAttentionCallback: vi.fn(),
     subscribe: vi.fn(() => () => {}),
+    onStop: () => () => {},
     getMetricsSnapshot: vi.fn(() => ({
       total: 0,
       byLifecycle: {},

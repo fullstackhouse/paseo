@@ -1,3 +1,4 @@
+import { featuresFromControls } from "@getpaseo/protocol/option-controls";
 import type { Logger } from "pino";
 import { PARENT_AGENT_ID_LABEL } from "@getpaseo/protocol/agent-labels";
 import type { ProjectLastAgentSetup } from "@getpaseo/protocol/messages";
@@ -22,7 +23,11 @@ export interface ProjectLastAgentSetupRecorder {
 export function toProjectLastAgentSetup(agent: ManagedAgent): ProjectLastAgentSetup | null {
   if (!agent.lastUserMessageAt) return null;
   const featureValues: ProjectLastAgentSetup["featureValues"] = {};
-  for (const feature of agent.features ?? []) featureValues[feature.id] = feature.value;
+  const features = featuresFromControls({
+    controls: agent.controls,
+    options: agent.effectiveOptions,
+  });
+  for (const feature of features ?? []) featureValues[feature.id] = feature.value;
   return {
     provider: agent.provider,
     model: agent.config.model ?? null,

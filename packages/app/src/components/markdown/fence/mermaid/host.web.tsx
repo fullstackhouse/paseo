@@ -114,22 +114,22 @@ function MermaidFenceHostImpl({
         </View>
       ) : null}
       {nearViewport ? (
-      <div inert={!diagramVisible} style={boundaryStyle}>
-        <ZoomableViewport
-          accessibilityLabel={t("message.diagram.diagram")}
-          actions={actions}
-          contentSize={diagramSize}
-          style={viewportStyle}
-          testID="mermaid-viewport"
-          wheelActivation="modifier"
-        >
-          <MermaidIframeRuntime
-            request={request}
-            onRendered={handleRendered}
-            onRenderFailed={renderFailed}
-          />
-        </ZoomableViewport>
-      </div>
+        <div inert={!diagramVisible} style={boundaryStyle}>
+          <ZoomableViewport
+            accessibilityLabel={t("message.diagram.diagram")}
+            actions={actions}
+            contentSize={diagramSize}
+            style={viewportStyle}
+            testID="mermaid-viewport"
+            wheelActivation="modifier"
+          >
+            <MermaidIframeRuntime
+              request={request}
+              onRendered={handleRendered}
+              onRenderFailed={renderFailed}
+            />
+          </ZoomableViewport>
+        </div>
       ) : null}
       {isFullscreen && visible ? (
         <MermaidFullscreenViewer
