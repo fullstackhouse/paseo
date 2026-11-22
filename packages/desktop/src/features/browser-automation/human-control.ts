@@ -23,6 +23,7 @@ const DRAIN_TIMEOUT_MS = 10_000;
 const CDP_TIMEOUT_MS = 3_000;
 const LOAD_TIMEOUT_MS = 4_000;
 const LOAD_POLL_MS = 100;
+const DISCARD_RETRY_MS = 30_000;
 
 const ERROR_MESSAGES = {
   not_controller: "This device doesn't control the tab.",
@@ -83,6 +84,7 @@ interface Control {
   binding: Binding | null;
   /** The frames this control typed into, by process and routing id. */
   typedFrames: Set<string>;
+  retry: ReturnType<typeof setTimeout> | null;
   cleanup: Array<() => void>;
 }
 
@@ -163,6 +165,7 @@ export class BrowserHumanControls {
       queue: new CdpSessionQueue(),
       binding: null,
       typedFrames: new Set(),
+      retry: null,
       cleanup: [],
     };
     // Locked from here on, so no new agent command starts while the running ones finish.
@@ -246,7 +249,8 @@ export class BrowserHumanControls {
         this.forget(control);
         return null;
       }
-      if (!discardInput) control.phase = "held";
+      if (discardInput) this.retryDiscard(control);
+      else if (!control.retry) control.phase = "held";
       return controlError("failed");
     });
   }
@@ -388,6 +392,17 @@ export class BrowserHumanControls {
     );
   }
 
+  // A daemon retries too, but after a reset no daemon knows about this control.
+  private retryDiscard(control: Control): void {
+    if (control.retry) return;
+    control.retry = setTimeout(() => {
+      control.retry = null;
+      const { controlId, hostId } = control;
+      void this.release({ controlId, hostId, discardInput: true });
+    }, DISCARD_RETRY_MS);
+    control.retry.unref?.();
+  }
+
   private markTypedInto(control: Control): void {
     const { contentsId, tab } = control;
     if (this.typedInto.has(contentsId)) return;
@@ -403,6 +418,7 @@ export class BrowserHumanControls {
     if (!this.isCurrent(control)) return;
     this.byControlId.delete(control.controlId);
     this.byContentsId.delete(control.contentsId);
+    if (control.retry) clearTimeout(control.retry);
     for (const cleanup of control.cleanup.splice(0)) cleanup();
   }
 }

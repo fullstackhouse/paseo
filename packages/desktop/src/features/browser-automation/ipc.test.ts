@@ -1560,6 +1560,22 @@ describe("browser live view human control", () => {
     expect(controls.isHeld(contents.id)).toBe(false);
   });
 
+  test("retries a failed discard by itself, as after losing the daemon", async () => {
+    const { contents, controls, take, type, release } = await watchedTab();
+    await take();
+    await type();
+    contents.failedUrls.add("about:blank");
+    vi.useFakeTimers();
+    try {
+      await expect(release(true)).resolves.toMatchObject({ error: { code: "failed" } });
+      contents.failedUrls.clear();
+      await vi.advanceTimersByTimeAsync(30_000);
+      expect(controls.isHeld(contents.id)).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   test("won't hand back while a secret can't be cleared", async () => {
     const { contents, controls, take, type, release } = await watchedTab();
     await take();
