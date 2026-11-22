@@ -137,6 +137,12 @@ contextBridge.exposeInMainWorld("paseoDesktop", {
       ipcRenderer.invoke("paseo:browser:live-stop", request),
     ackLiveFrame: (ack: Record<string, unknown>) =>
       ipcRenderer.invoke("paseo:browser:live-frame-ack", ack),
+    takeLiveControl: (request: Record<string, unknown>) =>
+      ipcRenderer.invoke("paseo:browser:live-take-control", request),
+    sendLiveInput: (request: Record<string, unknown>) =>
+      ipcRenderer.invoke("paseo:browser:live-send-input", request),
+    releaseLiveControl: (request: Record<string, unknown>) =>
+      ipcRenderer.invoke("paseo:browser:live-release-control", request),
     captureElement: (
       browserId: string,
       rect: { x: number; y: number; width: number; height: number },

@@ -1,11 +1,15 @@
 import { describe, expect, test, vi } from "vitest";
 import { executeAutomationCommand, type BrowserRegistry, type TabImage } from "./service.js";
+import type { GuestControlReply, GuestControlRequest } from "./guest-frames.js";
+import { BrowserHumanControls } from "./human-control.js";
 import {
   adaptWebContents,
+  BROWSER_LIVE_CONTROL_ENDED_EVENT,
   BROWSER_LIVE_ENDED_EVENT,
   BROWSER_LIVE_FRAME_EVENT,
   BrowserLiveViewStreams,
   HostSnapshotEngineRegistry,
+  runAgentCommand,
 } from "./ipc.js";
 import type { IsolatedKeyboardInputEvent } from "./trusted-input.js";
 
@@ -136,7 +140,65 @@ type ConsoleMessageListener = (
   sourceId: unknown,
 ) => void;
 
+type WithoutId<T> = T extends unknown ? Omit<T, "id"> : never;
+
+class FakeFrame {
+  public url: string;
+  public detached = false;
+  public destroyed = false;
+  public readonly children: FakeFrame[] = [];
+  public readonly requests: GuestControlRequest[] = [];
+  /** Null leaves the request unanswered, as a hung or crashed renderer does. */
+  public answer: (request: WithoutId<GuestControlRequest>) => Omit<GuestControlReply, "id"> | null =
+    (request) => {
+      if (request.op === "describe") return { target: { targetId: "target-1", kind: "password" } };
+      if (request.op === "insert") return { inserted: true };
+      return { typed: true };
+    };
+  public reply: ((sender: FakeFrame, reply: GuestControlReply) => void) | null = null;
+
+  public constructor(
+    public origin: string,
+    public processId: number,
+    public routingId: number,
+  ) {
+    this.url = `${origin}/login`;
+  }
+
+  public get framesInSubtree(): FakeFrame[] {
+    return [this, ...this.children.flatMap((child) => child.framesInSubtree)];
+  }
+
+  public isDestroyed(): boolean {
+    return this.destroyed;
+  }
+
+  public send(_channel: string, request: GuestControlRequest): void {
+    if (this.destroyed) throw new Error("Render frame was disposed");
+    this.requests.push(request);
+    const answer = this.answer(request);
+    if (answer) queueMicrotask(() => this.reply?.(this, { id: request.id, ...answer }));
+  }
+}
+
 class FakeWebContents {
+  public readonly mainFrame = new FakeFrame("https://app.example", 10, 1);
+  public focusedFrame: FakeFrame | null = this.mainFrame;
+  public zoomFactor = 1;
+  public loadingMainFrame = false;
+  public historyClears = 0;
+  public readonly insertedTexts: string[] = [];
+  public readonly navigationHistory = {
+    clear: () => {
+      this.historyClears += 1;
+    },
+  };
+  public getZoomFactor(): number {
+    return this.zoomFactor;
+  }
+  public isLoadingMainFrame(): boolean {
+    return this.loadingMainFrame;
+  }
   public backgroundThrottling = true;
   public getBackgroundThrottling(): boolean {
     return this.backgroundThrottling;
@@ -194,7 +256,11 @@ class FakeWebContents {
 
   public async loadURL(url: string): Promise<void> {
     this.loadedUrls.push(url);
+    if (this.failedUrls.has(url)) throw new Error("ERR_ABORTED");
+    this.mainFrame.url = url;
+    this.mainFrame.children.length = 0;
   }
+  public readonly failedUrls = new Set<string>();
 
   public goBack(): void {}
 
@@ -220,11 +286,19 @@ class FakeWebContents {
     this.inputEvents.push(event);
   }
 
-  public async insertText(_text: string): Promise<void> {}
+  public async insertText(text: string): Promise<void> {
+    this.insertedTexts.push(text);
+  }
 
-  public on(event: "console-message", listener: ConsoleMessageListener): void {
-    expect(event).toBe("console-message");
-    this.consoleMessageListener = listener;
+  public readonly unloadListeners = new Set<(event: { preventDefault(): void }) => void>();
+
+  public on(
+    event: "console-message" | "will-prevent-unload",
+    listener: ConsoleMessageListener | ((event: { preventDefault(): void }) => void),
+  ): void {
+    if (event === "console-message")
+      this.consoleMessageListener = listener as ConsoleMessageListener;
+    else this.unloadListeners.add(listener as (event: { preventDefault(): void }) => void);
   }
 
   public once(event: "destroyed", listener: () => void): void {
@@ -232,9 +306,12 @@ class FakeWebContents {
     this.destroyedListeners.add(listener);
   }
 
-  public removeListener(event: "destroyed", listener: () => void): void {
-    expect(event).toBe("destroyed");
-    this.destroyedListeners.delete(listener);
+  public removeListener(
+    event: "destroyed" | "will-prevent-unload",
+    listener: (event: { preventDefault(): void }) => void,
+  ): void {
+    if (event === "will-prevent-unload") this.unloadListeners.delete(listener);
+    else this.destroyedListeners.delete(listener as () => void);
   }
 
   public emitConsoleMessage(input: {
@@ -1152,5 +1229,442 @@ describe("browser live view screencast", () => {
       error: { code: "browser_denied" },
     });
     expect(streams.size).toBe(1);
+  });
+});
+
+describe("browser live view human control", () => {
+  const SENTINEL = "LV3-SENTINEL-desktop";
+
+  async function watchedTab() {
+    const contents = new FakeWebContents(nextLiveContentsId++);
+    const host = new FakeLiveHostWindow(1);
+    const controls = new BrowserHumanControls({
+      settleMs: 0,
+      replyTimeoutMs: 20,
+      drainTimeoutMs: 20,
+    });
+    const streams = new BrowserLiveViewStreams(
+      (browserId, hostId) =>
+        browserId === LIVE_BROWSER_ID && hostId === host.id ? contents : null,
+      controls,
+    );
+    const connect = (frame: FakeFrame) => {
+      frame.reply = (sender, reply) =>
+        controls.frames.receive({ processId: sender.processId, frameId: sender.routingId }, reply);
+    };
+    connect(contents.mainFrame);
+    const addFrame = (origin: string, processId: number, parent = contents.mainFrame) => {
+      const frame = new FakeFrame(
+        origin,
+        processId,
+        20 + contents.mainFrame.framesInSubtree.length,
+      );
+      parent.children.push(frame);
+      connect(frame);
+      return frame;
+    };
+    await streams.start(host, liveStartRequest());
+
+    const take = (controlId = "control-1") =>
+      streams.takeControl(host, {
+        type: "browser.host.live.take_control.request",
+        requestId: "take",
+        streamId: "stream-1",
+        controlId,
+      });
+    const send = (input: object, controlId = "control-1") =>
+      streams.sendInput(host, {
+        type: "browser.host.live.send_input.request",
+        requestId: "input",
+        streamId: "stream-1",
+        controlId,
+        input,
+      });
+    const type = () => send({ kind: "insert_text", targetId: "target-1", text: SENTINEL });
+    const release = (discardInput: boolean, controlId = "control-1") =>
+      streams.releaseControl(host, {
+        type: "browser.host.live.release_control.request",
+        requestId: "release",
+        controlId,
+        discardInput,
+      });
+    return { contents, host, controls, streams, addFrame, take, send, type, release };
+  }
+
+  const silence = () => {};
+  const inserts = (frame: FakeFrame) => frame.requests.filter((request) => request.op === "insert");
+
+  test("watching leaves the tab to agents; taking control locks it", async () => {
+    const { contents, controls, take } = await watchedTab();
+    expect(controls.isHeld(contents.id)).toBe(false);
+
+    await expect(take()).resolves.toEqual({
+      requestId: "take",
+      focus: {
+        targetId: "target-1",
+        kind: "password",
+        origin: "https://app.example",
+        topOrigin: "https://app.example",
+      },
+      error: null,
+    });
+    expect(controls.isHeld(contents.id)).toBe(true);
+  });
+
+  test("accepts input only after the agent's running command finished", async () => {
+    const { contents, controls, take } = await watchedTab();
+    let finish!: () => void;
+    const command = controls.track(contents.id, () => new Promise<void>((done) => (finish = done)));
+    let taken = false;
+    const taking = take().then((result) => {
+      taken = true;
+      return result;
+    });
+    await flushMicrotasks();
+    expect(controls.isHeld(contents.id)).toBe(true);
+    expect(taken).toBe(false);
+
+    finish();
+    await command;
+    await expect(taking).resolves.toMatchObject({ error: null });
+  });
+
+  test("gives up taking control when the agent's command doesn't finish", async () => {
+    const { contents, controls, take } = await watchedTab();
+    void controls.track(contents.id, () => new Promise<void>(() => {}));
+    await expect(take()).resolves.toMatchObject({ error: { code: "agent_busy" } });
+    expect(controls.isHeld(contents.id)).toBe(false);
+  });
+
+  test("one controller per tab", async () => {
+    const { take, send } = await watchedTab();
+    await take();
+    await expect(take("control-2")).resolves.toMatchObject({ error: { code: "busy" } });
+    await expect(send({ kind: "key", key: "Tab" }, "control-2")).resolves.toMatchObject({
+      error: { code: "not_controller" },
+    });
+  });
+
+  test("maps a tap from screen space to CSS pixels under page zoom", async () => {
+    const { contents, take, send } = await watchedTab();
+    await take();
+    contents.zoomFactor = 2;
+    await send({ kind: "tap", x: 100, y: 60 });
+    expect(
+      contents.debugger.commands.filter(({ params }) => params.type === "mousePressed"),
+    ).toEqual([
+      {
+        command: "Input.dispatchMouseEvent",
+        params: expect.objectContaining({ x: 50, y: 30 }),
+      },
+    ]);
+  });
+
+  test("scrolls at the point the finger started", async () => {
+    const { contents, take, send } = await watchedTab();
+    await take();
+    await send({ kind: "scroll", x: 10, y: 20, deltaX: 0, deltaY: 300 });
+    expect(contents.debugger.commands).toContainEqual({
+      command: "Input.dispatchMouseEvent",
+      params: { type: "mouseWheel", x: 10, y: 20, deltaX: 0, deltaY: 300 },
+    });
+  });
+
+  test("Enter carries the character that submits a form", async () => {
+    const { contents, take, send } = await watchedTab();
+    await take();
+    await send({ kind: "key", key: "Enter" });
+    expect(contents.inputEvents.map(({ type, keyCode }) => [type, keyCode])).toEqual([
+      ["keyDown", "Enter"],
+      ["char", "\r"],
+      ["keyUp", "Enter"],
+    ]);
+  });
+
+  test("types into a cross-origin iframe through that frame, never webContents.insertText", async () => {
+    const { contents, addFrame, take, type } = await watchedTab();
+    const outer = addFrame("https://idp.example", 30);
+    const nested = addFrame("https://idp.example", 30, outer);
+    const bystander = addFrame("https://ads.example", 40);
+    contents.focusedFrame = nested;
+
+    await expect(take()).resolves.toMatchObject({
+      focus: { origin: "https://idp.example", topOrigin: "https://app.example" },
+    });
+    await expect(type()).resolves.toMatchObject({ error: null });
+
+    expect(inserts(nested)).toEqual([expect.objectContaining({ text: SENTINEL })]);
+    // webContents.insertText crashes the renderer with focus in an out-of-process iframe.
+    expect(contents.insertedTexts).toEqual([]);
+    expect(inserts(contents.mainFrame)).toEqual([]);
+    expect(outer.requests).toEqual([]);
+    expect(bystander.requests).toEqual([]);
+  });
+
+  test("keys don't reach another process's frame, so say so", async () => {
+    const { contents, addFrame, take, send } = await watchedTab();
+    contents.focusedFrame = addFrame("https://idp.example", 30);
+    await take();
+    await expect(send({ kind: "key", key: "Enter" })).resolves.toMatchObject({
+      error: { code: "key_unsupported" },
+    });
+    expect(contents.inputEvents).toEqual([]);
+  });
+
+  test.each([
+    "the frame navigated",
+    "the tab navigated",
+    "focus moved to another frame",
+    "the frame is gone",
+  ])("refuses text without sending it when %s", async (change) => {
+    const { contents, addFrame, take, type } = await watchedTab();
+    const shown = addFrame("https://idp.example", 30);
+    const other = addFrame("https://idp.example", 30);
+    contents.focusedFrame = shown;
+    await take();
+
+    if (change === "the frame navigated") shown.origin = "https://evil.example";
+    if (change === "the tab navigated") contents.mainFrame.origin = "https://evil.example";
+    if (change === "focus moved to another frame") contents.focusedFrame = other;
+    if (change === "the frame is gone") shown.destroyed = true;
+
+    await expect(type()).resolves.toMatchObject({ focus: null, error: { code: "target_changed" } });
+    for (const frame of [shown, other, contents.mainFrame]) expect(inserts(frame)).toEqual([]);
+  });
+
+  test("refuses text for a field the user wasn't shown last", async () => {
+    const { contents, take, send } = await watchedTab();
+    await take();
+    await expect(
+      send({ kind: "insert_text", targetId: "an-older-target", text: SENTINEL }),
+    ).resolves.toMatchObject({ error: { code: "target_changed" } });
+    expect(inserts(contents.mainFrame)).toEqual([]);
+  });
+
+  test("reports a field the page switched while typing", async () => {
+    const { contents, take, type } = await watchedTab();
+    await take();
+    contents.mainFrame.answer = () => ({ inserted: false });
+    await expect(type()).resolves.toMatchObject({ error: { code: "target_changed" } });
+  });
+
+  test("an unanswered insert fails closed: lock kept, value not resent or logged", async () => {
+    const logged = (["log", "info", "warn", "error", "debug"] as const).map((level) =>
+      vi.spyOn(console, level).mockImplementation(silence),
+    );
+    try {
+      const { contents, controls, take, type } = await watchedTab();
+      await take();
+      contents.mainFrame.answer = () => null;
+
+      const result = await type();
+
+      expect(result).toMatchObject({ error: { code: "unconfirmed" } });
+      expect(controls.isHeld(contents.id)).toBe(true);
+      expect(inserts(contents.mainFrame)).toHaveLength(1);
+      expect(inserts(contents.mainFrame)[0]).toMatchObject({ deadline: expect.any(Number) });
+      expect(JSON.stringify(result)).not.toContain(SENTINEL);
+      expect(JSON.stringify(logged.map((spy) => spy.mock.calls))).not.toContain(SENTINEL);
+      expect(JSON.stringify(contents.debugger.commands)).not.toContain(SENTINEL);
+    } finally {
+      for (const spy of logged) spy.mockRestore();
+    }
+  });
+
+  test("only the frame that was asked can answer", async () => {
+    const { contents, controls, take, type } = await watchedTab();
+    await take();
+    contents.mainFrame.answer = () => null;
+    const typing = type();
+    await flushMicrotasks();
+    const [sent] = inserts(contents.mainFrame);
+    controls.frames.receive({ processId: 99, frameId: 1 }, { id: sent!.id, inserted: true });
+    await expect(typing).resolves.toMatchObject({ error: { code: "unconfirmed" } });
+  });
+
+  test("hand-back clears secrets in place and doesn't reload the page", async () => {
+    const { contents, controls, take, type, release } = await watchedTab();
+    await take();
+    await type();
+
+    await expect(release(false)).resolves.toEqual({ requestId: "release", error: null });
+
+    expect(contents.mainFrame.requests).toContainEqual(
+      expect.objectContaining({ op: "clear", scope: "secrets" }),
+    );
+    expect(contents.loadedUrls).toEqual([]);
+    expect(contents.historyClears).toBe(1);
+    expect(controls.isHeld(contents.id)).toBe(false);
+  });
+
+  test("a release the user didn't ask for discards the document before unlocking", async () => {
+    const { contents, controls, take, type, release } = await watchedTab();
+    await take();
+    await type();
+    const loadURL = contents.loadURL.bind(contents);
+    const heldDuringLoad: boolean[] = [];
+    contents.loadURL = (url) => {
+      heldDuringLoad.push(controls.isHeld(contents.id));
+      return loadURL(url);
+    };
+
+    await expect(release(true)).resolves.toEqual({ requestId: "release", error: null });
+
+    expect(contents.mainFrame.requests).toContainEqual(
+      expect.objectContaining({ op: "clear", scope: "all" }),
+    );
+    // A GET of the URL: a reload would submit the page's POST again.
+    expect(contents.loadedUrls).toEqual(["about:blank", "https://app.example/login"]);
+    expect(heldDuringLoad).toEqual([true, true]);
+    // Back, forward and their saved form state go too.
+    expect(contents.historyClears).toBe(2);
+    expect(contents.unloadListeners.size).toBe(0);
+    expect(controls.isHeld(contents.id)).toBe(false);
+  });
+
+  test("an auto-release leaves a page the user submitted or never typed into", async () => {
+    const untouched = await watchedTab();
+    await untouched.take();
+    await untouched.release(true);
+    expect(untouched.contents.loadedUrls).toEqual([]);
+
+    const submitted = await watchedTab();
+    await submitted.take();
+    await submitted.type();
+    submitted.contents.mainFrame.answer = () => ({ typed: false });
+    await submitted.release(true);
+    expect(submitted.contents.loadedUrls).toEqual([]);
+    expect(submitted.contents.historyClears).toBe(1);
+  });
+
+  test("a frame that can't answer is discarded", async () => {
+    const { contents, take, type, release } = await watchedTab();
+    await take();
+    await type();
+    contents.mainFrame.answer = () => null;
+    await expect(release(true)).resolves.toMatchObject({ error: null });
+    expect(contents.loadedUrls[0]).toBe("about:blank");
+  });
+
+  test("keeps the lock when the document can't be discarded, and can retry", async () => {
+    const { contents, controls, take, type, release } = await watchedTab();
+    await take();
+    await type();
+    contents.failedUrls.add("about:blank");
+
+    await expect(release(true)).resolves.toMatchObject({ error: { code: "failed" } });
+    expect(controls.isHeld(contents.id)).toBe(true);
+
+    contents.failedUrls.clear();
+    await expect(release(true)).resolves.toMatchObject({ error: null });
+    expect(controls.isHeld(contents.id)).toBe(false);
+  });
+
+  test("won't hand back while a secret can't be cleared", async () => {
+    const { contents, controls, take, type, release } = await watchedTab();
+    await take();
+    await type();
+    contents.mainFrame.answer = () => null;
+    await expect(release(false)).resolves.toMatchObject({ error: { code: "failed" } });
+    expect(controls.isHeld(contents.id)).toBe(true);
+  });
+
+  test("closing the tab ends control and tells the host", async () => {
+    const { contents, host, controls, take } = await watchedTab();
+    await take();
+    const contentsId = contents.id;
+    contents.destroy();
+    expect(controls.isHeld(contentsId)).toBe(false);
+    expect(host.sent).toContainEqual({
+      channel: BROWSER_LIVE_CONTROL_ENDED_EVENT,
+      payload: { controlId: "control-1" },
+    });
+  });
+
+  test("the lock outlives the stream and only its controller can watch again", async () => {
+    const { contents, host, controls, streams, take } = await watchedTab();
+    await take();
+    await streams.stop({
+      type: "browser.host.live.stop.request",
+      requestId: "stop",
+      streamId: "stream-1",
+    });
+    expect(controls.isHeld(contents.id)).toBe(true);
+
+    await expect(streams.start(host, liveStartRequest("stream-2"))).resolves.toMatchObject({
+      error: { code: "browser_denied" },
+    });
+    await expect(
+      streams.start(host, { ...liveStartRequest("stream-3"), controlId: "control-1" }),
+    ).resolves.toMatchObject({ error: null });
+  });
+
+  test("dismisses page dialogs, which would block every further input", async () => {
+    const { contents, take } = await watchedTab();
+    await take();
+    contents.debugger.emitMessage("Page.javascriptDialogOpening", { type: "alert", message: "x" });
+    await flushMicrotasks();
+    expect(contents.debugger.commands.at(-1)?.command).toBe("Page.handleJavaScriptDialog");
+  });
+
+  test("frames carry the committed origin", async () => {
+    const { contents, host } = await watchedTab();
+    screencastFrame(contents, 3);
+    expect(host.sent.at(-1)?.payload).toMatchObject({
+      metadata: { origin: "https://app.example" },
+    });
+  });
+
+  test("only tabs live view typed into drop out of the desktop log", async () => {
+    const { contents, controls, take, send, type } = await watchedTab();
+    await take();
+    await send({ kind: "tap", x: 1, y: 1 });
+    expect(controls.hasTypedInto(contents.id)).toBe(false);
+    await type();
+    expect(controls.hasTypedInto(contents.id)).toBe(true);
+  });
+
+  test("every agent command on a held tab is refused, list_tabs withholds its address", async () => {
+    const { contents, host, controls, take, release } = await watchedTab();
+    const run = (command: object) =>
+      runAgentCommand({
+        request: {
+          type: "browser.automation.execute.request",
+          requestId: "agent",
+          command,
+        } as never,
+        registry: {
+          listRegisteredBrowserIds: () => [LIVE_BROWSER_ID],
+          listRegisteredBrowserIdsForWorkspace: () => [LIVE_BROWSER_ID],
+          getTabContents: () => adaptWebContents(contents),
+          getBrowserWorkspaceId: () => null,
+          getWorkspaceActiveBrowserId: () => null,
+        },
+        snapshotEngine: new HostSnapshotEngineRegistry().get(new FakeHostWebContents(host.id)),
+        controls,
+      });
+    await take();
+
+    const browserId = LIVE_BROWSER_ID;
+    for (const command of [
+      { command: "snapshot", args: { browserId } },
+      { command: "screenshot", args: { browserId, fullPage: false } },
+      { command: "evaluate", args: { browserId, function: "() => 1" } },
+      { command: "logs", args: { browserId, maxEntries: 5 } },
+      { command: "navigate", args: { browserId, url: "https://example.com" } },
+    ]) {
+      await expect(run(command)).resolves.toMatchObject({
+        ok: false,
+        error: { code: "browser_denied", retryable: true },
+      });
+    }
+    await expect(run({ command: "list_tabs", args: {} })).resolves.toMatchObject({
+      result: { tabs: [{ browserId, url: "", title: "" }] },
+    });
+
+    await release(false);
+    await expect(run({ command: "list_tabs", args: {} })).resolves.toMatchObject({
+      result: { tabs: [{ url: "https://example.com" }] },
+    });
   });
 });

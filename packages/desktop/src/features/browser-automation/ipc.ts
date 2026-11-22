@@ -2,17 +2,35 @@ import { ipcMain } from "electron";
 import { BrowserAutomationExecuteRequestSchema } from "@getpaseo/protocol/browser-automation/rpc-schemas";
 import {
   BrowserHostLiveFrameAckSchema,
+  BrowserHostLiveReleaseControlRequestSchema,
+  BrowserHostLiveSendInputRequestSchema,
   BrowserHostLiveStartRequestSchema,
   BrowserHostLiveStopRequestSchema,
+  BrowserHostLiveTakeControlRequestSchema,
+  type BrowserHostLiveReleaseControlResponse,
+  type BrowserHostLiveSendInputResponse,
   type BrowserHostLiveStartResponse,
   type BrowserHostLiveStopResponse,
+  type BrowserHostLiveTakeControlResponse,
 } from "@getpaseo/protocol/browser-automation/live-view";
+import { GUEST_CONTROL_REPLY_CHANNEL, type GuestFrame } from "./guest-frames.js";
+import {
+  BrowserHumanControls,
+  type HumanControlContents,
+  type HumanControlTab,
+} from "./human-control.js";
 import { BrowserLiveViewStream, type BrowserLiveViewEvents } from "./live-view.js";
 import type {
   BrowserAutomationConsoleLogEntry,
   BrowserAutomationDialogEvent,
+  BrowserAutomationExecuteRequest,
 } from "@getpaseo/protocol/browser-automation/rpc-schemas";
-import type { TabContents, BrowserRegistry, TabImage } from "./service.js";
+import type {
+  AutomationCommandPayload,
+  TabContents,
+  BrowserRegistry,
+  TabImage,
+} from "./service.js";
 import type { IsolatedKeyboardInputEvent } from "./trusted-input.js";
 import { CdpSessionQueue } from "./cdp-session-queue.js";
 import { FrameProduction } from "./frame-production.js";
@@ -41,8 +59,21 @@ const dialogMonitorsByContentsId = new Map<number, DialogMonitor>();
 const observedContentsIds = new Set<number>();
 const frameProductionByContentsId = new Map<number, FrameProduction>();
 
+const humanControls = new BrowserHumanControls();
+
+/** See BrowserHumanControls.hasTypedInto. */
+export function hasLiveViewTypedInto(contentsId: number): boolean {
+  return humanControls.hasTypedInto(contentsId);
+}
+
 interface IpcHandlerRegistry {
   handle(channel: string, listener: (event: unknown, ...args: unknown[]) => unknown): void;
+  on(channel: string, listener: (event: GuestReplyEvent, payload: unknown) => void): void;
+}
+
+interface GuestReplyEvent {
+  processId: number;
+  frameId: number;
 }
 
 interface HostWebContents {
@@ -59,6 +90,7 @@ interface LiveViewHostWebContents extends HostWebContents {
 
 export const BROWSER_LIVE_FRAME_EVENT = "paseo:event:browser-live-frame";
 export const BROWSER_LIVE_ENDED_EVENT = "paseo:event:browser-live-ended";
+export const BROWSER_LIVE_CONTROL_ENDED_EVENT = "paseo:event:browser-live-control-ended";
 
 export class HostSnapshotEngineRegistry {
   private readonly entries = new Map<
@@ -117,6 +149,11 @@ interface ConsoleMessageEmitter {
 
 interface BrowserAutomationWebContents extends ConsoleMessageEmitter {
   removeListener(event: "destroyed", listener: () => void): void;
+  readonly mainFrame: HumanControlContents["mainFrame"];
+  readonly focusedFrame: GuestFrame | null;
+  readonly navigationHistory: HumanControlContents["navigationHistory"];
+  getZoomFactor(): number;
+  isLoadingMainFrame(): boolean;
   readonly id: number;
   readonly debugger: WebContentsDebugger;
   getURL(): string;
@@ -251,6 +288,8 @@ function observeConsoleMessages(contents: BrowserAutomationWebContents, contents
   }
   observedContentsIds.add(contentsId);
   contents.on("console-message", (_event, level, message, line, sourceId) => {
+    // browser_logs would read it after hand-back.
+    if (humanControls.isHeld(contentsId)) return;
     const entry = normalizeConsoleMessage({ level, message, line, sourceId });
     const messages = consoleMessagesByContentsId.get(contentsId) ?? [];
     messages.push(entry);
@@ -511,12 +550,83 @@ function liveViewEvents(contents: BrowserAutomationWebContents): BrowserLiveView
   };
 }
 
+function humanControlTab(contents: BrowserAutomationWebContents): HumanControlTab {
+  const { sendDebugCommand } = adaptWebContents(contents);
+  const { onMessage } = liveViewEvents(contents);
+  return {
+    contents: contents as BrowserAutomationWebContents & HumanControlContents,
+    send: sendDebugCommand,
+    answerDialog: (accept) =>
+      contents.debugger.sendCommand("Page.handleJavaScriptDialog", { accept }),
+    onDialog: (listener) =>
+      onMessage((method, params) => {
+        if (method === "Page.javascriptDialogOpening") listener(params.type);
+      }),
+  };
+}
+
+function readCommittedOrigin(contents: BrowserAutomationWebContents): string | undefined {
+  if (contents.isDestroyed()) return undefined;
+  const { mainFrame } = contents;
+  return mainFrame.isDestroyed() ? undefined : mainFrame.origin;
+}
+
+/** Runs an agent's command unless a human controls its tab. */
+export async function runAgentCommand(input: {
+  request: BrowserAutomationExecuteRequest;
+  registry: BrowserRegistry;
+  snapshotEngine: BrowserSnapshotEngine;
+  controls: BrowserHumanControls;
+}): Promise<AutomationCommandPayload> {
+  const { request, registry, snapshotEngine, controls } = input;
+  const execute = () => executeAutomationCommand(request, registry, { snapshotEngine });
+  const { command } = request;
+  if (command.command === "list_tabs") {
+    return withholdHeldTabs(await execute(), registry, controls);
+  }
+  if (command.command === "new_tab") return execute();
+  const contents = registry.getTabContents(command.args.browserId);
+  if (!contents || contents.isDestroyed()) return execute();
+  if (controls.isHeld(contents.id)) {
+    return {
+      requestId: request.requestId,
+      ok: false,
+      error: {
+        // Not browser_human_control: daemons that predate it reject responses with unknown codes.
+        code: "browser_denied",
+        message:
+          "The user is controlling this tab. Wait for hand-back, then call browser_snapshot.",
+        retryable: true,
+      },
+    };
+  }
+  return controls.track(contents.id, execute);
+}
+
+function withholdHeldTabs(
+  payload: AutomationCommandPayload,
+  registry: BrowserRegistry,
+  controls: BrowserHumanControls,
+): AutomationCommandPayload {
+  if (!payload.ok || payload.result.command !== "list_tabs") return payload;
+  const tabs = payload.result.tabs.map((tab) => {
+    const contents = registry.getTabContents(tab.browserId);
+    const held = contents && !contents.isDestroyed() && controls.isHeld(contents.id);
+    return held ? { ...tab, url: "", title: "" } : tab;
+  });
+  return { ...payload, result: { ...payload.result, tabs } };
+}
+
 /** Live view screencasts by streamId, across host windows. */
 export class BrowserLiveViewStreams {
   private readonly streams = new Map<string, BrowserLiveViewStream>();
   private readonly streamIdsByHost = new Map<number, Set<string>>();
   // CDP allows one screencast per debugger session, so one stream per tab.
   private readonly streamIdByContentsId = new Map<number, string>();
+  private readonly tabByStreamId = new Map<
+    string,
+    { contents: BrowserAutomationWebContents; hostId: number }
+  >();
   private readonly hostThrottlingBefore = new Map<number, boolean>();
 
   public constructor(
@@ -524,6 +634,7 @@ export class BrowserLiveViewStreams {
       browserId: string,
       hostWebContentsId: number,
     ) => BrowserAutomationWebContents | null,
+    private readonly controls: BrowserHumanControls = humanControls,
   ) {}
 
   public get size(): number {
@@ -555,6 +666,13 @@ export class BrowserLiveViewStreams {
       );
     }
     const contentsId = contents.id;
+    if (this.controls.isHeldByOther(contentsId, request.controlId)) {
+      return liveFailure(
+        request.requestId,
+        "browser_denied",
+        `Browser tab ${request.browserId} is being controlled.`,
+      );
+    }
     if (this.streamIdByContentsId.has(contentsId)) {
       return liveFailure(
         request.requestId,
@@ -568,7 +686,12 @@ export class BrowserLiveViewStreams {
       tab: adaptWebContents(contents),
       events: liveViewEvents(contents),
       onFrame: (frame) => {
-        if (!hostContents.isDestroyed()) hostContents.send(BROWSER_LIVE_FRAME_EVENT, frame);
+        if (hostContents.isDestroyed()) return;
+        const origin = readCommittedOrigin(contents);
+        hostContents.send(BROWSER_LIVE_FRAME_EVENT, {
+          ...frame,
+          metadata: { ...frame.metadata, ...(origin ? { origin } : {}) },
+        });
       },
       onEnded: (reason) => {
         if (this.streams.get(request.streamId) !== stream) return;
@@ -576,6 +699,7 @@ export class BrowserLiveViewStreams {
         hostStreamIds.delete(request.streamId);
         if (hostStreamIds.size === 0) this.releaseHostWindow(hostContents);
         this.streamIdByContentsId.delete(contentsId);
+        this.tabByStreamId.delete(request.streamId);
         // Nobody asked for this end; the daemon still thinks the viewer is watching.
         if (reason === "gone" && !hostContents.isDestroyed()) {
           hostContents.send(BROWSER_LIVE_ENDED_EVENT, {
@@ -593,6 +717,7 @@ export class BrowserLiveViewStreams {
     if (hostStreamIds.size === 0) this.holdHostWindow(hostContents);
     hostStreamIds.add(request.streamId);
     this.streamIdByContentsId.set(contentsId, request.streamId);
+    this.tabByStreamId.set(request.streamId, { contents, hostId: hostContents.id });
     try {
       const viewport = await stream.start({
         ...(request.maxFps !== undefined ? { maxFps: request.maxFps } : {}),
@@ -624,6 +749,72 @@ export class BrowserLiveViewStreams {
     // Stopping an unknown stream is a no-op: the daemon may stop a stream that already ended.
     await this.streams.get(parsed.data.streamId)?.stop();
     return { requestId: parsed.data.requestId, error: null };
+  }
+
+  public async takeControl(
+    hostContents: LiveViewHostWebContents,
+    rawRequest: unknown,
+  ): Promise<BrowserHostLiveTakeControlResponse["payload"]> {
+    const parsed = BrowserHostLiveTakeControlRequestSchema.safeParse(rawRequest);
+    if (!parsed.success) return invalidControlRequest(rawRequest);
+    const { requestId, streamId, controlId } = parsed.data;
+    const contents = this.tabOfStream(hostContents, streamId);
+    if (!contents) return streamGone(requestId);
+    const result = await this.controls.take({
+      controlId,
+      hostId: hostContents.id,
+      tab: humanControlTab(contents),
+      onEnded: () => {
+        if (hostContents.isDestroyed()) return;
+        hostContents.send(BROWSER_LIVE_CONTROL_ENDED_EVENT, { controlId });
+      },
+    });
+    return { requestId, ...result };
+  }
+
+  public async sendInput(
+    hostContents: LiveViewHostWebContents,
+    rawRequest: unknown,
+  ): Promise<BrowserHostLiveSendInputResponse["payload"]> {
+    const parsed = BrowserHostLiveSendInputRequestSchema.safeParse(rawRequest);
+    // The parse error is dropped on purpose: the request can hold a secret.
+    if (!parsed.success) return invalidControlRequest(rawRequest);
+    const { requestId, streamId, controlId, input } = parsed.data;
+    const contents = this.tabOfStream(hostContents, streamId);
+    if (!contents) return streamGone(requestId);
+    const result = await this.controls.input({
+      controlId,
+      hostId: hostContents.id,
+      contentsId: contents.id,
+      input,
+    });
+    return { requestId, ...result };
+  }
+
+  public async releaseControl(
+    hostContents: LiveViewHostWebContents,
+    rawRequest: unknown,
+  ): Promise<BrowserHostLiveReleaseControlResponse["payload"]> {
+    const parsed = BrowserHostLiveReleaseControlRequestSchema.safeParse(rawRequest);
+    if (!parsed.success) {
+      const { requestId, error } = invalidControlRequest(rawRequest);
+      return { requestId, error };
+    }
+    const { requestId, controlId, discardInput } = parsed.data;
+    const error = await this.controls.release({
+      controlId,
+      hostId: hostContents.id,
+      discardInput,
+    });
+    return { requestId, error };
+  }
+
+  private tabOfStream(
+    hostContents: LiveViewHostWebContents,
+    streamId: string,
+  ): BrowserAutomationWebContents | null {
+    const tab = this.tabByStreamId.get(streamId);
+    return tab?.hostId === hostContents.id && !tab.contents.isDestroyed() ? tab.contents : null;
   }
 
   public ack(rawAck: unknown): void {
@@ -672,6 +863,22 @@ function liveFailure(
   return { requestId, viewport: null, error: { code, message, retryable: false } };
 }
 
+function invalidControlRequest(rawRequest: unknown) {
+  return {
+    requestId: readRequestId(rawRequest),
+    focus: null,
+    error: { code: "failed", message: "Invalid live view request." },
+  };
+}
+
+function streamGone(requestId: string) {
+  return {
+    requestId,
+    focus: null,
+    error: { code: "failed", message: "The live view ended." },
+  };
+}
+
 export function registerBrowserAutomationIpc(options?: { ipc?: IpcHandlerRegistry }): void {
   const ipc = options?.ipc ?? ipcMain;
   const liveViews = new BrowserLiveViewStreams(getPaseoBrowserWebContentsForHostWindow);
@@ -692,6 +899,19 @@ export function registerBrowserAutomationIpc(options?: { ipc?: IpcHandlerRegistr
   );
   ipc.handle("paseo:browser:live-frame-ack", (_event, rawAck: unknown) => {
     liveViews.ack(rawAck);
+  });
+
+  ipc.handle("paseo:browser:live-take-control", (event, rawRequest: unknown) =>
+    liveViews.takeControl((event as { sender: LiveViewHostWebContents }).sender, rawRequest),
+  );
+  ipc.handle("paseo:browser:live-send-input", (event, rawRequest: unknown) =>
+    liveViews.sendInput((event as { sender: LiveViewHostWebContents }).sender, rawRequest),
+  );
+  ipc.handle("paseo:browser:live-release-control", (event, rawRequest: unknown) =>
+    liveViews.releaseControl((event as { sender: LiveViewHostWebContents }).sender, rawRequest),
+  );
+  ipc.on(GUEST_CONTROL_REPLY_CHANNEL, (event, reply) => {
+    humanControls.frames.receive(event, reply);
   });
 
   ipc.handle("paseo:browser:execute-automation-command", async (event, rawRequest: unknown) => {
@@ -720,8 +940,11 @@ export function registerBrowserAutomationIpc(options?: { ipc?: IpcHandlerRegistr
         },
       };
     }
-    return executeAutomationCommand(parsed.data, registry, {
+    return runAgentCommand({
+      request: parsed.data,
+      registry,
       snapshotEngine: hostSnapshotEngines.get(hostContents),
+      controls: humanControls,
     });
   });
 }

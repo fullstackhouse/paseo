@@ -5,7 +5,7 @@ process.emitWarning = (() => {}) as typeof process.emitWarning;
 
 import log from "electron-log/main";
 log.transports.console.level = "info";
-log.initialize({ spyRendererConsole: true });
+log.initialize();
 
 import { inheritLoginShellEnv } from "./login-shell-env.js";
 
@@ -29,6 +29,7 @@ import {
   shell,
   webContents,
 } from "electron";
+import { logRendererConsoles } from "./diagnostics/renderer-console.js";
 import { registerDaemonManager } from "./daemon/daemon-manager.js";
 import { parsePassthroughCliArgsFromArgv, runPassthroughCli } from "./daemon/cli/passthrough.js";
 import { closeAllTransportSessions } from "./daemon/local-transport.js";
@@ -101,7 +102,10 @@ import {
   stopDesktopManagedDaemonOnQuitIfNeeded,
 } from "./daemon/quit-lifecycle.js";
 import { runDesktopStartup } from "./desktop-startup.js";
-import { registerBrowserAutomationIpc } from "./features/browser-automation/ipc.js";
+import {
+  hasLiveViewTypedInto,
+  registerBrowserAutomationIpc,
+} from "./features/browser-automation/ipc.js";
 import { BrowserKeyboard } from "./features/browser-keyboard/index.js";
 import { installAppUpdateOnQuit } from "./features/auto-updater.js";
 import {
@@ -110,6 +114,8 @@ import {
   type AgentDeepLinkTarget,
 } from "@getpaseo/protocol/agent-deep-link";
 import { AgentNavigationInbox, parseAgentDeepLinkFromArgv } from "./agent-navigation.js";
+
+logRendererConsoles({ log, isWithheld: hasLiveViewTypedInto });
 
 const DEV_SERVER_URL = process.env.EXPO_DEV_URL ?? "http://localhost:8081";
 const APP_SCHEME = "paseo";
