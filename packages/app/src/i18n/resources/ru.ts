@@ -1470,6 +1470,18 @@ export const ru: TranslationResources = {
       composerStateRequired: "Редактор сообщения ещё не готов.",
       selectModel: "Выберите модель",
     },
+    initialBranch: {
+      title: "В этом репозитории ещё нет коммитов",
+      message: "Worktree создаётся от ветки, а в этом репозитории пока нет ни одной.",
+      createDetail: "Создайте {{branch}} с пустым первым коммитом и начните worktree от неё.",
+      createDetailWithPush:
+        "Создайте {{branch}} с пустым первым коммитом, отправьте её в {{remote}} и начните worktree от неё.",
+      localDetail:
+        "Или начните в локальном checkout. Коммит не нужен, а ваш первый коммит попадёт в {{branch}}.",
+      create: "Создать {{branch}}",
+      creating: "Создание {{branch}}…",
+      useLocalCheckout: "Локальный checkout",
+    },
     tooltips: {
       project: "Выберите проект",
       host: "Выберите хост",

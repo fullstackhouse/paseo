@@ -39,6 +39,14 @@ export type CreationInput = CreationRequest &
     | { kind: "workspace" }
     | { kind: "agent"; readAgent: (id: string) => Promise<AgentSnapshotPayload | null> }
   );
+// Workspace failures that rejected the request before anything was provisioned, so the same
+// request key may run again once the cause is fixed.
+const REJECTED_BEFORE_PROVISION: ReadonlySet<string> = new Set([
+  "directory_not_found",
+  "source_required",
+  "repository_has_no_commits",
+]);
+
 const RecordSchema = z.object({
   fingerprint: z.string(),
   snapshot: CreationSnapshotSchema,
@@ -198,7 +206,7 @@ export class CreationService {
         error instanceof Error && "code" in error && typeof error.code === "string"
           ? error.code
           : undefined;
-      const rejectedBeforeProvision = code === "directory_not_found" || code === "source_required";
+      const rejectedBeforeProvision = code !== undefined && REJECTED_BEFORE_PROVISION.has(code);
       const unknown =
         stage === "prompt" ||
         (stage === "workspace" && !rejectedBeforeProvision) ||

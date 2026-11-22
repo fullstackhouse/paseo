@@ -2654,6 +2654,15 @@ export const CheckoutRenameBranchRequestSchema = z.object({
   requestId: z.string(),
 });
 
+// Gives a repository with no commits (a fresh clone of an empty remote) its first branch.
+export const CheckoutCreateInitialBranchRequestSchema = z.object({
+  type: z.literal("checkout.create_initial_branch.request"),
+  cwd: z.string(),
+  // Report the branch and push remote without creating anything, so the client can ask first.
+  dryRun: z.boolean().optional(),
+  requestId: z.string(),
+});
+
 export const StashSaveRequestSchema = z.object({
   type: z.literal("stash_save_request"),
   cwd: z.string(),
@@ -3623,6 +3632,7 @@ export const SessionInboundMessageSchema = z.discriminatedUnion("type", [
   PullRequestTimelineRequestSchema,
   CheckoutSwitchBranchRequestSchema,
   CheckoutRenameBranchRequestSchema,
+  CheckoutCreateInitialBranchRequestSchema,
   StashSaveRequestSchema,
   StashPopRequestSchema,
   StashListRequestSchema,
@@ -4105,6 +4115,8 @@ export const ServerInfoStatusPayloadSchema = z
         agentProfiles: z.boolean().optional(),
         // COMPAT(agentConfigApply): added in v0.3.2, remove gate after 2027-02-11.
         agentConfigApply: z.boolean().optional(),
+        // COMPAT(checkoutCreateInitialBranch): added in v0.15.4 (FSH fork), remove gate after 2027-05-20.
+        checkoutCreateInitialBranch: z.boolean().optional(),
       })
       .optional(),
   })
@@ -6326,6 +6338,19 @@ export const CheckoutRenameBranchResponseSchema = z.object({
   }),
 });
 
+export const CheckoutCreateInitialBranchResponseSchema = z.object({
+  type: z.literal("checkout.create_initial_branch.response"),
+  payload: z.object({
+    requestId: z.string(),
+    cwd: z.string(),
+    success: z.boolean(),
+    branch: z.string().nullable(),
+    // Remote the branch was (or, for a dry run, would be) pushed to; null without an origin.
+    pushedTo: z.string().nullable(),
+    error: CheckoutErrorSchema.nullable(),
+  }),
+});
+
 const StashEntrySchema = z.object({
   index: z.number().int().min(0),
   message: z.string(),
@@ -7567,6 +7592,7 @@ export const SessionOutboundMessageSchema = z.discriminatedUnion("type", [
   PullRequestTimelineResponseSchema,
   CheckoutSwitchBranchResponseSchema,
   CheckoutRenameBranchResponseSchema,
+  CheckoutCreateInitialBranchResponseSchema,
   StashSaveResponseSchema,
   StashPopResponseSchema,
   StashListResponseSchema,
@@ -8003,6 +8029,12 @@ export type CheckoutSwitchBranchRequest = z.infer<typeof CheckoutSwitchBranchReq
 export type CheckoutSwitchBranchResponse = z.infer<typeof CheckoutSwitchBranchResponseSchema>;
 export type CheckoutRenameBranchRequest = z.infer<typeof CheckoutRenameBranchRequestSchema>;
 export type CheckoutRenameBranchResponse = z.infer<typeof CheckoutRenameBranchResponseSchema>;
+export type CheckoutCreateInitialBranchRequest = z.infer<
+  typeof CheckoutCreateInitialBranchRequestSchema
+>;
+export type CheckoutCreateInitialBranchResponse = z.infer<
+  typeof CheckoutCreateInitialBranchResponseSchema
+>;
 export type StashSaveRequest = z.infer<typeof StashSaveRequestSchema>;
 export type StashSaveResponse = z.infer<typeof StashSaveResponseSchema>;
 export type StashPopRequest = z.infer<typeof StashPopRequestSchema>;

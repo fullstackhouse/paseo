@@ -1466,6 +1466,18 @@ export const ja: TranslationResources = {
       composerStateRequired: "コンポーザーの状態が必要です",
       selectModel: "モデルを選択してください",
     },
+    initialBranch: {
+      title: "このリポジトリにはまだコミットがありません",
+      message: "worktree はブランチから作成しますが、このリポジトリにはまだブランチがありません。",
+      createDetail: "空の最初のコミットで {{branch}} を作成し、そこから worktree を開始します。",
+      createDetailWithPush:
+        "空の最初のコミットで {{branch}} を作成して {{remote}} にプッシュし、そこから worktree を開始します。",
+      localDetail:
+        "またはローカルのチェックアウトで開始します。コミットは不要で、最初のコミットは {{branch}} に入ります。",
+      create: "{{branch}} を作成",
+      creating: "{{branch}} を作成中…",
+      useLocalCheckout: "ローカルのチェックアウトを使用",
+    },
     tooltips: {
       project: "Choose the project",
       host: "Choose the host",

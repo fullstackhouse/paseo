@@ -1,10 +1,12 @@
 import { MissingCheckoutTargetError } from "./resolve-worktree-creation-intent.js";
 import { BranchAlreadyCheckedOutError, UnknownBranchError } from "../utils/worktree.js";
+import { RepositoryHasNoCommitsError } from "../utils/initial-branch.js";
 
 export type WorktreeWireErrorCode =
   | "branch_already_checked_out"
   | "missing_checkout_target"
   | "unknown_branch"
+  | "repository_has_no_commits"
   | "unknown";
 
 export interface WorktreeWireError {
@@ -31,6 +33,9 @@ export function toWorktreeWireError(error: unknown): WorktreeWireError {
   }
   if (error instanceof UnknownBranchError) {
     return { code: "unknown_branch", message: error.message };
+  }
+  if (error instanceof RepositoryHasNoCommitsError) {
+    return { code: error.code, message: error.message };
   }
   if (error instanceof Error) {
     return { code: "unknown", message: error.message };

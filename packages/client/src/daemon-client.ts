@@ -40,6 +40,7 @@ import {
   AgentRefreshedStatusPayloadSchema,
   AgentResumedStatusPayloadSchema,
   CheckoutRenameBranchResponseSchema,
+  CheckoutCreateInitialBranchResponseSchema,
   parseServerInfoStatusPayload,
   RenameTerminalResponseSchema,
   RestartRequestedStatusPayloadSchema,
@@ -220,6 +221,8 @@ const perfNow: () => number =
     : () => Date.now();
 
 const PROJECT_GITHUB_CLONE_TIMEOUT_MS = 5 * 60 * 1000;
+// Covers the daemon's 120s push of the new branch, plus the local commit.
+const CREATE_INITIAL_BRANCH_TIMEOUT_MS = 3 * 60 * 1000;
 
 interface ImportAgentInputBase {
   cwd?: string;
@@ -570,6 +573,9 @@ type CheckoutPrStatusPayload = CheckoutPrStatusResponse["payload"];
 type PullRequestTimelinePayload = PullRequestTimelineResponse["payload"];
 type CheckoutSwitchBranchPayload = CheckoutSwitchBranchResponse["payload"];
 export type RenameBranchResult = z.infer<typeof CheckoutRenameBranchResponseSchema>["payload"];
+export type CreateInitialBranchResult = z.infer<
+  typeof CheckoutCreateInitialBranchResponseSchema
+>["payload"];
 type StashSavePayload = StashSaveResponse["payload"];
 type StashPopPayload = StashPopResponse["payload"];
 type StashListPayload = StashListResponse["payload"];
@@ -5213,6 +5219,21 @@ export class DaemonClient {
         branch: input.branch,
       },
       responseType: "checkout.rename_branch.response",
+    });
+  }
+
+  async createInitialBranch(
+    cwd: string,
+    options?: { dryRun?: boolean; requestId?: string },
+  ): Promise<CreateInitialBranchResult> {
+    return this.sendNamespacedCorrelatedSessionRequest<"checkout.create_initial_branch.response">({
+      requestId: options?.requestId,
+      message: {
+        type: "checkout.create_initial_branch.request",
+        cwd,
+        ...(options?.dryRun ? { dryRun: true } : {}),
+      },
+      timeout: CREATE_INITIAL_BRANCH_TIMEOUT_MS,
     });
   }
 
