@@ -51,6 +51,7 @@ describe("initial branch", () => {
     await expect(planInitialBranch(checkout)).resolves.toEqual({
       branch: "main",
       pushTo: "origin",
+      needsCommit: true,
     });
     expect(git(checkout, "for-each-ref", "refs/heads")).toBe("");
   });
@@ -59,6 +60,7 @@ describe("initial branch", () => {
     await expect(createInitialBranch(checkout)).resolves.toEqual({
       branch: "main",
       pushTo: "origin",
+      needsCommit: true,
     });
 
     expect(git(checkout, "log", "--format=%s", "main")).toBe("Initial commit");
@@ -86,8 +88,41 @@ describe("initial branch", () => {
     execFileSync("git", ["init", "-b", "trunk", local]);
     configureIdentity(local);
 
-    await expect(createInitialBranch(local)).resolves.toEqual({ branch: "trunk", pushTo: null });
+    await expect(createInitialBranch(local)).resolves.toEqual({
+      branch: "trunk",
+      pushTo: null,
+      needsCommit: true,
+    });
     expect(git(local, "log", "--format=%s", "trunk")).toBe("Initial commit");
+  });
+
+  it("retries only the push after a failed one, without a second commit", async () => {
+    git(checkout, "remote", "set-url", "origin", join(root, "missing.git"));
+
+    await expect(createInitialBranch(checkout)).rejects.toThrow(
+      "Created branch 'main' locally, but pushing it to origin failed",
+    );
+    const firstCommit = git(checkout, "rev-parse", "main");
+    await expect(planInitialBranch(checkout)).resolves.toEqual({
+      branch: "main",
+      pushTo: "origin",
+      needsCommit: false,
+    });
+
+    git(checkout, "remote", "set-url", "origin", remote);
+    await expect(createInitialBranch(checkout)).resolves.toEqual({
+      branch: "main",
+      pushTo: "origin",
+      needsCommit: false,
+    });
+
+    expect(git(checkout, "rev-parse", "main")).toBe(firstCommit);
+    expect(git(checkout, "rev-list", "--count", "main")).toBe("1");
+    expect(git(remote, "rev-parse", "main")).toBe(firstCommit);
+    expect(git(checkout, "rev-parse", "--abbrev-ref", "main@{upstream}")).toBe("origin/main");
+    expect(git(checkout, "symbolic-ref", "refs/remotes/origin/HEAD")).toBe(
+      "refs/remotes/origin/main",
+    );
   });
 
   it("refuses once the repository has commits", async () => {
