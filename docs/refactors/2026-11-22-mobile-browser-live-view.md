@@ -2,9 +2,11 @@
 
 ## Status / TLDR
 
-Draft spec, not implemented. The phone gets a live view of one Paseo browser tab hosted by the connected desktop app. Frames come from CDP `Page.startScreencast` on the desktop, travel desktop → daemon → phone as binary frames, and the phone sends taps, scrolls, keys, and autofilled text back. While the human holds the view, agent `browser_*` calls on that tab fail with a retryable error until the human hands back.
+Phases 1-3 are implemented behind the off-by-default `daemon.browserLiveView` setting. Phase 4 (login request and deep link) is not.
 
-Line references were checked on branch `use-paseo-builtin-browser-tabs` on 2026-11-22. Claims marked **(unverified)** were not traced in code.
+The phone gets a live view of one Paseo browser tab hosted by the connected desktop app. Frames come from CDP `Page.startScreencast` on the desktop and travel desktop → daemon → phone as binary frames. The view is read-only until the user presses Take control. From then until control ends, agent `browser_*` calls on that tab fail with a retryable `browser_human_control`, and the phone sends taps, scrolls, keys, and autofilled text back.
+
+Electron behavior described here was checked on Electron 44.2 on 2026-11-22. Claims marked **(unverified)** were not.
 
 ## Problem
 
@@ -31,87 +33,113 @@ Non-goals:
 
 ## User flow
 
-1. Agent hits a login wall and calls `browser_request_human` with `browserId` and a short reason. The daemon sends an attention notification to the user's devices.
-2. User taps the notification. The app opens the live view route for that host, agent, and tab.
-3. The app sends `browser.live.start.request`. The daemon takes the human-control lock and asks the desktop to start the screencast. Frames appear.
-4. User taps the email field. The desktop clicks, reads the focused element's `type` and `autocomplete`, and returns them. The phone focuses a native `TextInput` with the matching autofill hint; 1Password offers the credential.
-5. The phone sends the value as `insert_text`. The desktop commits it into the focused field. The user taps "Sign in", completes OTP the same way.
-6. User taps "Hand back to agent". The daemon stops the screencast, releases the lock, and appends a short "human finished in tab X" note to the agent (text only, no values). The agent re-snapshots.
+1. The agent hits a login wall. The user opens the tab with View live in the chat (phase 4 adds a notification).
+2. Frames appear. The agent can still use the tab: watching locks nothing.
+3. The user presses Take control. The tab locks at once. Input is accepted after the agent's running command on that tab finishes.
+4. The user taps a field. The desktop clicks and returns the focused field's kind, its frame's committed origin, and the top-level origin. The phone shows both origins and focuses a native `TextInput` with the matching autofill hint.
+5. The password manager fills the input and the user presses Send. The desktop types the value only if the origins and the field are still the ones shown. Otherwise it refuses and the phone says so.
+6. The user submits, completes the one-time code the same way, and presses Hand back to agent. The lock ends and the agent gets a note on its next browser call. Hand-back starts no turn.
 
-Leaving the screen, backgrounding the app, or disconnecting also stops the stream. The lock stays until hand-back or a lock timeout (open question).
+Leaving the screen or backgrounding the app, as switching to a password manager does, stops the stream and keeps the lock. Returning resumes control.
 
 ## Design
 
 ### Protocol (`packages/protocol`)
 
-New RPCs, dotted per `docs/rpc-namespacing.md`, all fields beyond the required ids optional:
+Dotted RPCs per `docs/rpc-namespacing.md`, in `browser-automation/live-view.ts`:
 
-| Message                                    | Direction        | Fields                                                                                                                                                                                       |
-| ------------------------------------------ | ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `browser.live.start.request` / `.response` | app → daemon     | `requestId`, `browserId`, `maxFps?`, `jpegQuality?`, `maxWidth?`; response `streamId`, `viewport {width,height}`, `error`                                                                    |
-| `browser.live.stop.request` / `.response`  | app → daemon     | `requestId`, `streamId`, `handBack?: boolean`                                                                                                                                                |
-| `browser.live.input.request` / `.response` | app → daemon     | `requestId`, `streamId`, `input`: discriminated union `tap {x,y}` / `scroll {x,y,deltaX,deltaY}` / `key {key}` / `insert_text {text}`; response `focus? {inputType, autocomplete, editable}` |
-| `browser.live.frame_ack.request`           | app → daemon     | `streamId`, `frameSeq`; no response (call out next to the schema)                                                                                                                            |
-| `browser.host.live.*`                      | daemon → desktop | same shapes, forwarded to the registered browser host                                                                                                                                        |
+| App → daemon                           | Daemon → desktop                            | Purpose                                                                       |
+| -------------------------------------- | ------------------------------------------- | ----------------------------------------------------------------------------- |
+| `browser.live.start.request`           | `browser.host.live.start.request`           | Watch. The response's `control` says whether this viewer holds the tab        |
+| `browser.live.stop.request`            | `browser.host.live.stop.request`            | Stop watching. Control survives                                               |
+| `browser.live.take_control.request`    | `browser.host.live.take_control.request`    | Lock, drain the agent's running command, return focus                         |
+| `browser.live.send_input.request`      | `browser.host.live.send_input.request`      | `tap`, `scroll`, `key`, or `insert_text` bound to a `targetId`; returns focus |
+| `browser.live.release_control.request` | `browser.host.live.release_control.request` | Hand back. The daemon adds `discardInput` on releases the user didn't ask for |
+| `browser.live.frame_ack`               | `browser.host.live.frame_ack`               | One-way; releases the next frame                                              |
 
-Frames are binary, not JSON. Add a `browser_live` opcode to `packages/protocol/src/binary-frames/` next to terminal and file-transfer (`demux.ts:13-40`): `[opcode][streamId][frameSeq][metadata: deviceWidth, deviceHeight, offsetTop, pageScaleFactor, scrollOffsetX/Y][jpeg bytes]`. A 60-quality JPEG at 1080px wide is ~60-150 KB, which binary chunking and relay `binaryCiphertext` already carry (`docs/protocol-compatibility.md` "Binary chunking"; `SECURITY.md` "How it works" step 4).
+The desktop reports a stream or a controlled tab that went away with the one-way `browser.host.live.ended` and `browser.host.live.control_ended`.
 
-Error codes: add `browser_human_control` to `BrowserAutomationErrorCodeSchema` (`packages/protocol/src/browser-automation/rpc-schemas.ts:3-14`). The daemon generates it toward MCP tools only; confirm no old peer parses it **(unverified)**.
+Frames are binary, not JSON. Add a `browser_live` opcode to `packages/protocol/src/binary-frames/` next to terminal and file-transfer (`demux.ts:13-40`): `[opcode][streamId][frameSeq][metadata: deviceWidth, deviceHeight, offsetTop, pageScaleFactor, scrollOffsetX/Y, origin][jpeg bytes]`. `origin` is the tab's committed origin, added by Electron main. A 60-quality JPEG at 1080px wide is ~60-150 KB, which binary chunking and relay `binaryCiphertext` already carry (`docs/protocol-compatibility.md` "Binary chunking"; `SECURITY.md` "How it works" step 4).
 
-Desktop host advertises support with an optional `liveView: true` on `browser.host.register.request` (`packages/protocol/src/messages.ts:3423-3428`). The daemon advertises `server_info.features.browserLiveView` (`messages.ts:3843`), tagged `// COMPAT(browserLiveView)`.
+`browser_human_control` is not in the wire enum, because older peers reject responses with codes they don't know. The daemon makes it for MCP callers only. The desktop and live view responses use `browser_denied`, which the daemon translates for a held tab. Control RPCs have their own error shape with an open string `code`.
+
+Desktop hosts register `liveView` and `liveViewInput`. The daemon advertises `features.browserLiveView` and `features.browserLiveViewInput` while the setting is on.
 
 ### Daemon (`packages/server`)
 
-- `BrowserToolsBroker` (`packages/server/src/server/browser-tools/broker.ts:48`) gains a `LiveViewRegistry`: `browserId → { streamId, ownerSessionId, hostClientId, startedAt }`. It routes start/stop/input to the host that owns the tab via the existing affinity map (`broker.ts:53`, `selectHostForCommand` at `:140`).
-- Lock check at the top of `execute` (`broker.ts:113`): a command whose `browserId` is held by a human returns `browser_human_control`, `retryable: true`, message "The user is controlling this tab. Wait for hand-back, then call browser_snapshot." `list_tabs` stays allowed and reports `humanControl: true` per tab.
-- Session wiring next to `registerBrowserHost` (`packages/server/src/server/session.ts:2407`). Binary frames from the desktop session are relayed to the owner session without decoding the JPEG. Inbound frame acks follow the same path back.
-- Flow control: the desktop sends `Page.screencastFrameAck` only after the phone acks that frame, so at most one frame is in flight end to end. That caps bandwidth on slow relays without extra timers.
-- On owner disconnect: stop the screencast, keep the lock (see open questions). On host disconnect: drop the stream and lock, send `.stop` with an error to the phone.
-- New MCP tool `browser_request_human` in `browser-tools/tools.ts`, gated on a connected host with `liveView`. It emits an attention notification (see Notifications below) and returns immediately.
-- Permissions: classify every `browser.live.*` RPC as `workspace.write` in `packages/server/src/server/authorization/operation-permissions.ts`, matching `browser.automation.execute.request` (`:290`). A viewer principal (read-only) must not open the live view: frames show authenticated pages.
+- `BrowserToolsBroker` routes streams, control, and input to the host that owns the tab, and relays frames without decoding them. The phone's ack releases the next frame, so one is in flight end to end. The desktop keeps the newest frame that arrived meanwhile: a page that stops painting never sends another.
+- `BrowserHumanControl` holds one controller per tab, keyed by principal and app install so control survives a new session. Only the controller can send input, hand back, or start a stream on a held tab.
+- While held, the broker refuses every command that names the tab, reads included, before host selection. `browser_list_tabs` keeps the entry with `humanControl: true` and withholds its URL and title.
+- All `browser.live.*` and `browser.host.live.*` messages need `workspace.write`. A read-only principal can't watch either: frames show authenticated pages.
+- The hand-back note says which tab and what ended. It goes into the chat and into the agent's next browser result (`userNotes` and the last text part), never into a prompt.
+
+How control ends:
+
+| Event                                          | Result                                                                                               |
+| ---------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| Hand back                                      | Secret fields live view filled are cleared; the page stays; history is cleared if anything was typed |
+| Phone has no stream for 5 minutes              | Discard, then release                                                                                |
+| Setting switched off                           | Streams end at once; discard, then release                                                           |
+| Daemon restart, or desktop lost its connection | The daemon has no lock left. The desktop stays locked, discards, then releases by itself             |
+| Tab closed, or its window reloaded             | The document is gone; control ends                                                                   |
+| A discard fails                                | The lock stays and is retried every 30 seconds                                                       |
 
 ### Desktop (`packages/desktop`)
 
-- Live view lives in `packages/desktop/src/features/browser-automation/` beside `ipc.ts`. It reuses the per-tab `webContents.debugger` attachment (`ipc.ts:152-155`) and must share the tab's `CdpSessionQueue` (`cdp-session-queue.ts`) for input commands so they never interleave with a stray agent command.
-- Start: `Page.startScreencast { format: "jpeg", quality, maxWidth, maxHeight, everyNthFrame }`. Listen for `Page.screencastFrame` on the existing `debugger.on("message")` listener pattern (`ipc.ts:293`). Background tabs may not paint; wrap the stream in the existing `withFrameProduction` (`service.ts:39`, `ipc.ts:137`) **(unverified that it covers a long-running stream)**.
-- Tap: map phone coordinates to CSS pixels with frame metadata (`x / imageWidth * deviceWidth`, `y / imageHeight * deviceHeight + offsetTop`), then `dispatchTrustedClick` (`trusted-input.ts:38`). After the click, read `document.activeElement` `type`, `autocomplete`, `isContentEditable` and return them as `focus`.
-- Scroll: `Input.dispatchMouseEvent { type: "mouseWheel" }` at the mapped point.
-- Keys: reuse the isolated `sendInputEvent` path (`service.ts:40`).
-- Text: use `contents.insertText` (`ipc.ts:147`), **not** CDP `Input.insertText`. `service.ts:41-42` documents that CDP commits into whichever element has focus in the Paseo window.
-- The Electron renderer forwards `browser.host.live.*` the same way `packages/app/src/desktop/browser/automation/handler.ts:47-72` forwards `browser.automation.execute.request` over the `paseo:browser:execute-automation-command` IPC (`ipc.ts:454`). New IPC channels: `paseo:browser:live-start`, `-stop`, `-input`, plus a frame event channel to the renderer.
+Electron main enforces the lock too (`features/browser-automation/human-control.ts`). It alone knows when an agent command really finished, and every daemon connected to the desktop goes through it.
+
+- **Focus and origins.** `webContents.focusedFrame` names the frame and main reads its committed origin and the top frame's. Page script supplies neither. The guest preload describes the focused `input` or `textarea` in that frame and mints a `targetId` bound to the element and its type, name, id and autocomplete.
+- **Text.** Main checks both origins and the focused frame, then sends the value to that one frame. The guest preload checks the field and calls `webFrame.insertText` on its local root in the same synchronous step, with a guard against page handlers that move focus mid-commit.
+  - Don't use `webContents.insertText`. It runs `webFrame.insertText` in the main frame, whose widget has no input controller while a cross-origin iframe has focus: the renderer crashed 3 of 3 times (exit code 11) and the promise never settled.
+  - Don't use CDP `Input.insertText`. It commits into whichever element has focus in the Paseo window.
+  - An unanswered insert fails closed: error on the phone, lock kept, no resend. The request carries a deadline, so a late arrival types nothing.
+- **The preload** is the keyboard preload every guest frame already runs. It adds one IPC listener and sets nothing up until main sends to it, which happens only during control. It exposes nothing to page script.
+- **Tap and scroll.** Screencast coordinates are device-independent pixels; divide by the zoom factor for CDP. A tab that isn't on screen is parked at 1x1, so root-session mouse input never hit-tests into its out-of-process iframes. Route through the iframe's auto-attached CDP session (`frame-sessions.ts`). `DOM.getNodeForLocation` takes document coordinates, while quads and input take viewport coordinates.
+- **Keys** use the isolated `sendInputEvent`. Enter needs a `char` event to submit a form. Keys don't reach another process's iframe, so they are refused there and the user taps the button.
+- **Discard.** Setting a value keeps the undo stack: `execCommand("undo")` and `"redo"` brought back cleared usernames and passwords. A release the user didn't ask for replaces each still-open document live view typed into (about:blank, then a GET of the URL) and clears history, which also drops saved form state. It never calls `reload()`, which submits a POST again. Hand-back only clears secrets, and rebuilds those inputs' inner editors by toggling their type, which removes their undo steps.
+- **Dialogs** are answered during control, because one blocks all further input: `alert` and `beforeunload` accepted, `confirm` and `prompt` dismissed.
+- Read `webContents.debugger` before the tab is destroyed. The getter throws afterwards, and a throw in the `destroyed` listener blocks Electron main behind an error dialog.
 
 ### App (`packages/app`)
 
 - Native pane: replace the "unavailable" body in `pane/index.tsx` with a live view when `server_info.features.browserLiveView` is true; otherwise keep the current text plus "Update your host". `index.web.tsx` and `index.electron.tsx` are unchanged.
-- `LiveViewSurface`: an `Image` fed from the latest frame (decode JPEG bytes to a base64 data URI, or an `expo-image` source; pick whichever avoids flicker at 5 fps). Tap and pan gestures map to image coordinates and send `input`. Ack each frame after it renders.
+- `LiveViewSurface`: an `Image` fed from the latest frame as a base64 data URI in `expo-image`, which swaps without a flash. While controlling, tap and pan gestures map to screen coordinates and send input. Ack each frame after it renders.
 - Stream only while the route is focused and `AppState` is `active`. Stop on blur; restart on focus.
-- `SecretTextInput`: a native `TextInput` shown above the keyboard when `focus.editable` is true. Hints from `focus`:
-  - `type=password` or `autocomplete=current-password|new-password` → iOS `textContentType="password"`, Android `autoComplete="password"`, `secureTextEntry`.
-  - `autocomplete=one-time-code` or numeric short field → iOS `oneTimeCode`, Android `sms-otp`.
-  - `autocomplete=username|email` or `type=email` → `username` / `emailAddress`.
-  - Otherwise plain text.
-    Send on submit or on autofill change, then clear local state. Do not bind the value to any store, form model, or persisted draft.
-- Header shows "You are controlling this tab" and a "Hand back to agent" button.
+- `SecretTextInput`: a native `TextInput` shown for a focused field, with hints from its kind: `password`, `one-time-code`, `username`, `email`. A native input gets no domain matching from a password manager, so the origin it types into, and the top-level origin when that differs, sit right above it.
+- Text is sent with Send, then cleared. It is in no store, form model, or draft. The input is keyed by target, so text can't follow focus to another field.
+- The binding changes only with the user's own input, never by itself: a fill can arrive long after the field was shown.
+- The control panel and its input stay mounted while the stream is stopped.
 
-### Notifications
+### Notifications (phase 4)
 
 Add a `browser_live` payload to `notification-open` (`docs/notifications.md`; `packages/app/src/notification-open/model.ts`): `{ serverId, agentId, browserId, reason: "browser_login" }`. Open it with `navigateToAgent` and then the browser tab for `browserId`, so a moved agent still resolves. Push eligibility stays a daemon concern.
 
 ## Security and secrets
 
-- Authority: `workspace.write`, same as agent browser tools and terminals. Anyone who can type into a terminal can already drive the tab.
+- Authority: `workspace.write`, same as agent browser tools and terminals.
 - `insert_text.text` is a secret:
-  - Never logged at any layer. Daemon, desktop main, and renderer log only `{ streamId, inputKind }`. Check whether the daemon logs inbound message bodies anywhere (debug or trace level) and redact `browser.live.input.request` there **(unverified)**.
-  - Not persisted: not in agent timelines, not in `daemon.log`, not in app storage or crash reports.
-  - The hand-back note to the agent says which tab and that input happened, never values or field names that reveal them.
-- Frames show authenticated pages. Keep them in memory only; no disk cache on phone or daemon. Relay traffic stays E2E encrypted (`SECURITY.md` "Relay threat model").
-- Only one live viewer per tab. A second `start` from another session fails with `browser_human_control` unless it comes from the lock owner.
-- Agents keep the session cookies after hand-back. That is the point of the feature; state it in the UI ("The agent can use this login").
+  - No layer logs it. The daemon's only inbound payload trace was `payloadBytes`, which would leak a password's length, so input messages omit it. Validation errors don't quote values. Client traces carry types and ids only.
+  - The desktop log's renderer-console spy wrote every guest page's console to `main.log`. Tabs live view typed into are left out, and `browser_logs` collects nothing while a tab is held.
+  - It is in no timeline, note, error, metric, or persisted state. Desktop and app start no crash reporter.
+- Frames are in memory only. Relay traffic stays E2E encrypted (`SECURITY.md`).
+- Agents keep the session after hand-back. The UI says so, and that unsubmitted input is discarded after 5 minutes away.
+
+A per-tab lock can't cover these:
+
+- The browser profile is shared. An agent can open the same site in another tab and use the new cookies while the user still controls this one. A same-origin tab can also reach this one through `window.opener`, `BroadcastChannel`, or storage.
+- Scripts an agent put in the page before Take control keep running and see what is typed.
+- What the page copies itself survives a discard: storage, cookies, its server, the URL of a GET form.
+- Hand-back leaves the page open. Text that wasn't secret, and any copy the page made, stays readable.
+- Popups open as separate windows or tabs, with no lock and no view on the phone.
+- Local processes with the daemon's owner credential, the desktop's debugging port, or DevTools bypass browser tools.
+- Another daemon on the same desktop is refused by Electron main for page commands. Resize and close are handled in the renderer and only by this daemon's lock.
+- The person at the desktop can still use the tab (open question 4).
 
 ## Compatibility
 
 - All new message types and fields are additive. Old apps never send `browser.live.*`; old daemons reject them as unknown, and the app does not send them without `features.browserLiveView`.
 - Old desktop hosts register without `liveView`; the daemon returns `browser_unsupported` on start ("Update Paseo desktop").
+- A phone that can control, with a watch-only daemon, sees "Update Paseo on this host to take control". With a watch-only desktop, the start response has no `control` and the phone names the desktop. Neither sends a control RPC.
 - New binary opcode is only sent to sessions that opened a stream, so old clients never see it.
 - Wire schemas stay pure: no `.transform()` on the new schemas (`docs/protocol-validation.md`).
 
@@ -119,23 +147,23 @@ Add a `browser_live` payload to `notification-open` (`docs/notifications.md`; `p
 
 1. **Protocol, daemon, desktop streaming.** Schemas, binary opcode, broker registry, desktop screencast with ack flow control, `features.browserLiveView`, permissions. No UI. Verified with the CLI or an SDK test client.
 2. **Mobile view-only.** Native pane, visibility-gated streaming, frame acks, update-host message.
-3. **Input and human control.** Tap/scroll/key/`insert_text`, focus hints, `SecretTextInput`, broker lock and `browser_human_control`, hand-back note to the agent.
+3. **Input and human control.** Explicit Take control, tap/scroll/key/`insert_text`, origin-bound text, `SecretTextInput`, the lock in daemon and desktop, `browser_human_control`, hand-back note.
 4. **Login request and deep link.** `browser_request_human` tool, attention notification, `notification-open` route.
 
 ## Test plan
 
-- `rpc-schemas.test.ts`: new schemas, input union, old messages still parse.
-- Binary codec test beside `binary-frames/terminal.test.ts`: round-trip metadata and payload.
-- `broker.test.ts`: lock blocks `click`/`type`/`snapshot` on the held tab only; `list_tabs` reports it; hand-back and host disconnect release it; second viewer rejected.
-- `ipc.test.ts`: fake debugger receives `Page.startScreencast`; ack forwarded only after phone ack; coordinate mapping with `offsetTop` and scale; `insertText` goes to `contents.insertText`, not CDP.
-- Secret test: drive an `insert_text` through session and desktop handler with a spy logger; assert the value appears in no log call.
-- Manual QA (`docs/qa.md`): iOS and Android, LAN and relay, sign into a real site with 1Password password + TOTP autofill; background mid-stream; kill relay; agent calls a browser tool during control and gets the retryable error.
+- Schemas, binary codec, and a secret in rejected input: `messages.browser-automation.test.ts`, `binary-frames/browser-live.test.ts`.
+- Lock, lifecycle table, notes: `browser-tools/broker.test.ts`.
+- A sentinel through phone client, WebSocket, session, broker, and host, checked against logs, traces, and replies: `websocket-server.browser-tools.test.ts`.
+- Binding, coordinates, discard, fail-closed inserts: `browser-automation/ipc.test.ts`. The preload: `browser-keyboard/guest-preload.test.ts`.
+- Real Electron, for what fakes can't reproduce (cross-origin iframe input, undo after discard): `e2e/browser-live-input.electron.mjs`, run by `test:e2e:browser-tabs`.
+- Manual QA (`docs/qa.md`): iOS and Android, LAN and relay, sign in with password and one-time code from a password manager **(unverified: 1Password isn't available in simulators)**, background mid-fill, then grep daemon and desktop logs for the dummy values.
 
 ## Open questions
 
-1. Reject or pause agent calls while the human holds the tab? Recommendation: reject with retryable `browser_human_control`. Pausing holds MCP calls up to the tool timeout and hides state from the agent.
-2. Lock lifetime when the phone disconnects without hand-back: release immediately, after N minutes, or never until hand-back?
-3. Should the agent be woken (prompted) on hand-back, or only see the note on its next tool call?
+1. Reject or pause agent calls while the human holds the tab? Decided: reject with a retryable `browser_human_control`.
+2. Lock lifetime when the phone disconnects without hand-back? Decided: 5 minutes, then discard and release.
+3. Should the agent be woken on hand-back? Decided: no. It gets a note on its next browser call.
 4. Should a desktop user's local clicks in the same tab also count as human control? Not covered here.
 5. Default caps: 5 fps, quality 60, `maxWidth` = phone pixel width capped at 1280. Measure over relay before fixing them.
-6. Does `withFrameProduction` keep a hidden guest painting for minutes, or does the desktop need to bring the tab forward while streaming?
+6. Does a hidden guest keep painting for minutes? Decided in phase 1: a frame subscription and unthrottled window while streaming (`frame-production.ts`).
