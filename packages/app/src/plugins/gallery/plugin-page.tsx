@@ -57,6 +57,7 @@ import {
   usePluginListing,
   usePluginUpdates,
 } from "./queries";
+import { useManualPluginUpdateScreen } from "@/plugins/updates/manual-update-screens";
 import { pluginErrorText } from "./error-text";
 
 /** Which plugin the page is for: one installed on the host, or one listed in the directory. */
@@ -407,6 +408,7 @@ export function PluginPage({
 }) {
   const { t } = useTranslation();
   const compact = useIsCompactFormFactor();
+  useManualPluginUpdateScreen(serverId);
   const { plugin, listingId, listing, detail, loading } = useResolvedPlugin(serverId, subject);
   const installOperation = usePluginOperation(serverId, listingId);
   const model = usePluginPageModel({

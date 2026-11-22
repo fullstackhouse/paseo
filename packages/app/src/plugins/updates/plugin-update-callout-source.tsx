@@ -10,6 +10,7 @@ import {
 } from "@/plugins/updates/resolve-plugin-update-callout";
 import { useHostFeature } from "@/runtime/host-features";
 import { useHostRuntimeClient, useHostRuntimeIsConnected, useHosts } from "@/runtime/host-runtime";
+import { useIsManualPluginUpdateScreenOpen } from "@/plugins/updates/manual-update-screens";
 
 const CHECK_INTERVAL_MS = 30 * 60 * 1000;
 
@@ -40,6 +41,7 @@ function HostPluginUpdateCallout({
   const client = useHostRuntimeClient(serverId);
   const connected = useHostRuntimeIsConnected(serverId);
   const supported = useHostFeature(serverId, "pluginSourceUpdates");
+  const manualScreenOpen = useIsManualPluginUpdateScreenOpen(serverId);
 
   // Clients without daemon.manage get a permission error here; that host shows no callout.
   const preview = useFetchQuery({
@@ -108,7 +110,7 @@ function HostPluginUpdateCallout({
   const attempted = useRef(new Set<string>());
 
   useEffect(() => {
-    if (!client || !connected || !supported || isApplying) return;
+    if (!client || !connected || !supported || isApplying || manualScreenOpen) return;
     const proposals = selectPluginUpdateProposals(preview.data).filter(
       (proposal) => !attempted.current.has(JSON.stringify(proposal)),
     );
@@ -117,7 +119,7 @@ function HostPluginUpdateCallout({
     // new target/installation or an explicit retry should attempt it again.
     for (const proposal of proposals) attempted.current.add(JSON.stringify(proposal));
     applyUpdates(proposals);
-  }, [client, connected, supported, isApplying, preview.data, applyUpdates]);
+  }, [client, connected, supported, isApplying, manualScreenOpen, preview.data, applyUpdates]);
 
   const applyError =
     selectPluginUpdateProposals(preview.data)

@@ -19,10 +19,10 @@ test.describe("Agent timeline sync retry", () => {
     const gate = await installDaemonWebSocketGate(page);
     const agent = await seedLongMockAgentTimeline({ turns: 2 });
     try {
-      gate.holdNextClientRequest("clear_agent_attention");
+      // FSH: viewing a finished agent keeps it Ready to review, so opening sends no
+      // clear_agent_attention to wait on.
       await openAgentTimeline(page, agent);
       await expectTimelinePromptVisible(page, agent.newestPrompt);
-      await gate.waitForHeldClientRequest();
 
       gate.failTimelineResponses(agent.agentId);
       await disconnectViewedTimeline(page, gate);

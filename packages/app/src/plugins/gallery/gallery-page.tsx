@@ -10,6 +10,7 @@ import { SegmentedControl } from "@/components/ui/segmented-control";
 import { useHostFeature } from "@/runtime/host-features";
 import { useHostRuntimeIsConnected } from "@/runtime/host-runtime";
 import { useInstalledPlugins } from "@/plugins/registry";
+import { useManualPluginUpdateScreen } from "@/plugins/updates/manual-update-screens";
 import { BrowseTab } from "./browse-tab";
 import { InstallPluginSheet, type InstallTarget } from "./install-sheet";
 import { InstalledTab } from "./installed-tab";
@@ -29,6 +30,7 @@ export function PluginGalleryPage({ serverId }: { serverId: string }) {
   const { t } = useTranslation();
   const connected = useHostRuntimeIsConnected(serverId);
   const supported = useHostFeature(serverId, "pluginManagement");
+  useManualPluginUpdateScreen(serverId);
   useInstalledPlugins();
   const plugins = useLivePluginList(serverId);
   const directory = usePluginDirectory(serverId);
