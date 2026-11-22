@@ -39,15 +39,18 @@ type LiveViewTab = Pick<TabContents, "invalidate" | "isDestroyed"> & {
 export type BrowserLiveViewEndReason = "stopped" | "failed" | "gone";
 
 /**
- * One CDP screencast of a tab. Chromium sends the next Page.screencastFrame only after
- * Page.screencastFrameAck, and this stream sends that ack only after the viewer acked the
- * frame, so exactly one frame is in flight from tab to viewer.
+ * One CDP screencast of a tab. Chromium keeps up to two Page.screencastFrame unacked, so
+ * this stream forwards one frame at a time: a frame that arrives while the viewer still
+ * holds one, or while the frame-rate delay runs, is dropped and acked with the next ack.
+ * Exactly one frame is in flight from tab to viewer.
  */
 export class BrowserLiveViewStream {
   private nextFrameSeq = 0;
   private unackedFrame: { frameSeq: number; sessionId: number; receivedAt: number } | null = null;
   private minFrameIntervalMs = 1000 / DEFAULT_MAX_FPS;
   private ackTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Screencast sessions of dropped frames, acked together with the forwarded one. */
+  private droppedSessionIds: number[] = [];
   private stopped = false;
   private readonly unsubscribers: Array<() => void> = [];
 
@@ -108,9 +111,11 @@ export class BrowserLiveViewStream {
     const send = () => {
       this.ackTimer = null;
       if (this.stopped) return;
-      void this.params.tab
-        .sendDebugCommand("Page.screencastFrameAck", { sessionId: frame.sessionId })
-        .catch(() => {});
+      for (const sessionId of [frame.sessionId, ...this.droppedSessionIds.splice(0)]) {
+        void this.params.tab
+          .sendDebugCommand("Page.screencastFrameAck", { sessionId })
+          .catch(() => {});
+      }
     };
     const wait = frame.receivedAt + this.minFrameIntervalMs - Date.now();
     if (wait <= 0) send();
@@ -135,6 +140,10 @@ export class BrowserLiveViewStream {
     const sessionId = params.sessionId;
     const data = params.data;
     if (typeof sessionId !== "number" || typeof data !== "string") {
+      return;
+    }
+    if (this.unackedFrame || this.ackTimer) {
+      this.droppedSessionIds.push(sessionId);
       return;
     }
     const frameSeq = this.nextFrameSeq++;

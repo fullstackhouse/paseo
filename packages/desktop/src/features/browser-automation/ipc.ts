@@ -53,6 +53,8 @@ interface HostWebContents {
 interface LiveViewHostWebContents extends HostWebContents {
   isDestroyed(): boolean;
   send(channel: string, payload: unknown): void;
+  getBackgroundThrottling(): boolean;
+  setBackgroundThrottling(allowed: boolean): void;
 }
 
 export const BROWSER_LIVE_FRAME_EVENT = "paseo:event:browser-live-frame";
@@ -515,6 +517,7 @@ export class BrowserLiveViewStreams {
   private readonly streamIdsByHost = new Map<number, Set<string>>();
   // CDP allows one screencast per debugger session, so one stream per tab.
   private readonly streamIdByContentsId = new Map<number, string>();
+  private readonly hostThrottlingBefore = new Map<number, boolean>();
 
   public constructor(
     private readonly getTabContents: (
@@ -571,6 +574,7 @@ export class BrowserLiveViewStreams {
         if (this.streams.get(request.streamId) !== stream) return;
         this.streams.delete(request.streamId);
         hostStreamIds.delete(request.streamId);
+        if (hostStreamIds.size === 0) this.releaseHostWindow(hostContents);
         this.streamIdByContentsId.delete(contentsId);
         // Nobody asked for this end; the daemon still thinks the viewer is watching.
         if (reason === "gone" && !hostContents.isDestroyed()) {
@@ -586,6 +590,7 @@ export class BrowserLiveViewStreams {
       },
     });
     this.streams.set(request.streamId, stream);
+    if (hostStreamIds.size === 0) this.holdHostWindow(hostContents);
     hostStreamIds.add(request.streamId);
     this.streamIdByContentsId.set(contentsId, request.streamId);
     try {
@@ -624,6 +629,24 @@ export class BrowserLiveViewStreams {
   public ack(rawAck: unknown): void {
     const parsed = BrowserHostLiveFrameAckSchema.safeParse(rawAck);
     if (parsed.success) this.streams.get(parsed.data.streamId)?.ack(parsed.data.frameSeq);
+  }
+
+  /**
+   * Guests composite inside their window. A hidden or occluded Paseo window stops painting
+   * its guests too, and the phone is usually used away from the desk, so keep the window
+   * rendering while it streams.
+   */
+  private holdHostWindow(hostContents: LiveViewHostWebContents): void {
+    this.hostThrottlingBefore.set(hostContents.id, hostContents.getBackgroundThrottling());
+    hostContents.setBackgroundThrottling(false);
+  }
+
+  private releaseHostWindow(hostContents: LiveViewHostWebContents): void {
+    const before = this.hostThrottlingBefore.get(hostContents.id);
+    this.hostThrottlingBefore.delete(hostContents.id);
+    if (before !== undefined && !hostContents.isDestroyed()) {
+      hostContents.setBackgroundThrottling(before);
+    }
   }
 
   private streamIdsOfHost(hostContents: LiveViewHostWebContents): Set<string> {

@@ -828,6 +828,15 @@ describe("pixel capture frame production", () => {
 
 class FakeLiveHostWindow {
   public readonly sent: Array<{ channel: string; payload: unknown }> = [];
+  public backgroundThrottling = true;
+
+  public getBackgroundThrottling(): boolean {
+    return this.backgroundThrottling;
+  }
+
+  public setBackgroundThrottling(allowed: boolean): void {
+    this.backgroundThrottling = allowed;
+  }
   private readonly destroyedListeners: Array<() => void> = [];
   public destroyed = false;
 
@@ -960,6 +969,46 @@ describe("browser live view screencast", () => {
 
     screencastFrame(contents, 8);
     expect(host.sent.at(-1)?.payload).toMatchObject({ frameSeq: 1 });
+  });
+
+  test("keeps the hosting window rendering while any of its streams runs", async () => {
+    const { host, streams } = createLiveViews();
+    await streams.start(host, liveStartRequest());
+    expect(host.backgroundThrottling).toBe(false);
+
+    await streams.stop({
+      type: "browser.host.live.stop.request",
+      requestId: "stop-1",
+      streamId: "stream-1",
+    });
+    expect(host.backgroundThrottling).toBe(true);
+  });
+
+  test("forwards one frame at a time even though Chromium sends two ahead", async () => {
+    vi.useFakeTimers();
+    try {
+      const { contents, host, streams } = createLiveViews();
+      await streams.start(host, liveStartRequest());
+      const forwarded = () =>
+        host.sent.filter((event) => event.channel === BROWSER_LIVE_FRAME_EVENT).length;
+
+      screencastFrame(contents, 1);
+      screencastFrame(contents, 2);
+      expect(forwarded()).toBe(1);
+
+      streams.ack({ type: "browser.host.live.frame_ack", streamId: "stream-1", frameSeq: 0 });
+      // A frame arriving during the frame-rate delay is dropped too.
+      screencastFrame(contents, 3);
+      expect(forwarded()).toBe(1);
+      await vi.advanceTimersByTimeAsync(250);
+      expect(screencastAcks(contents)).toEqual([1, 2, 3]);
+
+      screencastFrame(contents, 4);
+      expect(forwarded()).toBe(2);
+      expect(host.sent.at(-1)?.payload).toMatchObject({ frameSeq: 1 });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   test("delays the CDP ack so frames arrive no faster than maxFps", async () => {
