@@ -8,6 +8,7 @@ import type {
   BranchSuggestionsRequest,
   CheckoutCommitsListRequest,
   CheckoutCommitFileDiffRequest,
+  CheckoutCreateInitialBranchRequest,
   CheckoutDiffImageGetRequest,
   CheckoutRefreshRequest,
   CheckoutRenameBranchRequest,
@@ -35,6 +36,7 @@ import type {
   WorkspaceGitSnapshotOptions,
 } from "../../workspace-git-service.js";
 import { assertSafeGitRef } from "../../worktree-session.js";
+import { createInitialBranch, planInitialBranch } from "../../../utils/initial-branch.js";
 import type { GitMutationService } from "../git-mutation/git-mutation-service.js";
 import type {
   ForgeAuthState,
@@ -721,6 +723,48 @@ export class CheckoutSession {
           currentBranch: null,
           error: toCheckoutError(error),
           requestId,
+        },
+      });
+    }
+  }
+
+  async handleCheckoutCreateInitialBranchRequest(
+    msg: CheckoutCreateInitialBranchRequest,
+  ): Promise<void> {
+    const { cwd, requestId } = msg;
+    try {
+      const repoRoot = await this.workspaceGitService.resolveRepoRoot(cwd);
+      const result = msg.dryRun
+        ? await planInitialBranch(repoRoot)
+        : await createInitialBranch(repoRoot);
+      if (!msg.dryRun) {
+        await this.gitMutation.notifyGitMutation(repoRoot, "create-branch", {
+          invalidateForge: true,
+        });
+        this.host.handleWorkspaceGitBranchSnapshot(repoRoot, result.branch);
+        await this.host.emitWorkspaceUpdateForCwd(repoRoot);
+      }
+      this.host.emit({
+        type: "checkout.create_initial_branch.response",
+        payload: {
+          requestId,
+          cwd,
+          success: true,
+          branch: result.branch,
+          pushedTo: result.pushTo,
+          error: null,
+        },
+      });
+    } catch (error) {
+      this.host.emit({
+        type: "checkout.create_initial_branch.response",
+        payload: {
+          requestId,
+          cwd,
+          success: false,
+          branch: null,
+          pushedTo: null,
+          error: toCheckoutError(error),
         },
       });
     }

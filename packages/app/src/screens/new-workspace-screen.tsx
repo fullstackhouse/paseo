@@ -63,6 +63,17 @@ import { useFormPreferences } from "@/hooks/use-form-preferences";
 import type { CreateAgentInitialValues } from "@/hooks/use-agent-form-state";
 import { toErrorMessage } from "@/utils/error-messages";
 import {
+  REPOSITORY_HAS_NO_COMMITS,
+  RepositoryHasNoCommitsError,
+  resolveEmptyRepository,
+  type EmptyRepositoryChoice,
+  type EmptyRepositoryPrompt,
+} from "./new-workspace/initial-branch";
+import {
+  InitialBranchSheet,
+  type InitialBranchSheetRequest,
+} from "./new-workspace/initial-branch-sheet";
+import {
   getHostProjectId,
   getWorktreeSupportForHostProject,
   hostProjectFromRoute,
@@ -404,6 +415,9 @@ async function createMultiplicityWorkspace(input: {
     ...(firstAgentContext ? { firstAgentContext } : {}),
     ...(Object.keys(input.metadata).length > 0 ? { metadata: { ...input.metadata } } : {}),
   });
+  if (payload.errorCode === REPOSITORY_HAS_NO_COMMITS) {
+    throw new RepositoryHasNoCommitsError(payload.error ?? input.createFailedMessage);
+  }
   if (payload.error || !payload.workspace) {
     throw new Error(payload.error ?? input.createFailedMessage);
   }
@@ -957,6 +971,22 @@ export function NewWorkspaceScreen({
   // COMPAT(workspaceMultiplicity): added in v0.1.97, drop the gate when floor >= v0.1.97
   const supportsWorkspaceMultiplicity = useHostFeature(selectedServerId, "workspaceMultiplicity");
   const supportsForgeSearch = useHostFeature(selectedServerId, "forgeSearch");
+  const supportsInitialBranch = useHostFeature(selectedServerId, "checkoutCreateInitialBranch");
+  const [emptyRepositoryRequest, setEmptyRepositoryRequest] =
+    useState<InitialBranchSheetRequest | null>(null);
+  const askEmptyRepository = useCallback(
+    (prompt: EmptyRepositoryPrompt) =>
+      new Promise<EmptyRepositoryChoice>((resolve) => {
+        setEmptyRepositoryRequest({
+          ...prompt,
+          resolve: (choice) => {
+            setEmptyRepositoryRequest(null);
+            resolve(choice);
+          },
+        });
+      }),
+    [],
+  );
   const [creationIdentity] = useState(() => ({
     draftId: draftId ?? generateDraftId(),
     worktreeSlug: createNameId(),
@@ -1362,25 +1392,51 @@ export function NewWorkspaceScreen({
             checkoutRequestOrExplain(() => setup.checkoutRequestFor(item), t),
           )
         : undefined;
-      const normalizedWorkspace = await createMultiplicityWorkspace({
-        idempotencyKey: creationIdentity.draftId,
-        worktreeSlug: creationIdentity.worktreeSlug,
-        client: connectedClient,
-        isolation: createsWorktree ? "worktree" : "local",
-        project: selectedProject,
-        sourceDirectory: workingDirectory,
-        checkoutRequest,
-        branchName: setup.getSnapshot().branch,
-        metadata: setup.getSnapshot().metadata,
-        withInitialAgent: input.withInitialAgent,
-        prompt: input.prompt,
-        attachments: input.attachments,
-        agent: input.agent,
-        onEvent: input.onEvent,
-        mergeWorkspaces,
-        serverId: selectedServerId,
-        createFailedMessage: t("newWorkspace.errors.createWorktreeFailed"),
-      });
+      const sourceDirectory = workingDirectory;
+      const create = (isolation: "local" | "worktree") =>
+        createMultiplicityWorkspace({
+          // The worktree attempt is a different request, so the local fallback needs its own key.
+          idempotencyKey:
+            isolation === "local" && createsWorktree
+              ? `${creationIdentity.draftId}:local`
+              : creationIdentity.draftId,
+          worktreeSlug: creationIdentity.worktreeSlug,
+          client: connectedClient,
+          isolation,
+          project: selectedProject,
+          sourceDirectory,
+          checkoutRequest: isolation === "worktree" ? checkoutRequest : undefined,
+          branchName: setup.getSnapshot().branch,
+          metadata: setup.getSnapshot().metadata,
+          withInitialAgent: input.withInitialAgent,
+          prompt: input.prompt,
+          attachments: input.attachments,
+          agent: input.agent,
+          onEvent: input.onEvent,
+          mergeWorkspaces,
+          serverId: selectedServerId,
+          createFailedMessage: t("newWorkspace.errors.createWorktreeFailed"),
+        });
+      const isolation = createsWorktree ? "worktree" : "local";
+      let normalizedWorkspace: WorkspaceCreationResult;
+      try {
+        normalizedWorkspace = await create(isolation);
+      } catch (error) {
+        if (!(error instanceof RepositoryHasNoCommitsError) || !supportsInitialBranch) {
+          throw error;
+        }
+        const emptyRepositoryChoice = await resolveEmptyRepository({
+          client: connectedClient,
+          cwd: sourceDirectory,
+          ask: askEmptyRepository,
+        });
+        if (emptyRepositoryChoice === "cancelled") {
+          throw error;
+        }
+        normalizedWorkspace = await create(
+          emptyRepositoryChoice === "local" ? "local" : "worktree",
+        );
+      }
       setCreationResult(normalizedWorkspace);
       return normalizedWorkspace;
     },
@@ -1394,6 +1450,8 @@ export function NewWorkspaceScreen({
       selectedServerId,
       selectedSourceDirectory,
       setup,
+      askEmptyRepository,
+      supportsInitialBranch,
       supportsWorkspaceMultiplicity,
       t,
       withConnectedClient,
@@ -1771,6 +1829,7 @@ export function NewWorkspaceScreen({
         {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
       </NewWorkspaceLayout>
       {importSession.sheet}
+      <InitialBranchSheet request={emptyRepositoryRequest} />
     </FileDropZone>
   );
 }

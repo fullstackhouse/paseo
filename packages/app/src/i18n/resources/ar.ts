@@ -1511,6 +1511,18 @@ export const ar: TranslationResources = {
       branchInWorktree:
         "الفرع {{branch}} مفعّل في {{path}}. اختر شجرة العمل هذه من شجرة عمل موجودة، أو أنشئ فرعًا جديدًا منه.",
     },
+    initialBranch: {
+      title: "لا يحتوي هذا المستودع على أي commit بعد",
+      message: "يبدأ worktree من فرع، ولا يحتوي هذا المستودع على أي فرع بعد.",
+      createDetail: "أنشئ {{branch}} بأول commit فارغ، ثم ابدأ worktree منه.",
+      createDetailWithPush:
+        "أنشئ {{branch}} بأول commit فارغ وادفعه إلى {{remote}}، ثم ابدأ worktree منه.",
+      localDetail:
+        "أو ابدأ في النسخة المحلية. لا تحتاج إلى commit، وسيذهب أول commit لك إلى {{branch}}.",
+      create: "إنشاء {{branch}}",
+      creating: "جارٍ إنشاء {{branch}}…",
+      useLocalCheckout: "استخدام النسخة المحلية",
+    },
     tooltips: {
       project: "Choose the project",
       host: "Choose the host",

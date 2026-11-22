@@ -1521,6 +1521,19 @@ export const en = {
       branchInWorktree:
         "{{branch}} is checked out in {{path}}. Choose that worktree under Existing worktree, or branch off it.",
     },
+    initialBranch: {
+      title: "This repository has no commits yet",
+      message: "A worktree starts from a branch, and this repository doesn't have one yet.",
+      createDetail:
+        "Create {{branch}} with an empty first commit, then start the worktree from it.",
+      createDetailWithPush:
+        "Create {{branch}} with an empty first commit and push it to {{remote}}, then start the worktree from it.",
+      localDetail:
+        "Or start in the local checkout. It needs no commit, and your first commit lands on {{branch}}.",
+      create: "Create {{branch}}",
+      creating: "Creating {{branch}}…",
+      useLocalCheckout: "Use local checkout",
+    },
     tooltips: {
       project: "Choose the project",
       host: "Choose the host",

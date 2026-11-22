@@ -1541,6 +1541,19 @@ export const fr: TranslationResources = {
       branchInWorktree:
         "{{branch}} est extraite dans {{path}}. Choisissez ce worktree dans Worktree existant, ou créez une branche à partir d’elle.",
     },
+    initialBranch: {
+      title: "Ce dépôt n'a encore aucun commit",
+      message: "Un worktree part d'une branche, et ce dépôt n'en a pas encore.",
+      createDetail:
+        "Créez {{branch}} avec un premier commit vide, puis démarrez le worktree à partir de celle-ci.",
+      createDetailWithPush:
+        "Créez {{branch}} avec un premier commit vide, poussez-la vers {{remote}}, puis démarrez le worktree à partir de celle-ci.",
+      localDetail:
+        "Ou démarrez dans le checkout local. Aucun commit n'est nécessaire, et votre premier commit ira sur {{branch}}.",
+      create: "Créer {{branch}}",
+      creating: "Création de {{branch}}…",
+      useLocalCheckout: "Utiliser le checkout local",
+    },
     tooltips: {
       project: "Choisir le projet",
       host: "Choisir l’hôte",
