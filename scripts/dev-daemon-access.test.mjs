@@ -17,7 +17,7 @@ function resolve(env, config = {}) {
   return resolveDevDaemonAccess({ env, config, lanAddresses: ["192.0.2.10"] });
 }
 
-test("workspace services: loopback listen and exactly this workspace's origins", () => {
+test("workspace services: loopback listen and only the workspace's proxy origins", () => {
   const access = resolve({
     PASEO_LISTEN: "127.0.0.1:6000",
     PASEO_URL: "http://daemon--fix--paseo.localhost:6767",
@@ -33,13 +33,8 @@ test("workspace services: loopback listen and exactly this workspace's origins",
   assert.deepEqual(access.lanUrls, []);
   assert.deepEqual(
     new Set(access.corsOrigins),
+    // Peer ports change whenever a peer restarts, so they are not admitted.
     new Set([
-      "http://localhost:6000",
-      "http://127.0.0.1:6000",
-      "http://localhost:6001",
-      "http://127.0.0.1:6001",
-      "http://localhost:6002",
-      "http://127.0.0.1:6002",
       "http://daemon--fix--paseo.localhost:6767",
       "http://app--fix--paseo.localhost:6767",
       "http://desktop--fix--paseo.localhost:6767",
@@ -113,14 +108,15 @@ test("dev-home.sh exports the resolved access and corrects config.json", () => {
     PASEO_HOME: home,
     PASEO_DEV_MANAGED_HOME: "1",
     PASEO_LISTEN: "127.0.0.1:7000",
-    PASEO_SERVICE_APP_PORT: "7001",
+    PASEO_SERVICE_APP_URL: "http://app--x--y.localhost:6767",
+    EXPO_PORT: "7001",
   };
   const [listen, cors] = execFileSync("bash", ["-c", script], { env, encoding: "utf8" })
     .trim()
     .split("\n");
 
   assert.equal(listen, "127.0.0.1:7000");
-  assert.equal(cors, "http://localhost:7001,http://127.0.0.1:7001");
+  assert.equal(cors, "http://localhost:7001,http://127.0.0.1:7001,http://app--x--y.localhost:6767");
   assert.deepEqual(JSON.parse(readFileSync(join(home, "config.json"), "utf8")).daemon, {
     listen: "127.0.0.1:7000",
   });

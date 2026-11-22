@@ -8,7 +8,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { networkInterfaces } from "node:os";
 import { isMainModule } from "./is-main-module.mjs";
 
-// Metro ports the dev scripts pick when no workspace service ports exist: `dev:app` uses 8081,
+// Metro ports the dev scripts pick outside a Paseo workspace: `dev:app` uses 8081,
 // `packages/desktop/scripts/dev.sh` the first free port from 8082 through 8089.
 const STANDALONE_METRO_PORTS = [8081, 8082, 8083, 8084, 8085, 8086, 8087, 8088, 8089];
 const DEFAULT_LISTEN = "127.0.0.1:6768";
@@ -86,12 +86,11 @@ function resolveListen(env, config) {
 }
 
 function resolveMetroPorts(env) {
-  const servicePorts = Object.entries(env)
-    .filter(([key]) => /^PASEO_SERVICE_.+_PORT$/.test(key))
-    .map(([, value]) => value);
-  const ports = [...servicePorts, env.EXPO_PORT].filter((port) => /^\d+$/.test(port ?? ""));
-  // Outside a Paseo workspace the daemon cannot know which Metro port a later client picks.
-  return servicePorts.length > 0 ? ports : [...ports, ...STANDALONE_METRO_PORTS.map(String)];
+  const ports = /^\d+$/.test(env.EXPO_PORT ?? "") ? [env.EXPO_PORT] : [];
+  // Workspace services get a new free port on every start, so a peer's port in this env goes
+  // stale; browser clients there come through their stable proxy URLs instead.
+  const inWorkspace = Object.keys(env).some((key) => /^PASEO_SERVICE_.+_URL$/.test(key));
+  return inWorkspace ? ports : [...ports, ...STANDALONE_METRO_PORTS.map(String)];
 }
 
 function parseTcpListen(value) {

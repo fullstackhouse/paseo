@@ -75,7 +75,7 @@ In Paseo-managed worktree services, use the injected service environment rather 
 Dev homes have no password, so any client that reaches a dev daemon gets full owner access. `scripts/dev-home.sh` (used by every dev script, `paseo.json` service and `npm run cli`) therefore:
 
 - binds the daemon to `127.0.0.1` and refuses to start on another address;
-- admits browser origins from this checkout only, through `PASEO_CORS_ORIGINS` (`scripts/dev-daemon-access.mjs`): `localhost` and `127.0.0.1` on each workspace service port, plus each service's proxy URL. Outside a Paseo workspace it admits Metro ports `8081`–`8089` on `localhost`. Native apps and the CLI send no browser origin, or their own, and are unaffected. `PASEO_CORS_ORIGINS` adds origins; `*` is refused;
+- admits browser origins from this checkout only, through `PASEO_CORS_ORIGINS` (`scripts/dev-daemon-access.mjs`). In a Paseo workspace these are the services' proxy URLs: a service gets a new port on every start, so another service's port is never admitted. Open the web app through its proxy URL; the `desktop` service loads its renderer through its own. Outside a workspace it admits Metro ports `8081`–`8089` on `localhost`. Native apps and the CLI send no browser origin, or their own, and are unaffected. `PASEO_CORS_ORIGINS` adds origins; `*` is refused;
 - removes a `*` left in `daemon.cors.allowedOrigins` of a managed home. The daemon merges persisted origins with the variable, so a leftover `*` would admit every website.
 
 The startup banner prints the listen address and the admitted origins. A client rejected with `Origin not allowed` in `daemon.log` is missing from that list.
