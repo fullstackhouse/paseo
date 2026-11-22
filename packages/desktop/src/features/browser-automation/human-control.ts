@@ -196,6 +196,10 @@ export class BrowserHumanControls {
       onEnded();
     };
     tab.contents.once("destroyed", destroyed);
+    // Ahead of frameSessions.dispose(), so releasing ends on the iframes' detach as before.
+    control.cleanup.unshift(() => {
+      void tab.send("Emulation.setFocusEmulationEnabled", { enabled: false }).catch(() => {});
+    });
     control.cleanup.push(() => tab.contents.removeListener("destroyed", destroyed));
     // Before anything is awaited: a dialog blocks the drain, Page.enable and auto-attach.
     control.cleanup.push(
@@ -248,7 +252,12 @@ export class BrowserHumanControls {
 
     const attach = () =>
       within(
-        tab.send("Page.enable").then(() => control.frameSessions.attach()),
+        tab
+          .send("Page.enable")
+          // A press moves the host window's focus to the webview, which then focuses the guest's
+          // main frame: in a tab without focus that blurred the iframe field just pressed.
+          .then(() => tab.send("Emulation.setFocusEmulationEnabled", { enabled: true }))
+          .then(() => control.frameSessions.attach()),
         CDP_TIMEOUT_MS,
       );
     let enabled = await attach();

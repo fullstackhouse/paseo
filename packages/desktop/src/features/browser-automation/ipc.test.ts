@@ -1642,6 +1642,20 @@ describe("browser live view human control", () => {
     },
   );
 
+  test("the page counts as focused while controlled, and only then", async () => {
+    const { contents, take, release } = await watchedTab();
+    const emulated = () =>
+      contents.debugger.commands
+        .filter(({ command }) => command === "Emulation.setFocusEmulationEnabled")
+        .map(({ params }) => params.enabled);
+    // Without it, the first press in a tab without focus blurs the iframe field it focused.
+    await take();
+    expect(emulated()).toEqual([true]);
+    await release(false);
+    await flushMicrotasks();
+    expect(emulated()).toEqual([true, false]);
+  });
+
   test("releasing detaches from iframe targets", async () => {
     const { contents, take, release } = await watchedTab();
     await take();
