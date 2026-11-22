@@ -127,6 +127,10 @@ export const SETTINGS_SEARCH_ENTRIES: SettingsSearchEntry[] = [
   ...host("agents", [
     ["settings.host.orchestration.enableTools.title"],
     [{ text: "Browser tools" }],
+    [
+      { text: "Browser live view (experimental)" },
+      { text: "Lets your phone view an agent's browser tab. Off by default." },
+    ],
     ["settings.host.orchestration.systemPrompt.title"],
     ["settings.host.agents.resumeOnStartup.title", "settings.host.agents.resumeOnStartup.info"],
     [
