@@ -25,7 +25,7 @@ In scope:
 
 Non-goals:
 
-- **Passkeys / WebAuthn.** They do not work in Paseo's Electron browser (tested by Jacek). The phone cannot forward a platform authenticator either. Sites that require a passkey stay unsupported.
+- **Passkeys / WebAuthn.** They do not work in Paseo's Electron browser (tested). The phone cannot forward a platform authenticator either. Sites that require a passkey stay unsupported.
 - Opening, closing, or navigating tabs from the phone beyond what taps do. URL bar is out.
 - Web (browser) client live view. Electron already shows the real tab.
 - Video codecs (H.264/WebRTC). JPEG screencast is enough for login forms.
