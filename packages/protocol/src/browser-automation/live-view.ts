@@ -61,7 +61,7 @@ export const BrowserLiveFrameAckSchema = z.object({
 });
 
 // Daemon -> app, one-way: the stream ended without a stop request from the app
-// (the desktop host disconnected).
+// (the desktop host disconnected, or the tab closed or went away on the desktop).
 export const BrowserLiveEndedSchema = z.object({
   type: z.literal("browser.live.ended"),
   payload: z.object({
@@ -117,6 +117,16 @@ export const BrowserHostLiveStopResponseSchema = z.object({
   }),
 });
 
+// One-way: the screencast ended on the desktop without a stop request (tab closed or
+// destroyed, debugger detached). No response; the daemon tells the viewer browser.live.ended.
+export const BrowserHostLiveEndedSchema = z.object({
+  type: z.literal("browser.host.live.ended"),
+  payload: z.object({
+    streamId: z.string().min(1),
+    error: BrowserAutomationErrorSchema.nullable(),
+  }),
+});
+
 export type BrowserLiveViewport = z.infer<typeof BrowserLiveViewportSchema>;
 export type BrowserLiveStartRequest = z.infer<typeof BrowserLiveStartRequestSchema>;
 export type BrowserLiveStartResponse = z.infer<typeof BrowserLiveStartResponseSchema>;
@@ -127,6 +137,7 @@ export type BrowserHostLiveStopRequest = z.infer<typeof BrowserHostLiveStopReque
 export type BrowserHostLiveFrameAck = z.infer<typeof BrowserHostLiveFrameAckSchema>;
 export type BrowserHostLiveStartResponse = z.infer<typeof BrowserHostLiveStartResponseSchema>;
 export type BrowserHostLiveStopResponse = z.infer<typeof BrowserHostLiveStopResponseSchema>;
+export type BrowserHostLiveEnded = z.infer<typeof BrowserHostLiveEndedSchema>;
 export type BrowserHostLiveOutboundMessage =
   | BrowserHostLiveStartRequest
   | BrowserHostLiveStopRequest

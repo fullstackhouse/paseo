@@ -113,6 +113,7 @@ import {
 } from "./browser-automation/rpc-schemas.js";
 import { BrowserAutomationHostCapabilitySchema } from "./browser-automation/capabilities.js";
 import {
+  BrowserHostLiveEndedSchema,
   BrowserHostLiveFrameAckSchema,
   BrowserHostLiveStartRequestSchema,
   BrowserHostLiveStartResponseSchema,
@@ -3474,7 +3475,7 @@ export const BrowserHostRegisterRequestSchema = z.object({
   requestId: z.string(),
   hostKind: z.string().min(1),
   supportedCommands: z.array(z.enum(BROWSER_AUTOMATION_COMMAND_NAMES)).min(1),
-  // COMPAT(browserLiveView): added after v0.15.4; hosts without it answer live view with browser_unsupported.
+  // COMPAT(browserLiveView): added after v0.15.4, remove after 2027-05-22. Hosts without it get browser_unsupported on live view.
   liveView: z.boolean().optional(),
 });
 export const BrowserHostRegisterResponseSchema = z.object({
@@ -3514,6 +3515,7 @@ export const SessionInboundMessageSchema = z.discriminatedUnion("type", [
   BrowserLiveFrameAckSchema,
   BrowserHostLiveStartResponseSchema,
   BrowserHostLiveStopResponseSchema,
+  BrowserHostLiveEndedSchema,
   VoiceAudioChunkMessageSchema,
   AbortRequestMessageSchema,
   AudioPlayedMessageSchema,

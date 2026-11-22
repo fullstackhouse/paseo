@@ -253,6 +253,15 @@ describe("browser automation protocol integration", () => {
         payload: { requestId: "req-2", error: null },
       }).type,
     ).toBe("browser.host.live.stop.response");
+    expect(
+      SessionInboundMessageSchema.parse({
+        type: "browser.host.live.ended",
+        payload: {
+          streamId: "stream-1",
+          error: { code: "browser_tab_closed", message: "Tab closed.", retryable: false },
+        },
+      }).type,
+    ).toBe("browser.host.live.ended");
   });
 
   test("browser host registration accepts an optional liveView flag", () => {
