@@ -10,6 +10,8 @@ Line references were checked on branch `use-paseo-builtin-browser-tabs` on 2026-
 
 Agents drive desktop `<webview>` tabs through `browser_*` MCP tools. When a site asks for a login, the agent stops and the human has to walk to the desktop. On mobile the browser pane only renders "unavailable" (`packages/app/src/desktop/browser/pane/index.tsx:15-33`). The human should be able to sign in from the phone, with 1Password autofill for passwords and OTP codes.
 
+At the desktop, password and one-time-code logins already work in Paseo tabs: 1Password Universal Autofill (Cmd+\\) filled a test login form in a built-in tab (user-observed, 22 November 2026). Passkeys do not work there. This feature brings the same password and one-time-code path to the phone.
+
 ## Scope and non-goals
 
 In scope:
