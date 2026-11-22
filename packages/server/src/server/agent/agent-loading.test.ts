@@ -5,7 +5,7 @@ import { expect, test } from "vitest";
 
 import { createTestLogger } from "../../test-utils/test-logger.js";
 import { AgentManager } from "./agent-manager.js";
-import { ensureAgentLoaded } from "./agent-loading.js";
+import { ensureAgentLoaded, readLoadedAgent } from "./agent-loading.js";
 import { startAgentRun } from "./agent-prompt.js";
 import { AgentStorage } from "./agent-storage.js";
 import type {
@@ -471,3 +471,43 @@ test.each(["mode", "thinking", "rewind"])(
   },
   30000,
 );
+
+test("a history read that overlaps a restore returns the restored agent's timeline", async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "agent-loading-restore-"));
+  const logger = createTestLogger();
+  const storage = new AgentStorage(path.join(root, "agents"), logger);
+  const manager = new AgentManager({
+    clients: createTestAgentClients(),
+    registry: storage,
+    logger,
+  });
+  const agentId = "00000000-0000-4000-8000-000000000601";
+
+  try {
+    await manager.createAgent({ provider: "codex", cwd: root }, agentId, {
+      workspaceId: "workspace-restore",
+    });
+    await manager.archiveAgent(agentId);
+
+    let reads = 0;
+    const timeline = await readLoadedAgent(
+      agentId,
+      { agentManager: manager, agentStorage: storage, logger, purpose: "history" },
+      async () => {
+        reads += 1;
+        // Restore closes the history-only runtime while the first read is using it.
+        if (reads === 1) await manager.unarchiveSnapshot(agentId);
+        return manager.fetchTimeline(agentId, { direction: "tail" });
+      },
+    );
+
+    expect(reads).toBe(2);
+    expect(timeline.epoch).not.toBe("");
+    expect((await storage.get(agentId))?.archivedAt).toBeNull();
+  } finally {
+    await manager.closeAgent(agentId).catch(() => undefined);
+    await manager.flush().catch(() => undefined);
+    await storage.flush().catch(() => undefined);
+    await rm(root, { recursive: true, force: true });
+  }
+});

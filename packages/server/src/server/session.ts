@@ -79,7 +79,11 @@ import {
   resolveStoredAgentUpdatedAt,
   toAgentPersistenceHandle,
 } from "./persistence-hooks.js";
-import { ensureAgentLoaded, ensureUnarchivedAgentLoaded } from "./agent/agent-loading.js";
+import {
+  ensureAgentLoaded,
+  ensureUnarchivedAgentLoaded,
+  readLoadedAgent,
+} from "./agent/agent-loading.js";
 import {
   sendPromptToAgent,
   waitForAgentRunStartWithTimeout,
@@ -8900,20 +8904,25 @@ export class Session {
       : undefined;
 
     try {
-      const snapshot = await ensureAgentLoaded(msg.agentId, {
-        agentManager: this.agentManager,
-        agentStorage: this.agentStorage,
-        logger: this.sessionLogger,
-        purpose: "history",
-      });
-      const agentPayload = await this.buildAgentPayload(snapshot);
-
-      const fetchedControlTimeline = this.agentManager.fetchTimeline(msg.agentId, {
-        direction,
-        cursor,
-        limit: msg.limit,
-        wholeTurns: msg.wholeTurns,
-      });
+      const { snapshot, agentPayload, fetchedControlTimeline } = await readLoadedAgent(
+        msg.agentId,
+        {
+          agentManager: this.agentManager,
+          agentStorage: this.agentStorage,
+          logger: this.sessionLogger,
+          purpose: "history",
+        },
+        async (agent) => ({
+          snapshot: agent,
+          agentPayload: await this.buildAgentPayload(agent),
+          fetchedControlTimeline: this.agentManager.fetchTimeline(msg.agentId, {
+            direction,
+            cursor,
+            limit: msg.limit,
+            wholeTurns: msg.wholeTurns,
+          }),
+        }),
+      );
       const selectedTimeline = {
         timeline: fetchedControlTimeline,
         entries: fetchedControlTimeline.rows,

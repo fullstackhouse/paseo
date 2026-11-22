@@ -148,3 +148,25 @@ export async function ensureAgentLoaded(
     }
   }
 }
+
+/**
+ * FSH: an archived workspace's agent is readable, so a read can overlap its Restore. Unarchive
+ * closes the history-only runtime, so repeat that read once against the restored agent.
+ */
+export async function readLoadedAgent<T>(
+  agentId: string,
+  deps: EnsureAgentLoadedDeps,
+  read: (agent: ManagedAgent) => Promise<T>,
+): Promise<T> {
+  const wasArchived = Boolean((await deps.agentStorage.get(agentId))?.archivedAt);
+  try {
+    return await read(await ensureAgentLoaded(agentId, deps));
+  } catch (error) {
+    if (!wasArchived) throw error;
+    // The unarchive may still hold the lifecycle lane; its record is written last.
+    await deps.agentManager.waitForAgentClose?.(agentId);
+    const record = await deps.agentStorage.get(agentId);
+    if (!record || record.archivedAt) throw error;
+    return await read(await ensureAgentLoaded(agentId, deps));
+  }
+}
