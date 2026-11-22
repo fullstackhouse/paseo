@@ -106,6 +106,7 @@ import {
   hasLiveViewTypedInto,
   registerBrowserAutomationIpc,
 } from "./features/browser-automation/ipc.js";
+import { observePageDialogs } from "./features/browser-automation/page-dialogs.js";
 import { BrowserKeyboard } from "./features/browser-keyboard/index.js";
 import { installAppUpdateOnQuit } from "./features/auto-updater.js";
 import {
@@ -777,6 +778,7 @@ async function createWindow(
   });
   mainWindow.webContents.on("did-attach-webview", (_event, contents) => {
     preparePaseoBrowserWebContents(contents);
+    observePageDialogs(contents);
     contents.once("destroyed", () => {
       pendingBrowserWindowOpenRequests.delete(contents.id);
     });

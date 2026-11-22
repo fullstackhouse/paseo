@@ -78,8 +78,8 @@ function useBrowserLiveView(input: {
       options: getLiveViewOptions(),
       onChange: (next) => {
         setState(next);
-        if (next.status === "live") browserControl.setOrigin(next.frame.origin);
-        if (next.status === "ended") browserControl.streamEnded(next.code);
+        if (next.status === "live" && next.shown) browserControl.setOrigin(next.shown.origin);
+        if (next.status === "ended") browserControl.streamEnded(next.held);
       },
       onStreamChange: browserControl.setStream,
     });
@@ -131,6 +131,7 @@ export function LiveViewSurface(props: {
         <View style={styles.container} testID="browser-live-view">
           <LiveFrame
             frame={state.frame}
+            shown={state.shown}
             onRendered={frameRendered}
             onInput={control.held ? send : null}
           />
@@ -140,7 +141,7 @@ export function LiveViewSurface(props: {
       )}
       <ControlPanel
         state={control}
-        canTakeControl={state.status === "live"}
+        canTakeControl={state.status === "live" && state.shown !== null}
         availability={availability}
         onTake={take}
         onHandBack={handBack}
@@ -175,13 +176,18 @@ function LiveViewStatus(props: { state: BrowserLiveViewState; onRetry: () => voi
 
 function LiveFrame(props: {
   frame: BrowserLiveViewFrame;
+  /** What the user sees and aims at. */
+  shown: BrowserLiveViewFrame | null;
   onRendered: (seq: number) => void;
   /** Null while read-only. */
   onInput: ((input: BrowserLiveInput) => void) | null;
 }) {
-  const { frame, onRendered, onInput } = props;
+  const { frame, shown, onRendered, onInput } = props;
   const { seq, uri } = frame;
-  const { width, height, offsetTop } = frame.screen;
+  const shownRef = useRef(shown);
+  shownRef.current = shown;
+  // A gesture aims at the image under the finger when it began, not at one that arrived since.
+  const aimedAtRef = useRef<BrowserLiveViewFrame | null>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
   const source = useMemo(() => ({ uri }), [uri]);
   const handleDisplay = useCallback(() => onRendered(seq), [onRendered, seq]);
@@ -191,35 +197,41 @@ function LiveFrame(props: {
   }, []);
 
   const gesture = useMemo(() => {
-    const screen = { width, height, offsetTop };
+    const aim = () => {
+      aimedAtRef.current = shownRef.current;
+    };
     const tap = Gesture.Tap()
       .runOnJS(true)
       .enabled(onInput !== null)
       .maxDistance(SCROLL_SLOP)
+      .onBegin(aim)
       .onEnd((event, success) => {
-        if (!success) return;
-        const point = toScreenPoint(event, size, screen);
-        if (point) onInput?.({ kind: "tap", ...point });
+        const aimedAt = aimedAtRef.current;
+        if (!success || !aimedAt?.documentId) return;
+        const point = toScreenPoint(event, size, aimedAt.screen);
+        if (point) onInput?.({ kind: "tap", documentId: aimedAt.documentId, ...point });
       });
     const pan = Gesture.Pan()
       .runOnJS(true)
       .enabled(onInput !== null)
       .minDistance(SCROLL_SLOP)
       .maxPointers(1)
+      .onBegin(aim)
       .onEnd((event, success) => {
-        if (!success) return;
+        const aimedAt = aimedAtRef.current;
+        if (!success || !aimedAt?.documentId) return;
         const { translationX, translationY } = event;
         const start = { x: event.x - translationX, y: event.y - translationY };
-        const point = toScreenPoint(start, size, screen);
+        const point = toScreenPoint(start, size, aimedAt.screen);
         if (!point) return;
-        const scale = getScreenScale(size, screen);
+        const scale = getScreenScale(size, aimedAt.screen);
         // The page follows the finger, so the wheel turns the other way.
         const deltaX = -translationX / scale;
         const deltaY = -translationY / scale;
-        onInput?.({ kind: "scroll", ...point, deltaX, deltaY });
+        onInput?.({ kind: "scroll", documentId: aimedAt.documentId, ...point, deltaX, deltaY });
       });
     return Gesture.Race(pan, tap);
-  }, [height, offsetTop, onInput, size, width]);
+  }, [onInput, size]);
 
   // expo-image keeps the previous frame on screen until the next one decodes, so frames swap
   // without a blank flash. Frames show authenticated pages: never cache them.

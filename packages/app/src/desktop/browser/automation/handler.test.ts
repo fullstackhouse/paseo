@@ -826,6 +826,27 @@ describe("browser live view host", () => {
     expect(harness.inputs).toEqual([{ kind: "key", key: "Tab" }]);
   });
 
+  test("names an ended stream, not an outdated desktop", async () => {
+    const harness = createLiveHarness();
+    await harness.start("stream-1");
+    await harness.take("control-1", "stream-gone");
+    expect(harness.sentMessages.at(-1)).toMatchObject({
+      payload: { error: { code: "stream_ended" } },
+    });
+
+    await harness.take("control-1");
+    await harness.forward({
+      type: "browser.host.live.send_input.request",
+      requestId: "input",
+      streamId: "stream-gone",
+      controlId: "control-1",
+      input: { kind: "key", key: "Tab" },
+    });
+    expect(harness.sentMessages.at(-1)).toMatchObject({
+      payload: { error: { code: "stream_ended" } },
+    });
+  });
+
   test("tells the daemon when a controlled tab is gone", async () => {
     const harness = createLiveHarness();
     await harness.start("stream-1");

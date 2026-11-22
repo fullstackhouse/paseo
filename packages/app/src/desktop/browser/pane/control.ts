@@ -37,21 +37,13 @@ export const INITIAL_CONTROL_STATE: BrowserControlState = {
 export interface BrowserControl {
   setStream(stream: BrowserLiveViewStreamInfo | null): void;
   setOrigin(origin: string | null): void;
-  streamEnded(code: string | null): void;
+  /** held is the daemon's word, or null when it didn't say. */
+  streamEnded(held: boolean | null): void;
   take(): Promise<void>;
   send(input: BrowserLiveInput): Promise<void>;
   handBack(): Promise<void>;
   dispose(): void;
 }
-
-// Ends after which this device holds nothing: the tab, its desktop, or the setting is gone.
-const CONTROL_ENDING_CODES = new Set([
-  "browser_tab_closed",
-  "browser_tab_not_found",
-  "browser_no_host",
-  "browser_denied",
-  "browser_unsupported",
-]);
 
 export type BrowserControlAvailability = "update_host" | "update_desktop" | "unknown" | "ready";
 
@@ -102,8 +94,9 @@ export function createBrowserControl(input: {
       });
     },
 
-    streamEnded(code) {
-      if (!state.held || !code || !CONTROL_ENDING_CODES.has(code)) return;
+    streamEnded(held) {
+      // Only the daemon ends control: a stream also ends while the lock goes on.
+      if (!state.held || held !== false) return;
       update({ held: false, focus: null, notice: "released" });
     },
 
@@ -138,7 +131,8 @@ export function createBrowserControl(input: {
           update({ busy: null, held: false, focus: null, notice: "released" });
         } else {
           // Refused text is gone from both sides; the user picks the field again.
-          update({ busy: null, notice: error.code, ...(isText ? { focus: null } : {}) });
+          const dropField = isText || error.code === "page_changed";
+          update({ busy: null, notice: error.code, ...(dropField ? { focus: null } : {}) });
         }
       } catch {
         // The thrown error is dropped: it must not carry what was typed into the UI or a log.
@@ -155,7 +149,9 @@ export function createBrowserControl(input: {
       update({ busy: "releasing", notice: null });
       try {
         const { error } = await client.releaseBrowserLiveControl(streamId);
-        if (error) update({ busy: null, notice: error.code });
+        if (error?.code === "not_controller") {
+          update({ busy: null, held: false, focus: null, notice: "released" });
+        } else if (error) update({ busy: null, notice: error.code });
         else update({ busy: null, held: false, focus: null });
       } catch {
         update({ busy: null, notice: "connection" });

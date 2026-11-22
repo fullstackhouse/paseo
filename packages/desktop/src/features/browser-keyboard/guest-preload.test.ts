@@ -42,6 +42,9 @@ class FakeInput extends FakeElement {
   public inputMode = "";
   public maxLength = -1;
   public pattern = "";
+  public form: object | null = null;
+  public visible = true;
+  public onInput: (() => void) | null = null;
   public readonly typeChanges: string[] = [];
   private readonly attributes = new Map<string, string>();
   private currentValue = "";
@@ -72,6 +75,15 @@ class FakeInput extends FakeElement {
     this.attributes.delete(name);
   }
   public select(): void {}
+  public focus(): void {
+    FakeDocument.active = this;
+  }
+  public getClientRects(): object[] {
+    return this.visible ? [{}] : [];
+  }
+  public getRootNode(): unknown {
+    return document;
+  }
   public dispatchEvent(): boolean {
     return true;
   }
@@ -84,6 +96,10 @@ class FakeTextArea extends FakeElement {
 class FakeDocument {
   public static active: FakeElement | null = null;
   public static focused = true;
+  public static inputs: FakeInput[] = [];
+  public querySelectorAll(): FakeInput[] {
+    return FakeDocument.inputs;
+  }
   public get activeElement(): FakeElement | null {
     return FakeDocument.active;
   }
@@ -142,8 +158,9 @@ function commitText(text: string, duringBeforeInput?: () => void): void {
   guestWindow.dispatch("textInput", textInput);
   if (textInput.defaultPrevented) return;
   const edited = FakeDocument.active as FakeInput;
-  edited.value = text;
+  edited.value = edited.maxLength >= 0 ? text.slice(0, edited.maxLength) : text;
   guestWindow.dispatch("input", editEvent(edited));
+  edited.onInput?.();
 }
 
 let nextId = 0;
@@ -163,14 +180,41 @@ function focus(element: FakeElement): string {
   return (reply.target as { targetId: string }).targetId;
 }
 
-function insert(targetId: string, deadline = Date.now() + 1000): Record<string, unknown> {
-  return request({ op: "insert", targetId, text: SENTINEL, deadline });
+function insert(
+  targetId: string,
+  deadline = Date.now() + 1000,
+  text = SENTINEL,
+  controlId = "control-1",
+): Record<string, unknown> {
+  return request({ op: "insert", controlId, targetId, text, deadline });
+}
+
+function clear(scope: "all" | "secrets", controlId = "control-1"): Record<string, unknown> {
+  return request({ op: "clear", controlId, scope });
+}
+
+/** One-character boxes of a code, in document order. */
+function codeBoxes(count: number, autoAdvance: boolean): FakeInput[] {
+  const form = {};
+  const boxes = Array.from({ length: count }, () => {
+    const box = new FakeInput("text");
+    box.maxLength = 1;
+    box.form = form;
+    return box;
+  });
+  FakeDocument.inputs = boxes;
+  if (!autoAdvance) return boxes;
+  for (const [index, box] of boxes.entries()) {
+    box.onInput = () => boxes[index + 1]?.focus();
+  }
+  return boxes;
 }
 
 beforeEach(async () => {
   guestWindow = new FakeWindow();
   FakeDocument.active = null;
   FakeDocument.focused = true;
+  FakeDocument.inputs = [];
   vi.stubGlobal("window", guestWindow);
   vi.stubGlobal("Document", FakeDocument);
   vi.stubGlobal("document", new FakeDocument());
@@ -351,29 +395,167 @@ describe("browser guest preload", () => {
     expect(insert(targetId)).toMatchObject({ inserted: true });
   });
 
+  const typeCode = (box: FakeInput, code: string) => insert(focus(box), Date.now() + 1000, code);
+  const values = (boxes: FakeInput[]) => boxes.map((box) => box.value);
+
+  test.each([true, false])("spreads a code over its boxes (auto-advance %s)", (autoAdvance) => {
+    const boxes = codeBoxes(6, autoAdvance);
+
+    expect(typeCode(boxes[0]!, "482915")).toMatchObject({ inserted: true });
+    expect(values(boxes)).toEqual(["4", "8", "2", "9", "1", "5"]);
+
+    clear("secrets");
+    expect(values(boxes)).toEqual(["", "", "", "", "", ""]);
+  });
+
+  test("offers a code box's hints for one-character boxes", () => {
+    const [first] = codeBoxes(4, false);
+    FakeDocument.active = first!;
+    expect(request({ op: "describe" }).target).toMatchObject({ kind: "one_time_code" });
+  });
+
+  test("a code may end a form that clears the last box", () => {
+    const boxes = codeBoxes(3, true);
+    boxes[2]!.onInput = () => {
+      boxes[2]!.value = "";
+      FakeDocument.active = null; // The form went away.
+    };
+    expect(typeCode(boxes[0]!, "123")).toMatchObject({ inserted: true });
+  });
+
+  test.each([
+    ["too few boxes", (boxes: FakeInput[]) => boxes.slice(0, 2)],
+    ["another form in between", (boxes: FakeInput[]) => ((boxes[1]!.form = {}), boxes)],
+    ["a hidden box in between", (boxes: FakeInput[]) => ((boxes[1]!.visible = false), boxes)],
+    ["a read-only box in between", (boxes: FakeInput[]) => ((boxes[1]!.readOnly = true), boxes)],
+  ])("types nothing with %s, and says it doesn't fit", (_name, change) => {
+    const boxes = codeBoxes(3, false);
+    FakeDocument.inputs = change(boxes);
+
+    expect(typeCode(boxes[0]!, "123")).toMatchObject({ inserted: false, reason: "does_not_fit" });
+    expect(values(boxes)).toEqual(["", "", ""]);
+  });
+
+  test("takes back a partial code when a box's handler steals focus", () => {
+    const boxes = codeBoxes(4, true);
+    const decoy = new FakeInput("text");
+    let commits = 0;
+    electron.webFrame.insertText = (text) =>
+      commitText(text, () => {
+        if (++commits === 3) decoy.focus();
+      });
+
+    expect(typeCode(boxes[0]!, "1234")).toMatchObject({ inserted: false });
+    expect([...values(boxes), decoy.value]).toEqual(["", "", "", "", ""]);
+  });
+
+  test("takes back a partial code when the document loses focus", () => {
+    const boxes = codeBoxes(3, true);
+    boxes[0]!.onInput = () => (FakeDocument.focused = false);
+    expect(typeCode(boxes[0]!, "123")).toMatchObject({ inserted: false });
+    expect(values(boxes)).toEqual(["", "", ""]);
+  });
+
+  test("refuses text longer than the field instead of cutting it", () => {
+    const field = new FakeInput("password");
+    field.maxLength = 8;
+    expect(insert(focus(field), Date.now() + 1000, "nine-char")).toMatchObject({
+      inserted: false,
+      reason: "does_not_fit",
+    });
+    expect(field.value).toBe("");
+  });
+
+  test("reports and takes back text the page cut short", () => {
+    const field = new FakeInput("text");
+    field.onInput = () => (field.value = field.value.slice(0, 1));
+    expect(typeCode(field, "482915")).toMatchObject({ inserted: false, reason: "does_not_fit" });
+    expect(field.value).toBe("");
+  });
+
+  test("reports text the page didn't take at all", () => {
+    const field = new FakeInput("text");
+    electron.webFrame.insertText = () => {};
+    expect(typeCode(field, "482915")).toMatchObject({ inserted: false, reason: "does_not_fit" });
+  });
+
+  test.each([
+    ["adds separators", (value: string) => `${value.slice(0, 3)}-${value.slice(3)}`, "482915"],
+    ["drops separators", (value: string) => value.replace(" ", ""), "482 915"],
+  ])("accepts a field that %s", (_name, format, text) => {
+    const field = new FakeInput("text");
+    field.onInput = () => (field.value = format(field.value));
+    expect(typeCode(field, text)).toMatchObject({ inserted: true });
+  });
+
+  test("accepts a field that submits and clears", () => {
+    const field = new FakeInput("text");
+    field.onInput = () => {
+      field.value = "";
+      FakeDocument.active = null;
+    };
+    expect(typeCode(field, "482915")).toMatchObject({ inserted: true });
+  });
+
+  test.each(["", "111111"])("reports text the page rejected back to %j", (previous) => {
+    const field = new FakeInput("text");
+    field.value = previous;
+    field.onInput = () => (field.value = previous);
+    expect(typeCode(field, "abcdef")).toMatchObject({ inserted: false, reason: "does_not_fit" });
+  });
+
+  test("accepts and later clears a code the page spread out itself", () => {
+    const boxes = [new FakeInput("text", "one-time-code"), new FakeInput("text")];
+    FakeDocument.inputs = boxes;
+    boxes[0]!.onInput = () => {
+      boxes[1]!.value = boxes[0]!.value.slice(1);
+      boxes[0]!.value = boxes[0]!.value.slice(0, 1);
+    };
+
+    expect(typeCode(boxes[0]!, "42")).toMatchObject({ inserted: true });
+    expect(values(boxes)).toEqual(["4", "2"]);
+    clear("secrets");
+    expect(values(boxes)).toEqual(["", ""]);
+  });
+
+  test("a later control doesn't clear what an earlier one typed, or the agent since", () => {
+    const password = new FakeInput("password");
+    const user = new FakeInput("text", "username");
+    insert(focus(password));
+    clear("secrets");
+    password.value = "typed by the agent";
+
+    insert(focus(user), Date.now() + 1000, "someone", "control-2");
+    clear("secrets", "control-2");
+    expect(password.value).toBe("typed by the agent");
+
+    expect(clear("all", "control-3")).toMatchObject({ typed: false });
+    expect(user.value).toBe("someone");
+  });
+
   test("hand-back clears secrets and their undo stack, and leaves other fields", () => {
     const user = new FakeInput("text", "username");
     const password = new FakeInput("password");
     insert(focus(user));
     insert(focus(password));
 
-    expect(request({ op: "clear", scope: "secrets" })).toMatchObject({ typed: true });
+    expect(clear("secrets")).toMatchObject({ typed: true });
     expect(password.value).toBe("");
     // A cleared value comes back with execCommand("undo") unless the inner editor is rebuilt.
     expect(password.typeChanges).toEqual(["hidden", "password"]);
     expect(user.value).toBe(SENTINEL);
 
-    request({ op: "clear", scope: "all" });
+    clear("all");
     expect(user.value).toBe("");
   });
 
   test("a document live view never typed into reports nothing typed", () => {
-    expect(request({ op: "clear", scope: "all" })).toMatchObject({ typed: false });
+    expect(clear("all")).toMatchObject({ typed: false });
   });
 
   test("never sends the typed text back over IPC", () => {
     insert(focus(new FakeInput("password")));
-    request({ op: "clear", scope: "all" });
+    clear("all");
     expect(JSON.stringify(electron.sent)).not.toContain(SENTINEL);
   });
 });

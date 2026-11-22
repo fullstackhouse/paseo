@@ -1,3 +1,4 @@
+import { BrowserLiveEndedSchema, BrowserLiveInputSchema } from "./browser-automation/live-view.js";
 import { describe, expect, test } from "vitest";
 
 import { BROWSER_AUTOMATION_COMMAND_NAMES } from "./browser-automation/rpc-schemas.js";
@@ -273,8 +274,8 @@ describe("browser automation protocol integration", () => {
       topOrigin: "https://app.example",
     };
     const inputs = [
-      { kind: "tap", x: 12.5, y: 40 },
-      { kind: "scroll", x: 1, y: 2, deltaX: 0, deltaY: 300 },
+      { kind: "tap", documentId: "stream-1:0", x: 12.5, y: 40 },
+      { kind: "scroll", documentId: "stream-1:0", x: 1, y: 2, deltaX: 0, deltaY: 300 },
       { kind: "key", key: "Enter" },
       { kind: "insert_text", targetId: "target-1", text: "dummy" },
     ];
@@ -409,5 +410,25 @@ describe("browser automation protocol integration", () => {
         browserTools: { enabled: true },
       }).browserTools,
     ).toEqual({ enabled: true });
+  });
+});
+
+describe("browser live control state", () => {
+  test("pointer input names the document of the frame it was aimed at", () => {
+    expect(BrowserLiveInputSchema.safeParse({ kind: "tap", x: 1, y: 2 }).success).toBe(false);
+    expect(
+      BrowserLiveInputSchema.parse({ kind: "tap", documentId: "stream-1:0", x: 1, y: 2 }),
+    ).toMatchObject({ documentId: "stream-1:0" });
+  });
+
+  test("an ended stream can say whether the viewer still holds the tab", () => {
+    const ended = { type: "browser.live.ended", payload: { streamId: "s", error: null } };
+    expect(BrowserLiveEndedSchema.safeParse(ended).success).toBe(true);
+    expect(
+      BrowserLiveEndedSchema.parse({
+        ...ended,
+        payload: { ...ended.payload, control: { held: true } },
+      }).payload,
+    ).toMatchObject({ control: { held: true } });
   });
 });

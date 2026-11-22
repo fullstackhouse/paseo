@@ -7,8 +7,15 @@ export const GUEST_CONTROL_REPLY_CHANNEL = "paseo:browser-human-control-reply";
 
 export type GuestControlRequest =
   | { id: string; op: "describe" }
-  | { id: string; op: "insert"; targetId: string; text: string; deadline: number }
-  | { id: string; op: "clear"; scope: "all" | "secrets" };
+  | {
+      id: string;
+      op: "insert";
+      controlId: string;
+      targetId: string;
+      text: string;
+      deadline: number;
+    }
+  | { id: string; op: "clear"; controlId: string; scope: "all" | "secrets" };
 
 export type GuestFieldKind =
   | "password"
@@ -23,7 +30,8 @@ export interface GuestControlReply {
   id: string;
   target?: { targetId: string; kind: GuestFieldKind } | null;
   inserted?: boolean;
-  /** The document holds a field live view typed into. */
+  reason?: "does_not_fit";
+  /** The document holds a field this control typed into. */
   typed?: boolean;
 }
 

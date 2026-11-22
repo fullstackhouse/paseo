@@ -82,8 +82,13 @@ function createHarness() {
     frameSeq: number,
     jpeg = [0xff, 0xd8, frameSeq],
     origin?: string,
+    documentId?: string,
   ) {
-    const metadata = { ...METADATA, ...(origin ? { origin } : {}) };
+    const metadata = {
+      ...METADATA,
+      ...(origin ? { origin } : {}),
+      ...(documentId ? { documentId } : {}),
+    };
     for (const handler of frameHandlers) {
       handler({ streamId, frameSeq, metadata, jpeg: Uint8Array.from(jpeg) });
     }
@@ -142,7 +147,8 @@ describe("createBrowserLiveView", () => {
     harness.sendFrame("s1", 0, [1, 2, 3]);
     expect(harness.lastState()).toEqual({
       status: "live",
-      frame: { seq: 0, uri: frameUri([1, 2, 3]), screen: SCREEN, origin: null },
+      frame: { seq: 0, uri: frameUri([1, 2, 3]), screen: SCREEN, origin: null, documentId: null },
+      shown: null,
     });
   });
 
@@ -170,10 +176,14 @@ describe("createBrowserLiveView", () => {
       ["s1", 1],
       ["s1", 2],
     ]);
-    expect(harness.lastState()).toEqual({
-      status: "live",
-      frame: { seq: 1, uri: frameUri([9, 9]), screen: SCREEN, origin: null },
-    });
+    const frame = {
+      seq: 1,
+      uri: frameUri([9, 9]),
+      screen: SCREEN,
+      origin: null,
+      documentId: null,
+    };
+    expect(harness.lastState()).toEqual({ status: "live", frame, shown: frame });
   });
 
   it("ignores frames from other streams", async () => {
@@ -229,7 +239,11 @@ describe("createBrowserLiveView", () => {
         retryable: false,
       },
     });
-    expect(harness.lastState()).toEqual({ status: "ended", code: "browser_tab_closed" });
+    expect(harness.lastState()).toEqual({
+      status: "ended",
+      code: "browser_tab_closed",
+      held: null,
+    });
 
     harness.view.frameRendered(0);
     expect(harness.acks).toEqual([]);
@@ -267,6 +281,40 @@ describe("createBrowserLiveView", () => {
     expect(harness.lastState()).toMatchObject({ frame: { origin: "https://second.example" } });
   });
 
+  it("keeps the origin and document of the image on screen until the next one renders", async () => {
+    const harness = createHarness();
+    await harness.activate("s1");
+    harness.sendFrame("s1", 1, [1], "https://first.example", "s1:0");
+    harness.view.frameRendered(1);
+    harness.sendFrame("s1", 2, [2], "https://second.example", "s1:1");
+
+    expect(harness.lastState()).toMatchObject({
+      frame: { seq: 2 },
+      shown: { origin: "https://first.example", documentId: "s1:0" },
+    });
+
+    harness.view.frameRendered(2);
+    expect(harness.lastState()).toMatchObject({
+      shown: { origin: "https://second.example", documentId: "s1:1" },
+    });
+  });
+
+  it("moves an identical image on screen to the document it now stands for", async () => {
+    const harness = createHarness();
+    await harness.activate("s1");
+    harness.sendFrame("s1", 1, [9], "https://first.example", "s1:0");
+    harness.view.frameRendered(1);
+    harness.sendFrame("s1", 2, [9], "https://first.example", "s1:1");
+    expect(harness.lastState()).toMatchObject({ shown: { documentId: "s1:1" } });
+  });
+
+  it("passes on whether control outlived the stream", async () => {
+    const harness = createHarness();
+    await harness.activate("s1");
+    harness.sendEnded({ streamId: "s1", error: null, control: { held: true } });
+    expect(harness.lastState()).toEqual({ status: "ended", code: null, held: true });
+  });
+
   it("ignores ended messages for other streams", async () => {
     const harness = createHarness();
     await harness.activate("s1");
@@ -292,7 +340,11 @@ describe("createBrowserLiveView", () => {
     });
     await flush();
 
-    expect(harness.lastState()).toEqual({ status: "ended", code: "browser_unsupported" });
+    expect(harness.lastState()).toEqual({
+      status: "ended",
+      code: "browser_unsupported",
+      held: null,
+    });
   });
 
   it("shows a failed start request as ended", async () => {
@@ -302,7 +354,7 @@ describe("createBrowserLiveView", () => {
     harness.starts[0].reject(new Error("Request timed out"));
     await flush();
 
-    expect(harness.lastState()).toEqual({ status: "ended", code: "connection" });
+    expect(harness.lastState()).toEqual({ status: "ended", code: "connection", held: null });
   });
 
   it("does not retry while inactive", () => {

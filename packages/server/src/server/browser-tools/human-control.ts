@@ -12,7 +12,7 @@ import type {
 const DISCONNECT_GRACE_MS = 5 * 60_000;
 const RELEASE_RETRY_MS = 30_000;
 // Each exceeds what the desktop allows itself for that request.
-const TAKE_TIMEOUT_MS = 20_000;
+const TAKE_TIMEOUT_MS = 35_000;
 const INPUT_TIMEOUT_MS = 12_000;
 const RELEASE_TIMEOUT_MS = 30_000;
 
@@ -108,7 +108,6 @@ export class BrowserHumanControl {
       timer: null,
     };
     this.byBrowserId.set(browserId, control);
-    this.deps.onTaken(browserId);
 
     const requestId = this.deps.createId();
     const answer = await this.deps.send(
@@ -135,6 +134,8 @@ export class BrowserHumanControl {
     }
     control.phase = "held";
     control.granted = true;
+    // Not before: a take that fails leaves the last hand-back's note true.
+    this.deps.onTaken(browserId);
     if (!this.deps.hasViewer(browserId)) this.startGrace(control);
     return { focus: answer.focus ?? null, error: null };
   }
@@ -159,7 +160,7 @@ export class BrowserHumanControl {
       },
       INPUT_TIMEOUT_MS,
     );
-    if (answer) return { focus: answer.focus ?? null, error: answer.error };
+    if (answer) return { focus: answer.focus ?? null, error: whileLocked(answer.error) };
     // Never sent again: the desktop may have typed it.
     const code = input.kind === "insert_text" ? "unconfirmed" : "failed";
     return refuse(code, "The desktop didn't confirm the input.");
@@ -187,7 +188,7 @@ export class BrowserHumanControl {
       control.phase = "held";
       if (!this.deps.hasViewer(control.browserId)) this.startGrace(control);
     }
-    return answer?.error ?? controlError("failed", "The desktop didn't answer.");
+    return whileLocked(answer?.error) ?? controlError("failed", "The desktop didn't answer.");
   }
 
   public viewerArrived(browserId: string): void {
@@ -285,6 +286,14 @@ function formatNote(browserId: string, reason: EndReason): string {
     case "tab_gone":
       return `Browser tab ${browserId} closed while the user controlled it.`;
   }
+}
+
+/** not_controller tells the phone that control is over, which only the daemon's lock decides. */
+function whileLocked(
+  error: BrowserLiveControlError | null | undefined,
+): BrowserLiveControlError | null {
+  if (error?.code !== "not_controller") return error ?? null;
+  return controlError("failed", "The desktop didn't accept the request.");
 }
 
 function refuse(code: BrowserLiveControlErrorCode, message: string): BrowserLiveFocusResult {

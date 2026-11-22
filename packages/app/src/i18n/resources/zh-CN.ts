@@ -651,6 +651,9 @@ export const zhCN: TranslationResources = {
         notices: {
           released: "你的控制已结束。未提交的输入可能已被丢弃。",
           targetChanged: "页面或输入框已变化，文本已被拒绝。请再次点按输入框。",
+          pageChanged: "页面已变化，因此未发送点按或滚动。请在新页面上重试。",
+          doesNotFit: "该文本超出此字段的容纳范围，因此未输入。请点按该字段后重试。",
+          streamEnded: "实时画面已停止，因此未发送任何内容。请重新连接后重试。",
           unconfirmed: "桌面端未确认文本。再次输入前请检查页面。",
           agentBusy: "智能体的浏览器操作仍在进行。请重试。",
           busy: "此标签页已被控制",

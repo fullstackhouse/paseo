@@ -99,3 +99,22 @@ describe("browser live binary frames", () => {
     );
   });
 });
+
+it("keeps the document a frame was captured from", () => {
+  const documentMetadata = {
+    deviceWidth: 800,
+    deviceHeight: 600,
+    offsetTop: 0,
+    pageScaleFactor: 1,
+    scrollOffsetX: 0,
+    scrollOffsetY: 0,
+    documentId: "stream-1:2",
+  };
+  const bytes = encodeBrowserLiveFrame({
+    streamId: "stream-1",
+    frameSeq: 1,
+    metadata: documentMetadata,
+    jpeg: new Uint8Array([1]),
+  });
+  expect(decodeBrowserLiveFrame(bytes)?.metadata).toEqual(documentMetadata);
+});

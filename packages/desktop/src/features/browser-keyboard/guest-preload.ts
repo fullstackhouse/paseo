@@ -115,6 +115,12 @@ ipcRenderer.on(CONTROL_CHANNEL, (_event, request: GuestControlRequest) => {
 });
 
 type TextField = HTMLInputElement | HTMLTextAreaElement;
+type InsertResult = Pick<GuestControlReply, "inserted" | "reason">;
+
+const INSERTED: InsertResult = { inserted: true };
+const REFUSED: InsertResult = { inserted: false };
+const DOES_NOT_FIT: InsertResult = { inserted: false, reason: "does_not_fit" };
+const TEXT_INPUT_TYPES = new Set(["text", "password", "email", "tel", "number", "search", "url"]);
 
 let humanControl: ReturnType<typeof createHumanControl> | null = null;
 
@@ -127,8 +133,9 @@ function createHumanControl() {
   const hasFocus = Document.prototype.hasFocus;
   const documentId = [...crypto.getRandomValues(new Uint32Array(4))].join("-");
   const targets = new WeakMap<TextField, { signature: string; targetId: string }>();
-  /** The fields live view typed into, and whether each holds a secret. */
+  /** The fields the current control typed into, and whether each holds a secret. */
   const filled = new Map<TextField, boolean>();
+  let filledBy: string | null = null;
   let nextTarget = 0;
 
   function activeElement(): Element | null {
@@ -141,11 +148,8 @@ function createHumanControl() {
   function focusedField(): TextField | null {
     if (!hasFocus.call(document)) return null;
     const element = activeElement();
-    const editable =
-      element instanceof HTMLTextAreaElement ||
-      (element instanceof HTMLInputElement &&
-        ["text", "password", "email", "tel", "number", "search", "url"].includes(element.type));
-    return editable && !element.readOnly && !element.disabled ? element : null;
+    const isField = element instanceof HTMLTextAreaElement || element instanceof HTMLInputElement;
+    return isField && isEditable(element) ? element : null;
   }
 
   function targetIdOf(field: TextField): string {
@@ -166,20 +170,92 @@ function createHumanControl() {
     return field !== null && targetIdOf(field) === targetId;
   }
 
-  function insert(request: Extract<GuestControlRequest, { op: "insert" }>): boolean {
-    if (Date.now() > request.deadline) return false;
+  // An agent may have typed into the same fields since an earlier control.
+  function scopeTo(controlId: string): void {
+    if (filledBy !== controlId) filled.clear();
+    filledBy = controlId;
+  }
+
+  function insert(request: Extract<GuestControlRequest, { op: "insert" }>): InsertResult {
+    if (Date.now() > request.deadline) return REFUSED;
     const field = focusedField();
-    if (!field || !isTarget(field, request.targetId)) return false;
+    if (!field || !isTarget(field, request.targetId)) return REFUSED;
+    const { text } = request;
+    const characters = [...text];
+    if (field.maxLength === 1 && characters.length > 1) return spreadOverBoxes(field, characters);
+    if (field.maxLength >= 0 && text.length > field.maxLength) return DOES_NOT_FIT;
+
     const secret = isSecret(fieldKind(field));
+    // A page may move the rest of a code on to the fields after this one.
+    const following = fieldsFrom(field).slice(1, characters.length + 1);
+    const valuesBefore = following.map((next) => next.value);
+    const valueBefore = field.value;
+    const commit = commitInto(field, text, secret);
+    if (!commit) return REFUSED;
+
+    const spread = following.filter((next, index) => next.value !== valuesBefore[index]);
+    for (const next of spread) filled.set(next, secret || characters.length > 1);
+    if (commit.edited && wasSubmitted(field)) return INSERTED;
+    if (tookWholeText({ field, text, valueBefore, spread })) {
+      return INSERTED;
+    }
+    for (const cut of commit.edited ? [field, ...spread] : spread) clearField(cut);
+    return DOES_NOT_FIT;
+  }
+
+  /** A code over one-character boxes: all of it, or none. */
+  function spreadOverBoxes(first: TextField, characters: string[]): InsertResult {
+    const boxes = fieldsFrom(first).slice(0, characters.length);
+    const fits =
+      boxes.length === characters.length &&
+      boxes.every(
+        (box) =>
+          box.maxLength === 1 &&
+          box.form === first.form &&
+          isEditable(box) &&
+          box.getClientRects().length > 0,
+      );
+    if (!fits) return DOES_NOT_FIT;
+    const typed: TextField[] = [];
+    const takeBack = (result: InsertResult) => {
+      for (const box of typed) clearField(box);
+      return result;
+    };
+    for (const [index, box] of boxes.entries()) {
+      // The document keeps focus throughout, or it's another frame's turn to receive text.
+      if (!hasFocus.call(document)) return takeBack(REFUSED);
+      if (focusedField() !== box) box.focus();
+      if (focusedField() !== box) return takeBack(REFUSED);
+      const character = characters[index]!;
+      const commit = commitInto(box, character, true);
+      if (!commit) return takeBack(REFUSED);
+      typed.push(box);
+      // The last one may submit the form and clear it.
+      const submitted = index === boxes.length - 1 && commit.edited && wasSubmitted(box);
+      if (!submitted && box.value.toLowerCase() !== character.toLowerCase()) {
+        return takeBack(DOES_NOT_FIT);
+      }
+    }
+    return INSERTED;
+  }
+
+  // Empty alone is what a page that rejects the text leaves behind, too.
+  function wasSubmitted(field: TextField): boolean {
+    return field.value === "" && focusedField() !== field;
+  }
+
+  /** Null when the text wasn't left in this field. */
+  function commitInto(field: TextField, text: string, secret: boolean): { edited: boolean } | null {
+    const targetId = targetIdOf(field);
     // Replace what is there; a password manager fills whole values.
     field.select();
-    if (focusedField() !== field) return false;
+    if (focusedField() !== field) return null;
 
     let blocked = false;
     const edits: EventTarget[] = [];
     // Page handlers of these events can move focus, and the text follows focus.
     const guard = (event: Event) => {
-      if (event.composedPath()[0] === field && isTarget(focusedField(), request.targetId)) return;
+      if (event.composedPath()[0] === field && isTarget(focusedField(), targetId)) return;
       blocked = true;
       event.preventDefault();
       event.stopImmediatePropagation();
@@ -196,20 +272,20 @@ function createHumanControl() {
       let localRoot = webFrame;
       // Only a local root has the widget that commits text.
       while (localRoot.parent) localRoot = localRoot.parent;
-      localRoot.insertText(request.text);
+      localRoot.insertText(text);
     } finally {
       for (const type of guardedEvents) window.removeEventListener(type, guard, true);
       window.removeEventListener("input", recordEdit, true);
     }
-    if (blocked) return false;
+    if (blocked) return null;
     const edited = edits[0];
-    if (edited === field) return true;
+    if (edited === field) return { edited: true };
     if (edited instanceof HTMLInputElement || edited instanceof HTMLTextAreaElement) {
       filled.set(edited, true);
       clearField(edited);
-      return false;
+      return null;
     }
-    return focusedField() === field;
+    return focusedField() === field ? { edited: false } : null;
   }
 
   return {
@@ -222,8 +298,10 @@ function createHumanControl() {
           };
         }
         case "insert":
-          return { inserted: insert(request) };
+          scopeTo(request.controlId);
+          return insert(request);
         case "clear":
+          scopeTo(request.controlId);
           for (const [field, secret] of filled) {
             if (secret || request.scope === "all") clearField(field);
           }
@@ -242,9 +320,64 @@ function fieldKind(field: TextField): GuestFieldKind {
   if (autocomplete.some((token) => token.startsWith("cc-"))) return "secret";
   if (autocomplete.includes("username")) return "username";
   if (field.type === "email" || autocomplete.includes("email")) return "email";
+  if (isCodeBox(field)) return "one_time_code";
   const numeric = field.inputMode === "numeric" || field.type === "number" || field.type === "tel";
   if (numeric && field.maxLength > 0 && field.maxLength <= 8) return "one_time_code";
   return "text";
+}
+
+function isEditable(field: TextField): boolean {
+  const takesText = !(field instanceof HTMLInputElement) || TEXT_INPUT_TYPES.has(field.type);
+  return takesText && !field.readOnly && !field.disabled;
+}
+
+/** The inputs of the field's document or shadow root, without hidden ones, in document order. */
+function inputsAround(field: TextField): HTMLInputElement[] {
+  if (!(field instanceof HTMLInputElement)) return [];
+  const root = field.getRootNode() as Document | ShadowRoot;
+  const found =
+    root === document
+      ? Document.prototype.querySelectorAll.call(document, "input")
+      : root.querySelectorAll("input");
+  return (Array.from(found) as HTMLInputElement[]).filter((input) => input.type !== "hidden");
+}
+
+function fieldsFrom(field: TextField): HTMLInputElement[] {
+  const inputs = inputsAround(field);
+  const index = inputs.indexOf(field as HTMLInputElement);
+  return index === -1 ? [] : inputs.slice(index);
+}
+
+function isCodeBox(field: HTMLInputElement): boolean {
+  if (field.maxLength !== 1) return false;
+  const inputs = inputsAround(field);
+  const index = inputs.indexOf(field);
+  if (index === -1) return false;
+  return [inputs[index - 1], inputs[index + 1]].some(
+    (next) => next?.maxLength === 1 && next.form === field.form,
+  );
+}
+
+function tookWholeText(commit: {
+  field: TextField;
+  text: string;
+  valueBefore: string;
+  spread: TextField[];
+}): boolean {
+  const { field, text, valueBefore, spread } = commit;
+  if (field.value === text) return true;
+  // A field may add or drop separators.
+  const wanted = withoutSeparators(text);
+  if (spread.length === 0 && field.value === valueBefore) {
+    return withoutSeparators(field.value) === wanted;
+  }
+  if (withoutSeparators(field.value).length >= wanted.length) return true;
+  const spreadText = [field, ...spread].map((next) => next.value).join("");
+  return spread.length > 0 && withoutSeparators(spreadText).includes(wanted);
+}
+
+function withoutSeparators(value: string): string {
+  return value.replace(/[\s().+-]/g, "");
 }
 
 function isSecret(kind: GuestFieldKind): boolean {

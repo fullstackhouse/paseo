@@ -979,6 +979,7 @@ class FakeLiveHost extends FakeBrowserHostClient {
 interface RecordingViewer {
   frames: Uint8Array[];
   ended: Array<{ code: string }>;
+  endedControl: Array<{ held: boolean } | undefined>;
   results: BrowserLiveViewStartResult[];
   sink: BrowserLiveViewSink;
   respond: (result: BrowserLiveViewStartResult) => void;
@@ -988,10 +989,14 @@ function createViewer(): RecordingViewer {
   const viewer: RecordingViewer = {
     frames: [],
     ended: [],
+    endedControl: [],
     results: [],
     sink: {
       sendFrame: (frame) => viewer.frames.push(frame),
-      ended: (error) => viewer.ended.push(error),
+      ended: (error, control) => {
+        viewer.ended.push(error);
+        viewer.endedControl.push(control);
+      },
     },
     respond: (result) => viewer.results.push(result),
   };
@@ -1080,6 +1085,7 @@ describe("BrowserToolsBroker live view", () => {
           message: "Browser live view is turned off in Host settings.",
           retryable: false,
         },
+        control: { held: false },
       },
     ]);
     expect(host.liveMessages).toEqual([]);
@@ -1179,7 +1185,11 @@ describe("BrowserToolsBroker live view", () => {
     });
 
     expect(viewer.results).toEqual([
-      { ok: false, error: expect.objectContaining({ code: "browser_unsupported" }) },
+      {
+        ok: false,
+        error: expect.objectContaining({ code: "browser_unsupported" }),
+        control: { held: false },
+      },
     ]);
     expect(broker.getLiveViewCount()).toBe(0);
   });
@@ -1201,7 +1211,11 @@ describe("BrowserToolsBroker live view", () => {
       respond: second.respond,
     });
     expect(second.results).toEqual([
-      { ok: false, error: expect.objectContaining({ code: "browser_denied" }) },
+      {
+        ok: false,
+        error: expect.objectContaining({ code: "browser_denied" }),
+        control: { held: false },
+      },
     ]);
     expect(
       host.liveMessages.filter((m) => m.type === "browser.host.live.start.request"),
@@ -1307,7 +1321,11 @@ describe("BrowserToolsBroker live view", () => {
     });
     await started;
     expect(viewer.results).toEqual([
-      { ok: false, error: { code: "browser_tab_not_found", message: "gone", retryable: false } },
+      {
+        ok: false,
+        error: { code: "browser_tab_not_found", message: "gone", retryable: false },
+        control: { held: false },
+      },
     ]);
     expect(broker.getLiveViewCount()).toBe(0);
   });
@@ -1338,7 +1356,9 @@ describe("BrowserToolsBroker live view", () => {
     });
     await started;
 
-    expect(viewer.results).toEqual([{ ok: false, error: expect.anything() }]);
+    expect(viewer.results).toEqual([
+      { ok: false, error: expect.anything(), control: { held: false } },
+    ]);
     expect(
       host.liveMessages.filter((m) => m.type === "browser.host.live.stop.request"),
     ).toHaveLength(2);
@@ -1364,7 +1384,11 @@ describe("BrowserToolsBroker live view", () => {
     await started;
 
     expect(viewer.results).toEqual([
-      { ok: false, error: expect.objectContaining({ code: "browser_timeout" }) },
+      {
+        ok: false,
+        error: expect.objectContaining({ code: "browser_timeout" }),
+        control: { held: false },
+      },
     ]);
     expect(host.lastLiveRequest("browser.host.live.stop.request")).toMatchObject({
       streamId: "stream-1",
@@ -1447,7 +1471,11 @@ describe("BrowserToolsBroker live view", () => {
     await vi.advanceTimersByTimeAsync(100);
     await started;
     expect(viewer.results).toEqual([
-      { ok: false, error: expect.objectContaining({ code: "browser_timeout" }) },
+      {
+        ok: false,
+        error: expect.objectContaining({ code: "browser_timeout" }),
+        control: { held: false },
+      },
     ]);
     expect(broker.getLiveViewCount()).toBe(0);
     vi.useRealTimers();
@@ -1593,7 +1621,10 @@ describe("BrowserToolsBroker human control", () => {
 
     await expect(
       broker.execute({ agentId: "agent-1", command: snapshotCommand() }),
-    ).resolves.toMatchObject({ ok: false, error: { code: "browser_human_control" } });
+    ).resolves.toMatchObject({
+      ok: false,
+      error: { code: "browser_human_control" },
+    });
     await expect(
       broker.sendLiveInput({ ...viewer(), input: { kind: "key", key: "Tab" } }),
     ).resolves.toMatchObject({ error: { code: "not_controller" } });
@@ -1732,7 +1763,7 @@ describe("BrowserToolsBroker human control", () => {
       viewer("stream-1", "viewer-1", "tablet"),
     ]) {
       await expect(broker.sendLiveInput({ ...impostor, input })).resolves.toMatchObject({
-        error: { code: "not_controller" },
+        error: { code: "stream_ended" },
       });
     }
     expect(JSON.stringify(host.liveMessages)).not.toContain(SENTINEL);
@@ -1786,7 +1817,11 @@ describe("BrowserToolsBroker human control", () => {
       respond: stranger.respond,
     });
     expect(stranger.results).toEqual([
-      { ok: false, error: expect.objectContaining({ code: "browser_denied" }) },
+      {
+        ok: false,
+        error: expect.objectContaining({ code: "browser_denied" }),
+        control: { held: false },
+      },
     ]);
 
     // A new session of the same phone.
@@ -1951,6 +1986,116 @@ describe("BrowserToolsBroker human control", () => {
     });
     expect(broker.receiveControlEnded({ payload, clientIds: [host.id] })).toBe(true);
     await expect(agentSnapshot()).resolves.toMatchObject({ ok: true });
+  });
+
+  test("a failed take leaves the last hand-back note waiting", async () => {
+    vi.useFakeTimers();
+    const { broker, answer, viewer, watch, take, released, agentSnapshot } = controlledBroker();
+    await agentSnapshot();
+    await watch();
+    await take();
+    const handingBack = broker.releaseControl(viewer());
+    await released();
+    await handingBack;
+
+    const taking = broker.takeControl(viewer());
+    const refused = await broker.execute({ agentId: "agent-1", command: snapshotCommand() });
+    expect(refused).not.toHaveProperty("userNotes");
+    answer(
+      { focus: null, error: { code: "agent_busy", message: "Busy." } },
+      "browser.host.live.take_control.request",
+    );
+    await taking;
+
+    await expect(agentSnapshot()).resolves.toMatchObject({
+      userNotes: [expect.stringContaining("handed browser tab")],
+    });
+  });
+
+  test("a granted take drops the note it made stale", async () => {
+    vi.useFakeTimers();
+    const { broker, viewer, watch, take, released, releases, agentSnapshot } = controlledBroker();
+    await agentSnapshot();
+    await watch();
+    await take();
+    const handingBack = broker.releaseControl(viewer());
+    await released();
+    await handingBack;
+
+    await take();
+    await expect(agentSnapshot()).resolves.not.toHaveProperty("userNotes");
+    expect(releases()).toHaveLength(1);
+  });
+
+  test("a stream that ends while control goes on says so", async () => {
+    const { broker, host, watch, take } = controlledBroker();
+    const recording = await watch();
+    await take();
+    const error = { code: "browser_tab_closed", message: "Detached.", retryable: false } as const;
+    broker.receiveLiveEnded({ payload: { streamId: "stream-1", error }, clientIds: [host.id] });
+    expect(recording.endedControl).toEqual([{ held: true }]);
+  });
+
+  test("a stream that ends with control says so", async () => {
+    const { broker, host, watch, take } = controlledBroker();
+    const recording = await watch();
+    await take();
+    broker.unregisterClient(host.id);
+    expect(recording.endedControl).toEqual([{ held: false }]);
+  });
+
+  test("switching the setting off tells the viewer control is over", async () => {
+    const { broker, watch, take } = controlledBroker();
+    const recording = await watch();
+    await take();
+    broker.stopAllLiveViews();
+    expect(recording.endedControl).toEqual([{ held: false }]);
+  });
+
+  test("a start that fails says whether the viewer still holds the tab", async () => {
+    const { broker, host, viewer, watch, take } = controlledBroker();
+    await watch();
+    await take();
+    const again = createViewer();
+    await broker.startLiveView({
+      ...viewer("stream-2"),
+      browserId: BROWSER_ID,
+      options: {},
+      sink: again.sink,
+      respond: again.respond,
+    });
+    expect(again.results).toEqual([
+      expect.objectContaining({ ok: false, control: { held: true } }),
+    ]);
+    expect(host.receivedRequests).toEqual([]);
+  });
+
+  test("an inactive stream is not a lost control", async () => {
+    vi.useFakeTimers();
+    const { broker, viewer, watch, take, leave } = controlledBroker();
+    await watch();
+    await take();
+    await leave();
+    const gone = { error: { code: "stream_ended" } };
+    const input = { kind: "key", key: "Tab" } as const;
+    await expect(broker.sendLiveInput({ ...viewer(), input })).resolves.toMatchObject(gone);
+    await expect(broker.releaseControl(viewer())).resolves.toMatchObject(gone);
+    await expect(broker.takeControl(viewer())).resolves.toMatchObject(gone);
+  });
+
+  test("the desktop can't declare control lost while the daemon holds the lock", async () => {
+    const { broker, answer, viewer, watch, take } = controlledBroker();
+    await watch();
+    await take();
+    const error = { code: "not_controller", message: "Unknown control." };
+    const input = { kind: "key", key: "Tab" } as const;
+    const sending = broker.sendLiveInput({ ...viewer(), input });
+    answer({ focus: null, error }, "browser.host.live.send_input.request");
+    await expect(sending).resolves.toMatchObject({ error: { code: "failed" } });
+
+    const handingBack = broker.releaseControl(viewer());
+    answer({ error }, "browser.host.live.release_control.request");
+    await expect(handingBack).resolves.toMatchObject({ error: { code: "failed" } });
   });
 
   test("a restarted daemon holds no lock", async () => {

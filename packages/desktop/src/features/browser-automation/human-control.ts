@@ -7,7 +7,8 @@ import type {
   BrowserLiveInput,
   BrowserLiveKey,
 } from "@getpaseo/protocol/browser-automation/live-view";
-import { CdpSessionQueue } from "./cdp-session-queue.js";
+import { AgentCommand } from "./agent-commands.js";
+import { CdpSessionQueue, type CdpCommandSender } from "./cdp-session-queue.js";
 import { FrameSessions, type CdpMessageListener, type CdpSessionSender } from "./frame-sessions.js";
 import { GuestFrames, type GuestFrame } from "./guest-frames.js";
 import {
@@ -21,6 +22,8 @@ const SETTLE_MS = 150;
 const REPLY_TIMEOUT_MS = 2_000;
 // Below the daemon's timeout for take_control, which also covers the steps after the drain.
 const DRAIN_TIMEOUT_MS = 10_000;
+const CANCEL_GRACE_MS = 500;
+const ANSWER_TIMEOUT_MS = 1_000;
 const CDP_TIMEOUT_MS = 3_000;
 const LOAD_TIMEOUT_MS = 4_000;
 const LOAD_POLL_MS = 100;
@@ -29,8 +32,10 @@ const DISCARD_RETRY_MS = 30_000;
 const ERROR_MESSAGES = {
   not_controller: "This device doesn't control the tab.",
   busy: "The tab is already controlled.",
-  agent_busy: "The agent's browser command is still running. Try again.",
+  agent_busy: "The agent's browser command couldn't be stopped. Try again.",
   target_changed: "The page or field changed, so the text was refused.",
+  page_changed: "The page changed, so the tap or scroll was refused.",
+  does_not_fit: "The text doesn't fit the field, so it was refused.",
   key_unsupported: "Keys don't reach embedded frames from another site.",
   unconfirmed: "The desktop didn't confirm the input.",
   failed: "The browser tab didn't respond.",
@@ -50,6 +55,7 @@ export interface HumanControlContents {
   isDestroyed(): boolean;
   isLoadingMainFrame(): boolean;
   loadURL(url: string): Promise<void>;
+  stop(): void;
   sendInputEvent(event: IsolatedKeyboardInputEvent): void;
   on(event: "will-prevent-unload", listener: (event: { preventDefault(): void }) => void): void;
   once(event: "destroyed", listener: () => void): void;
@@ -65,6 +71,8 @@ export interface HumanControlTab {
   send: CdpSessionSender;
   /** Runs outside the CDP queue: a dialog blocks the command in front of it. */
   answerDialog(accept: boolean, sessionId?: string): Promise<unknown>;
+  /** Ends the script that is running. Outside the CDP queue, which that script can hold up. */
+  interrupt(): Promise<unknown>;
   onMessage(listener: CdpMessageListener): () => void;
 }
 
@@ -90,6 +98,8 @@ interface Control {
   cleanup: Array<() => void>;
 }
 
+type ShowsDocument = (documentId: string) => boolean;
+
 interface Timing {
   settleMs: number;
   replyTimeoutMs: number;
@@ -107,7 +117,8 @@ export class BrowserHumanControls {
   public readonly frames = new GuestFrames();
   private readonly byControlId = new Map<string, Control>();
   private readonly byContentsId = new Map<number, Control>();
-  private readonly runningByContentsId = new Map<number, Set<Promise<unknown>>>();
+  /** A cancelled command stays until what it started in the page is known to have ended. */
+  private readonly runningByContentsId = new Map<number, Map<AgentCommand, Promise<unknown>>>();
   private readonly typedInto = new Set<number>();
   private readonly timing: Timing;
 
@@ -135,16 +146,20 @@ export class BrowserHumanControls {
   }
 
   /** Registers an agent command in the same tick as its lock check, for take() to wait on. */
-  public async track<T>(contentsId: number, run: () => T | Promise<T>): Promise<T> {
-    const running = this.runningByContentsId.get(contentsId) ?? new Set<Promise<unknown>>();
-    const result = Promise.resolve(run());
-    running.add(result);
+  public async track<T>(
+    contentsId: number,
+    work: (command: AgentCommand) => T | Promise<T>,
+  ): Promise<T> {
+    const command = new AgentCommand();
+    const result = command.run(work);
+    const running =
+      this.runningByContentsId.get(contentsId) ?? new Map<AgentCommand, Promise<unknown>>();
+    running.set(command, result);
     this.runningByContentsId.set(contentsId, running);
     try {
       return await result;
     } finally {
-      running.delete(result);
-      if (running.size === 0) this.runningByContentsId.delete(contentsId);
+      if (!command.cancelled) this.untrack(contentsId, command);
     }
   }
 
@@ -177,38 +192,79 @@ export class BrowserHumanControls {
     this.byControlId.set(controlId, control);
     const destroyed = () => {
       this.forget(control);
+      this.runningByContentsId.delete(contentsId);
       onEnded();
     };
     tab.contents.once("destroyed", destroyed);
     control.cleanup.push(() => tab.contents.removeListener("destroyed", destroyed));
+    // Before anything is awaited: a dialog blocks the drain, Page.enable and auto-attach.
+    control.cleanup.push(
+      tab.onMessage((method, params, sessionId) => {
+        if (method !== "Page.javascriptDialogOpening") return;
+        const accept = params.type === "alert" || params.type === "beforeunload";
+        void tab.answerDialog(accept, sessionId).catch(() => {});
+      }),
+    );
 
     return control.queue.run(async () => {
-      const running = [...(this.runningByContentsId.get(contentsId) ?? [])];
-      const drained = await within(Promise.allSettled(running), this.timing.drainTimeoutMs);
-      if (control.phase !== "taking" || !this.isCurrent(control)) return refuse("failed");
-      if (!drained) {
+      await within(tab.answerDialog(false), ANSWER_TIMEOUT_MS);
+      const code = await this.prepare(control);
+      // A release that came meanwhile is queued behind this and unlocks.
+      if (!this.isTaking(control)) return refuse("failed");
+      if (code) {
         this.forget(control);
-        return refuse("agent_busy");
+        return refuse(code);
       }
-      const enabled = await within(
-        tab.send("Page.enable").then(() => control.frameSessions.attach()),
-        CDP_TIMEOUT_MS,
-      );
-      if (control.phase !== "taking" || !this.isCurrent(control)) return refuse("failed");
-      if (!enabled) {
-        this.forget(control);
-        return refuse("failed");
-      }
-      control.cleanup.push(
-        tab.onMessage((method, params, sessionId) => {
-          if (method !== "Page.javascriptDialogOpening") return;
-          const accept = params.type === "alert" || params.type === "beforeunload";
-          void tab.answerDialog(accept, sessionId).catch(() => {});
-        }),
-      );
       control.phase = "held";
       return { focus: await this.describeFocus(control), error: null };
     });
+  }
+
+  /**
+   * Waits a while for the agent's running commands, then cancels them. A script one of them left
+   * in the page could still read or act, and only a new document is sure to end it.
+   */
+  private async prepare(control: Control): Promise<keyof typeof ERROR_MESSAGES | null> {
+    const { contentsId, tab } = control;
+    const running = [...(this.runningByContentsId.get(contentsId) ?? [])];
+    const results = running.map(([, result]) => result);
+    const commands = running.map(([command]) => command);
+    if (!(await within(Promise.allSettled(results), this.timing.drainTimeoutMs))) {
+      for (const command of commands) command.cancel();
+    }
+    if (!this.isTaking(control)) return "failed";
+
+    const cancelled = commands.filter((command) => command.cancelled);
+    let replaced = false;
+    if (cancelled.length > 0) {
+      if (cancelled.some((command) => command.isPending("loadURL"))) tab.contents.stop();
+      await within(Promise.all(cancelled.map((command) => command.settled())), CANCEL_GRACE_MS);
+      if (!this.isTaking(control)) return "failed";
+      if (cancelled.some((command) => command.isPending("executeJavaScript"))) {
+        replaced = await this.endScripts(control);
+        if (!replaced) return "agent_busy";
+      }
+    }
+
+    const attach = () =>
+      within(
+        tab.send("Page.enable").then(() => control.frameSessions.attach()),
+        CDP_TIMEOUT_MS,
+      );
+    let enabled = await attach();
+    // A cancelled command can also leave the page's own thread busy.
+    if (!enabled && cancelled.length > 0 && !replaced && this.isTaking(control)) {
+      enabled = (await this.endScripts(control)) && (await attach());
+    }
+    if (!enabled) return "failed";
+    for (const command of cancelled) this.untrack(contentsId, command);
+    return null;
+  }
+
+  private async endScripts(control: Control): Promise<boolean> {
+    // A loop would keep the navigation from committing.
+    await within(control.tab.interrupt(), ANSWER_TIMEOUT_MS);
+    return this.replaceDocument(control);
   }
 
   public async input(request: {
@@ -217,8 +273,10 @@ export class BrowserHumanControls {
     /** The tab of the stream the input came on. */
     contentsId: number;
     input: BrowserLiveInput;
+    /** Whether a frame of this document is what the tab still shows. */
+    showsDocument: ShowsDocument;
   }): Promise<BrowserLiveFocusResult> {
-    const { controlId, hostId, contentsId, input } = request;
+    const { controlId, hostId, contentsId, input, showsDocument } = request;
     const control = this.byControlId.get(controlId);
     if (!control || control.hostId !== hostId || control.contentsId !== contentsId) {
       return refuse("not_controller");
@@ -226,7 +284,7 @@ export class BrowserHumanControls {
     return control.queue.run(async () => {
       if (control.phase !== "held" || !this.isCurrent(control)) return refuse("not_controller");
       try {
-        const code = await this.dispatch(control, input);
+        const code = await this.dispatch(control, input, showsDocument);
         if (code) return refuse(code);
         await delay(this.timing.settleMs);
         return { focus: await this.describeFocus(control), error: null };
@@ -267,32 +325,30 @@ export class BrowserHumanControls {
   private async dispatch(
     control: Control,
     input: BrowserLiveInput,
+    showsDocument: ShowsDocument,
   ): Promise<keyof typeof ERROR_MESSAGES | null> {
     const { contents } = control.tab;
-    switch (input.kind) {
-      case "insert_text":
-        return this.insertText(control, input);
-      case "key":
-        return pressKey(contents, input.key);
-      case "tap": {
-        const clicked = control.frameSessions
-          .route(toCssPoint(contents, input))
-          .then(({ send, point }) => dispatchTrustedClick(send, point));
-        return (await within(clicked, CDP_TIMEOUT_MS)) ? null : "failed";
-      }
-      case "scroll": {
-        const zoom = contents.getZoomFactor();
-        const scrolled = await within(
-          control.frameSessions
-            .route(toCssPoint(contents, input))
-            .then(({ send, point }) =>
-              dispatchTrustedScroll(send, point, input.deltaX / zoom, input.deltaY / zoom),
-            ),
-          CDP_TIMEOUT_MS,
-        );
-        return scrolled ? null : "failed";
-      }
-    }
+    if (input.kind === "insert_text") return this.insertText(control, input);
+    if (input.kind === "key") return pressKey(contents, input.key);
+
+    const isShown = () => showsDocument(input.documentId);
+    if (!isShown()) return "page_changed";
+    const zoom = contents.getZoomFactor();
+    const dispatched = control.frameSessions
+      .route(toCssPoint(contents, input))
+      .then(({ send, point }) => {
+        // Routing takes a few round trips, and a navigation can commit during any of them.
+        const sendToShown: CdpCommandSender = async (command, params) => {
+          const acts = params?.type === "mousePressed" || params?.type === "mouseWheel";
+          if (acts && !isShown()) throw new Error("The page changed.");
+          return send(command, params);
+        };
+        return input.kind === "tap"
+          ? dispatchTrustedClick(sendToShown, point)
+          : dispatchTrustedScroll(sendToShown, point, input.deltaX / zoom, input.deltaY / zoom);
+      });
+    if (await within(dispatched, CDP_TIMEOUT_MS)) return null;
+    return isShown() ? "failed" : "page_changed";
   }
 
   private async insertText(
@@ -318,6 +374,7 @@ export class BrowserHumanControls {
       frame,
       {
         op: "insert",
+        controlId: control.controlId,
         targetId: binding.targetId,
         text: input.text,
         // A request that arrives after the user was told it failed must not type.
@@ -326,7 +383,8 @@ export class BrowserHumanControls {
       replyTimeoutMs,
     );
     if (!reply) return "unconfirmed";
-    return reply.inserted === true ? null : "target_changed";
+    if (reply.inserted === true) return null;
+    return reply.reason === "does_not_fit" ? "does_not_fit" : "target_changed";
   }
 
   private async describeFocus(control: Control): Promise<BrowserLiveFocus | null> {
@@ -373,13 +431,20 @@ export class BrowserHumanControls {
       contents.navigationHistory.clear();
       return true;
     }
+    if (!(await this.replaceDocument(control))) return false;
+    control.typedFrames.clear();
+    return true;
+  }
+
+  /** History goes with the document: back would restore it, its form state and its scripts. */
+  private async replaceDocument(control: Control): Promise<boolean> {
+    const { contents } = control.tab;
     const url = contents.mainFrame.isDestroyed() ? contents.getURL() : contents.mainFrame.url;
     const allowUnload = (event: { preventDefault(): void }) => event.preventDefault();
     contents.on("will-prevent-unload", allowUnload);
     try {
       await within(contents.loadURL("about:blank"), LOAD_TIMEOUT_MS);
       if (contents.mainFrame.url !== "about:blank") return false;
-      control.typedFrames.clear();
       contents.navigationHistory.clear();
       if (/^https?:/i.test(url)) {
         // Never reload(): on the result of a POST that submits the form again.
@@ -401,7 +466,11 @@ export class BrowserHumanControls {
     );
     return Promise.all(
       open.map((frame) =>
-        this.frames.ask(frame, { op: "clear", scope }, this.timing.replyTimeoutMs),
+        this.frames.ask(
+          frame,
+          { op: "clear", controlId: control.controlId, scope },
+          this.timing.replyTimeoutMs,
+        ),
       ),
     );
   }
@@ -422,6 +491,16 @@ export class BrowserHumanControls {
     if (this.typedInto.has(contentsId)) return;
     this.typedInto.add(contentsId);
     tab.contents.once("destroyed", () => this.typedInto.delete(contentsId));
+  }
+
+  private untrack(contentsId: number, command: AgentCommand): void {
+    const running = this.runningByContentsId.get(contentsId);
+    running?.delete(command);
+    if (running?.size === 0) this.runningByContentsId.delete(contentsId);
+  }
+
+  private isTaking(control: Control): boolean {
+    return control.phase === "taking" && this.isCurrent(control);
   }
 
   private isCurrent(control: Control): boolean {

@@ -75,7 +75,7 @@ describe("createBrowserControl", () => {
     const harness = createHarness();
     harness.watch();
 
-    await harness.control.send({ kind: "tap", x: 1, y: 2 });
+    await harness.control.send({ kind: "tap", documentId: "s1:0", x: 1, y: 2 });
 
     expect(harness.calls).toEqual([]);
     expect(harness.state()).toMatchObject({
@@ -130,24 +130,42 @@ describe("createBrowserControl", () => {
     expect(harness.state()).toMatchObject({ held: false, focus: null, notice: "released" });
   });
 
-  it.each([
-    "browser_tab_closed",
-    "browser_tab_not_found",
-    "browser_no_host",
-    "browser_denied",
-    "browser_unsupported",
-  ])("stops showing control when the stream ended with %s", async (code) => {
+  it("stops showing control when the daemon says it's over", async () => {
     const harness = createHarness();
     await harness.controlled();
-    harness.control.streamEnded(code);
+    harness.control.streamEnded(false);
     expect(harness.state()).toMatchObject({ held: false, focus: null, notice: "released" });
   });
 
-  it("keeps control through an end that doesn't say it is over", async () => {
+  it.each([true, null])("keeps control through an end that says held: %s", async (held) => {
     const harness = createHarness();
     await harness.controlled();
-    harness.control.streamEnded("connection");
+    harness.control.streamEnded(held);
     expect(harness.state()).toMatchObject({ held: true, focus: FIELD });
+  });
+
+  it("keeps control when only the stream is gone", async () => {
+    const harness = createHarness();
+    await harness.controlled();
+    harness.answers.input = REFUSE("stream_ended");
+    await harness.control.send({ kind: "key", key: "Tab" });
+    expect(harness.state()).toMatchObject({ held: true, focus: FIELD, notice: "stream_ended" });
+  });
+
+  it("drops the field when a tap was refused for a page change", async () => {
+    const harness = createHarness();
+    await harness.controlled();
+    harness.answers.input = REFUSE("page_changed");
+    await harness.control.send({ kind: "tap", documentId: "s1:0", x: 1, y: 2 });
+    expect(harness.state()).toMatchObject({ held: true, focus: null, notice: "page_changed" });
+  });
+
+  it("drops control when a hand-back finds this device no longer has it", async () => {
+    const harness = createHarness();
+    await harness.controlled();
+    harness.answers.release = { error: { code: "not_controller", message: "English detail" } };
+    await harness.control.handBack();
+    expect(harness.state()).toMatchObject({ held: false, focus: null, notice: "released" });
   });
 
   it("drops the field when the page moves to another origin", async () => {

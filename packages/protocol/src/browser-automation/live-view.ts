@@ -32,10 +32,12 @@ export const BROWSER_LIVE_KEYS = [
 ] as const;
 
 // x and y are in the screen space of the frame metadata (deviceWidth x deviceHeight) less offsetTop.
+// documentId is that frame's: a tap or scroll aimed at a previous document is refused.
 export const BrowserLiveInputSchema = z.discriminatedUnion("kind", [
-  z.object({ kind: z.literal("tap"), x: z.number(), y: z.number() }),
+  z.object({ kind: z.literal("tap"), documentId: z.string(), x: z.number(), y: z.number() }),
   z.object({
     kind: z.literal("scroll"),
+    documentId: z.string(),
     x: z.number(),
     y: z.number(),
     deltaX: z.number(),
@@ -69,6 +71,9 @@ export type BrowserLiveControlErrorCode =
   | "busy"
   | "agent_busy"
   | "target_changed"
+  | "page_changed"
+  | "does_not_fit"
+  | "stream_ended"
   | "key_unsupported"
   | "unconfirmed"
   | "failed";
@@ -99,7 +104,8 @@ export const BrowserLiveStartResponseSchema = z.object({
     requestId: z.string(),
     ...BrowserLiveStartResultShape,
     // COMPAT(browserLiveViewInput): added after v0.15.4, remove optional after 2027-05-22.
-    // Present when the tab's desktop can hand over control.
+    // On success: present when the tab's desktop can hand over control. On failure: whether the
+    // viewer still holds the tab.
     control: z.object({ held: z.boolean() }).optional(),
   }),
 });
@@ -180,6 +186,9 @@ export const BrowserLiveEndedSchema = z.object({
   payload: z.object({
     streamId: z.string(),
     error: BrowserAutomationErrorSchema.nullable(),
+    // COMPAT(browserLiveViewInput): added after v0.15.4, remove optional after 2027-05-22.
+    // The daemon's word on whether the viewer still holds the tab: a stream can end while it does.
+    control: z.object({ held: z.boolean() }).optional(),
     subscriptionId: z.string().optional(),
   }),
 });

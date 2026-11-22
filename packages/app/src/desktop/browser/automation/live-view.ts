@@ -208,7 +208,10 @@ export function createBrowserLiveViewHost(options: {
   ): Promise<void> {
     const { requestId, streamId, controlId } = message;
     const takeLiveControl = getHost()?.browser?.takeLiveControl;
-    let payload = { requestId, ...controlFailure("update_desktop") };
+    let payload = {
+      requestId,
+      ...controlFailure(takeLiveControl ? "stream_ended" : "update_desktop"),
+    };
     if (takeLiveControl && streamIds.has(streamId)) {
       // Known before it is granted, so a reset meanwhile releases it too.
       controlIds.add(controlId);
@@ -224,7 +227,8 @@ export function createBrowserLiveViewHost(options: {
   ): Promise<void> {
     const { requestId, streamId, controlId } = message;
     const sendLiveInput = getHost()?.browser?.sendLiveInput;
-    let payload = { requestId, ...controlFailure("not_controller") };
+    const refusal = streamIds.has(streamId) ? "not_controller" : "stream_ended";
+    let payload = { requestId, ...controlFailure(refusal) };
     if (sendLiveInput && streamIds.has(streamId) && controlIds.has(controlId)) {
       const result = await sendLiveInput(message).catch(() => controlFailure("unconfirmed"));
       payload = { ...result, requestId };

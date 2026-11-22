@@ -20,8 +20,10 @@ export interface BrowserLiveViewFrame {
   seq: number;
   uri: string;
   screen: BrowserLiveScreen;
-  /** The tab's committed origin when this frame was sent. */
+  /** The tab's committed origin when this frame was captured. */
   origin: string | null;
+  /** The document it shows, which taps and scrolls on it send back. */
+  documentId: string | null;
 }
 
 export interface BrowserLiveViewStreamInfo {
@@ -33,8 +35,13 @@ export interface BrowserLiveViewStreamInfo {
 export type BrowserLiveViewState =
   | { status: "idle" }
   | { status: "connecting" }
-  | { status: "live"; frame: BrowserLiveViewFrame }
-  | { status: "ended"; code: string | null };
+  | {
+      status: "live";
+      frame: BrowserLiveViewFrame;
+      /** The frame on screen. frame still decodes until it rendered. */
+      shown: BrowserLiveViewFrame | null;
+    }
+  | { status: "ended"; code: string | null; held: boolean | null };
 
 export interface BrowserLiveViewOptions {
   maxFps: number;
@@ -78,11 +85,11 @@ export function createBrowserLiveView(input: {
     onChange(next);
   }
 
-  function end(code: string | null): void {
+  function end(code: string | null, held: boolean | null): void {
     streamId = null;
     unackedSeq = null;
     onStreamChange(null);
-    setState({ status: "ended", code });
+    setState({ status: "ended", code, held });
   }
 
   async function start(): Promise<void> {
@@ -93,7 +100,7 @@ export function createBrowserLiveView(input: {
       result = await client.startBrowserLiveView({ browserId, ...options });
     } catch {
       // Timeouts and disconnects reject; the user sees them and can retry.
-      if (startGeneration === generation) end("connection");
+      if (startGeneration === generation) end("connection", null);
       return;
     }
     if (startGeneration !== generation) {
@@ -101,7 +108,7 @@ export function createBrowserLiveView(input: {
       return;
     }
     if (!result.streamId) {
-      end(result.error?.code ?? null);
+      end(result.error?.code ?? null, result.control?.held ?? null);
       return;
     }
     streamId = result.streamId;
@@ -126,22 +133,35 @@ export function createBrowserLiveView(input: {
   const unsubscribeFrames = client.subscribeBrowserLiveFrames((frame) => {
     if (frame.streamId !== streamId) return;
     const uri = `data:image/jpeg;base64,${bytesToBase64(frame.jpeg)}`;
-    const { deviceWidth, deviceHeight, offsetTop, origin = null } = frame.metadata;
+    const {
+      deviceWidth,
+      deviceHeight,
+      offsetTop,
+      origin = null,
+      documentId = null,
+    } = frame.metadata;
     const screen = { width: deviceWidth, height: deviceHeight, offsetTop };
     // An identical image never re-renders, so ack it now or the stream stalls.
     if (state.status === "live" && state.frame.uri === uri) {
       client.ackBrowserLiveFrame(frame.streamId, frame.frameSeq);
-      if (state.frame.origin !== origin)
-        setState({ status: "live", frame: { ...state.frame, origin } });
+      if (state.frame.origin !== origin || state.frame.documentId !== documentId) {
+        const same = { ...state.frame, origin, documentId };
+        const isShown = state.shown?.seq === state.frame.seq;
+        setState({ status: "live", frame: same, shown: isShown ? same : state.shown });
+      }
       return;
     }
     unackedSeq = frame.frameSeq;
-    setState({ status: "live", frame: { seq: frame.frameSeq, uri, screen, origin } });
+    setState({
+      status: "live",
+      frame: { seq: frame.frameSeq, uri, screen, origin, documentId },
+      shown: state.status === "live" ? state.shown : null,
+    });
   });
 
   const unsubscribeEnded = input.subscribeEnded((ended) => {
     if (ended.streamId !== streamId) return;
-    end(ended.error?.code ?? null);
+    end(ended.error?.code ?? null, ended.control?.held ?? null);
   });
 
   return {
@@ -161,6 +181,7 @@ export function createBrowserLiveView(input: {
     frameRendered(seq) {
       if (!streamId || unackedSeq !== seq) return;
       unackedSeq = null;
+      if (state.status === "live") setState({ ...state, shown: state.frame });
       client.ackBrowserLiveFrame(streamId, seq);
     },
     dispose() {

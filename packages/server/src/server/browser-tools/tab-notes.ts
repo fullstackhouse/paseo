@@ -32,10 +32,21 @@ export class BrowserTabNotes {
     for (const notes of this.notesByAgentId.values()) notes.delete(browserId);
   }
 
-  public deliver(agentId: string, browserId: string | null): string[] {
-    const notes = [...(this.notesByAgentId.get(agentId)?.values() ?? [])];
-    this.notesByAgentId.delete(agentId);
-    if (!browserId) return notes;
+  /** Keeps the notes of held tabs: they are stale if the take succeeds, and true if it fails. */
+  public deliver(
+    agentId: string,
+    browserId: string | null,
+    isHeld: (browserId: string) => boolean,
+  ): string[] {
+    const notes: string[] = [];
+    const waiting = this.notesByAgentId.get(agentId) ?? new Map<string, string>();
+    for (const [noteBrowserId, note] of waiting) {
+      if (isHeld(noteBrowserId)) continue;
+      notes.push(note);
+      waiting.delete(noteBrowserId);
+    }
+    if (waiting.size === 0) this.notesByAgentId.delete(agentId);
+    if (!browserId || isHeld(browserId)) return notes;
     const unclaimed = this.notesForNextCaller.get(browserId);
     if (unclaimed === undefined) return notes;
     this.notesForNextCaller.delete(browserId);

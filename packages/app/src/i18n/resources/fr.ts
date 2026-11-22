@@ -661,6 +661,12 @@ export const fr: TranslationResources = {
           released: "Votre contrôle a pris fin. La saisie non envoyée a pu être supprimée.",
           targetChanged:
             "La page ou le champ a changé, le texte a donc été refusé. Touchez à nouveau le champ.",
+          pageChanged:
+            "La page a changé, votre appui ou défilement n'a donc pas été envoyé. Réessayez sur la nouvelle page.",
+          doesNotFit:
+            "Ce texte ne tient pas dans ce champ, il n'a donc pas été saisi. Touchez le champ et réessayez.",
+          streamEnded:
+            "La vue en direct s'est arrêtée, rien n'a donc été envoyé. Reconnectez-vous et réessayez.",
           unconfirmed:
             "L’ordinateur n’a pas confirmé le texte. Vérifiez la page avant de le saisir à nouveau.",
           agentBusy: "L’action de l’agent dans le navigateur est encore en cours. Réessayez.",

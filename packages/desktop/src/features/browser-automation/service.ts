@@ -30,6 +30,8 @@ export interface TabContents {
   isLoading(): boolean;
   isDestroyed(): boolean;
   executeJavaScript(code: string): Promise<unknown>;
+  /** Settles once executeJavaScript would run at once, instead of waiting for loading to stop. */
+  waitUntilScriptable?(): Promise<void>;
   loadURL(url: string): Promise<void>;
   goBack(): void;
   goForward(): void;

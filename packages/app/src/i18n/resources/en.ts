@@ -650,6 +650,11 @@ export const en = {
           released: "Your control ended. Input you didn't submit may have been discarded.",
           targetChanged:
             "The page or field changed, so your text was refused. Tap the field again.",
+          pageChanged:
+            "The page changed, so your tap or scroll wasn't sent. Try again on the new page.",
+          doesNotFit:
+            "That text doesn't fit this field, so it wasn't entered. Tap the field and try again.",
+          streamEnded: "The live view stopped, so nothing was sent. Reconnect and try again.",
           unconfirmed:
             "The desktop didn't confirm your text. Check the page before typing it again.",
           agentBusy: "The agent's browser action is still running. Try again.",

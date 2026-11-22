@@ -19,8 +19,10 @@ export const BrowserLiveFrameMetadataSchema = z.object({
   scrollOffsetX: z.number(),
   scrollOffsetY: z.number(),
   timestamp: z.number().optional(),
-  // The tab's committed top-level origin when the frame was sent, from Electron main.
+  // The tab's committed top-level origin when the frame arrived in Electron main.
   origin: z.string().optional(),
+  // The document the frame shows. Taps and scrolls send it back.
+  documentId: z.string().optional(),
 });
 
 export type BrowserLiveFrameMetadata = z.infer<typeof BrowserLiveFrameMetadataSchema>;

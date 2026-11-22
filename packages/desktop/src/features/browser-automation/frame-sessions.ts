@@ -1,4 +1,5 @@
 import type { CdpCommandSender } from "./cdp-session-queue.js";
+import { toBoxPoint } from "./quad.js";
 
 // An iframe in an iframe in an iframe is already more than a sign-in page uses.
 const MAX_FRAME_DEPTH = 5;
@@ -79,11 +80,16 @@ export class FrameSessions {
     const childSessionId = node?.frameId ? this.sessionIdByTargetId.get(node.frameId) : undefined;
     if (!childSessionId) return null;
     const { model } = (await this.send("DOM.getBoxModel", { backendNodeId }, sessionId)) as {
-      model?: { content?: number[] };
+      model?: { content?: number[]; border?: number[]; width?: number; height?: number };
     };
-    const [left, top] = model?.content ?? [];
-    if (left === undefined || top === undefined) return null;
-    return { sessionId: childSessionId, point: { x: point.x - left, y: point.y - top } };
+    const { content = [], border = [], width, height } = model ?? {};
+    const [left, top] = content;
+    if (!width || !height || left === undefined || top === undefined) return null;
+    // Quads show the box after CSS transforms; width and height are its border box before them.
+    const local = toBoxPoint(point, border, { width, height });
+    const origin = toBoxPoint({ x: left, y: top }, border, { width, height });
+    if (!local || !origin) return null;
+    return { sessionId: childSessionId, point: { x: local.x - origin.x, y: local.y - origin.y } };
   }
 
   private handleMessage(method: string, params: Record<string, unknown>): void {

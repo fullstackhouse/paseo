@@ -659,6 +659,12 @@ export const ptBR: TranslationResources = {
           released: "Seu controle terminou. O que você não enviou pode ter sido descartado.",
           targetChanged:
             "A página ou o campo mudou e o texto foi recusado. Toque no campo novamente.",
+          pageChanged:
+            "A página mudou, por isso seu toque ou rolagem não foi enviado. Tente novamente na nova página.",
+          doesNotFit:
+            "Esse texto não cabe neste campo, por isso não foi inserido. Toque no campo e tente novamente.",
+          streamEnded:
+            "A visualização ao vivo parou, por isso nada foi enviado. Reconecte e tente novamente.",
           unconfirmed:
             "O computador não confirmou o texto. Verifique a página antes de digitar de novo.",
           agentBusy: "A ação do agente no navegador ainda está em andamento. Tente novamente.",

@@ -290,7 +290,7 @@ describe("WebSocketServer browser tools wiring", () => {
 
       const input = { kind: "insert_text", targetId: "target-1", text: sentinel } as const;
       await expect(stranger.sendBrowserLiveInput(streamId, input)).resolves.toMatchObject({
-        error: { code: "not_controller" },
+        error: { code: "stream_ended" },
       });
       expect(received).toEqual([]);
 

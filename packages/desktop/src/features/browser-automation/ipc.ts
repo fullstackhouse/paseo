@@ -20,6 +20,8 @@ import {
   type HumanControlTab,
 } from "./human-control.js";
 import { BrowserLiveViewStream, type BrowserLiveViewEvents } from "./live-view.js";
+import { AgentCommandCancelledError } from "./agent-commands.js";
+import { dismissPageDialog } from "./page-dialogs.js";
 import type {
   BrowserAutomationConsoleLogEntry,
   BrowserAutomationDialogEvent,
@@ -153,6 +155,7 @@ interface ConsoleMessageEmitter {
 }
 
 interface BrowserAutomationWebContents extends ConsoleMessageEmitter {
+  once(event: "destroyed" | "did-stop-loading", listener: () => void): void;
   removeListener(event: "destroyed", listener: () => void): void;
   readonly mainFrame: HumanControlContents["mainFrame"];
   readonly focusedFrame: GuestFrame | null;
@@ -169,6 +172,7 @@ interface BrowserAutomationWebContents extends ConsoleMessageEmitter {
   isDestroyed(): boolean;
   executeJavaScript(code: string): Promise<unknown>;
   loadURL(url: string): Promise<void>;
+  stop(): void;
   goBack(): void;
   goForward(): void;
   reload(): void;
@@ -198,6 +202,12 @@ export function adaptWebContents(
     isLoading: () => contents.isLoading(),
     isDestroyed: () => contents.isDestroyed(),
     executeJavaScript: (code: string) => contents.executeJavaScript(code),
+    // Electron's own condition in executeJavaScript.
+    waitUntilScriptable: async () => {
+      while (!contents.isDestroyed() && (!contents.getURL() || contents.isLoadingMainFrame())) {
+        await new Promise<void>((resolve) => contents.once("did-stop-loading", () => resolve()));
+      }
+    },
     loadURL: (url: string) => contents.loadURL(url),
     goBack: () => contents.goBack(),
     goForward: () => contents.goForward(),
@@ -539,8 +549,8 @@ function createRegistry(hostWebContentsId: number): BrowserRegistry {
 function liveViewEvents(contents: BrowserAutomationWebContents): BrowserLiveViewEvents {
   return {
     onMessage(listener) {
-      const handler = (_event: unknown, method: string, params?: Record<string, unknown>) =>
-        listener(method, params ?? {});
+      const handler: DebuggerMessageListener = (_event, method, params, sessionId) =>
+        listener(method, params ?? {}, sessionId);
       contents.debugger.on?.("message", handler);
       return () => contents.debugger.removeListener?.("message", handler);
     },
@@ -570,8 +580,15 @@ function humanControlTab(contents: BrowserAutomationWebContents): HumanControlTa
         if (!debuggerApi.isAttached()) debuggerApi.attach("1.3");
         return debuggerApi.sendCommand(command, params ?? {}, sessionId);
       }),
-    answerDialog: async (accept, sessionId) =>
-      debuggerApi.sendCommand("Page.handleJavaScriptDialog", { accept }, sessionId),
+    answerDialog: async (accept, sessionId) => {
+      try {
+        return await debuggerApi.sendCommand("Page.handleJavaScriptDialog", { accept }, sessionId);
+      } finally {
+        // For a dialog older than Page.enable, and for the message box, which CDP leaves open.
+        dismissPageDialog(contents, accept);
+      }
+    },
+    interrupt: async () => debuggerApi.sendCommand("Runtime.terminateExecution", {}),
     onMessage: (listener) => {
       const handler: DebuggerMessageListener = (_event, method, params, sessionId) =>
         listener(method, params ?? {}, sessionId);
@@ -603,20 +620,38 @@ export async function runAgentCommand(input: {
   if (command.command === "new_tab") return execute();
   const contents = registry.getTabContents(command.args.browserId);
   if (!contents || contents.isDestroyed()) return execute();
-  if (controls.isHeld(contents.id)) {
-    return {
-      requestId: request.requestId,
-      ok: false,
-      error: {
-        // Not browser_human_control: daemons that predate it reject responses with unknown codes.
-        code: "browser_denied",
-        message:
-          "The user is controlling this tab. Wait for hand-back, then call browser_snapshot.",
-        retryable: true,
-      },
-    };
+  if (controls.isHeld(contents.id)) return refuseHeldTab(request.requestId);
+  try {
+    return await controls.track(contents.id, (agentCommand) =>
+      executeAutomationCommand(
+        request,
+        {
+          ...registry,
+          getTabContents: (browserId) => {
+            const tab = registry.getTabContents(browserId);
+            return tab && agentCommand.guard(tab);
+          },
+        },
+        { snapshotEngine },
+      ),
+    );
+  } catch (error) {
+    if (error instanceof AgentCommandCancelledError) return refuseHeldTab(request.requestId);
+    throw error;
   }
-  return controls.track(contents.id, execute);
+}
+
+function refuseHeldTab(requestId: string): AutomationCommandPayload {
+  return {
+    requestId,
+    ok: false,
+    error: {
+      // Not browser_human_control: daemons that predate it reject responses with unknown codes.
+      code: "browser_denied",
+      message: "The user is controlling this tab. Wait for hand-back, then call browser_snapshot.",
+      retryable: true,
+    },
+  };
 }
 
 function withholdHeldTabs(
@@ -696,18 +731,17 @@ export class BrowserLiveViewStreams {
         `Browser tab ${request.browserId} is already streaming a live view.`,
       );
     }
+    // A dialog in the main frame holds up Page.enable and the screencast.
+    dismissPageDialog(contents);
     const hostStreamIds = this.streamIdsOfHost(hostContents);
     const stream = new BrowserLiveViewStream({
       streamId: request.streamId,
       tab: adaptWebContents(contents),
       events: liveViewEvents(contents),
+      readOrigin: () => readCommittedOrigin(contents),
       onFrame: (frame) => {
         if (hostContents.isDestroyed()) return;
-        const origin = readCommittedOrigin(contents);
-        hostContents.send(BROWSER_LIVE_FRAME_EVENT, {
-          ...frame,
-          metadata: { ...frame.metadata, ...(origin ? { origin } : {}) },
-        });
+        hostContents.send(BROWSER_LIVE_FRAME_EVENT, frame);
       },
       onEnded: (reason) => {
         if (this.streams.get(request.streamId) !== stream) return;
@@ -717,15 +751,20 @@ export class BrowserLiveViewStreams {
         this.streamIdByContentsId.delete(contentsId);
         this.tabByStreamId.delete(request.streamId);
         // Nobody asked for this end; the daemon still thinks the viewer is watching.
-        if (reason === "gone" && !hostContents.isDestroyed()) {
-          hostContents.send(BROWSER_LIVE_ENDED_EVENT, {
-            streamId: request.streamId,
-            error: {
-              code: "browser_tab_closed",
-              message: `Browser tab ${request.browserId} closed.`,
-              retryable: false,
-            },
-          });
+        if (reason === "gone") {
+          // Closing a tab detaches the debugger before it ends control. The daemon has to hear
+          // that control ended first, so the viewer learns both from the stream's end.
+          setTimeout(() => {
+            if (hostContents.isDestroyed()) return;
+            hostContents.send(BROWSER_LIVE_ENDED_EVENT, {
+              streamId: request.streamId,
+              error: {
+                code: "browser_tab_closed",
+                message: `Browser tab ${request.browserId} closed.`,
+                retryable: false,
+              },
+            });
+          }, 0);
         }
       },
     });
@@ -798,11 +837,13 @@ export class BrowserLiveViewStreams {
     const { requestId, streamId, controlId, input } = parsed.data;
     const contents = this.tabOfStream(hostContents, streamId);
     if (!contents) return streamGone(requestId);
+    const stream = this.streams.get(streamId);
     const result = await this.controls.input({
       controlId,
       hostId: hostContents.id,
       contentsId: contents.id,
       input,
+      showsDocument: (documentId) => stream?.showsDocument(documentId) === true,
     });
     return { requestId, ...result };
   }
@@ -891,7 +932,7 @@ function streamGone(requestId: string) {
   return {
     requestId,
     focus: null,
-    error: { code: "failed", message: "The live view ended." },
+    error: { code: "stream_ended", message: "The live view ended." },
   };
 }
 

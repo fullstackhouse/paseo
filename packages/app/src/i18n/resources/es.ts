@@ -661,6 +661,12 @@ export const es: TranslationResources = {
           released: "Tu control terminó. Puede que se haya descartado lo que no enviaste.",
           targetChanged:
             "La página o el campo cambió y se rechazó el texto. Vuelve a tocar el campo.",
+          pageChanged:
+            "La página cambió, así que no se envió tu toque ni desplazamiento. Inténtalo de nuevo en la página nueva.",
+          doesNotFit:
+            "Ese texto no cabe en este campo, así que no se introdujo. Toca el campo e inténtalo de nuevo.",
+          streamEnded:
+            "La vista en vivo se detuvo, así que no se envió nada. Vuelve a conectarte e inténtalo de nuevo.",
           unconfirmed:
             "El escritorio no confirmó el texto. Revisa la página antes de escribirlo de nuevo.",
           agentBusy: "La acción del agente en el navegador sigue en curso. Inténtalo de nuevo.",

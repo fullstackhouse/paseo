@@ -21,7 +21,9 @@ export interface BrowserLiveViewOptions {
 
 /** CDP events of the tab's debugger session. Both return an unsubscribe. */
 export interface BrowserLiveViewEvents {
-  onMessage(listener: (method: string, params: Record<string, unknown>) => void): () => void;
+  onMessage(
+    listener: (method: string, params: Record<string, unknown>, sessionId?: string) => void,
+  ): () => void;
   /** The tab was destroyed or its debugger session detached. */
   onGone(listener: () => void): () => void;
 }
@@ -41,7 +43,7 @@ export type BrowserLiveViewEndReason = "stopped" | "failed" | "gone";
 interface ScreencastFrame {
   sessionId: number;
   data: string;
-  metadata: unknown;
+  metadata: BrowserLiveFrameMetadata;
 }
 
 /**
@@ -53,6 +55,10 @@ interface ScreencastFrame {
  * restarts the screencast after catching up: that begins with the current paint, and
  * invalidate() doesn't produce one.
  * Exactly one frame is in flight from tab to viewer.
+ *
+ * A frame belongs to the document and origin it arrived with. Chromium paints no new frame of
+ * the old document after a commit, but one captured just before can still be on its way: its
+ * capture time gives it away.
  */
 export class BrowserLiveViewStream {
   private nextFrameSeq = 0;
@@ -65,6 +71,8 @@ export class BrowserLiveViewStream {
   /** Screencast sessions of dropped frames, acked together with the forwarded one. */
   private droppedSessionIds: number[] = [];
   private stopped = false;
+  private documentSeq = 0;
+  private committedAt = 0;
   private readonly unsubscribers: Array<() => void> = [];
 
   public constructor(
@@ -72,6 +80,8 @@ export class BrowserLiveViewStream {
       streamId: string;
       tab: LiveViewTab;
       events: BrowserLiveViewEvents;
+      /** The tab's committed top-level origin. */
+      readOrigin: () => string | undefined;
       onFrame: (frame: BrowserLiveViewFrame) => void;
       /** Called once when the stream ends for any reason, including stop(). */
       onEnded: (reason: BrowserLiveViewEndReason) => void;
@@ -81,7 +91,9 @@ export class BrowserLiveViewStream {
   public async start(options: BrowserLiveViewOptions): Promise<BrowserLiveViewport> {
     const { tab, events } = this.params;
     this.unsubscribers.push(
-      events.onMessage((method, params) => this.handleMessage(method, params)),
+      events.onMessage((method, params, sessionId) =>
+        this.handleMessage(method, params, sessionId),
+      ),
       events.onGone(() => this.end("gone")),
       tab.holdPainting(),
     );
@@ -155,17 +167,53 @@ export class BrowserLiveViewStream {
     await this.params.tab.sendDebugCommand("Page.stopScreencast").catch(() => {});
   }
 
-  private handleMessage(method: string, params: Record<string, unknown>): void {
-    if (this.stopped || method !== "Page.screencastFrame") {
+  /** Whether the tab still shows the document of the frames that carry this id. */
+  public showsDocument(documentId: string): boolean {
+    return !this.stopped && documentId === this.documentId;
+  }
+
+  private get documentId(): string {
+    return `${this.params.streamId}:${this.documentSeq}`;
+  }
+
+  private handleMessage(
+    method: string,
+    params: Record<string, unknown>,
+    targetSessionId?: string,
+  ): void {
+    // Only the tab's own session: an iframe's reports that iframe's documents.
+    if (this.stopped || targetSessionId) return;
+    if (method === "Page.frameNavigated") {
+      const { frame } = params as { frame?: { parentId?: string } };
+      if (frame && !frame.parentId) this.documentCommitted();
       return;
     }
+    if (method !== "Page.screencastFrame") return;
     const sessionId = params.sessionId;
     const data = params.data;
     if (typeof sessionId !== "number" || typeof data !== "string") {
       return;
     }
-    const frame = { sessionId, data, metadata: params.metadata };
-    if (!this.unackedFrame && !this.ackTimer) {
+    const metadata = readFrameMetadata(params.metadata);
+    const isFree = !this.unackedFrame && !this.ackTimer;
+    if (metadata.timestamp !== undefined && metadata.timestamp * 1000 < this.committedAt) {
+      if (isFree) {
+        void this.params.tab
+          .sendDebugCommand("Page.screencastFrameAck", { sessionId })
+          .catch(() => {});
+      } else {
+        this.droppedSessionIds.push(sessionId);
+        this.mayHaveMissedPaint = true;
+      }
+      return;
+    }
+    const origin = this.params.readOrigin();
+    const frame = {
+      sessionId,
+      data,
+      metadata: { ...metadata, ...(origin ? { origin } : {}), documentId: this.documentId },
+    };
+    if (isFree) {
       this.forward(frame);
       return;
     }
@@ -180,9 +228,18 @@ export class BrowserLiveViewStream {
     this.params.onFrame({
       streamId: this.params.streamId,
       frameSeq,
-      metadata: readFrameMetadata(metadata),
+      metadata,
       jpeg: new Uint8Array(Buffer.from(data, "base64")),
     });
+  }
+
+  private documentCommitted(): void {
+    this.documentSeq += 1;
+    this.committedAt = Date.now();
+    if (!this.waitingFrame) return;
+    this.droppedSessionIds.push(this.waitingFrame.sessionId);
+    this.waitingFrame = null;
+    this.mayHaveMissedPaint = true;
   }
 
   private restartScreencast(): void {

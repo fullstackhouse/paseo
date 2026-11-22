@@ -64,10 +64,13 @@ export class SessionLiveViews {
       },
       sink: {
         sendFrame: (frame) => subscription.emitBinary(frame),
-        ended: (failure) => {
+        ended: (failure, control) => {
           if (this.streams.get(streamId)?.subscription !== subscription) return;
           this.streams.delete(streamId);
-          subscription.emit({ type: "browser.live.ended", payload: { streamId, error: failure } });
+          subscription.emit({
+            type: "browser.live.ended",
+            payload: { streamId, error: failure, control },
+          });
           void subscription.release().catch(() => {});
         },
       },
@@ -86,7 +89,13 @@ export class SessionLiveViews {
                 error: null,
                 ...(result.control ? { control: result.control } : {}),
               }
-            : { requestId: request.requestId, streamId: null, viewport: null, error: result.error },
+            : {
+                requestId: request.requestId,
+                streamId: null,
+                viewport: null,
+                error: result.error,
+                control: result.control,
+              },
         });
       },
     });
