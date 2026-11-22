@@ -100,6 +100,9 @@ interface RegisteredBrowserHost {
 export interface BrowserToolsBrokerOptions {
   defaultTimeoutMs?: number;
   createRequestId?: () => string;
+  // COMPAT(browserLiveViewFlag): experimental opt-in added after v0.15.4, remove once live view ships on by default.
+  /** Whether viewers may start live views (the host's browserLiveView setting). Off when absent. */
+  isLiveViewEnabled?: () => boolean;
 }
 
 const DEFAULT_BROWSER_TOOLS_TIMEOUT_MS = 15_000;
@@ -107,6 +110,7 @@ const DEFAULT_BROWSER_TOOLS_TIMEOUT_MS = 15_000;
 export class BrowserToolsBroker {
   private readonly defaultTimeoutMs: number;
   private readonly createRequestId: () => string;
+  private readonly isLiveViewEnabled: () => boolean;
   private readonly clients = new Map<string, RegisteredBrowserHost>();
   private readonly pending = new Map<string, PendingBrowserToolsRequest>();
   private readonly browserHostByBrowserId = new Map<string, string>();
@@ -118,6 +122,7 @@ export class BrowserToolsBroker {
   public constructor(options: BrowserToolsBrokerOptions) {
     this.defaultTimeoutMs = options.defaultTimeoutMs ?? DEFAULT_BROWSER_TOOLS_TIMEOUT_MS;
     this.createRequestId = options.createRequestId ?? (() => `browser_${randomUUID()}`);
+    this.isLiveViewEnabled = options.isLiveViewEnabled ?? (() => false);
   }
 
   public registerClient(client: BrowserHostClient): () => void {
@@ -300,6 +305,17 @@ export class BrowserToolsBroker {
     respond: (result: BrowserLiveViewStartResult) => void;
     timeoutMs?: number;
   }): Promise<void> {
+    if (!this.isLiveViewEnabled()) {
+      input.respond({
+        ok: false,
+        error: {
+          code: "browser_unsupported",
+          message: "Browser live view is turned off in Host settings.",
+          retryable: false,
+        },
+      });
+      return;
+    }
     if (this.liveViews.getByBrowserId(input.browserId)) {
       input.respond({
         ok: false,
@@ -484,6 +500,18 @@ export class BrowserToolsBroker {
       },
     );
     return true;
+  }
+
+  /** Ends every stream, e.g. when live view is switched off. Viewers get browser.live.ended. */
+  public stopAllLiveViews(): void {
+    for (const stream of this.liveViews.removeAll()) {
+      this.stopOrphanedHostStream(stream);
+      stream.sink.ended({
+        code: "browser_unsupported",
+        message: "Browser live view was turned off in Host settings.",
+        retryable: false,
+      });
+    }
   }
 
   public getLiveViewCount(): number {
@@ -880,6 +908,13 @@ class LiveViewRegistry {
       this.streamIdByBrowserId.delete(stream.browserId);
     }
     return stream;
+  }
+
+  public removeAll(): BrowserLiveViewStream[] {
+    const removed = [...this.byStreamId.values()];
+    this.byStreamId.clear();
+    this.streamIdByBrowserId.clear();
+    return removed;
   }
 
   public removeForHost(hostClientId: string): BrowserLiveViewStream[] {

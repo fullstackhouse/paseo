@@ -998,11 +998,12 @@ function createViewer(): RecordingViewer {
   return viewer;
 }
 
-function createLiveBroker(): BrowserToolsBroker {
+function createLiveBroker(options: { enabled?: () => boolean } = {}): BrowserToolsBroker {
   let sequence = 0;
   return new BrowserToolsBroker({
     defaultTimeoutMs: 100,
     createRequestId: () => `req-${++sequence}`,
+    isLiveViewEnabled: options.enabled ?? (() => true),
   });
 }
 
@@ -1053,6 +1054,64 @@ async function startStream(params: {
 }
 
 describe("BrowserToolsBroker live view", () => {
+  test("refuses to start while the host setting is off, without contacting the host", async () => {
+    const broker = createLiveBroker({ enabled: () => false });
+    const host = new FakeLiveHost("host-1");
+    broker.registerClient(host);
+    const viewer = createViewer();
+
+    await broker.startLiveView({
+      streamId: "stream-1",
+      browserId: BROWSER_ID,
+      viewerId: "viewer-1",
+      options: {},
+      sink: viewer.sink,
+      respond: viewer.respond,
+    });
+
+    expect(viewer.results).toEqual([
+      {
+        ok: false,
+        error: {
+          code: "browser_unsupported",
+          message: "Browser live view is turned off in Host settings.",
+          retryable: false,
+        },
+      },
+    ]);
+    expect(host.liveMessages).toEqual([]);
+  });
+
+  test("switching the setting off stops every stream on the host and tells viewers", async () => {
+    let enabled = true;
+    const broker = createLiveBroker({ enabled: () => enabled });
+    const host = new FakeLiveHost("host-1");
+    broker.registerClient(host);
+    const first = createViewer();
+    const second = createViewer();
+    await startStream({ broker, host, viewer: first });
+    await startStream({
+      broker,
+      host,
+      viewer: second,
+      streamId: "stream-2",
+      viewerId: "viewer-2",
+      browserId: SECOND_BROWSER_ID,
+    });
+
+    enabled = false;
+    broker.stopAllLiveViews();
+
+    expect(first.ended).toEqual([expect.objectContaining({ code: "browser_unsupported" })]);
+    expect(second.ended).toEqual([expect.objectContaining({ code: "browser_unsupported" })]);
+    expect(
+      host.liveMessages
+        .filter((message) => message.type === "browser.host.live.stop.request")
+        .map((message) => ("streamId" in message ? message.streamId : null)),
+    ).toEqual(["stream-1", "stream-2"]);
+    expect(broker.getLiveViewCount()).toBe(0);
+  });
+
   test("routes start to the host that owns the tab and relays its frames to the viewer", async () => {
     const broker = createLiveBroker();
     const owner = new FakeLiveHost("host-owner");

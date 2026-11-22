@@ -531,6 +531,10 @@ function resolveBrowserToolsEnabled(persisted: ReturnType<typeof loadPersistedCo
   return persisted.daemon?.browserTools?.enabled ?? false;
 }
 
+function resolveBrowserLiveView(persisted: ReturnType<typeof loadPersistedConfig>): boolean {
+  return persisted.daemon?.browserLiveView === true;
+}
+
 /**
  * Both profile lists stay `undefined` when absent rather than defaulting to an
  * empty array: for terminal profiles that is what selects the built-in
@@ -555,6 +559,7 @@ function resolveStaticLoadConfigSettings(
     usageEnabled: resolveUsageEnabled(persisted),
     browserToolsEnabled: resolveBrowserToolsEnabled(persisted),
     autoArchiveAfterMerge: persisted.daemon?.autoArchiveAfterMerge ?? false,
+    browserLiveView: resolveBrowserLiveView(persisted),
     snoozedPermission: persisted.daemon?.snoozedPermission,
     appendSystemPrompt: resolveAppendSystemPrompt(persisted),
     ...resolveProfileLists(persisted),
@@ -586,6 +591,7 @@ export type ResolvedDaemonSettings = Pick<
   | "browserToolsEnabled"
   | "git"
   | "autoArchiveAfterMerge"
+  | "browserLiveView"
   | "snoozedPermission"
   | "enableTerminalAgentHooks"
   | "appendSystemPrompt"

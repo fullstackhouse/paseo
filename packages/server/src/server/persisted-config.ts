@@ -274,6 +274,8 @@ export const PersistedConfigSchema = z
           .strict()
           .optional(),
         autoArchiveAfterMerge: z.boolean().optional(),
+        // COMPAT(browserLiveViewFlag): experimental opt-in added after v0.15.4, remove once live view ships on by default.
+        browserLiveView: z.boolean().optional(),
         enableTerminalAgentHooks: z.boolean().optional(),
         // FSH-only: what a permission prompt does to a snoozed workspace (default wake).
         snoozedPermission: z.enum(["wake", "badge", "silent"]).optional(),

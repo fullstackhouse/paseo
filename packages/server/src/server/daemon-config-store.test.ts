@@ -862,6 +862,31 @@ describe("DaemonConfigStore", () => {
     expect(persisted.daemon?.enableTerminalAgentHooks).toBe(true);
   });
 
+  test("patch persists the browser live view opt-in and reloads it, defaulting off", async () => {
+    const paseoHome = mkdtempSync(path.join(tmpdir(), "paseo-daemon-config-store-"));
+    tempDirs.push(paseoHome);
+    expect(loadConfig(paseoHome, { env: {} }).browserLiveView).toBe(false);
+
+    const store = new DaemonConfigStore(
+      paseoHome,
+      {
+        mcp: { injectIntoAgents: false },
+        providers: {},
+        metadataGeneration: { providers: [] },
+        autoArchiveAfterMerge: false,
+        enableTerminalAgentHooks: false,
+        appendSystemPrompt: "",
+      },
+      undefined,
+    );
+
+    await store.patch({ browserLiveView: true });
+
+    expect(store.get().browserLiveView).toBe(true);
+    expect(loadPersistedConfig(paseoHome).daemon?.browserLiveView).toBe(true);
+    expect(loadConfig(paseoHome, { env: {} }).browserLiveView).toBe(true);
+  });
+
   test("patch persists metadata generation providers into config.json", async () => {
     const paseoHome = mkdtempSync(path.join(tmpdir(), "paseo-daemon-config-store-"));
     tempDirs.push(paseoHome);
