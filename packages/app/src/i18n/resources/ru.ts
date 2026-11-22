@@ -354,6 +354,7 @@ export const ru: TranslationResources = {
       forkMissingWorkspace: "Этот агент не связан с рабочим пространством.",
       forkFailed: "Не удалось создать форк чата",
       openFile: "Открыть файл",
+      viewLive: "Смотреть вживую",
       copied: "Скопировано",
     },
     attachments: {

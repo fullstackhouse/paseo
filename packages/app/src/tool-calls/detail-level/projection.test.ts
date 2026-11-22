@@ -98,6 +98,31 @@ describe("tool call detail-level projection", () => {
     expect(result.groupsByHostId.size).toBe(0);
   });
 
+  it("links a group to the last browser tab the run left open", () => {
+    const first = "11111111-1111-4111-8111-111111111111";
+    const second = "22222222-2222-4222-8222-222222222222";
+    function browserCall(id: string, tool: string, browserId: string): ToolCallItem {
+      return toolCall(
+        id,
+        { type: "unknown", input: { browserId }, output: null },
+        { name: `mcp__paseo__${tool}` },
+      );
+    }
+    function groupBrowserId(calls: ToolCallItem[]) {
+      return project({ level: "overview", tail: calls }).groupsByHostId.get("1")?.liveBrowserId;
+    }
+    const opened = [
+      browserCall("1", "browser_snapshot", first),
+      browserCall("2", "browser_click", second),
+    ];
+    const closedSecond = browserCall("3", "browser_close_tab", second);
+    const closedFirst = browserCall("4", "browser_close_tab", first);
+
+    expect(groupBrowserId(opened)).toBe(second);
+    expect(groupBrowserId([...opened, closedSecond])).toBe(first);
+    expect(groupBrowserId([...opened, closedSecond, closedFirst])).toBeNull();
+  });
+
   it("keeps one stable overview host as a run grows", () => {
     const firstCall = toolCall("1", { type: "shell", command: "one" });
     const secondCall = toolCall("2", { type: "read", filePath: "/repo/a.ts" });
@@ -243,6 +268,7 @@ describe("tool call detail-level projection", () => {
       mode: "overview",
       run: expect.any(Object),
       isLoading: false,
+      liveBrowserId: null,
       summary: {
         thoughtCount: 0,
         editedFileCount: 1,

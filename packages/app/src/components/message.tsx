@@ -16,6 +16,8 @@ import { TaskListRow } from "@/components/task-list-row";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { isNative, isWeb } from "@/constants/platform";
+import { Button } from "@/components/ui/button";
+import { useViewLive } from "@/tool-calls/browser-live-view/context";
 import { useRevealedText, type MarkdownPhase } from "@/hooks/use-revealed-text";
 import { ICON_SIZE, type Theme } from "@/styles/theme";
 import { inlineUnistylesStyle } from "@/styles/unistyles-inline-style";
@@ -884,6 +886,19 @@ const expandableBadgeStylesheet = StyleSheet.create((theme) => ({
   containerLastInSequence: {
     marginBottom: theme.spacing[4],
   },
+  containerWithLink: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  pressableWithLink: {
+    flex: 1,
+    minWidth: 0,
+  },
+  viewLiveButton: {
+    flexShrink: 0,
+    // Cancels the container's outset, so the button ends on the message rail.
+    marginRight: 13,
+  },
   pressable: {
     borderRadius: theme.borderRadius.lg,
     borderWidth: theme.borderWidth[1],
@@ -1522,6 +1537,7 @@ interface ExpandableBadgeProps {
   style?: StyleProp<ViewStyle>;
   onToggle?: () => void;
   onOpenFile?: () => void;
+  onViewLive?: () => void;
   onDetailHoverChange?: (hovered: boolean) => void;
   renderDetails?: () => ReactNode;
   isLoading?: boolean;
@@ -1885,6 +1901,7 @@ export const ExpandableBadge = memo(function ExpandableBadge({
   isExpanded,
   onToggle,
   onOpenFile,
+  onViewLive,
   onDetailHoverChange,
   renderDetails,
   isLoading = false,
@@ -1894,6 +1911,7 @@ export const ExpandableBadge = memo(function ExpandableBadge({
   borderlessWhenExpanded = false,
   testID,
 }: ExpandableBadgeProps) {
+  const { t } = useTranslation();
   const resolvedDisableOuterSpacing = useDisableOuterSpacing(disableOuterSpacing);
   const [isHovered, setIsHovered] = useState(false);
   const [isOpenFileHovered, setIsOpenFileHovered] = useState(false);
@@ -2045,29 +2063,34 @@ export const ExpandableBadge = memo(function ExpandableBadge({
     ],
   );
 
+  // Beside the header rather than inside it, so screen readers reach both buttons. An open
+  // row gives the width back to its details.
+  const showViewLive = Boolean(onViewLive) && !isExpanded;
   const containerStyle = useMemo(
     () => [
       expandableBadgeStylesheet.container,
+      showViewLive && expandableBadgeStylesheet.containerWithLink,
       !resolvedDisableOuterSpacing &&
         (isLastInSequence
           ? expandableBadgeStylesheet.containerLastInSequence
           : expandableBadgeStylesheet.containerSpacing),
       style,
     ],
-    [isLastInSequence, resolvedDisableOuterSpacing, style],
+    [isLastInSequence, resolvedDisableOuterSpacing, showViewLive, style],
   );
 
   const pressableStyle = useMemo(
     () => [
       expandableBadgeStylesheet.pressable,
       isPressed && isInteractive ? expandableBadgeStylesheet.pressablePressed : null,
+      showViewLive && expandableBadgeStylesheet.pressableWithLink,
       isExpanded && expandableBadgeStylesheet.pressableExpanded,
       isExpanded &&
         (borderlessWhenExpanded
           ? expandableBadgeStylesheet.pressableExpandedDetached
           : expandableBadgeStylesheet.pressableExpandedAttached),
     ],
-    [borderlessWhenExpanded, isExpanded, isInteractive, isPressed],
+    [borderlessWhenExpanded, isExpanded, isInteractive, isPressed, showViewLive],
   );
 
   const detailWrapperStyle = useMemo(
@@ -2191,6 +2214,18 @@ export const ExpandableBadge = memo(function ExpandableBadge({
           />
         </View>
       </Pressable>
+      {showViewLive ? (
+        <Button
+          variant="outline"
+          size="sm"
+          hitSlop={8}
+          onPress={onViewLive}
+          style={expandableBadgeStylesheet.viewLiveButton}
+          testID="tool-call-view-live"
+        >
+          {t("message.actions.viewLive")}
+        </Button>
+      ) : null}
       {detailContent ? (
         <Pressable
           ref={detailWrapperRef}
@@ -2219,6 +2254,7 @@ function areExpandableBadgePropsEqual(previous: ExpandableBadgeProps, next: Expa
   if (previous.testID !== next.testID) return false;
   if (previous.onToggle !== next.onToggle) return false;
   if (previous.onOpenFile !== next.onOpenFile) return false;
+  if (previous.onViewLive !== next.onViewLive) return false;
   if (previous.onDetailHoverChange !== next.onDetailHoverChange) return false;
   if (previous.renderDetails !== next.renderDetails) return false;
   return true;
@@ -2310,6 +2346,7 @@ export const ToolCall = memo(function ToolCall({
       }),
     [toolName, status, error, effectiveDetail, metadata, cwd, agentMessage, targetAgentTitle],
   );
+  const viewLive = useViewLive(presentation.liveBrowserId);
   const handleOpenFile = useMemo(() => {
     const openFilePath = presentation.openFilePath;
     if (!openFilePath || !onOpenFilePath) {
@@ -2413,6 +2450,7 @@ export const ToolCall = memo(function ToolCall({
       isExpanded={shouldRenderInline && isExpanded}
       onToggle={presentation.canOpenDetails ? handleToggle : undefined}
       onOpenFile={handleOpenFile}
+      onViewLive={viewLive}
       renderDetails={presentation.canOpenDetails && shouldRenderInline ? renderDetails : undefined}
       isLoading={status === "running" || status === "executing"}
       isError={status === "failed"}

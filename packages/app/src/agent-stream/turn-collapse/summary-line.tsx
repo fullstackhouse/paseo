@@ -2,6 +2,7 @@ import { memo, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { Summary } from "lucide-react-native";
 import { ExpandableBadge } from "@/components/message";
+import { useViewLive } from "@/tool-calls/browser-live-view/context";
 import { useOverviewSummaryLabel } from "@/tool-calls/detail-level/overview/label";
 import type { CollapsedTurn } from "./model";
 
@@ -18,6 +19,7 @@ export const TurnSummaryLine = memo(function TurnSummaryLine({
 }) {
   const { t } = useTranslation();
   const label = useOverviewSummaryLabel(turn.summary.tools) || t("turnSummary.details");
+  const viewLive = useViewLive(turn.summary.liveBrowserId);
   const toggle = useCallback(
     () => onExpandedChange(turn.hostId, !turn.expanded),
     [onExpandedChange, turn.expanded, turn.hostId],
@@ -30,6 +32,7 @@ export const TurnSummaryLine = memo(function TurnSummaryLine({
       icon={Summary}
       isExpanded={turn.expanded}
       onToggle={toggle}
+      onViewLive={viewLive}
       borderlessWhenExpanded
     />
   );

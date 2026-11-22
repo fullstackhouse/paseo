@@ -5,10 +5,15 @@ import {
   type ThoughtItem,
   type ToolCallItem,
 } from "@/types/stream";
-import { summarizeToolCalls, type OverviewSummary } from "@/tool-calls/detail-level/overview/model";
+import {
+  findWorkLiveBrowserId,
+  summarizeToolCalls,
+  type OverviewSummary,
+} from "@/tool-calls/detail-level/overview/model";
 
 export interface TurnSummary {
   tools: OverviewSummary;
+  liveBrowserId: string | null;
 }
 
 export interface CollapsedTurn {
@@ -51,7 +56,7 @@ function summarizeTurn(
     if ((item.kind === "tool_call" || item.kind === "thought") && !isTurnTrigger(item))
       calls.push(...(getGroupedCalls(item.id) ?? [item]));
   }
-  return { tools: summarizeToolCalls(calls) };
+  return { tools: summarizeToolCalls(calls), liveBrowserId: findWorkLiveBrowserId(calls) };
 }
 
 function hasWork(summary: TurnSummary): boolean {

@@ -1,5 +1,6 @@
 import { getPaseoToolActionLabel } from "@getpaseo/protocol/paseo-tool-presentation/index";
 import { isTurnTrigger } from "@/agent-stream/turn-membership";
+import { findLiveBrowserId } from "@/tool-calls/browser-live-view/tab";
 
 import { describeToolCall, type GroupableItem, type ToolCallRun } from "../grouping";
 
@@ -20,6 +21,7 @@ export interface OverviewToolCallGroup {
   run: ToolCallRun;
   summary: OverviewSummary;
   isLoading: boolean;
+  liveBrowserId: string | null;
 }
 
 function isSearchCall(name: string): boolean {
@@ -71,6 +73,14 @@ export function summarizeToolCalls(calls: readonly GroupableItem[]): OverviewSum
   };
 }
 
+/** The browser tab a summary of agent work links to. */
+export function findWorkLiveBrowserId(calls: readonly GroupableItem[]): string | null {
+  const toolCalls = calls.flatMap((call) =>
+    call.kind === "tool_call" ? [describeToolCall(call)] : [],
+  );
+  return findLiveBrowserId(toolCalls);
+}
+
 export function buildOverviewGroup(run: ToolCallRun): OverviewToolCallGroup {
   const isLoading = run.calls.some((call) => {
     if (call.kind === "thought") return call.status !== "ready";
@@ -81,6 +91,7 @@ export function buildOverviewGroup(run: ToolCallRun): OverviewToolCallGroup {
     mode: "overview",
     run,
     isLoading,
+    liveBrowserId: findWorkLiveBrowserId(run.calls),
     summary: summarizeToolCalls(run.calls),
   };
 }

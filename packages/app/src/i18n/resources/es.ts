@@ -355,6 +355,7 @@ export const es: TranslationResources = {
       forkMissingWorkspace: "Este agente no está en un espacio de trabajo.",
       forkFailed: "No se pudo bifurcar el chat",
       openFile: "Abrir archivo",
+      viewLive: "Ver en vivo",
       copied: "Copiado",
     },
     attachments: {

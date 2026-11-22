@@ -126,6 +126,7 @@ describe("collapseTurns", () => {
       expanded: false,
       summary: {
         tools: expect.objectContaining({ commandCount: 2 }),
+        liveBrowserId: null,
       },
     });
     expect(result.hostIdByFoldedMessageId.get("early")).toBe("u1");
@@ -139,6 +140,27 @@ describe("collapseTurns", () => {
     expect(ids(result.tail)).toEqual(["u1", "t1", "c1", "final"]);
     expect([...result.nestedItemIds]).toEqual(["t1", "c1"]);
     expect(result.turnsByHostId.get("u1")?.expanded).toBe(true);
+  });
+
+  it("links a folded turn to the browser tab it used", () => {
+    const browserId = "7c8fbc4a-4543-434c-834b-501864c533e5";
+    const reload: ToolCallItem = {
+      ...shell("t1"),
+      payload: {
+        source: "agent",
+        data: {
+          provider: "claude",
+          callId: "t1",
+          name: "mcp__paseo__browser_reload",
+          status: "completed",
+          error: null,
+          detail: { type: "unknown", input: { browserId }, output: null },
+        },
+      },
+    };
+    const result = collapse([user("u1"), reload, reply("a1")]);
+
+    expect(result.turnsByHostId.get("u1")?.summary.liveBrowserId).toBe(browserId);
   });
 
   it("leaves the latest turn alone while it is still producing output", () => {

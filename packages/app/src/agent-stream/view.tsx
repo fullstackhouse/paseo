@@ -68,6 +68,7 @@ import {
 } from "@/tool-calls/expansion-context";
 import { ToolCallSheetProvider } from "@/components/tool-call-sheet";
 import { createStreamPresentation } from "./presentation";
+import { BrowserLiveViewLinks } from "@/tool-calls/browser-live-view/context";
 import { OverviewToolCallGroupView } from "@/tool-calls/detail-level/overview/view";
 import { IndentRail } from "@/components/indent-rail";
 import { TurnSummaryLine } from "./turn-collapse/summary-line";
@@ -1225,30 +1226,36 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
           <AssistantSelectionCopySurface style={stylesheet.container}>
             <MessageOuterSpacingProvider disableOuterSpacing>
               <ToolCallExpansionContext.Provider value={toolCallExpansion}>
-                {streamRenderStrategy.render({
-                  readingRowReplacements: presentation.readingRowReplacements,
-                  agentId,
-                  segments: renderModel.segments,
-                  historyRowRevision,
-                  liveHeadRowRevision: expandedToolCallGroups,
-                  boundary,
-                  renderers,
-                  listEmptyComponent,
-                  viewportRef,
-                  routeBottomAnchorRequest,
-                  isAuthoritativeHistoryReady,
-                  onNearBottomChange: setIsNearBottom,
-                  onReadingPositionChange: handleReadingPositionChange,
-                  onNearHistoryStart: loadOlder,
-                  isLoadingOlderHistory: isLoadingOlder,
-                  hasOlderHistory: hasOlder,
-                  olderHistoryProgressKey: progressKey,
-                  scrollEnabled: streamScrollEnabled,
-                  listStyle: stylesheet.list,
-                  baseListContentContainerStyle: stylesheet.listContentContainer,
-                  forwardListContentContainerStyle: stylesheet.forwardListContentContainer,
-                  contentMaxWidth,
-                })}
+                <BrowserLiveViewLinks
+                  serverId={resolvedServerId}
+                  workspaceId={context.workspaceId}
+                  opensWorkspaceTabs={opensWorkspacePaths}
+                >
+                  {streamRenderStrategy.render({
+                    readingRowReplacements: presentation.readingRowReplacements,
+                    agentId,
+                    segments: renderModel.segments,
+                    historyRowRevision,
+                    liveHeadRowRevision: expandedToolCallGroups,
+                    boundary,
+                    renderers,
+                    listEmptyComponent,
+                    viewportRef,
+                    routeBottomAnchorRequest,
+                    isAuthoritativeHistoryReady,
+                    onNearBottomChange: setIsNearBottom,
+                    onReadingPositionChange: handleReadingPositionChange,
+                    onNearHistoryStart: loadOlder,
+                    isLoadingOlderHistory: isLoadingOlder,
+                    hasOlderHistory: hasOlder,
+                    olderHistoryProgressKey: progressKey,
+                    scrollEnabled: streamScrollEnabled,
+                    listStyle: stylesheet.list,
+                    baseListContentContainerStyle: stylesheet.listContentContainer,
+                    forwardListContentContainerStyle: stylesheet.forwardListContentContainer,
+                    contentMaxWidth,
+                  })}
+                </BrowserLiveViewLinks>
               </ToolCallExpansionContext.Provider>
             </MessageOuterSpacingProvider>
             <ChatOutlineRail
