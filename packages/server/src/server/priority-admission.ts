@@ -38,7 +38,10 @@ export class PriorityAdmission {
     return new Promise<T>((resolve, reject) => {
       const start = () => {
         this.active += 1;
-        void (async () => work())()
+        // The work starts on the next microtask, as with p-limit (which this replaced), so a
+        // request made right after this one still finds the work in flight and joins it.
+        void Promise.resolve()
+          .then(work)
           .then(resolve, reject)
           .finally(() => {
             this.active -= 1;

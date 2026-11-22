@@ -3574,7 +3574,7 @@ export class WorkspaceGitServiceImpl implements WorkspaceGitService {
           }
           // Demand refreshes keep the caller's lane, so a user action running at "high" is not
           // demoted. FSH: a client waiting on this run (interactive admission, possibly raised
-          // after a watcher started it) runs its git processes at high priority.
+          // after a watcher started it) takes it out of the background lane.
           const runRefreshGitCommand = createRunGitCommand(`workspace-refresh:${request.reason}`, {
             priority: refreshGitPriority(admission, request),
           });
@@ -4584,11 +4584,12 @@ function computeGenericForgeNextInterval(
   );
 }
 
-// Demand refreshes keep the caller's lane (undefined). FSH: a client waiting on the run goes first.
+// Demand refreshes keep the caller's lane (undefined); observation runs in the background lane.
+// FSH: an observation run a client joined is no longer background work.
 function refreshGitPriority(
   admission: AdmissionTicket,
   request: WorkspaceGitRefreshRequest,
 ): GitProcessPriority | undefined {
-  if (admission.priority === "interactive") return "high";
+  if (admission.priority === "interactive") return undefined;
   return request.origin === "observation" ? "background" : undefined;
 }

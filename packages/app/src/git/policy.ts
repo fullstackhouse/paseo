@@ -895,7 +895,10 @@ function isPullRequestMergeMethodAllowed(
   return capability.allowedMethods.includes(method);
 }
 
-// A Paseo worktree with no commits of its own has nothing to update (FSH).
+// A Paseo worktree with no commits of its own has nothing to update (FSH): its work is done or
+// went elsewhere, so Archive beats Update from base.
 function canUpdateFromBase(input: BuildGitActionsInput): boolean {
-  return canMergeFromBase(input) && !input.isPaseoOwnedWorktree;
+  const finishedWorktree =
+    input.isPaseoOwnedWorktree && !input.isOnBaseBranch && input.aheadCount === 0;
+  return canMergeFromBase(input) && !finishedWorktree;
 }

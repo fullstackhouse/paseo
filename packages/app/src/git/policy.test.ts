@@ -322,7 +322,9 @@ describe("git-actions-policy", () => {
         behindOfOrigin: null,
       }),
     );
-    expect(actions.primary?.id).toBe("merge-from-base");
+    // FSH: a Paseo worktree with no commits of its own leads with Archive; Update stays offered.
+    expect(actions.primary?.id).toBe("archive-workspace");
+    expect(actionsWithoutPrimary(actions).map((action) => action.id)).toContain("merge-from-base");
   });
 
   it("drops a promoted merge action from the remaining menu actions", () => {

@@ -8139,7 +8139,7 @@ describe("Codex app-server provider", () => {
     async (modeId, expected) => {
       const session = createSession({
         modeId: "auto",
-        featureValues: { plan_mode: true },
+        providerOptions: { plan_mode: true },
       });
       const events: AgentStreamEvent[] = [];
       session.subscribe((event) => events.push(event));
