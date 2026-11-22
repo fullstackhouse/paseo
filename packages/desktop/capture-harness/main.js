@@ -2480,6 +2480,7 @@ async function createBrowserProfileHarnessWindow(partition, sourceUrl) {
     height: 480,
     backgroundColor: "#202020",
     webPreferences: {
+      preload: path.join(ROOT, "host-preload.js"),
       webviewTag: true,
       contextIsolation: true,
       nodeIntegration: false,
@@ -2582,6 +2583,9 @@ async function prepareBrowserProfileValue(firstGuest, profileSession) {
   }
   return profileValue;
 }
+
+// Empty on purpose, like the production handler: invoke replies are ordered, so the round trip is the barrier.
+ipcMain.handle("paseo:browser:wait-for-pending-ipc", () => {});
 
 async function runBrowserProfileGroup() {
   if (!["write", "read"].includes(BROWSER_PROFILE_PHASE)) {
