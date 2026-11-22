@@ -79,6 +79,10 @@ class FakeBrowserBridge {
   }> = [];
   public response: BrowserAutomationResponsePayload | null = null;
   public thrownError: unknown = null;
+  // When set, list_tabs reports only these ids, like the desktop main-process registry.
+  public registry: Set<string> | null = null;
+  // Registers every app browser right after answering a poll: a registration landing late.
+  public registerAfterEachPoll = false;
 
   public executeAutomationCommand = async (
     request: BrowserAutomationExecuteRequest,
@@ -87,11 +91,25 @@ class FakeBrowserBridge {
     if (this.thrownError) {
       throw this.thrownError;
     }
+    if (this.registry) {
+      const registry = this.registry;
+      const payload = listTabsPayload(
+        request.requestId,
+        currentBrowserTabs().filter((tab) => registry.has(tab.browserId)),
+      );
+      if (this.registerAfterEachPoll) {
+        for (const tab of currentBrowserTabs()) {
+          registry.add(tab.browserId);
+        }
+      }
+      return payload;
+    }
     return this.response ?? currentListTabsPayload(request.requestId);
   };
 
   public unregisterWorkspaceBrowser = async (browserId: string): Promise<void> => {
     this.unregisteredWorkspaceBrowsers.push(browserId);
+    this.registry?.delete(browserId);
   };
 
   public setWorkspaceActiveBrowser = async (input: {
@@ -229,6 +247,13 @@ function currentListTabsPayload(requestId = "req-new:list_tabs"): BrowserAutomat
   };
 }
 
+function listTabsPayload(
+  requestId: string,
+  tabs: ReturnType<typeof currentBrowserTabs>,
+): BrowserAutomationResponsePayload {
+  return { requestId, ok: true, result: { command: "list_tabs", tabs } };
+}
+
 function currentBrowserTabs() {
   return Object.values(useBrowserStore.getState().browsersById).map((browser) => ({
     browserId: browser.browserId,
@@ -257,6 +282,25 @@ function workspaceBrowserTabs(workspaceKey: string, browserId: string) {
     .getState()
     .getWorkspaceTabs(workspaceKey)
     .filter((tab) => tab.target.kind === "browser" && tab.target.browserId === browserId);
+}
+
+// The workspace's own draft and browser tabs, without the hidden explorer companions.
+function conversationTabs(workspaceKey: string) {
+  return useWorkspaceLayoutStore
+    .getState()
+    .getWorkspaceTabs(workspaceKey)
+    .filter((tab) => tab.target.kind === "draft" || tab.target.kind === "browser");
+}
+
+function requireWorkspaceKey(): string {
+  const workspaceKey = buildWorkspaceTabPersistenceKey({
+    serverId: "server-1",
+    workspaceId: "wks_workspace_a",
+  });
+  if (!workspaceKey) {
+    throw new Error("Expected workspace key");
+  }
+  return workspaceKey;
 }
 
 function flushAsyncWork(): Promise<void> {
@@ -359,7 +403,7 @@ describe("mountBrowserAutomationHandler", () => {
           ok: false,
           error: {
             code: "browser_timeout",
-            message: expect.stringContaining("Timed out waiting for browser tab"),
+            message: expect.stringContaining("Could not open a browser tab"),
             retryable: true,
           },
         },
@@ -373,8 +417,72 @@ describe("mountBrowserAutomationHandler", () => {
     ]);
   });
 
-  test("browser_new_tab wraps registration bridge errors in a response", async () => {
+  test("browser_new_tab closes the tab everywhere when it does not register in time", async () => {
     const browser = new BrowserAutomationHandlerHarness();
+    const workspaceKey = requireWorkspaceKey();
+    browser.browser.response = emptyListTabsPayload();
+    browser.mount({
+      serverId: "server-1",
+      registrationWaitTimeoutMs: 1,
+      registrationPollIntervalMs: 1,
+    });
+
+    browser.receive(browserNewTabRequest());
+    await waitForRegistrationTimeout();
+
+    const [ensured] = browser.resident.ensuredWebviews;
+    if (!ensured) {
+      throw new Error("Expected a resident webview for the new tab");
+    }
+    expect(browser.client.payloadAt(0)).toMatchObject({ ok: false });
+    expect(workspaceBrowserTabs(workspaceKey, ensured.browserId)).toEqual([]);
+    expect(useBrowserStore.getState().browsersById).toEqual({});
+    expect(browser.browser.unregisteredWorkspaceBrowsers).toEqual([ensured.browserId]);
+  });
+
+  test("browser_new_tab closes a registration that lands just after the timeout, and a retry opens one tab", async () => {
+    const browser = new BrowserAutomationHandlerHarness();
+    const workspaceKey = requireWorkspaceKey();
+    const userTabId = useWorkspaceLayoutStore.getState().openTab({
+      workspaceKey,
+      target: { kind: "draft", draftId: "human-draft" },
+      intent: "reveal",
+    });
+    browser.browser.registry = new Set();
+    browser.browser.registerAfterEachPoll = true;
+    browser.mount({
+      serverId: "server-1",
+      registrationWaitTimeoutMs: 1,
+      registrationPollIntervalMs: 5,
+    });
+
+    browser.receive(browserNewTabRequest());
+    await waitForRegistrationTimeout();
+
+    expect(browser.client.payloadAt(0)).toMatchObject({
+      ok: false,
+      error: { code: "browser_timeout", retryable: true },
+    });
+    expect(browser.browser.registry).toEqual(new Set());
+    expect(useBrowserStore.getState().browsersById).toEqual({});
+    expect(conversationTabs(workspaceKey).map((tab) => tab.tabId)).toEqual([userTabId]);
+
+    browser.browser.registerAfterEachPoll = false;
+    browser.browser.registry = null;
+    browser.receive(browserNewTabRequest());
+    await flushAsyncWork();
+
+    const result = newTabResultFrom(browser.client.payloadAt(1));
+    expect(Object.keys(useBrowserStore.getState().browsersById)).toEqual([result.browserId]);
+    expect(conversationTabs(workspaceKey).map((tab) => tab.target)).toEqual([
+      { kind: "draft", draftId: "human-draft" },
+      { kind: "browser", browserId: result.browserId },
+    ]);
+  });
+
+  test("browser_new_tab wraps registration bridge errors in a response and closes the tab", async () => {
+    const browser = new BrowserAutomationHandlerHarness();
+    const workspaceKey = requireWorkspaceKey();
     browser.browser.thrownError = new Error("IPC registration check failed");
     browser.mount({ serverId: "server-1" });
 
@@ -395,6 +503,13 @@ describe("mountBrowserAutomationHandler", () => {
         },
       },
     ]);
+    const [ensured] = browser.resident.ensuredWebviews;
+    if (!ensured) {
+      throw new Error("Expected a resident webview for the new tab");
+    }
+    expect(workspaceBrowserTabs(workspaceKey, ensured.browserId)).toEqual([]);
+    expect(useBrowserStore.getState().browsersById).toEqual({});
+    expect(browser.browser.unregisteredWorkspaceBrowsers).toEqual([ensured.browserId]);
   });
 
   test("browser_resize updates resident webview dimensions", async () => {
