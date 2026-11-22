@@ -38,6 +38,10 @@ interface RegisteredBrowserHost {
   supportedCommands: ReadonlySet<BrowserAutomationCommandName>;
 }
 
+type HostSelection =
+  | { ok: true; value: RegisteredBrowserHost }
+  | { ok: false; payload: BrowserToolsResponsePayload };
+
 export interface BrowserToolsBrokerOptions {
   defaultTimeoutMs?: number;
   createRequestId?: () => string;
@@ -137,7 +141,16 @@ export class BrowserToolsBroker {
       });
     }
 
-    const host = this.selectHostForCommand(request.data.command, requestId);
+    const timeoutMs = input.timeoutMs ?? this.defaultTimeoutMs;
+    const selected = this.selectHostForCommand(request.data.command, requestId);
+    const host =
+      "strandedBrowserId" in selected
+        ? await this.locateStrandedBrowserTab({
+            request: request.data,
+            browserId: selected.strandedBrowserId,
+            timeoutMs,
+          })
+        : selected;
     if (!host.ok) {
       return host.payload;
     }
@@ -151,11 +164,7 @@ export class BrowserToolsBroker {
       return unsupported;
     }
 
-    return this.sendRequest({
-      host: host.value,
-      request: request.data,
-      timeoutMs: input.timeoutMs ?? this.defaultTimeoutMs,
-    });
+    return this.sendRequest({ host: host.value, request: request.data, timeoutMs });
   }
 
   public receiveResponse(
@@ -267,9 +276,7 @@ export class BrowserToolsBroker {
   private selectHostForCommand(
     command: BrowserAutomationCommand,
     requestId: string,
-  ):
-    | { ok: true; value: RegisteredBrowserHost }
-    | { ok: false; payload: BrowserToolsResponsePayload } {
+  ): HostSelection | { strandedBrowserId: string } {
     if (command.command === "new_tab") {
       const host = this.selectMostRecentlyRegisteredHost();
       return host
@@ -305,10 +312,13 @@ export class BrowserToolsBroker {
         this.browserHostByBrowserId.set(browserId, strandedOwnerClientId);
         return { ok: true, value: reconnectedHost };
       }
-      return {
-        ok: false,
-        payload: this.strandedBrowserTabFailure({ requestId, browserId }),
-      };
+      if (this.clients.size === 0) {
+        return {
+          ok: false,
+          payload: this.strandedBrowserTabFailure({ requestId, browserId }),
+        };
+      }
+      return { strandedBrowserId: browserId };
     }
 
     if (this.clients.size === 1) {
@@ -328,6 +338,76 @@ export class BrowserToolsBroker {
         requestId,
         code: "browser_tab_not_found",
         message: `Browser tab ${browserId} is not associated with a connected browser automation host. Call browser_list_tabs and use one of the returned browserId values.`,
+      }),
+    };
+  }
+
+  // A host that reloads or reconnects registers under a new client id, which strands its tabs
+  // under the old one. Ask every connected host for its tabs and route only to the one that has it.
+  private async locateStrandedBrowserTab(params: {
+    request: BrowserAutomationExecuteRequest;
+    browserId: string;
+    timeoutMs: number;
+  }): Promise<HostSelection> {
+    const { request, browserId, timeoutMs } = params;
+    const hosts = Array.from(this.clients.values()).filter((host) =>
+      host.supportedCommands.has("list_tabs"),
+    );
+    const responses = await Promise.all(
+      hosts.map(async (host) => ({
+        host,
+        payload: await this.sendRequest({
+          host,
+          request: {
+            ...request,
+            requestId: `${request.requestId}:${host.client.id}`,
+            command: { command: "list_tabs", args: {} },
+          },
+          rememberAffinity: false,
+          timeoutMs,
+        }),
+      })),
+    );
+
+    const owners = responses.filter(
+      ({ payload }) =>
+        payload.ok &&
+        payload.result.command === "list_tabs" &&
+        payload.result.tabs.some((tab) => tab.browserId === browserId),
+    );
+    if (owners.length > 1) {
+      return {
+        ok: false,
+        payload: browserToolsFailure({
+          requestId: request.requestId,
+          code: "browser_tab_not_found",
+          message: `Browser tab ${browserId} is open in more than one connected app. Call browser_list_tabs and use one of the returned browserId values.`,
+        }),
+      };
+    }
+    const owner = owners[0]?.host;
+    if (owner) {
+      if (this.clients.get(owner.client.id) !== owner) {
+        return {
+          ok: false,
+          payload: this.strandedBrowserTabFailure({ requestId: request.requestId, browserId }),
+        };
+      }
+      this.strandedBrowserHostByBrowserId.delete(browserId);
+      this.browserHostByBrowserId.set(browserId, owner.client.id);
+      return { ok: true, value: owner };
+    }
+
+    const failed = responses.find(({ payload }) => !payload.ok);
+    if (failed) {
+      return { ok: false, payload: withBrowserToolsRequestId(failed.payload, request.requestId) };
+    }
+    return {
+      ok: false,
+      payload: browserToolsFailure({
+        requestId: request.requestId,
+        code: "browser_tab_not_found",
+        message: `Browser tab ${browserId} is not open in any connected app. Call browser_list_tabs and use one of the returned browserId values.`,
       }),
     };
   }
