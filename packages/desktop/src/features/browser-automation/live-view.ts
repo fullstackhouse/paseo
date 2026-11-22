@@ -5,6 +5,9 @@ import type { TabContents } from "./service.js";
 const DEFAULT_MAX_FPS = 5;
 const DEFAULT_JPEG_QUALITY = 60;
 const DEFAULT_MAX_WIDTH = 1280;
+const RESPONSE_TIMEOUT_MS = 2_000;
+// Chromium clears a page's old pixels 4 seconds after a commit that painted nothing.
+const NEW_CONTENT_TIMEOUT_MS = 5_000;
 
 export interface BrowserLiveViewFrame {
   streamId: string;
@@ -29,7 +32,10 @@ export interface BrowserLiveViewEvents {
 }
 
 type LiveViewTab = Pick<TabContents, "invalidate" | "isDestroyed"> & {
+  /** Outside the tab's CDP queue, which a dialog holds up. */
   sendDebugCommand(command: string, params?: Record<string, unknown>): Promise<unknown>;
+  /** Asked in an isolated world, where the page can't lie. Hangs while the page is blocked. */
+  hasPainted(): Promise<boolean>;
   /**
    * Keeps a hidden guest compositing, unthrottled, until the returned release runs. A hidden
    * or occluded <webview> produces no screencast frames on its own.
@@ -56,9 +62,11 @@ interface ScreencastFrame {
  * invalidate() doesn't produce one.
  * Exactly one frame is in flight from tab to viewer.
  *
- * A frame belongs to the document and origin it arrived with. Chromium paints no new frame of
- * the old document after a commit, but one captured just before can still be on its way: its
- * capture time gives it away.
+ * A frame belongs to the document and origin it arrived with. Until that document's first paint
+ * Chromium can still copy the old one's pixels, stamped after the commit, so frames are held
+ * until then and the screencast asked again.
+ *
+ * Watching is read-only: a dialog is reported on the frames, never answered.
  */
 export class BrowserLiveViewStream {
   private nextFrameSeq = 0;
@@ -72,7 +80,11 @@ export class BrowserLiveViewStream {
   private droppedSessionIds: number[] = [];
   private stopped = false;
   private documentSeq = 0;
-  private committedAt = 0;
+  private loaderId: string | null = null;
+  private holding = true;
+  private showingSince = 0;
+  private paintTimer: ReturnType<typeof setTimeout> | null = null;
+  private blocked = false;
   private readonly unsubscribers: Array<() => void> = [];
 
   public constructor(
@@ -98,32 +110,63 @@ export class BrowserLiveViewStream {
       tab.holdPainting(),
     );
 
+    // everyNthFrame counts painted frames, not time, so the frame rate is capped by
+    // delaying the ack instead.
+    this.minFrameIntervalMs = 1000 / (options.maxFps ?? DEFAULT_MAX_FPS);
+    const maxWidth = options.maxWidth ?? DEFAULT_MAX_WIDTH;
+    this.screencast = {
+      format: "jpeg",
+      quality: options.jpegQuality ?? DEFAULT_JPEG_QUALITY,
+      maxWidth,
+      maxHeight: maxWidth * 2,
+      everyNthFrame: 1,
+    };
+    this.holdUntilPaint();
+    // All sent at once: a blocked page answers none of them and still gets screencast.
+    const responses = Promise.all([
+      tab.sendDebugCommand("Page.enable"),
+      tab.sendDebugCommand("Page.getLayoutMetrics"),
+      tab.sendDebugCommand("Page.setLifecycleEventsEnabled", { enabled: true }),
+      tab.sendDebugCommand("Page.startScreencast", this.screencast),
+    ]);
+    // A static page produces no frame on its own; request one paint.
+    tab.invalidate();
+    const { documentSeq } = this;
+    void tab
+      .hasPainted()
+      .catch(() => false)
+      .then((painted) => {
+        if (painted && documentSeq === this.documentSeq) this.showFrames();
+        return undefined;
+      });
+
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    const noAnswer = new Promise<null>((resolve) => {
+      timeout = setTimeout(() => resolve(null), RESPONSE_TIMEOUT_MS);
+    });
     try {
-      await tab.sendDebugCommand("Page.enable");
-      const metrics = (await tab.sendDebugCommand("Page.getLayoutMetrics")) as {
+      const answered = await Promise.race([responses, noAnswer]);
+      if (!answered) {
+        this.setBlocked(true);
+        responses.then(
+          () => this.setBlocked(false),
+          () => this.end("gone"),
+        );
+        return { width: 0, height: 0 };
+      }
+      const metrics = answered[1] as {
         cssLayoutViewport?: { clientWidth?: number; clientHeight?: number };
       };
-      // everyNthFrame counts painted frames, not time, so the frame rate is capped by
-      // delaying the ack instead.
-      this.minFrameIntervalMs = 1000 / (options.maxFps ?? DEFAULT_MAX_FPS);
-      const maxWidth = options.maxWidth ?? DEFAULT_MAX_WIDTH;
-      this.screencast = {
-        format: "jpeg",
-        quality: options.jpegQuality ?? DEFAULT_JPEG_QUALITY,
-        maxWidth,
-        maxHeight: maxWidth * 2,
-        everyNthFrame: 1,
-      };
-      await tab.sendDebugCommand("Page.startScreencast", this.screencast);
-      // A static page produces no frame on its own; request one paint.
-      tab.invalidate();
       return {
         width: metrics.cssLayoutViewport?.clientWidth ?? 0,
         height: metrics.cssLayoutViewport?.clientHeight ?? 0,
       };
     } catch (error) {
       this.end("failed");
+      if (!tab.isDestroyed()) void tab.sendDebugCommand("Page.stopScreencast").catch(() => {});
       throw error;
+    } finally {
+      clearTimeout(timeout);
     }
   }
 
@@ -146,7 +189,7 @@ export class BrowserLiveViewStream {
       this.waitingFrame = null;
       if (waiting) {
         this.forward(waiting);
-      } else if (this.mayHaveMissedPaint) {
+      } else if (this.mayHaveMissedPaint && !this.holding) {
         this.mayHaveMissedPaint = false;
         this.restartScreencast();
       }
@@ -164,7 +207,8 @@ export class BrowserLiveViewStream {
     if (this.params.tab.isDestroyed()) {
       return;
     }
-    await this.params.tab.sendDebugCommand("Page.stopScreencast").catch(() => {});
+    // Not awaited: a blocked page doesn't answer.
+    void this.params.tab.sendDebugCommand("Page.stopScreencast").catch(() => {});
   }
 
   /** Whether the tab still shows the document of the frames that carry this id. */
@@ -184,11 +228,24 @@ export class BrowserLiveViewStream {
     // Only the tab's own session: an iframe's reports that iframe's documents.
     if (this.stopped || targetSessionId) return;
     if (method === "Page.frameNavigated") {
-      const { frame } = params as { frame?: { parentId?: string } };
-      if (frame && !frame.parentId) this.documentCommitted();
+      const { frame } = params as { frame?: { parentId?: string; loaderId?: string } };
+      if (frame && !frame.parentId) this.documentCommitted(frame.loaderId ?? null);
       return;
     }
-    if (method !== "Page.screencastFrame") return;
+    if (method === "Page.lifecycleEvent") {
+      const painted = params.name === "firstPaint" && params.loaderId === this.loaderId;
+      if (painted && this.holding) this.showFrames();
+      return;
+    }
+    if (method === "Page.javascriptDialogOpening") {
+      if (params.type !== "beforeunload") this.setBlocked(true);
+      return;
+    }
+    if (method === "Page.javascriptDialogClosed") this.setBlocked(false);
+    else if (method === "Page.screencastFrame") this.handleFrame(params);
+  }
+
+  private handleFrame(params: Record<string, unknown>): void {
     const sessionId = params.sessionId;
     const data = params.data;
     if (typeof sessionId !== "number" || typeof data !== "string") {
@@ -196,15 +253,17 @@ export class BrowserLiveViewStream {
     }
     const metadata = readFrameMetadata(params.metadata);
     const isFree = !this.unackedFrame && !this.ackTimer;
-    if (metadata.timestamp !== undefined && metadata.timestamp * 1000 < this.committedAt) {
+    const tooOld =
+      metadata.timestamp !== undefined && metadata.timestamp * 1000 < this.showingSince;
+    if (this.holding || tooOld) {
       if (isFree) {
         void this.params.tab
           .sendDebugCommand("Page.screencastFrameAck", { sessionId })
           .catch(() => {});
       } else {
         this.droppedSessionIds.push(sessionId);
-        this.mayHaveMissedPaint = true;
       }
+      this.missedPaint();
       return;
     }
     const origin = this.params.readOrigin();
@@ -228,23 +287,54 @@ export class BrowserLiveViewStream {
     this.params.onFrame({
       streamId: this.params.streamId,
       frameSeq,
-      metadata,
+      metadata: this.blocked ? { ...metadata, blocked: true } : metadata,
       jpeg: new Uint8Array(Buffer.from(data, "base64")),
     });
   }
 
-  private documentCommitted(): void {
+  private documentCommitted(loaderId: string | null): void {
     this.documentSeq += 1;
-    this.committedAt = Date.now();
+    this.loaderId = loaderId;
+    this.holdUntilPaint();
+    this.mayHaveMissedPaint = true;
     if (!this.waitingFrame) return;
     this.droppedSessionIds.push(this.waitingFrame.sessionId);
     this.waitingFrame = null;
+  }
+
+  private holdUntilPaint(): void {
+    this.holding = true;
+    if (this.paintTimer) clearTimeout(this.paintTimer);
+    this.paintTimer = setTimeout(() => this.showFrames(), NEW_CONTENT_TIMEOUT_MS);
+  }
+
+  private showFrames(): void {
+    if (this.stopped || !this.holding) return;
+    this.holding = false;
+    this.showingSince = Date.now();
+    if (this.paintTimer) clearTimeout(this.paintTimer);
+    this.paintTimer = null;
+    if (this.mayHaveMissedPaint) this.missedPaint();
+  }
+
+  private setBlocked(blocked: boolean): void {
+    if (this.stopped || this.blocked === blocked) return;
+    this.blocked = blocked;
+    // The phone learns it from the next frame, which a blocked page doesn't paint.
+    this.missedPaint();
+  }
+
+  /** Asks for the current paint, now or once the viewer and the hold allow it. */
+  private missedPaint(): void {
     this.mayHaveMissedPaint = true;
+    if (this.holding || this.unackedFrame || this.ackTimer) return;
+    this.mayHaveMissedPaint = false;
+    this.restartScreencast();
   }
 
   private restartScreencast(): void {
     const { tab } = this.params;
-    // Queued together, so a stop() can't land between them and leave a screencast running.
+    // Sent together, so a stop() can't land between them and leave a screencast running.
     void Promise.all([
       tab.sendDebugCommand("Page.stopScreencast"),
       tab.sendDebugCommand("Page.startScreencast", this.screencast),
@@ -260,6 +350,8 @@ export class BrowserLiveViewStream {
     this.waitingFrame = null;
     if (this.ackTimer) clearTimeout(this.ackTimer);
     this.ackTimer = null;
+    if (this.paintTimer) clearTimeout(this.paintTimer);
+    this.paintTimer = null;
     for (const unsubscribe of this.unsubscribers.splice(0)) unsubscribe();
     this.params.onEnded(reason);
   }

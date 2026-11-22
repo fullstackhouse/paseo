@@ -30,6 +30,10 @@ const NOTICE_KEYS: Record<string, string> = {
   page_changed: "workspace.browser.liveView.notices.pageChanged",
   does_not_fit: "workspace.browser.liveView.notices.doesNotFit",
   stream_ended: "workspace.browser.liveView.notices.streamEnded",
+  not_sent: "workspace.browser.liveView.notices.notSent",
+  page_blocked: "workspace.browser.liveView.notices.pageBlocked",
+  unload_blocked: "workspace.browser.liveView.notices.unloadBlocked",
+  reloaded: "workspace.browser.liveView.notices.reloaded",
   unconfirmed: "workspace.browser.liveView.notices.unconfirmed",
   agent_busy: "workspace.browser.liveView.notices.agentBusy",
   busy: "workspace.browser.liveView.notices.busy",
@@ -43,6 +47,8 @@ interface ControlPanelProps {
   availability: BrowserControlAvailability;
   /** False until a frame is on screen, so nobody controls a page they can't see. */
   canTakeControl: boolean;
+  /** A dialog or a busy script holds the page up. Watching doesn't touch it. */
+  pageBlocked: boolean;
   onTake: () => void;
   onHandBack: () => void;
   onSend: (input: BrowserLiveInput) => void;
@@ -50,13 +56,13 @@ interface ControlPanelProps {
 
 /** Below the live view: where the page is, who controls it, and where typed text goes. */
 export function ControlPanel(props: ControlPanelProps) {
-  const { state, availability, canTakeControl, onTake } = props;
+  const { state, availability, canTakeControl, pageBlocked, onTake } = props;
   const { t } = useTranslation();
   const { origin, held, notice, busy, connected } = state;
   if (availability === "unknown" && !held) return null;
-  const noticeKey = notice
-    ? (NOTICE_KEYS[notice] ?? "workspace.browser.liveView.notices.failed")
-    : null;
+  let noticeKey: string | null = null;
+  if (notice) noticeKey = NOTICE_KEYS[notice] ?? "workspace.browser.liveView.notices.failed";
+  else if (pageBlocked && !held) noticeKey = "workspace.browser.liveView.notices.watchBlocked";
 
   return (
     <View style={styles.panel} testID="browser-live-control">

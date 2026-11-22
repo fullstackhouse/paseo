@@ -20,6 +20,7 @@ import type {
   BrowserLiveControlErrorCode,
   BrowserLiveFocusResult,
   BrowserLiveInput,
+  BrowserLiveTakeResult,
   BrowserLiveViewport,
 } from "@getpaseo/protocol/browser-automation/live-view";
 import type { BrowserLiveFrameHeader } from "@getpaseo/protocol/binary-frames/browser-live";
@@ -555,7 +556,7 @@ export class BrowserToolsBroker {
   }
 
   /** Locks the watched tab for this viewer. Watching alone never locks it. */
-  public async takeControl(viewer: BrowserLiveViewerRef): Promise<BrowserLiveFocusResult> {
+  public async takeControl(viewer: BrowserLiveViewerRef): Promise<BrowserLiveTakeResult> {
     if (!this.isLiveViewEnabled()) {
       return controlRefusal("disabled", "Browser live view is turned off in Host settings.");
     }

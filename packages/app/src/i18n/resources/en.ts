@@ -656,7 +656,16 @@ export const en = {
             "That text doesn't fit this field, so it wasn't entered. Tap the field and try again.",
           streamEnded: "The live view stopped, so nothing was sent. Reconnect and try again.",
           unconfirmed:
-            "The desktop didn't confirm your text. Check the page before typing it again.",
+            "The desktop didn't confirm that. It may have gone through, so check the page before sending it again.",
+          notSent: "Not sent. Try again.",
+          pageBlocked:
+            "The page isn't responding. If a dialog is open on it, answer it on the desktop.",
+          watchBlocked:
+            "The page isn't responding. A dialog may be open on it. Take control to dismiss it, or answer it on the desktop.",
+          unloadBlocked:
+            "Taking control needs a reload to stop the agent's stuck action, and this page blocks leaving it. Finish on the desktop.",
+          reloaded:
+            "The agent's action was stuck, so the page was reloaded to stop it. Anything unsaved on it was lost.",
           agentBusy: "The agent's browser action is still running. Try again.",
           busy: "This tab is already controlled",
           keyUnsupported: "Keys don't work in this embedded frame. Tap its button instead.",

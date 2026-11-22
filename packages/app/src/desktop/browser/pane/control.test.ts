@@ -213,6 +213,25 @@ describe("createBrowserControl", () => {
     expect(JSON.stringify(harness.states)).not.toContain(SENTINEL);
   });
 
+  it.each([
+    { kind: "key", key: "Enter" },
+    { kind: "tap", documentId: "s1:0", x: 1, y: 2 },
+  ] as const)("a $kind that threw may have been sent", async (input) => {
+    const harness = createHarness();
+    await harness.controlled();
+    harness.fail(new Error("Request timed out"));
+    await harness.control.send(input);
+    expect(harness.state()).toMatchObject({ held: true, notice: "unconfirmed" });
+  });
+
+  it("says when taking control reloaded the page", async () => {
+    const harness = createHarness();
+    harness.answers.take = { focus: null, error: null, reloaded: true };
+    harness.watch();
+    await harness.control.take();
+    expect(harness.state()).toMatchObject({ held: true, notice: "reloaded" });
+  });
+
   it("keeps the field when only a key was refused", async () => {
     const harness = createHarness();
     await harness.controlled();

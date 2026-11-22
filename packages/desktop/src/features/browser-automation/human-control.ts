@@ -6,9 +6,11 @@ import type {
   BrowserLiveFocusResult,
   BrowserLiveInput,
   BrowserLiveKey,
+  BrowserLiveTakeResult,
 } from "@getpaseo/protocol/browser-automation/live-view";
 import { AgentCommand } from "./agent-commands.js";
 import { CdpSessionQueue, type CdpCommandSender } from "./cdp-session-queue.js";
+import { ownDiscardUnload } from "./discard-unload.js";
 import { FrameSessions, type CdpMessageListener, type CdpSessionSender } from "./frame-sessions.js";
 import { GuestFrames, type GuestFrame } from "./guest-frames.js";
 import {
@@ -25,6 +27,12 @@ const DRAIN_TIMEOUT_MS = 10_000;
 const CANCEL_GRACE_MS = 500;
 const ANSWER_TIMEOUT_MS = 1_000;
 const CDP_TIMEOUT_MS = 3_000;
+// Below the daemon's timeout for an input, with the settling and focus read after it.
+const INPUT_DEADLINE_MS = 5_000;
+const DISCARD_URL = "about:blank";
+// A page that keeps starting navigations can use up the beforeunload of a few.
+const DISCARD_ATTEMPTS = 8;
+const DISCARD_ATTEMPT_GAP_MS = 50;
 const LOAD_TIMEOUT_MS = 4_000;
 const LOAD_POLL_MS = 100;
 const DISCARD_RETRY_MS = 30_000;
@@ -37,7 +45,10 @@ const ERROR_MESSAGES = {
   page_changed: "The page changed, so the tap or scroll was refused.",
   does_not_fit: "The text doesn't fit the field, so it was refused.",
   key_unsupported: "Keys don't reach embedded frames from another site.",
-  unconfirmed: "The desktop didn't confirm the input.",
+  unconfirmed: "The input may have been sent. Check the page before sending it again.",
+  not_sent: "The input wasn't sent.",
+  page_blocked: "The page doesn't respond. Answer any dialog on the desktop.",
+  unload_blocked: "The page refuses the reload that stopping the agent's script needs.",
   failed: "The browser tab didn't respond.",
 } satisfies Partial<Record<BrowserLiveControlErrorCode, string>>;
 
@@ -58,7 +69,7 @@ export interface HumanControlContents {
   stop(): void;
   sendInputEvent(event: IsolatedKeyboardInputEvent): void;
   on(event: "will-prevent-unload", listener: (event: { preventDefault(): void }) => void): void;
-  once(event: "destroyed", listener: () => void): void;
+  once(event: "destroyed" | "did-navigate", listener: () => void): void;
   removeListener(
     event: "will-prevent-unload",
     listener: (event: { preventDefault(): void }) => void,
@@ -69,8 +80,11 @@ export interface HumanControlContents {
 export interface HumanControlTab {
   contents: HumanControlContents;
   send: CdpSessionSender;
-  /** Runs outside the CDP queue: a dialog blocks the command in front of it. */
-  answerDialog(accept: boolean, sessionId?: string): Promise<unknown>;
+  /**
+   * Dismisses the open dialog; there's no accepting. Runs outside the CDP queue, because a dialog
+   * blocks the command in front of it.
+   */
+  dismissDialog(sessionId?: string): Promise<unknown>;
   /** Ends the script that is running. Outside the CDP queue, which that script can hold up. */
   interrupt(): Promise<unknown>;
   onMessage(listener: CdpMessageListener): () => void;
@@ -100,8 +114,11 @@ interface Control {
 
 type ShowsDocument = (documentId: string) => boolean;
 
+type ControlCode = keyof typeof ERROR_MESSAGES;
+
 interface Timing {
   settleMs: number;
+  cdpTimeoutMs: number;
   replyTimeoutMs: number;
   drainTimeoutMs: number;
 }
@@ -125,6 +142,7 @@ export class BrowserHumanControls {
   public constructor(timing: Partial<Timing> = {}) {
     this.timing = {
       settleMs: SETTLE_MS,
+      cdpTimeoutMs: CDP_TIMEOUT_MS,
       replyTimeoutMs: REPLY_TIMEOUT_MS,
       drainTimeoutMs: DRAIN_TIMEOUT_MS,
       ...timing,
@@ -168,7 +186,7 @@ export class BrowserHumanControls {
     hostId: number;
     tab: HumanControlTab;
     onEnded: () => void;
-  }): Promise<BrowserLiveFocusResult> {
+  }): Promise<BrowserLiveTakeResult> {
     const { controlId, hostId, tab, onEnded } = input;
     const contentsId = tab.contents.id;
     if (this.byContentsId.has(contentsId) || this.byControlId.has(controlId)) return refuse("busy");
@@ -204,15 +222,18 @@ export class BrowserHumanControls {
     // Before anything is awaited: a dialog blocks the drain, Page.enable and auto-attach.
     control.cleanup.push(
       tab.onMessage((method, params, sessionId) => {
-        if (method !== "Page.javascriptDialogOpening") return;
-        const accept = params.type === "alert" || params.type === "beforeunload";
-        void tab.answerDialog(accept, sessionId).catch(() => {});
+        // Electron answers beforeunload itself, by keeping the page.
+        if (method !== "Page.javascriptDialogOpening" || params.type === "beforeunload") return;
+        // A turn later: CDP reports the dialog before Electron opens the box that has to be closed.
+        setImmediate(() => {
+          if (this.isCurrent(control)) void tab.dismissDialog(sessionId).catch(() => {});
+        });
       }),
     );
 
     return control.queue.run(async () => {
-      await within(tab.answerDialog(false), ANSWER_TIMEOUT_MS);
-      const code = await this.prepare(control);
+      await within(tab.dismissDialog(), ANSWER_TIMEOUT_MS);
+      const { code, reloaded } = await this.prepare(control);
       // A release that came meanwhile is queued behind this and unlocks.
       if (!this.isTaking(control)) return refuse("failed");
       if (code) {
@@ -220,7 +241,8 @@ export class BrowserHumanControls {
         return refuse(code);
       }
       control.phase = "held";
-      return { focus: await this.describeFocus(control), error: null };
+      const focus = await this.describeFocus(control);
+      return { focus, error: null, ...(reloaded ? { reloaded } : {}) };
     });
   }
 
@@ -228,7 +250,9 @@ export class BrowserHumanControls {
    * Waits a while for the agent's running commands, then cancels them. A script one of them left
    * in the page could still read or act, and only a new document is sure to end it.
    */
-  private async prepare(control: Control): Promise<keyof typeof ERROR_MESSAGES | null> {
+  private async prepare(
+    control: Control,
+  ): Promise<{ code: ControlCode | null; reloaded: boolean }> {
     const { contentsId, tab } = control;
     const running = [...(this.runningByContentsId.get(contentsId) ?? [])];
     const results = running.map(([, result]) => result);
@@ -236,44 +260,54 @@ export class BrowserHumanControls {
     if (!(await within(Promise.allSettled(results), this.timing.drainTimeoutMs))) {
       for (const command of commands) command.cancel();
     }
-    if (!this.isTaking(control)) return "failed";
+    if (!this.isTaking(control)) return { code: "failed", reloaded: false };
 
     const cancelled = commands.filter((command) => command.cancelled);
-    let replaced = false;
+    let reloaded = false;
     if (cancelled.length > 0) {
       if (cancelled.some((command) => command.isPending("loadURL"))) tab.contents.stop();
       await within(Promise.all(cancelled.map((command) => command.settled())), CANCEL_GRACE_MS);
-      if (!this.isTaking(control)) return "failed";
+      if (!this.isTaking(control)) return { code: "failed", reloaded };
       if (cancelled.some((command) => command.isPending("executeJavaScript"))) {
-        replaced = await this.endScripts(control);
-        if (!replaced) return "agent_busy";
+        const code = await this.endScripts(control);
+        if (code) {
+          // Their scripts end with the document, and Electron restores none from a back/forward
+          // cache, so a later take needn't reload the page the user went on to.
+          tab.contents.once("did-navigate", () => {
+            for (const command of cancelled) this.untrack(contentsId, command);
+          });
+          return { code, reloaded };
+        }
+        reloaded = true;
       }
     }
 
-    const attach = () =>
-      within(
-        tab
-          .send("Page.enable")
-          // A press moves the host window's focus to the webview, which then focuses the guest's
-          // main frame: in a tab without focus that blurred the iframe field just pressed.
-          .then(() => tab.send("Emulation.setFocusEmulationEnabled", { enabled: true }))
-          .then(() => control.frameSessions.attach()),
-        CDP_TIMEOUT_MS,
-      );
-    let enabled = await attach();
-    // A cancelled command can also leave the page's own thread busy.
-    if (!enabled && cancelled.length > 0 && !replaced && this.isTaking(control)) {
-      enabled = (await this.endScripts(control)) && (await attach());
+    if (!(await within(this.attach(control), this.timing.cdpTimeoutMs))) {
+      return { code: "page_blocked", reloaded };
     }
-    if (!enabled) return "failed";
     for (const command of cancelled) this.untrack(contentsId, command);
-    return null;
+    return { code: null, reloaded };
   }
 
-  private async endScripts(control: Control): Promise<boolean> {
+  /** Can outlive its timeout, so it turns nothing on for a control that is gone by then. */
+  private async attach(control: Control): Promise<void> {
+    await control.tab.send("Page.enable");
+    if (!this.isTaking(control)) return;
+    // A press moves the host window's focus to the webview, which then focuses the guest's
+    // main frame: in a tab without focus that blurred the iframe field just pressed.
+    await control.tab.send("Emulation.setFocusEmulationEnabled", { enabled: true });
+    if (!this.isTaking(control)) return;
+    await control.frameSessions.attach();
+  }
+
+  /** Never past beforeunload: nobody agreed to lose the page's state for this. */
+  private async endScripts(control: Control): Promise<ControlCode | null> {
     // A loop would keep the navigation from committing.
     await within(control.tab.interrupt(), ANSWER_TIMEOUT_MS);
-    return this.replaceDocument(control);
+    if (!this.isTaking(control)) return "failed";
+    let guarded = false;
+    if (await this.replaceDocument(control, () => (guarded = true))) return null;
+    return guarded ? "unload_blocked" : "agent_busy";
   }
 
   public async input(request: {
@@ -286,20 +320,27 @@ export class BrowserHumanControls {
     showsDocument: ShowsDocument;
   }): Promise<BrowserLiveFocusResult> {
     const { controlId, hostId, contentsId, input, showsDocument } = request;
+    const deadline = Date.now() + INPUT_DEADLINE_MS;
     const control = this.byControlId.get(controlId);
     if (!control || control.hostId !== hostId || control.contentsId !== contentsId) {
       return refuse("not_controller");
     }
     return control.queue.run(async () => {
       if (control.phase !== "held" || !this.isCurrent(control)) return refuse("not_controller");
+      const mayDispatch = () =>
+        control.phase === "held" && this.isCurrent(control) && Date.now() < deadline;
+      if (!mayDispatch()) return refuse("not_sent");
       try {
-        const code = await this.dispatch(control, input, showsDocument);
+        const code =
+          input.kind === "insert_text"
+            ? await this.insertText(control, input, deadline)
+            : await this.dispatch(control, input, showsDocument, mayDispatch);
         if (code) return refuse(code);
         await delay(this.timing.settleMs);
         return { focus: await this.describeFocus(control), error: null };
       } catch {
         // The renderer or its debugger session went away. The caught error isn't passed on.
-        return refuse(input.kind === "insert_text" ? "unconfirmed" : "failed");
+        return refuse("unconfirmed");
       }
     });
   }
@@ -333,37 +374,47 @@ export class BrowserHumanControls {
 
   private async dispatch(
     control: Control,
-    input: BrowserLiveInput,
+    input: Exclude<BrowserLiveInput, { kind: "insert_text" }>,
     showsDocument: ShowsDocument,
-  ): Promise<keyof typeof ERROR_MESSAGES | null> {
+    mayDispatch: () => boolean,
+  ): Promise<ControlCode | null> {
     const { contents } = control.tab;
-    if (input.kind === "insert_text") return this.insertText(control, input);
     if (input.kind === "key") return pressKey(contents, input.key);
 
     const isShown = () => showsDocument(input.documentId);
     if (!isShown()) return "page_changed";
+    let reported = false;
+    let maybeSent = false;
+    // Asked as each event's turn in the CDP queue comes, not when it was queued.
+    const maySend = (acts: boolean) => () => {
+      if (reported || !mayDispatch() || !isShown()) return false;
+      maybeSent ||= acts;
+      return true;
+    };
     const zoom = contents.getZoomFactor();
     const dispatched = control.frameSessions
       .route(toCssPoint(contents, input))
-      .then(({ send, point }) => {
-        // Routing takes a few round trips, and a navigation can commit during any of them.
-        const sendToShown: CdpCommandSender = async (command, params) => {
+      .then(({ sessionId, point }) => {
+        const send: CdpCommandSender = (command, params) => {
           const acts = params?.type === "mousePressed" || params?.type === "mouseWheel";
-          if (acts && !isShown()) throw new Error("The page changed.");
-          return send(command, params);
+          return control.tab.send(command, params, sessionId, maySend(acts));
         };
         return input.kind === "tap"
-          ? dispatchTrustedClick(sendToShown, point)
-          : dispatchTrustedScroll(sendToShown, point, input.deltaX / zoom, input.deltaY / zoom);
+          ? dispatchTrustedClick(send, point)
+          : dispatchTrustedScroll(send, point, input.deltaX / zoom, input.deltaY / zoom);
       });
-    if (await within(dispatched, CDP_TIMEOUT_MS)) return null;
-    return isShown() ? "failed" : "page_changed";
+    const done = await within(dispatched, this.timing.cdpTimeoutMs);
+    reported = true;
+    if (done) return null;
+    if (maybeSent) return "unconfirmed";
+    return isShown() ? "not_sent" : "page_changed";
   }
 
   private async insertText(
     control: Control,
     input: Extract<BrowserLiveInput, { kind: "insert_text" }>,
-  ): Promise<keyof typeof ERROR_MESSAGES | null> {
+    deadline: number,
+  ): Promise<ControlCode | null> {
     const { binding } = control;
     control.binding = null;
     if (!binding || binding.targetId !== input.targetId) return "target_changed";
@@ -387,13 +438,13 @@ export class BrowserHumanControls {
         targetId: binding.targetId,
         text: input.text,
         // A request that arrives after the user was told it failed must not type.
-        deadline: Date.now() + replyTimeoutMs,
+        deadline: Math.min(deadline, Date.now() + replyTimeoutMs),
       },
       replyTimeoutMs,
     );
     if (!reply) return "unconfirmed";
     if (reply.inserted === true) return null;
-    return reply.reason === "does_not_fit" ? "does_not_fit" : "target_changed";
+    return reply.reason ?? "target_changed";
   }
 
   private async describeFocus(control: Control): Promise<BrowserLiveFocus | null> {
@@ -434,36 +485,50 @@ export class BrowserHumanControls {
     const deadline = Date.now() + LOAD_TIMEOUT_MS;
     while (contents.isLoadingMainFrame() && Date.now() < deadline) await delay(LOAD_POLL_MS);
 
-    const replies = await this.askTypedFrames(control, "all");
-    const typedDocumentIsOpen = !replies || replies.some((reply) => reply?.typed !== false);
-    if (!typedDocumentIsOpen) {
-      contents.navigationHistory.clear();
-      return true;
+    // Listening before the discard starts, to know of navigations the page began before it.
+    const unload = ownDiscardUnload(DISCARD_URL, (listener) => control.tab.onMessage(listener));
+    try {
+      const replies = await this.askTypedFrames(control, "all");
+      const typedDocumentIsOpen = !replies || replies.some((reply) => reply?.typed !== false);
+      if (!typedDocumentIsOpen) {
+        contents.navigationHistory.clear();
+        return true;
+      }
+      for (let attempt = 1; attempt <= DISCARD_ATTEMPTS && this.isCurrent(control); attempt++) {
+        if (await this.replaceDocument(control, unload.onUnload)) {
+          control.typedFrames.clear();
+          return true;
+        }
+        if (!unload.takeRefused()) return false;
+        await delay(DISCARD_ATTEMPT_GAP_MS);
+      }
+      return false;
+    } finally {
+      unload.dispose();
     }
-    if (!(await this.replaceDocument(control))) return false;
-    control.typedFrames.clear();
-    return true;
   }
 
   /** History goes with the document: back would restore it, its form state and its scripts. */
-  private async replaceDocument(control: Control): Promise<boolean> {
+  private async replaceDocument(
+    control: Control,
+    onUnload: (event: { preventDefault(): void }) => void,
+  ): Promise<boolean> {
     const { contents } = control.tab;
     const url = contents.mainFrame.isDestroyed() ? contents.getURL() : contents.mainFrame.url;
-    const allowUnload = (event: { preventDefault(): void }) => event.preventDefault();
-    contents.on("will-prevent-unload", allowUnload);
+    contents.on("will-prevent-unload", onUnload);
     try {
-      await within(contents.loadURL("about:blank"), LOAD_TIMEOUT_MS);
-      if (contents.mainFrame.url !== "about:blank") return false;
-      contents.navigationHistory.clear();
-      if (/^https?:/i.test(url)) {
-        // Never reload(): on the result of a POST that submits the form again.
-        await within(contents.loadURL(url), LOAD_TIMEOUT_MS);
-        contents.navigationHistory.clear();
-      }
-      return true;
+      await within(contents.loadURL(DISCARD_URL), LOAD_TIMEOUT_MS);
     } finally {
-      contents.removeListener("will-prevent-unload", allowUnload);
+      contents.removeListener("will-prevent-unload", onUnload);
     }
+    if (contents.mainFrame.url !== DISCARD_URL) return false;
+    contents.navigationHistory.clear();
+    if (/^https?:/i.test(url)) {
+      // Never reload(): on the result of a POST that submits the form again.
+      await within(contents.loadURL(url), LOAD_TIMEOUT_MS);
+      contents.navigationHistory.clear();
+    }
+    return true;
   }
 
   /** Null when the tab's frames can't be listed, as after a renderer crash. */
@@ -525,10 +590,7 @@ export class BrowserHumanControls {
   }
 }
 
-function pressKey(
-  contents: HumanControlContents,
-  key: BrowserLiveKey,
-): keyof typeof ERROR_MESSAGES | null {
+function pressKey(contents: HumanControlContents, key: BrowserLiveKey): ControlCode | null {
   const frame = contents.focusedFrame;
   // sendInputEvent reaches only the main frame's process.
   if (frame && frame.processId !== contents.mainFrame.processId) return "key_unsupported";
@@ -558,11 +620,11 @@ function frameKey(frame: GuestFrame): string {
   return `${frame.processId}:${frame.routingId}`;
 }
 
-function refuse(code: keyof typeof ERROR_MESSAGES): BrowserLiveFocusResult {
+function refuse(code: ControlCode): BrowserLiveFocusResult {
   return { focus: null, error: controlError(code) };
 }
 
-function controlError(code: keyof typeof ERROR_MESSAGES): BrowserLiveControlError {
+function controlError(code: ControlCode): BrowserLiveControlError {
   return { code, message: ERROR_MESSAGES[code] };
 }
 

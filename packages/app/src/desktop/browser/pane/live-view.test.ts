@@ -83,11 +83,13 @@ function createHarness() {
     jpeg = [0xff, 0xd8, frameSeq],
     origin?: string,
     documentId?: string,
+    blocked?: boolean,
   ) {
     const metadata = {
       ...METADATA,
       ...(origin ? { origin } : {}),
       ...(documentId ? { documentId } : {}),
+      ...(blocked ? { blocked } : {}),
     };
     for (const handler of frameHandlers) {
       handler({ streamId, frameSeq, metadata, jpeg: Uint8Array.from(jpeg) });
@@ -147,7 +149,14 @@ describe("createBrowserLiveView", () => {
     harness.sendFrame("s1", 0, [1, 2, 3]);
     expect(harness.lastState()).toEqual({
       status: "live",
-      frame: { seq: 0, uri: frameUri([1, 2, 3]), screen: SCREEN, origin: null, documentId: null },
+      frame: {
+        seq: 0,
+        uri: frameUri([1, 2, 3]),
+        screen: SCREEN,
+        origin: null,
+        documentId: null,
+        blocked: false,
+      },
       shown: null,
     });
   });
@@ -182,6 +191,7 @@ describe("createBrowserLiveView", () => {
       screen: SCREEN,
       origin: null,
       documentId: null,
+      blocked: false,
     };
     expect(harness.lastState()).toEqual({ status: "live", frame, shown: frame });
   });
@@ -306,6 +316,15 @@ describe("createBrowserLiveView", () => {
     harness.view.frameRendered(1);
     harness.sendFrame("s1", 2, [9], "https://first.example", "s1:1");
     expect(harness.lastState()).toMatchObject({ shown: { documentId: "s1:1" } });
+  });
+
+  it("shows that the page is blocked, though its image is the same", async () => {
+    const harness = createHarness();
+    await harness.activate("s1");
+    harness.sendFrame("s1", 1, [9], "https://first.example", "s1:0");
+    harness.view.frameRendered(1);
+    harness.sendFrame("s1", 2, [9], "https://first.example", "s1:0", true);
+    expect(harness.lastState()).toMatchObject({ shown: { blocked: true } });
   });
 
   it("passes on whether control outlived the stream", async () => {

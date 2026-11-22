@@ -7,6 +7,7 @@ import type {
   BrowserLiveFocus,
   BrowserLiveFocusResult,
   BrowserLiveInput,
+  BrowserLiveTakeResult,
 } from "@getpaseo/protocol/browser-automation/live-view";
 
 const DISCONNECT_GRACE_MS = 5 * 60_000;
@@ -24,6 +25,7 @@ export type BrowserHostControlRequest =
 export interface BrowserHostControlAnswer {
   focus?: BrowserLiveFocus | null;
   error: BrowserLiveControlError | null;
+  reloaded?: boolean;
 }
 
 /** A watching stream, as far as control needs it. */
@@ -88,7 +90,7 @@ export class BrowserHumanControl {
     return { controlId: control.controlId, held: control.phase === "held" };
   }
 
-  public async take(stream: ControlledStream, ownerId: string): Promise<BrowserLiveFocusResult> {
+  public async take(stream: ControlledStream, ownerId: string): Promise<BrowserLiveTakeResult> {
     const { browserId, hostClientId, streamId } = stream;
     const existing = this.byBrowserId.get(browserId);
     if (existing) {
@@ -137,7 +139,11 @@ export class BrowserHumanControl {
     // Not before: a take that fails leaves the last hand-back's note true.
     this.deps.onTaken(browserId);
     if (!this.deps.hasViewer(browserId)) this.startGrace(control);
-    return { focus: answer.focus ?? null, error: null };
+    return {
+      focus: answer.focus ?? null,
+      error: null,
+      ...(answer.reloaded ? { reloaded: true } : {}),
+    };
   }
 
   public async input(
@@ -160,10 +166,12 @@ export class BrowserHumanControl {
       },
       INPUT_TIMEOUT_MS,
     );
-    if (answer) return { focus: answer.focus ?? null, error: whileLocked(answer.error) };
-    // Never sent again: the desktop may have typed it.
-    const code = input.kind === "insert_text" ? "unconfirmed" : "failed";
-    return refuse(code, "The desktop didn't confirm the input.");
+    if (answer?.error?.code === "not_controller") {
+      return refuse("not_sent", "The desktop didn't take the input.");
+    }
+    if (answer) return { focus: answer.focus ?? null, error: answer.error };
+    // Never sent again: whatever it was, the desktop may have done it.
+    return refuse("unconfirmed", "The desktop didn't confirm the input.");
   }
 
   public async handBack(

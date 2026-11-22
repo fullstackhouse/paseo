@@ -668,7 +668,16 @@ export const fr: TranslationResources = {
           streamEnded:
             "La vue en direct s'est arrêtée, rien n'a donc été envoyé. Reconnectez-vous et réessayez.",
           unconfirmed:
-            "L’ordinateur n’a pas confirmé le texte. Vérifiez la page avant de le saisir à nouveau.",
+            "L'ordinateur ne l'a pas confirmé. L'envoi a peut-être abouti : vérifiez la page avant de renvoyer.",
+          notSent: "Non envoyé. Réessayez.",
+          pageBlocked:
+            "La page ne répond pas. Si une boîte de dialogue y est ouverte, répondez-y sur l'ordinateur.",
+          watchBlocked:
+            "La page ne répond pas. Une boîte de dialogue y est peut-être ouverte. Prenez le contrôle pour l'ignorer ou répondez-y sur l'ordinateur.",
+          unloadBlocked:
+            "Prendre le contrôle exige de recharger la page pour arrêter l'action bloquée de l'agent, mais cette page empêche de la quitter. Terminez sur l'ordinateur.",
+          reloaded:
+            "L'action de l'agent était bloquée, la page a donc été rechargée pour l'arrêter. Ce qui n'était pas enregistré a été perdu.",
           agentBusy: "L’action de l’agent dans le navigateur est encore en cours. Réessayez.",
           busy: "Cet onglet est déjà contrôlé",
           keyUnsupported:

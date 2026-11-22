@@ -141,6 +141,7 @@ export function LiveViewSurface(props: {
       )}
       <ControlPanel
         state={control}
+        pageBlocked={state.status === "live" && state.shown?.blocked === true}
         canTakeControl={state.status === "live" && state.shown !== null}
         availability={availability}
         onTake={take}

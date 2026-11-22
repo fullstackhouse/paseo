@@ -24,6 +24,8 @@ export interface BrowserLiveViewFrame {
   origin: string | null;
   /** The document it shows, which taps and scrolls on it send back. */
   documentId: string | null;
+  /** The page didn't respond then, as behind a dialog. */
+  blocked: boolean;
 }
 
 export interface BrowserLiveViewStreamInfo {
@@ -139,13 +141,15 @@ export function createBrowserLiveView(input: {
       offsetTop,
       origin = null,
       documentId = null,
+      blocked = false,
     } = frame.metadata;
     const screen = { width: deviceWidth, height: deviceHeight, offsetTop };
     // An identical image never re-renders, so ack it now or the stream stalls.
     if (state.status === "live" && state.frame.uri === uri) {
       client.ackBrowserLiveFrame(frame.streamId, frame.frameSeq);
-      if (state.frame.origin !== origin || state.frame.documentId !== documentId) {
-        const same = { ...state.frame, origin, documentId };
+      const last = state.frame;
+      if (last.origin !== origin || last.documentId !== documentId || last.blocked !== blocked) {
+        const same = { ...last, origin, documentId, blocked };
         const isShown = state.shown?.seq === state.frame.seq;
         setState({ status: "live", frame: same, shown: isShown ? same : state.shown });
       }
@@ -154,7 +158,7 @@ export function createBrowserLiveView(input: {
     unackedSeq = frame.frameSeq;
     setState({
       status: "live",
-      frame: { seq: frame.frameSeq, uri, screen, origin, documentId },
+      frame: { seq: frame.frameSeq, uri, screen, origin, documentId, blocked },
       shown: state.status === "live" ? state.shown : null,
     });
   });

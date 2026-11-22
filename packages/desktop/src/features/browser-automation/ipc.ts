@@ -21,7 +21,6 @@ import {
 } from "./human-control.js";
 import { BrowserLiveViewStream, type BrowserLiveViewEvents } from "./live-view.js";
 import { AgentCommandCancelledError } from "./agent-commands.js";
-import { dismissPageDialog } from "./page-dialogs.js";
 import type {
   BrowserAutomationConsoleLogEntry,
   BrowserAutomationDialogEvent,
@@ -37,7 +36,6 @@ import type { IsolatedKeyboardInputEvent } from "./trusted-input.js";
 import { CdpSessionQueue } from "./cdp-session-queue.js";
 import { FrameProduction } from "./frame-production.js";
 import {
-  dialogAcceptValue,
   handledDialogEvent,
   MAX_DIALOGS_PER_COMMAND,
   promptShimDrainScript,
@@ -55,6 +53,8 @@ import {
 } from "../browser-webviews/index.js";
 
 const MAX_CONSOLE_MESSAGES_PER_TAB = 200;
+// Above Electron's own isolated world, 999.
+const PAINT_WORLD_ID = 1_100;
 const consoleMessagesByContentsId = new Map<number, BrowserAutomationConsoleLogEntry[]>();
 const cdpQueuesByContentsId = new Map<number, CdpSessionQueue>();
 const dialogMonitorsByContentsId = new Map<number, DialogMonitor>();
@@ -155,7 +155,7 @@ interface ConsoleMessageEmitter {
 }
 
 interface BrowserAutomationWebContents extends ConsoleMessageEmitter {
-  once(event: "destroyed" | "did-stop-loading", listener: () => void): void;
+  once(event: "destroyed" | "did-stop-loading" | "did-navigate", listener: () => void): void;
   removeListener(event: "destroyed", listener: () => void): void;
   readonly mainFrame: HumanControlContents["mainFrame"];
   readonly focusedFrame: GuestFrame | null;
@@ -171,6 +171,11 @@ interface BrowserAutomationWebContents extends ConsoleMessageEmitter {
   isLoading(): boolean;
   isDestroyed(): boolean;
   executeJavaScript(code: string): Promise<unknown>;
+  executeJavaScriptInIsolatedWorld(
+    worldId: number,
+    scripts: Array<{ code: string }>,
+  ): Promise<unknown>;
+  emit(event: "-cancel-dialogs"): boolean;
   loadURL(url: string): Promise<void>;
   stop(): void;
   goBack(): void;
@@ -412,7 +417,7 @@ class DialogMonitor {
       this.recordDialogs(collector, [event]);
     }
     await this.sendDialogResponseCommand("Page.handleJavaScriptDialog", {
-      accept: dialogAcceptValue(event.type),
+      accept: false,
     });
   }
 
@@ -546,6 +551,21 @@ function createRegistry(hostWebContentsId: number): BrowserRegistry {
   };
 }
 
+function liveViewTab(contents: BrowserAutomationWebContents) {
+  return {
+    ...adaptWebContents(contents),
+    sendDebugCommand: async (command: string, params?: Record<string, unknown>) => {
+      if (contents.isDestroyed()) throw new BrowserTabClosedError();
+      if (!contents.debugger.isAttached()) contents.debugger.attach("1.3");
+      return contents.debugger.sendCommand(command, params ?? {});
+    },
+    hasPainted: async () => {
+      const code = `performance.getEntriesByName("first-paint").length > 0`;
+      return (await contents.executeJavaScriptInIsolatedWorld(PAINT_WORLD_ID, [{ code }])) === true;
+    },
+  };
+}
+
 function liveViewEvents(contents: BrowserAutomationWebContents): BrowserLiveViewEvents {
   return {
     onMessage(listener) {
@@ -574,24 +594,23 @@ function humanControlTab(contents: BrowserAutomationWebContents): HumanControlTa
   const debuggerApi = contents.debugger;
   return {
     contents: contents as BrowserAutomationWebContents & HumanControlContents,
-    send: (command, params, sessionId) =>
+    send: (command, params, sessionId, mayRun) =>
       cdpQueue.run(async () => {
         if (contents.isDestroyed()) throw new BrowserTabClosedError();
         if (!debuggerApi.isAttached()) debuggerApi.attach("1.3");
+        if (mayRun && !mayRun()) throw new Error("The command is no longer current.");
         return debuggerApi.sendCommand(command, params ?? {}, sessionId);
       }),
-    answerDialog: async (accept, sessionId) => {
-      try {
-        return await debuggerApi.sendCommand("Page.handleJavaScriptDialog", { accept }, sessionId);
-      } finally {
-        // For a dialog older than Page.enable, and for the message box, which CDP leaves open.
-        dismissPageDialog(contents, accept);
-      }
+    dismissDialog: async (sessionId) => {
+      await debuggerApi.sendCommand("Page.handleJavaScriptDialog", { accept: false }, sessionId);
+      // CDP leaves Electron's message box up. This closes it and answers nothing.
+      contents.emit("-cancel-dialogs");
     },
     interrupt: async () => debuggerApi.sendCommand("Runtime.terminateExecution", {}),
     onMessage: (listener) => {
+      // Electron gives the tab's own session an empty id, and rejects that id when sent back.
       const handler: DebuggerMessageListener = (_event, method, params, sessionId) =>
-        listener(method, params ?? {}, sessionId);
+        listener(method, params ?? {}, sessionId || undefined);
       debuggerApi.on?.("message", handler);
       return () => debuggerApi.removeListener?.("message", handler);
     },
@@ -731,12 +750,10 @@ export class BrowserLiveViewStreams {
         `Browser tab ${request.browserId} is already streaming a live view.`,
       );
     }
-    // A dialog in the main frame holds up Page.enable and the screencast.
-    dismissPageDialog(contents);
     const hostStreamIds = this.streamIdsOfHost(hostContents);
     const stream = new BrowserLiveViewStream({
       streamId: request.streamId,
-      tab: adaptWebContents(contents),
+      tab: liveViewTab(contents),
       events: liveViewEvents(contents),
       readOrigin: () => readCommittedOrigin(contents),
       onFrame: (frame) => {
@@ -924,7 +941,7 @@ function invalidControlRequest(rawRequest: unknown) {
   return {
     requestId: readRequestId(rawRequest),
     focus: null,
-    error: { code: "failed", message: "Invalid live view request." },
+    error: { code: "not_sent", message: "Invalid live view request." },
   };
 }
 

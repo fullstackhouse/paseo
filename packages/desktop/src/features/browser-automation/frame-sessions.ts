@@ -1,4 +1,3 @@
-import type { CdpCommandSender } from "./cdp-session-queue.js";
 import { toBoxPoint } from "./quad.js";
 
 // An iframe in an iframe in an iframe is already more than a sign-in page uses.
@@ -9,6 +8,8 @@ export type CdpSessionSender = (
   command: string,
   params?: Record<string, unknown>,
   sessionId?: string,
+  /** Asked when the command's turn in the queue comes. False drops it. */
+  mayRun?: () => boolean,
 ) => Promise<unknown>;
 
 export type CdpMessageListener = (
@@ -43,7 +44,7 @@ export class FrameSessions {
   public async route(viewportPoint: {
     x: number;
     y: number;
-  }): Promise<{ send: CdpCommandSender; point: { x: number; y: number } }> {
+  }): Promise<{ sessionId: string | undefined; point: { x: number; y: number } }> {
     let sessionId: string | undefined;
     let point = viewportPoint;
     for (let depth = 0; depth < MAX_FRAME_DEPTH && this.sessionIdByTargetId.size > 0; depth++) {
@@ -51,8 +52,7 @@ export class FrameSessions {
       if (!child) break;
       ({ sessionId, point } = child);
     }
-    const target = sessionId;
-    return { send: (command, params) => this.send(command, params, target), point };
+    return { sessionId, point };
   }
 
   public dispose(): void {

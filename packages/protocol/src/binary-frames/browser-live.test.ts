@@ -109,6 +109,7 @@ it("keeps the document a frame was captured from", () => {
     scrollOffsetX: 0,
     scrollOffsetY: 0,
     documentId: "stream-1:2",
+    blocked: true,
   };
   const bytes = encodeBrowserLiveFrame({
     streamId: "stream-1",

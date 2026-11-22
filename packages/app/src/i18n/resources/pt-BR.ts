@@ -666,7 +666,16 @@ export const ptBR: TranslationResources = {
           streamEnded:
             "A visualização ao vivo parou, por isso nada foi enviado. Reconecte e tente novamente.",
           unconfirmed:
-            "O computador não confirmou o texto. Verifique a página antes de digitar de novo.",
+            "O computador não confirmou. Pode ter sido enviado, então confira a página antes de enviar de novo.",
+          notSent: "Não enviado. Tente novamente.",
+          pageBlocked:
+            "A página não responde. Se houver uma caixa de diálogo aberta, responda no computador.",
+          watchBlocked:
+            "A página não responde. Pode haver uma caixa de diálogo aberta. Assuma o controle para dispensá-la ou responda no computador.",
+          unloadBlocked:
+            "Assumir o controle exige recarregar para parar a ação travada do agente, mas esta página impede a saída. Conclua no computador.",
+          reloaded:
+            "A ação do agente travou, então a página foi recarregada para interrompê-la. O que não estava salvo foi perdido.",
           agentBusy: "A ação do agente no navegador ainda está em andamento. Tente novamente.",
           busy: "Esta aba já está sendo controlada",
           keyUnsupported: "As teclas não funcionam neste quadro incorporado. Toque no botão dele.",

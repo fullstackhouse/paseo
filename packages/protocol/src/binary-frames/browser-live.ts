@@ -23,6 +23,8 @@ export const BrowserLiveFrameMetadataSchema = z.object({
   origin: z.string().optional(),
   // The document the frame shows. Taps and scrolls send it back.
   documentId: z.string().optional(),
+  // The page doesn't respond, as behind a JavaScript dialog. Watching doesn't answer those.
+  blocked: z.boolean().optional(),
 });
 
 export type BrowserLiveFrameMetadata = z.infer<typeof BrowserLiveFrameMetadataSchema>;

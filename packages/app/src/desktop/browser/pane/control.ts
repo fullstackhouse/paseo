@@ -111,9 +111,9 @@ export function createBrowserControl(input: {
       if (!streamId || state.held || state.busy) return;
       update({ busy: "taking", notice: null });
       try {
-        const { focus, error } = await client.takeBrowserLiveControl(streamId);
+        const { focus, error, reloaded } = await client.takeBrowserLiveControl(streamId);
         if (error) update({ busy: null, notice: error.code });
-        else update({ busy: null, held: true, focus });
+        else update({ busy: null, held: true, focus, notice: reloaded ? "reloaded" : null });
       } catch {
         update({ busy: null, notice: "connection" });
       }
@@ -136,11 +136,8 @@ export function createBrowserControl(input: {
         }
       } catch {
         // The thrown error is dropped: it must not carry what was typed into the UI or a log.
-        update(
-          isText
-            ? { busy: null, focus: null, notice: "unconfirmed" }
-            : { busy: null, notice: "connection" },
-        );
+        // Whatever it was, it may have gone through.
+        update({ busy: null, notice: "unconfirmed", ...(isText ? { focus: null } : {}) });
       }
     },
 

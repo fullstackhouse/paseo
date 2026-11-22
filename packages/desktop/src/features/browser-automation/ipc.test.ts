@@ -11,7 +11,6 @@ import {
   HostSnapshotEngineRegistry,
   runAgentCommand,
 } from "./ipc.js";
-import { observePageDialogs } from "./page-dialogs.js";
 import type { IsolatedKeyboardInputEvent } from "./trusted-input.js";
 
 class FakeImage implements TabImage {
@@ -34,6 +33,7 @@ class FakeDebugger {
   >();
   public blockCommands = false;
   public readonly blockedCommandNames = new Set<string>();
+  public blockPressed = false;
   public readonly failedCommandNames = new Set<string>();
   public readonly failedCommandErrors = new Map<string, Error>();
   public readonly promptDialogs: unknown[] = [];
@@ -58,6 +58,8 @@ class FakeDebugger {
     params?: Record<string, unknown>,
     sessionId?: string,
   ): Promise<unknown> {
+    // As Electron does.
+    if (sessionId === "") throw new Error("Empty session id is not allowed");
     this.commands.push({ command, params: params ?? {}, ...(sessionId ? { sessionId } : {}) });
     this.beforeCommand?.(command);
     const commandError = this.failedCommandErrors.get(command);
@@ -67,7 +69,11 @@ class FakeDebugger {
     if (this.failedCommandNames.has(command)) {
       throw new Error(`${command} failed`);
     }
-    if (this.blockCommands || this.blockedCommandNames.has(command)) {
+    if (
+      this.blockCommands ||
+      this.blockedCommandNames.has(command) ||
+      (this.blockPressed && params?.type === "mousePressed")
+    ) {
       await new Promise<void>((resolve) => {
         this.blockedCommands.push(resolve);
       });
@@ -123,7 +129,8 @@ class FakeDebugger {
     return this.messageListeners.size;
   }
 
-  public emitMessage(method: string, params?: Record<string, unknown>, sessionId?: string): void {
+  /** Electron reports the tab's own session as an empty id. */
+  public emitMessage(method: string, params?: Record<string, unknown>, sessionId = ""): void {
     if (this.messageListeners.size === 0) {
       throw new Error("Debugger message listener was not registered");
     }
@@ -133,6 +140,12 @@ class FakeDebugger {
   public emitDetach(): void {
     this.attachedProtocolVersions.length = 0;
     for (const listener of this.detachListeners) listener();
+  }
+
+  public finishCommands(): void {
+    this.blockedCommandNames.clear();
+    this.blockPressed = false;
+    for (const resolve of this.blockedCommands.splice(0)) resolve();
   }
 
   public finishNextCommand(): void {
@@ -291,10 +304,35 @@ class FakeWebContents {
   public async loadURL(url: string): Promise<void> {
     this.loadedUrls.push(url);
     if (this.failedUrls.has(url)) throw new Error("ERR_ABORTED");
+    if (this.guardsUnload) {
+      // Chromium announces a navigation before that navigation's beforeunload.
+      this.debuggerApi.emitMessage("Page.frameStartedNavigating", {
+        frameId: "main",
+        url,
+        navigationType: "differentDocument",
+      });
+      this.beforeUnload?.();
+      if (!this.preventUnload()) throw new Error("ERR_ABORTED");
+      this.guardsUnload = false;
+    }
     this.mainFrame.url = url;
     this.mainFrame.children.length = 0;
   }
   public readonly failedUrls = new Set<string>();
+  public guardsUnload = false;
+  public beforeUnload: (() => void) | null = null;
+  /** Electron's will-prevent-unload: true when a listener lets the document go. */
+  public preventUnload(): boolean {
+    let prevented = false;
+    for (const listener of this.unloadListeners) {
+      listener({ preventDefault: () => (prevented = true) });
+    }
+    return prevented;
+  }
+  public hasPainted = true;
+  public async executeJavaScriptInIsolatedWorld(): Promise<unknown> {
+    return this.hasPainted;
+  }
 
   public goBack(): void {}
 
@@ -337,7 +375,10 @@ class FakeWebContents {
     this.internalListeners.set(event, [...(this.internalListeners.get(event) ?? []), listener]);
   }
 
-  public once(event: "destroyed" | "did-stop-loading", listener: () => void): void {
+  public once(
+    event: "destroyed" | "did-stop-loading" | "did-navigate",
+    listener: () => void,
+  ): void {
     if (event === "destroyed") this.destroyedListeners.add(listener);
     else this.listen(event, listener);
   }
@@ -632,7 +673,7 @@ describe("browser automation IPC adapter", () => {
           params: { expression: expect.any(String), returnByValue: true },
         },
         { command: "Input.dispatchMouseEvent", params: { type: "mousePressed" } },
-        { command: "Page.handleJavaScriptDialog", params: { accept: true } },
+        { command: "Page.handleJavaScriptDialog", params: { accept: false } },
       ]);
 
       contents.debugger.blockedCommandNames.clear();
@@ -1028,7 +1069,13 @@ function isPageEnable({ command }: { command: string }, index: number): boolean 
 
 function commitDocument(contents: FakeWebContents, origin: string): void {
   contents.mainFrame.origin = origin;
-  contents.debugger.emitMessage("Page.frameNavigated", { frame: { id: "main", url: origin } });
+  contents.debugger.emitMessage("Page.frameNavigated", {
+    frame: { id: "main", url: origin, loaderId: "next-loader" },
+  });
+}
+
+function firstPaint(contents: FakeWebContents, loaderId = "next-loader"): void {
+  contents.debugger.emitMessage("Page.lifecycleEvent", { name: "firstPaint", loaderId });
 }
 
 function screencastAcks(contents: FakeWebContents): unknown[] {
@@ -1334,6 +1381,7 @@ describe("browser live view human control", () => {
       settleMs: 0,
       replyTimeoutMs: 20,
       drainTimeoutMs: 20,
+      cdpTimeoutMs: 60,
     });
     const streams = new BrowserLiveViewStreams(
       (browserId, hostId) =>
@@ -1941,19 +1989,61 @@ describe("browser live view human control", () => {
     ).resolves.toMatchObject({ error: null });
   });
 
-  test("dismisses page dialogs, which would block every further input", async () => {
+  const handled = (contents: FakeWebContents) =>
+    contents.debugger.commands.filter(({ command }) => command === "Page.handleJavaScriptDialog");
+
+  test.each(["alert", "confirm", "prompt"])("only ever dismisses a %s", async (type) => {
     const { contents, take } = await watchedTab();
     await take();
-    contents.debugger.emitMessage(
-      "Page.javascriptDialogOpening",
-      { type: "alert", message: "x" },
-      "iframe-session",
-    );
+    const before = handled(contents).length;
+    contents.debugger.emitMessage("Page.javascriptDialogOpening", { type }, "iframe-session");
     await flushMicrotasks();
-    expect(contents.debugger.commands.at(-1)).toMatchObject({
-      command: "Page.handleJavaScriptDialog",
-      sessionId: "iframe-session",
-    });
+
+    expect(handled(contents).slice(before)).toEqual([
+      expect.objectContaining({ sessionId: "iframe-session" }),
+    ]);
+    expect(handled(contents).map(({ params }) => params.accept)).not.toContain(true);
+  });
+
+  test("leaves beforeunload to Electron, which keeps the page", async () => {
+    const { contents, take } = await watchedTab();
+    await take();
+    const before = handled(contents).length;
+    contents.debugger.emitMessage("Page.javascriptDialogOpening", { type: "beforeunload" });
+    await flushMicrotasks();
+    expect(handled(contents)).toHaveLength(before);
+    expect(contents.preventUnload()).toBe(false);
+  });
+
+  test("closes Electron's box of the dialog it dismissed", async () => {
+    const { contents, take } = await watchedTab();
+    let closed = 0;
+    contents.on("-cancel-dialogs", () => (closed += 1));
+    await expect(take()).resolves.toMatchObject({ error: null });
+    expect(closed).toBe(1);
+  });
+
+  test("closes the box of a dialog that opens under control, which follows CDP's event", async () => {
+    const { contents, take } = await watchedTab();
+    await take();
+    let boxOpen = false;
+    contents.on("-cancel-dialogs", () => (boxOpen = false));
+    contents.debugger.emitMessage("Page.javascriptDialogOpening", { type: "confirm" });
+    // Microtasks run when the event's listeners return, and only then does Electron open its box.
+    for (let turn = 0; turn < 10; turn++) await Promise.resolve();
+    boxOpen = true;
+    await flushMicrotasks();
+    await flushMicrotasks();
+    expect(boxOpen).toBe(false);
+  });
+
+  test("closes no box when there was no dialog to dismiss", async () => {
+    const { contents, take } = await watchedTab();
+    contents.debugger.failedCommandNames.add("Page.handleJavaScriptDialog");
+    let closed = 0;
+    contents.on("-cancel-dialogs", () => (closed += 1));
+    await expect(take()).resolves.toMatchObject({ error: null });
+    expect(closed).toBe(0);
   });
 
   test("frames carry the committed origin", async () => {
@@ -2001,6 +2091,7 @@ describe("browser live view human control", () => {
     const { contents, host } = await watchedTab();
     const capturedAt = Date.now() - 50;
     commitDocument(contents, "https://next.example");
+    firstPaint(contents);
 
     screencastFrame(contents, 7, capturedAt);
     await flushMicrotasks();
@@ -2080,21 +2171,325 @@ describe("browser live view human control", () => {
     await expect(take()).resolves.toMatchObject({ error: null });
   });
 
-  test("answers a dialog that opened before Page was enabled, and closes its box", async () => {
-    const contents = new FakeWebContents(nextLiveContentsId++);
-    observePageDialogs(contents as never);
-    const answered: boolean[] = [];
-    let boxOpen = true;
-    contents.on("-cancel-dialogs", () => (boxOpen = false));
-    contents.emit("-run-dialog", {}, (accept: boolean) => answered.push(accept));
-    const host = new FakeLiveHostWindow(1);
-    const streams = new BrowserLiveViewStreams(() => contents, new BrowserHumanControls());
+  test("watching answers no dialog and says the page is blocked", async () => {
+    const { contents, host, streams } = createLiveViews();
+    const cdp = contents.debugger;
+    cdp.blockedCommandNames.add("Page.enable");
+    cdp.blockedCommandNames.add("Page.getLayoutMetrics");
 
     await expect(streams.start(host, liveStartRequest())).resolves.toMatchObject({ error: null });
 
-    expect(answered).toEqual([false]);
-    expect(boxOpen).toBe(false);
+    expect(handled(contents)).toEqual([]);
+    expect(contents.loadedUrls).toEqual([]);
+    // The screencast doesn't wait for the page: this is what it shows behind the dialog.
+    expect(cdp.commands).toContainEqual(
+      expect.objectContaining({ command: "Page.startScreencast" }),
+    );
+    screencastFrame(contents, 1);
+    expect(host.sent.at(-1)?.payload).toMatchObject({ metadata: { blocked: true } });
+
+    cdp.finishCommands();
+    await flushMicrotasks();
+    streams.ack({ type: "browser.host.live.frame_ack", streamId: "stream-1", frameSeq: 0 });
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    screencastFrame(contents, 2);
+    expect(host.sent.at(-1)?.payload).not.toMatchObject({ metadata: { blocked: true } });
   });
+
+  test("resuming a controlled stream answers no dialog either", async () => {
+    const { contents, host, streams, take } = await watchedTab();
+    await take();
+    await streams.stop({
+      type: "browser.host.live.stop.request",
+      requestId: "stop",
+      streamId: "stream-1",
+    });
+    const before = handled(contents).length;
+    await streams.start(host, { ...liveStartRequest("stream-2"), controlId: "control-1" });
+    expect(handled(contents)).toHaveLength(before);
+  });
+
+  test("a dialog that opens while watching shows as blocked", async () => {
+    const { contents, host } = await watchedTab();
+    contents.debugger.emitMessage("Page.javascriptDialogOpening", { type: "confirm" });
+    screencastFrame(contents, 1);
+    expect(host.sent.at(-1)?.payload).toMatchObject({ metadata: { blocked: true } });
+    expect(handled(contents)).toEqual([]);
+  });
+
+  test("says to answer on the desktop when take can't get through to the page", async () => {
+    const { contents, controls, take } = await watchedTab();
+    contents.debugger.blockedCommandNames.add("Page.enable");
+    contents.debugger.failedCommandNames.add("Page.handleJavaScriptDialog");
+    await expect(take()).resolves.toMatchObject({ error: { code: "page_blocked" } });
+    expect(controls.isHeld(contents.id)).toBe(false);
+  });
+
+  test("an attach that timed out turns nothing on afterwards", async () => {
+    const { contents, take } = await watchedTab();
+    const cdp = contents.debugger;
+    cdp.blockedCommandNames.add("Page.enable");
+    await take();
+
+    cdp.finishCommands();
+    await flushMicrotasks();
+
+    const enabled = cdp.commands.filter(
+      ({ command, params }) =>
+        params.autoAttach === true ||
+        (command === "Emulation.setFocusEmulationEnabled" && params.enabled === true),
+    );
+    expect(enabled).toEqual([]);
+  });
+
+  test("holds frames of a new document until its first paint", async () => {
+    const { contents, host } = await watchedTab();
+    commitDocument(contents, "https://app.example");
+    // A restarted screencast can still copy the old surface, stamped after the commit.
+    screencastFrame(contents, 1, Date.now() + 5);
+    firstPaint(contents, "an-iframes-loader");
+    screencastFrame(contents, 2, Date.now() + 5);
+    await flushMicrotasks();
+    expect(framesSent(host)).toEqual([]);
+    expect(screencastAcks(contents)).toEqual([1, 2]);
+
+    firstPaint(contents);
+    await flushMicrotasks();
+    // What was painted is only shown if asked again.
+    expect(contents.debugger.commands.at(-1)).toMatchObject({ command: "Page.startScreencast" });
+    screencastFrame(contents, 3, Date.now() + 5);
+    expect(framesSent(host)).toEqual([expect.objectContaining({ documentId: "stream-1:1" })]);
+  });
+
+  test("stops holding a page that never paints when Chromium clears the old one", async () => {
+    const { contents, host } = await watchedTab();
+    vi.useFakeTimers();
+    try {
+      commitDocument(contents, "https://app.example");
+      await vi.advanceTimersByTimeAsync(4_000);
+      screencastFrame(contents, 1, Date.now() + 5);
+      expect(framesSent(host)).toEqual([]);
+      await vi.advanceTimersByTimeAsync(1_100);
+      screencastFrame(contents, 2, Date.now() + 5);
+      expect(framesSent(host)).toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  test("a stream that starts before the document's first paint holds its frames", async () => {
+    const { contents, host, streams } = createLiveViews();
+    contents.hasPainted = false;
+    await streams.start(host, liveStartRequest());
+    screencastFrame(contents, 1, Date.now() + 5);
+    expect(host.sent.filter(({ channel }) => channel === BROWSER_LIVE_FRAME_EVENT)).toEqual([]);
+    await streams.stop({
+      type: "browser.host.live.stop.request",
+      requestId: "stop",
+      streamId: "stream-1",
+    });
+  });
+
+  const dispatched = (contents: FakeWebContents) =>
+    contents.debugger.commands
+      .filter(({ command }) => command === "Input.dispatchMouseEvent")
+      .map(({ params }) => params.type);
+  const tapInput = { kind: "tap", documentId: DOCUMENT, x: 5, y: 5 };
+  const scrollInput = { ...tapInput, kind: "scroll", deltaX: 0, deltaY: 50 };
+
+  test.each([tapInput, scrollInput])("sends no $kind after it timed out", async (input) => {
+    const { contents, take, send } = await watchedTab();
+    await take();
+    const cdp = contents.debugger;
+    // The tab's CDP queue is held up, so the action waits in it.
+    cdp.blockedCommandNames.add("DOM.getDocument");
+    void adaptWebContents(contents).sendDebugCommand("DOM.getDocument");
+    await flushMicrotasks();
+
+    await expect(send(input)).resolves.toMatchObject({ error: { code: "not_sent" } });
+    cdp.finishCommands();
+    await flushMicrotasks();
+
+    expect(dispatched(contents)).toEqual([]);
+  });
+
+  test.each([tapInput, scrollInput])("sends no $kind after hand-back", async (input) => {
+    const { contents, take, send, release } = await watchedTab();
+    await take();
+    const cdp = contents.debugger;
+    cdp.blockedCommandNames.add("DOM.getDocument");
+    void adaptWebContents(contents).sendDebugCommand("DOM.getDocument");
+    await flushMicrotasks();
+
+    const sending = send(input);
+    await flushMicrotasks();
+    const releasing = release(false);
+    cdp.finishCommands();
+
+    await expect(sending).resolves.toMatchObject({ error: { code: "not_sent" } });
+    await releasing;
+    await flushMicrotasks();
+    expect(dispatched(contents)).toEqual([]);
+  });
+
+  test("a press that was delivered is never reported as not sent", async () => {
+    const { contents, take, send } = await watchedTab();
+    await take();
+    contents.debugger.beforeCommand = () => {
+      if (dispatched(contents).includes("mousePressed")) {
+        contents.debugger.beforeCommand = null;
+        commitDocument(contents, "https://next.example");
+      }
+    };
+    await expect(send(tapInput)).resolves.toMatchObject({ error: { code: "unconfirmed" } });
+  });
+
+  test("a press without an answer may have been sent, and is followed by nothing", async () => {
+    const { contents, take, send } = await watchedTab();
+    await take();
+    contents.debugger.blockPressed = true;
+    await expect(send(tapInput)).resolves.toMatchObject({ error: { code: "unconfirmed" } });
+    contents.debugger.finishCommands();
+    await flushMicrotasks();
+    expect(dispatched(contents)).toEqual(["mouseMoved", "mousePressed"]);
+  });
+
+  test("says that stopping a stuck script reloaded the page", async () => {
+    const { contents, take, run } = await watchedTab();
+    contents.script = () => new Promise(() => {});
+    void run(evaluateCommand);
+    await flushMicrotasks();
+    await expect(take()).resolves.toMatchObject({ error: null, reloaded: true });
+  });
+
+  test("won't throw away a page that guards unload to stop a stuck script", async () => {
+    const { contents, controls, take, run } = await watchedTab();
+    contents.script = () => new Promise(() => {});
+    void run(evaluateCommand);
+    await flushMicrotasks();
+    contents.guardsUnload = true;
+
+    await expect(take()).resolves.toMatchObject({ error: { code: "unload_blocked" } });
+    expect(contents.loadedUrls).toEqual(["about:blank"]);
+    expect(controls.isHeld(contents.id)).toBe(false);
+  });
+
+  test("a page the user left since doesn't get reloaded for its old stuck script", async () => {
+    const { contents, take, run } = await watchedTab();
+    contents.script = () => new Promise(() => {});
+    void run(evaluateCommand);
+    await flushMicrotasks();
+    contents.guardsUnload = true;
+    await expect(take()).resolves.toMatchObject({ error: { code: "unload_blocked" } });
+
+    contents.guardsUnload = false;
+    contents.loadedUrls.length = 0;
+    contents.emit("did-navigate");
+
+    await expect(take("control-2")).resolves.toEqual(
+      expect.not.objectContaining({ reloaded: true }),
+    );
+    expect(contents.loadedUrls).toEqual([]);
+  });
+
+  async function typedOnGuardedPage() {
+    const tab = await watchedTab();
+    await tab.take();
+    await tab.type();
+    tab.contents.guardsUnload = true;
+    return tab;
+  }
+
+  test("an auto-release's own discard gets past beforeunload, and only that", async () => {
+    const { contents, controls, release } = await typedOnGuardedPage();
+    await expect(release(true)).resolves.toMatchObject({ error: null });
+    expect(controls.isHeld(contents.id)).toBe(false);
+    expect(contents.unloadListeners.size).toBe(0);
+    expect(contents.preventUnload()).toBe(false);
+  });
+
+  test("a hand-back overrides no beforeunload", async () => {
+    const { contents, release } = await typedOnGuardedPage();
+    await release(false);
+    expect(contents.preventUnload()).toBe(false);
+  });
+
+  test("a navigation the page started during the discard isn't let through", async () => {
+    const { contents, release } = await typedOnGuardedPage();
+    const cdp = contents.debugger;
+    const pageStarted: boolean[] = [];
+    contents.beforeUnload = () => {
+      contents.beforeUnload = null;
+      cdp.emitMessage("Page.frameRequestedNavigation", { frameId: "child" }, "iframe-session");
+      pageStarted.push(contents.preventUnload());
+      cdp.emitMessage(
+        "Page.frameClearedScheduledNavigation",
+        { frameId: "child" },
+        "iframe-session",
+      );
+    };
+    await expect(release(true)).resolves.toMatchObject({ error: null });
+    expect(pageStarted).toEqual([false]);
+  });
+
+  test("a page navigation requested just before main's own isn't let through", async () => {
+    const { contents, release } = await typedOnGuardedPage();
+    const cdp = contents.debugger;
+    const answer = contents.mainFrame.answer;
+    contents.mainFrame.answer = (request) => {
+      if (request.op === "clear") {
+        cdp.emitMessage("Page.frameRequestedNavigation", { frameId: "main" });
+      }
+      return answer(request);
+    };
+    const pageStarted: boolean[] = [];
+    contents.beforeUnload = () => {
+      contents.beforeUnload = null;
+      pageStarted.push(contents.preventUnload());
+      cdp.emitMessage("Page.frameClearedScheduledNavigation", { frameId: "main" });
+    };
+    await expect(release(true)).resolves.toMatchObject({ error: null });
+    expect(pageStarted).toEqual([false]);
+  });
+
+  test("history navigation during the discard isn't let through either", async () => {
+    const { contents, release } = await typedOnGuardedPage();
+    const pageStarted: boolean[] = [];
+    contents.beforeUnload = () => {
+      if (pageStarted.length > 0) return;
+      contents.debugger.emitMessage("Page.frameStartedNavigating", {
+        url: "about:blank",
+        navigationType: "historyDifferentDocument",
+      });
+      pageStarted.push(contents.preventUnload());
+    };
+    await expect(release(true)).resolves.toMatchObject({ error: null });
+    expect(pageStarted).toEqual([false]);
+  });
+
+  test.each(["beforeunload", "pagehide", "timer"])(
+    "a confirm raised from %s during the discard is never accepted",
+    async (from) => {
+      const { contents, release } = await typedOnGuardedPage();
+      const confirm = () =>
+        contents.debugger.emitMessage("Page.javascriptDialogOpening", { type: "confirm" });
+      contents.beforeUnload = () => {
+        contents.beforeUnload = null;
+        if (from === "beforeunload") confirm();
+        else queueMicrotask(confirm);
+      };
+      const load = contents.loadURL.bind(contents);
+      contents.loadURL = async (url) => {
+        await load(url);
+        // A real navigation takes turns of the event loop.
+        await new Promise((resolve) => setTimeout(resolve, 5));
+      };
+      const before = handled(contents).length;
+      await release(true);
+      expect(handled(contents).length).toBeGreaterThan(before);
+      expect(handled(contents).map(({ params }) => params.accept)).not.toContain(true);
+    },
+  );
 
   test("a closed tab's control ends before its stream", async () => {
     const { contents, host, take } = await watchedTab();

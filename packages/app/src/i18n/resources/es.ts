@@ -668,7 +668,16 @@ export const es: TranslationResources = {
           streamEnded:
             "La vista en vivo se detuvo, así que no se envió nada. Vuelve a conectarte e inténtalo de nuevo.",
           unconfirmed:
-            "El escritorio no confirmó el texto. Revisa la página antes de escribirlo de nuevo.",
+            "El escritorio no lo confirmó. Puede que se haya enviado, así que revisa la página antes de volver a enviarlo.",
+          notSent: "No se envió. Inténtalo de nuevo.",
+          pageBlocked:
+            "La página no responde. Si tiene un diálogo abierto, respóndelo en el escritorio.",
+          watchBlocked:
+            "La página no responde. Puede que tenga un diálogo abierto. Toma el control para descartarlo o respóndelo en el escritorio.",
+          unloadBlocked:
+            "Para tomar el control hay que recargar y detener la acción bloqueada del agente, pero esta página impide salir de ella. Termina en el escritorio.",
+          reloaded:
+            "La acción del agente estaba bloqueada, así que se recargó la página para detenerla. Se perdió lo que no estaba guardado.",
           agentBusy: "La acción del agente en el navegador sigue en curso. Inténtalo de nuevo.",
           busy: "Esta pestaña ya está controlada",
           keyUnsupported: "Las teclas no funcionan en este marco integrado. Toca su botón.",

@@ -2091,11 +2091,33 @@ describe("BrowserToolsBroker human control", () => {
     const input = { kind: "key", key: "Tab" } as const;
     const sending = broker.sendLiveInput({ ...viewer(), input });
     answer({ focus: null, error }, "browser.host.live.send_input.request");
-    await expect(sending).resolves.toMatchObject({ error: { code: "failed" } });
+    await expect(sending).resolves.toMatchObject({ error: { code: "not_sent" } });
 
     const handingBack = broker.releaseControl(viewer());
     answer({ error }, "browser.host.live.release_control.request");
     await expect(handingBack).resolves.toMatchObject({ error: { code: "failed" } });
+  });
+
+  test.each([
+    { kind: "key", key: "Enter" },
+    { kind: "tap", documentId: "stream-1:0", x: 1, y: 2 },
+    { kind: "scroll", documentId: "stream-1:0", x: 1, y: 2, deltaX: 0, deltaY: 9 },
+  ] as const)("a $kind without an answer may have been sent", async (input) => {
+    const { broker, viewer, watch, take } = controlledBroker();
+    await watch();
+    await take();
+    vi.useFakeTimers();
+    const sending = broker.sendLiveInput({ ...viewer(), input });
+    await vi.advanceTimersByTimeAsync(12_000);
+    await expect(sending).resolves.toMatchObject({ error: { code: "unconfirmed" } });
+  });
+
+  test("passes on that taking control reloaded the page", async () => {
+    const { broker, answer, viewer, watch } = controlledBroker();
+    await watch();
+    const taking = broker.takeControl(viewer());
+    answer({ focus: FOCUS, error: null, reloaded: true }, "browser.host.live.take_control.request");
+    await expect(taking).resolves.toEqual({ focus: FOCUS, error: null, reloaded: true });
   });
 
   test("a restarted daemon holds no lock", async () => {

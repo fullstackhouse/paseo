@@ -120,6 +120,7 @@ type InsertResult = Pick<GuestControlReply, "inserted" | "reason">;
 const INSERTED: InsertResult = { inserted: true };
 const REFUSED: InsertResult = { inserted: false };
 const DOES_NOT_FIT: InsertResult = { inserted: false, reason: "does_not_fit" };
+const UNCONFIRMED: InsertResult = { inserted: false, reason: "unconfirmed" };
 const TEXT_INPUT_TYPES = new Set(["text", "password", "email", "tel", "number", "search", "url"]);
 
 let humanControl: ReturnType<typeof createHumanControl> | null = null;
@@ -183,27 +184,14 @@ function createHumanControl() {
     const { text } = request;
     const characters = [...text];
     if (field.maxLength === 1 && characters.length > 1) return spreadOverBoxes(field, characters);
-    if (field.maxLength >= 0 && text.length > field.maxLength) return DOES_NOT_FIT;
+    // type=number has the attribute and ignores it.
+    const limited = field.maxLength >= 0 && field.type !== "number";
+    if (limited && text.length > field.maxLength) return DOES_NOT_FIT;
 
-    const secret = isSecret(fieldKind(field));
-    // A page may move the rest of a code on to the fields after this one.
-    const following = fieldsFrom(field).slice(1, characters.length + 1);
-    const valuesBefore = following.map((next) => next.value);
-    const valueBefore = field.value;
-    const commit = commitInto(field, text, secret);
-    if (!commit) return REFUSED;
-
-    const spread = following.filter((next, index) => next.value !== valuesBefore[index]);
-    for (const next of spread) filled.set(next, secret || characters.length > 1);
-    if (commit.edited && wasSubmitted(field)) return INSERTED;
-    if (tookWholeText({ field, text, valueBefore, spread })) {
-      return INSERTED;
-    }
-    for (const cut of commit.edited ? [field, ...spread] : spread) clearField(cut);
-    return DOES_NOT_FIT;
+    return commitInto(field, text, isSecret(fieldKind(field)));
   }
 
-  /** A code over one-character boxes: all of it, or none. */
+  /** A code over one-character boxes: checked before the first, and stopped at any doubt. */
   function spreadOverBoxes(first: TextField, characters: string[]): InsertResult {
     const boxes = fieldsFrom(first).slice(0, characters.length);
     const fits =
@@ -216,47 +204,33 @@ function createHumanControl() {
           box.getClientRects().length > 0,
       );
     if (!fits) return DOES_NOT_FIT;
-    const typed: TextField[] = [];
-    const takeBack = (result: InsertResult) => {
-      for (const box of typed) clearField(box);
-      return result;
-    };
     for (const [index, box] of boxes.entries()) {
+      const notSent = index === 0 ? REFUSED : UNCONFIRMED;
       // The document keeps focus throughout, or it's another frame's turn to receive text.
-      if (!hasFocus.call(document)) return takeBack(REFUSED);
+      if (!hasFocus.call(document)) return notSent;
       if (focusedField() !== box) box.focus();
-      if (focusedField() !== box) return takeBack(REFUSED);
-      const character = characters[index]!;
-      const commit = commitInto(box, character, true);
-      if (!commit) return takeBack(REFUSED);
-      typed.push(box);
-      // The last one may submit the form and clear it.
-      const submitted = index === boxes.length - 1 && commit.edited && wasSubmitted(box);
-      if (!submitted && box.value.toLowerCase() !== character.toLowerCase()) {
-        return takeBack(DOES_NOT_FIT);
-      }
+      if (focusedField() !== box) return notSent;
+      const result = commitInto(box, characters[index]!, true);
+      if (result === REFUSED) return notSent;
+      if (result !== INSERTED) return result;
     }
     return INSERTED;
   }
 
-  // Empty alone is what a page that rejects the text leaves behind, too.
-  function wasSubmitted(field: TextField): boolean {
-    return field.value === "" && focusedField() !== field;
-  }
-
-  /** Null when the text wasn't left in this field. */
-  function commitInto(field: TextField, text: string, secret: boolean): { edited: boolean } | null {
+  /**
+   * REFUSED means never sent. Once the text is committed it is inserted only if it is exactly
+   * what the field holds. What a page made of anything else isn't guessed, and isn't cleared.
+   */
+  function commitInto(field: TextField, text: string, secret: boolean): InsertResult {
     const targetId = targetIdOf(field);
     // Replace what is there; a password manager fills whole values.
     field.select();
-    if (focusedField() !== field) return null;
+    if (focusedField() !== field) return REFUSED;
 
-    let blocked = false;
     const edits: EventTarget[] = [];
     // Page handlers of these events can move focus, and the text follows focus.
     const guard = (event: Event) => {
       if (event.composedPath()[0] === field && isTarget(focusedField(), targetId)) return;
-      blocked = true;
       event.preventDefault();
       event.stopImmediatePropagation();
     };
@@ -277,15 +251,12 @@ function createHumanControl() {
       for (const type of guardedEvents) window.removeEventListener(type, guard, true);
       window.removeEventListener("input", recordEdit, true);
     }
-    if (blocked) return null;
     const edited = edits[0];
-    if (edited === field) return { edited: true };
+    if (edited === field && field.value === text) return INSERTED;
     if (edited instanceof HTMLInputElement || edited instanceof HTMLTextAreaElement) {
-      filled.set(edited, true);
-      clearField(edited);
-      return null;
+      filled.set(edited, secret || filled.get(edited) === true);
     }
-    return focusedField() === field ? { edited: false } : null;
+    return UNCONFIRMED;
   }
 
   return {
@@ -356,28 +327,6 @@ function isCodeBox(field: HTMLInputElement): boolean {
   return [inputs[index - 1], inputs[index + 1]].some(
     (next) => next?.maxLength === 1 && next.form === field.form,
   );
-}
-
-function tookWholeText(commit: {
-  field: TextField;
-  text: string;
-  valueBefore: string;
-  spread: TextField[];
-}): boolean {
-  const { field, text, valueBefore, spread } = commit;
-  if (field.value === text) return true;
-  // A field may add or drop separators.
-  const wanted = withoutSeparators(text);
-  if (spread.length === 0 && field.value === valueBefore) {
-    return withoutSeparators(field.value) === wanted;
-  }
-  if (withoutSeparators(field.value).length >= wanted.length) return true;
-  const spreadText = [field, ...spread].map((next) => next.value).join("");
-  return spread.length > 0 && withoutSeparators(spreadText).includes(wanted);
-}
-
-function withoutSeparators(value: string): string {
-  return value.replace(/[\s().+-]/g, "");
 }
 
 function isSecret(kind: GuestFieldKind): boolean {

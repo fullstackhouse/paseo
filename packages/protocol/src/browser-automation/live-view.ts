@@ -74,6 +74,10 @@ export type BrowserLiveControlErrorCode =
   | "page_changed"
   | "does_not_fit"
   | "stream_ended"
+  | "page_blocked"
+  | "unload_blocked"
+  // Definitely not sent. An input that may have gone through is "unconfirmed".
+  | "not_sent"
   | "key_unsupported"
   | "unconfirmed"
   | "failed";
@@ -81,6 +85,12 @@ export type BrowserLiveControlErrorCode =
 const BrowserLiveFocusResultShape = {
   focus: BrowserLiveFocusSchema.nullable(),
   error: BrowserLiveControlErrorSchema.nullable(),
+};
+
+const BrowserLiveTakeResultShape = {
+  ...BrowserLiveFocusResultShape,
+  // Stopping a stuck agent script took a reload of the page.
+  reloaded: z.boolean().optional(),
 };
 
 const BrowserLiveStartResultShape = {
@@ -136,7 +146,7 @@ export const BrowserLiveTakeControlResponseSchema = z.object({
   payload: z.object({
     requestId: z.string(),
     streamId: z.string(),
-    ...BrowserLiveFocusResultShape,
+    ...BrowserLiveTakeResultShape,
   }),
 });
 
@@ -269,7 +279,7 @@ export const BrowserHostLiveStopResponseSchema = z.object({
 
 export const BrowserHostLiveTakeControlResponseSchema = z.object({
   type: z.literal("browser.host.live.take_control.response"),
-  payload: z.object({ requestId: z.string().min(1), ...BrowserLiveFocusResultShape }),
+  payload: z.object({ requestId: z.string().min(1), ...BrowserLiveTakeResultShape }),
 });
 
 export const BrowserHostLiveSendInputResponseSchema = z.object({
@@ -319,6 +329,9 @@ export type BrowserLiveControlError = z.infer<typeof BrowserLiveControlErrorSche
 export interface BrowserLiveFocusResult {
   focus: BrowserLiveFocus | null;
   error: BrowserLiveControlError | null;
+}
+export interface BrowserLiveTakeResult extends BrowserLiveFocusResult {
+  reloaded?: boolean;
 }
 export type BrowserHostLiveTakeControlRequest = z.infer<
   typeof BrowserHostLiveTakeControlRequestSchema

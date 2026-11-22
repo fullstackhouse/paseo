@@ -374,14 +374,16 @@ describe("browser guest preload", () => {
     expect([field.value, decoy.value]).toEqual(["", ""]);
   });
 
-  test("clears text that still landed in another field", () => {
+  test("text that still landed in another field is unconfirmed, and only cleared as a secret", () => {
     const decoy = new FakeInput("text");
     const targetId = focus(new FakeInput("password"));
     electron.webFrame.insertText = (text) => {
       decoy.value = text;
       guestWindow.dispatch("input", editEvent(decoy));
     };
-    expect(insert(targetId)).toMatchObject({ inserted: false });
+    expect(insert(targetId)).toMatchObject({ inserted: false, reason: "unconfirmed" });
+    expect(decoy.value).toBe(SENTINEL);
+    clear("secrets");
     expect(decoy.value).toBe("");
   });
 
@@ -414,13 +416,21 @@ describe("browser guest preload", () => {
     expect(request({ op: "describe" }).target).toMatchObject({ kind: "one_time_code" });
   });
 
-  test("a code may end a form that clears the last box", () => {
+  test("a code that a form consumed is unconfirmed, not refused", () => {
     const boxes = codeBoxes(3, true);
     boxes[2]!.onInput = () => {
       boxes[2]!.value = "";
       FakeDocument.active = null; // The form went away.
     };
-    expect(typeCode(boxes[0]!, "123")).toMatchObject({ inserted: true });
+    expect(typeCode(boxes[0]!, "123")).toMatchObject({ inserted: false, reason: "unconfirmed" });
+    expect(values(boxes)).toEqual(["1", "2", ""]);
+  });
+
+  test("repeated digits the boxes already hold still count", () => {
+    const boxes = codeBoxes(4, true);
+    for (const box of boxes) box.value = "1";
+    expect(typeCode(boxes[0]!, "1121")).toMatchObject({ inserted: true });
+    expect(values(boxes)).toEqual(["1", "1", "2", "1"]);
   });
 
   test.each([
@@ -436,7 +446,7 @@ describe("browser guest preload", () => {
     expect(values(boxes)).toEqual(["", "", ""]);
   });
 
-  test("takes back a partial code when a box's handler steals focus", () => {
+  test("a partial code is unconfirmed, and isn't taken back", () => {
     const boxes = codeBoxes(4, true);
     const decoy = new FakeInput("text");
     let commits = 0;
@@ -445,15 +455,15 @@ describe("browser guest preload", () => {
         if (++commits === 3) decoy.focus();
       });
 
-    expect(typeCode(boxes[0]!, "1234")).toMatchObject({ inserted: false });
-    expect([...values(boxes), decoy.value]).toEqual(["", "", "", "", ""]);
+    expect(typeCode(boxes[0]!, "1234")).toMatchObject({ inserted: false, reason: "unconfirmed" });
+    expect([...values(boxes), decoy.value]).toEqual(["1", "2", "", "", ""]);
   });
 
-  test("takes back a partial code when the document loses focus", () => {
+  test("stops at a lost focus and leaves what it typed", () => {
     const boxes = codeBoxes(3, true);
     boxes[0]!.onInput = () => (FakeDocument.focused = false);
-    expect(typeCode(boxes[0]!, "123")).toMatchObject({ inserted: false });
-    expect(values(boxes)).toEqual(["", "", ""]);
+    expect(typeCode(boxes[0]!, "123")).toMatchObject({ inserted: false, reason: "unconfirmed" });
+    expect(values(boxes)).toEqual(["1", "", ""]);
   });
 
   test("refuses text longer than the field instead of cutting it", () => {
@@ -466,56 +476,69 @@ describe("browser guest preload", () => {
     expect(field.value).toBe("");
   });
 
-  test("reports and takes back text the page cut short", () => {
-    const field = new FakeInput("text");
-    field.onInput = () => (field.value = field.value.slice(0, 1));
-    expect(typeCode(field, "482915")).toMatchObject({ inserted: false, reason: "does_not_fit" });
-    expect(field.value).toBe("");
-  });
-
-  test("reports text the page didn't take at all", () => {
-    const field = new FakeInput("text");
-    electron.webFrame.insertText = () => {};
-    expect(typeCode(field, "482915")).toMatchObject({ inserted: false, reason: "does_not_fit" });
-  });
-
   test.each([
-    ["adds separators", (value: string) => `${value.slice(0, 3)}-${value.slice(3)}`, "482915"],
-    ["drops separators", (value: string) => value.replace(" ", ""), "482 915"],
-  ])("accepts a field that %s", (_name, format, text) => {
+    ["cuts it short", "482915", (value: string) => value.slice(0, 1)],
+    ["drops a separator", "12/28", (value: string) => value.replace("/", "")],
+    ["adds a separator", "482915", (value: string) => `${value.slice(0, 3)}-${value.slice(3)}`],
+    ["rejects it", "abcdef", () => ""],
+    ["reverts it", "abcdef", () => "111111"],
+  ])("leaves text alone and unconfirmed when the page %s", (_name, text, change) => {
     const field = new FakeInput("text");
-    field.onInput = () => (field.value = format(field.value));
-    expect(typeCode(field, text)).toMatchObject({ inserted: true });
+    field.onInput = () => (field.value = change(field.value));
+    expect(typeCode(field, text)).toMatchObject({ inserted: false, reason: "unconfirmed" });
+    expect(field.value).toBe(change(text));
   });
 
-  test("accepts a field that submits and clears", () => {
-    const field = new FakeInput("text");
+  test("an auto-submitted code that was consumed is unconfirmed", () => {
+    const field = new FakeInput("text", "one-time-code");
     field.onInput = () => {
       field.value = "";
       FakeDocument.active = null;
     };
+    expect(typeCode(field, "482915")).toMatchObject({ inserted: false, reason: "unconfirmed" });
+  });
+
+  test("text without an edit is unconfirmed, not refused", () => {
+    const field = new FakeInput("text");
+    electron.webFrame.insertText = () => {};
+    expect(typeCode(field, "482915")).toMatchObject({ inserted: false, reason: "unconfirmed" });
+  });
+
+  test("type=number ignores maxlength, so it doesn't refuse by it", () => {
+    const field = new FakeInput("number");
+    field.maxLength = 4;
+    electron.webFrame.insertText = (text) => {
+      field.value = text;
+      guestWindow.dispatch("input", editEvent(field));
+    };
     expect(typeCode(field, "482915")).toMatchObject({ inserted: true });
   });
 
-  test.each(["", "111111"])("reports text the page rejected back to %j", (previous) => {
-    const field = new FakeInput("text");
-    field.value = previous;
-    field.onInput = () => (field.value = previous);
-    expect(typeCode(field, "abcdef")).toMatchObject({ inserted: false, reason: "does_not_fit" });
-  });
-
-  test("accepts and later clears a code the page spread out itself", () => {
-    const boxes = [new FakeInput("text", "one-time-code"), new FakeInput("text")];
+  test("a code the page spread out keeps every digit, equal ones included", () => {
+    const boxes = [
+      new FakeInput("text", "one-time-code"),
+      new FakeInput("text"),
+      new FakeInput("text"),
+    ];
+    boxes[1]!.value = "1";
     FakeDocument.inputs = boxes;
     boxes[0]!.onInput = () => {
-      boxes[1]!.value = boxes[0]!.value.slice(1);
-      boxes[0]!.value = boxes[0]!.value.slice(0, 1);
+      const digits = boxes[0]!.value;
+      for (const [index, box] of boxes.entries()) box.value = digits[index]!;
     };
 
-    expect(typeCode(boxes[0]!, "42")).toMatchObject({ inserted: true });
-    expect(values(boxes)).toEqual(["4", "2"]);
+    expect(typeCode(boxes[0]!, "113")).toMatchObject({ inserted: false, reason: "unconfirmed" });
+    expect(values(boxes)).toEqual(["1", "1", "3"]);
+  });
+
+  test("hand-back keeps fields the page filled in from what was typed", () => {
+    const name = new FakeInput("password");
+    const slug = new FakeInput("text");
+    FakeDocument.inputs = [name, slug];
+    name.onInput = () => (slug.value = "made-by-the-page");
+    typeCode(name, "My project");
     clear("secrets");
-    expect(values(boxes)).toEqual(["", ""]);
+    expect(slug.value).toBe("made-by-the-page");
   });
 
   test("a later control doesn't clear what an earlier one typed, or the agent since", () => {

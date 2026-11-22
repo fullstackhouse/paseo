@@ -1,4 +1,8 @@
-import { BrowserLiveEndedSchema, BrowserLiveInputSchema } from "./browser-automation/live-view.js";
+import {
+  BrowserLiveEndedSchema,
+  BrowserLiveInputSchema,
+  BrowserLiveTakeControlResponseSchema,
+} from "./browser-automation/live-view.js";
 import { describe, expect, test } from "vitest";
 
 import { BROWSER_AUTOMATION_COMMAND_NAMES } from "./browser-automation/rpc-schemas.js";
@@ -431,4 +435,13 @@ describe("browser live control state", () => {
       }).payload,
     ).toMatchObject({ control: { held: true } });
   });
+});
+
+test("a granted take can say that it reloaded the page", () => {
+  const payload = { requestId: "r", streamId: "s", focus: null, error: null, reloaded: true };
+  const parsed = BrowserLiveTakeControlResponseSchema.parse({
+    type: "browser.live.take_control.response",
+    payload,
+  });
+  expect(parsed.payload).toEqual(payload);
 });

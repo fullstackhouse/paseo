@@ -30,7 +30,8 @@ export interface GuestControlReply {
   id: string;
   target?: { targetId: string; kind: GuestFieldKind } | null;
   inserted?: boolean;
-  reason?: "does_not_fit";
+  /** Without one, an insert that didn't happen was never sent. */
+  reason?: "does_not_fit" | "unconfirmed";
   /** The document holds a field this control typed into. */
   typed?: boolean;
 }
