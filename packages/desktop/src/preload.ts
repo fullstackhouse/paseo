@@ -120,6 +120,7 @@ contextBridge.exposeInMainWorld("paseoDesktop", {
     profilePartition: PASEO_BROWSER_PROFILE_PARTITION,
     registerAttachedBrowser: (input: AttachedBrowserRegistration) =>
       ipcRenderer.invoke("paseo:browser:register-attached", input),
+    waitForPendingIpc: () => ipcRenderer.invoke("paseo:browser:wait-for-pending-ipc"),
     unregisterWorkspaceBrowser: (browserId: string) =>
       ipcRenderer.invoke("paseo:browser:unregister-workspace-browser", browserId),
     setWorkspaceActiveBrowser: (input: { workspaceId: string; browserId: string | null }) =>
