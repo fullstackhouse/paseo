@@ -1,3 +1,8 @@
+import {
+  BROWSER_LIVE_FRAME_OPCODE,
+  decodeBrowserLiveFrameHeader,
+  type BrowserLiveFrameHeader,
+} from "./browser-live.js";
 import { HOST_ROUTE_OPCODE, decodeHostRouteFrame, type HostRouteFrame } from "./host-route.js";
 import {
   decodeFileTransferFrame,
@@ -13,7 +18,8 @@ import {
 export type BinaryFrame =
   | { kind: "host_route"; frame: HostRouteFrame }
   | { kind: "terminal"; frame: TerminalStreamFrame }
-  | { kind: "file_transfer"; frame: FileTransferFrame };
+  | { kind: "file_transfer"; frame: FileTransferFrame }
+  | { kind: "browser_live"; frame: BrowserLiveFrameHeader; bytes: Uint8Array };
 
 export function decodeBinaryFrame(bytes: Uint8Array): BinaryFrame | null {
   switch (bytes[0]) {
@@ -37,6 +43,10 @@ export function decodeBinaryFrame(bytes: Uint8Array): BinaryFrame | null {
     case FileTransferOpcode.FileEnd: {
       const frame = decodeFileTransferFrame(bytes);
       return frame ? { kind: "file_transfer", frame } : null;
+    }
+    case BROWSER_LIVE_FRAME_OPCODE: {
+      const frame = decodeBrowserLiveFrameHeader(bytes);
+      return frame ? { kind: "browser_live", frame, bytes } : null;
     }
     default:
       return null;

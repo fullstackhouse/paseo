@@ -113,6 +113,19 @@ import {
 } from "./browser-automation/rpc-schemas.js";
 import { BrowserAutomationHostCapabilitySchema } from "./browser-automation/capabilities.js";
 import {
+  BrowserHostLiveFrameAckSchema,
+  BrowserHostLiveStartRequestSchema,
+  BrowserHostLiveStartResponseSchema,
+  BrowserHostLiveStopRequestSchema,
+  BrowserHostLiveStopResponseSchema,
+  BrowserLiveEndedSchema,
+  BrowserLiveFrameAckSchema,
+  BrowserLiveStartRequestSchema,
+  BrowserLiveStartResponseSchema,
+  BrowserLiveStopRequestSchema,
+  BrowserLiveStopResponseSchema,
+} from "./browser-automation/live-view.js";
+import {
   PaseoConfigRawSchema,
   PaseoLifecycleCommandRawSchema,
   PaseoMetadataGenerationEntrySchema,
@@ -3461,6 +3474,8 @@ export const BrowserHostRegisterRequestSchema = z.object({
   requestId: z.string(),
   hostKind: z.string().min(1),
   supportedCommands: z.array(z.enum(BROWSER_AUTOMATION_COMMAND_NAMES)).min(1),
+  // COMPAT(browserLiveView): added after v0.15.4; hosts without it answer live view with browser_unsupported.
+  liveView: z.boolean().optional(),
 });
 export const BrowserHostRegisterResponseSchema = z.object({
   type: z.literal("browser.host.register.response"),
@@ -3494,6 +3509,11 @@ export const SessionInboundMessageSchema = z.discriminatedUnion("type", [
   HubExecutionAgentValidateRequestSchema,
   HubExecutionControlRequestSchema,
   BrowserAutomationExecuteResponseSchema,
+  BrowserLiveStartRequestSchema,
+  BrowserLiveStopRequestSchema,
+  BrowserLiveFrameAckSchema,
+  BrowserHostLiveStartResponseSchema,
+  BrowserHostLiveStopResponseSchema,
   VoiceAudioChunkMessageSchema,
   AbortRequestMessageSchema,
   AudioPlayedMessageSchema,
@@ -3971,6 +3991,8 @@ export const ServerInfoStatusPayloadSchema = z
         workspaceManualGroup: z.boolean().optional(),
         // COMPAT(scheduleRunAttention): FSH-only, added after v0.15.4, remove gate after 2027-05-16.
         scheduleRunAttention: z.boolean().optional(),
+        // COMPAT(browserLiveView): FSH-only, added after v0.15.4, remove gate after 2027-05-22.
+        browserLiveView: z.boolean().optional(),
         // COMPAT(skillManagement): added in v0.4.0, remove gate after 2027-08-16.
         skillManagement: z.boolean().optional(),
         // COMPAT(idleRuntimeCleanupSetting): added in v0.13.0, remove gate after 2027-04-26.
@@ -7409,6 +7431,12 @@ export const SessionOutboundMessageSchema = z.discriminatedUnion("type", [
   HubExecutionAgentUpdateSchema,
   HubExecutionAgentStreamSchema,
   BrowserAutomationExecuteRequestSchema,
+  BrowserLiveStartResponseSchema,
+  BrowserLiveStopResponseSchema,
+  BrowserLiveEndedSchema,
+  BrowserHostLiveStartRequestSchema,
+  BrowserHostLiveStopRequestSchema,
+  BrowserHostLiveFrameAckSchema,
   PluginCatalogGetResponseSchema,
   PluginListResponseSchema,
   PluginLogsGetResponseSchema,
