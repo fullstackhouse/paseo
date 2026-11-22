@@ -7,7 +7,8 @@ import type {
   BrowserLiveInput,
   BrowserLiveKey,
 } from "@getpaseo/protocol/browser-automation/live-view";
-import { CdpSessionQueue, type CdpCommandSender } from "./cdp-session-queue.js";
+import { CdpSessionQueue } from "./cdp-session-queue.js";
+import { FrameSessions, type CdpMessageListener, type CdpSessionSender } from "./frame-sessions.js";
 import { GuestFrames, type GuestFrame } from "./guest-frames.js";
 import {
   dispatchTrustedClick,
@@ -61,10 +62,10 @@ export interface HumanControlContents {
 
 export interface HumanControlTab {
   contents: HumanControlContents;
-  send: CdpCommandSender;
+  send: CdpSessionSender;
   /** Runs outside the CDP queue: a dialog blocks the command in front of it. */
-  answerDialog(accept: boolean): Promise<unknown>;
-  onDialog(listener: (type: unknown) => void): () => void;
+  answerDialog(accept: boolean, sessionId?: string): Promise<unknown>;
+  onMessage(listener: CdpMessageListener): () => void;
 }
 
 interface Binding {
@@ -81,6 +82,7 @@ interface Control {
   tab: HumanControlTab;
   phase: "taking" | "held" | "releasing";
   queue: CdpSessionQueue;
+  frameSessions: FrameSessions;
   binding: Binding | null;
   /** The frames this control typed into, by process and routing id. */
   typedFrames: Set<string>;
@@ -163,11 +165,13 @@ export class BrowserHumanControls {
       tab,
       phase: "taking",
       queue: new CdpSessionQueue(),
+      frameSessions: new FrameSessions(tab.send, (listener) => tab.onMessage(listener)),
       binding: null,
       typedFrames: new Set(),
       retry: null,
       cleanup: [],
     };
+    control.cleanup.push(() => control.frameSessions.dispose());
     // Locked from here on, so no new agent command starts while the running ones finish.
     this.byContentsId.set(contentsId, control);
     this.byControlId.set(controlId, control);
@@ -186,15 +190,20 @@ export class BrowserHumanControls {
         this.forget(control);
         return refuse("agent_busy");
       }
-      const enabled = await within(tab.send("Page.enable"), CDP_TIMEOUT_MS);
+      const enabled = await within(
+        tab.send("Page.enable").then(() => control.frameSessions.attach()),
+        CDP_TIMEOUT_MS,
+      );
       if (control.phase !== "taking" || !this.isCurrent(control)) return refuse("failed");
       if (!enabled) {
         this.forget(control);
         return refuse("failed");
       }
       control.cleanup.push(
-        tab.onDialog((type) => {
-          void tab.answerDialog(type === "alert" || type === "beforeunload").catch(() => {});
+        tab.onMessage((method, params, sessionId) => {
+          if (method !== "Page.javascriptDialogOpening") return;
+          const accept = params.type === "alert" || params.type === "beforeunload";
+          void tab.answerDialog(accept, sessionId).catch(() => {});
         }),
       );
       control.phase = "held";
@@ -259,21 +268,26 @@ export class BrowserHumanControls {
     control: Control,
     input: BrowserLiveInput,
   ): Promise<keyof typeof ERROR_MESSAGES | null> {
-    const { contents, send } = control.tab;
+    const { contents } = control.tab;
     switch (input.kind) {
       case "insert_text":
         return this.insertText(control, input);
       case "key":
         return pressKey(contents, input.key);
       case "tap": {
-        const point = toCssPoint(contents, input);
-        return (await within(dispatchTrustedClick(send, point), CDP_TIMEOUT_MS)) ? null : "failed";
+        const clicked = control.frameSessions
+          .route(toCssPoint(contents, input))
+          .then(({ send, point }) => dispatchTrustedClick(send, point));
+        return (await within(clicked, CDP_TIMEOUT_MS)) ? null : "failed";
       }
       case "scroll": {
-        const point = toCssPoint(contents, input);
         const zoom = contents.getZoomFactor();
         const scrolled = await within(
-          dispatchTrustedScroll(send, point, input.deltaX / zoom, input.deltaY / zoom),
+          control.frameSessions
+            .route(toCssPoint(contents, input))
+            .then(({ send, point }) =>
+              dispatchTrustedScroll(send, point, input.deltaX / zoom, input.deltaY / zoom),
+            ),
           CDP_TIMEOUT_MS,
         );
         return scrolled ? null : "failed";

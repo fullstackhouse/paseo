@@ -117,19 +117,24 @@ export class HostSnapshotEngineRegistry {
 
 const hostSnapshotEngines = new HostSnapshotEngineRegistry();
 
+type DebuggerMessageListener = (
+  event: unknown,
+  method: string,
+  params?: Record<string, unknown>,
+  sessionId?: string,
+) => void;
+
 interface WebContentsDebugger {
   isAttached(): boolean;
   attach(protocolVersion?: string): void;
-  sendCommand(command: string, params?: Record<string, unknown>): Promise<unknown>;
-  on?(
-    event: "message",
-    listener: (event: unknown, method: string, params?: Record<string, unknown>) => void,
-  ): void;
+  sendCommand(
+    command: string,
+    params?: Record<string, unknown>,
+    sessionId?: string,
+  ): Promise<unknown>;
+  on?(event: "message", listener: DebuggerMessageListener): void;
   on?(event: "detach", listener: () => void): void;
-  removeListener?(
-    event: "message",
-    listener: (event: unknown, method: string, params?: Record<string, unknown>) => void,
-  ): void;
+  removeListener?(event: "message", listener: DebuggerMessageListener): void;
   removeListener?(event: "detach", listener: () => void): void;
 }
 
@@ -551,17 +556,24 @@ function liveViewEvents(contents: BrowserAutomationWebContents): BrowserLiveView
 }
 
 function humanControlTab(contents: BrowserAutomationWebContents): HumanControlTab {
-  const { sendDebugCommand } = adaptWebContents(contents);
-  const { onMessage } = liveViewEvents(contents);
+  // Adapting registers the tab's observers; sends share its CDP queue.
+  const { id } = adaptWebContents(contents);
+  const cdpQueue = getCdpQueue(id);
   return {
     contents: contents as BrowserAutomationWebContents & HumanControlContents,
-    send: sendDebugCommand,
-    answerDialog: (accept) =>
-      contents.debugger.sendCommand("Page.handleJavaScriptDialog", { accept }),
-    onDialog: (listener) =>
-      onMessage((method, params) => {
-        if (method === "Page.javascriptDialogOpening") listener(params.type);
+    send: (command, params, sessionId) =>
+      cdpQueue.run(async () => {
+        if (!contents.debugger.isAttached()) contents.debugger.attach("1.3");
+        return contents.debugger.sendCommand(command, params ?? {}, sessionId);
       }),
+    answerDialog: (accept, sessionId) =>
+      contents.debugger.sendCommand("Page.handleJavaScriptDialog", { accept }, sessionId),
+    onMessage: (listener) => {
+      const handler: DebuggerMessageListener = (_event, method, params, sessionId) =>
+        listener(method, params ?? {}, sessionId);
+      contents.debugger.on?.("message", handler);
+      return () => contents.debugger.removeListener?.("message", handler);
+    },
   };
 }
 

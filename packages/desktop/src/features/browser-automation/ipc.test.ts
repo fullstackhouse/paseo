@@ -25,7 +25,12 @@ class FakeImage implements TabImage {
 
 class FakeDebugger {
   public attachedProtocolVersions: string[] = [];
-  public commands: Array<{ command: string; params: Record<string, unknown> }> = [];
+  public commands: Array<{ command: string; params: Record<string, unknown>; sessionId?: string }> =
+    [];
+  public readonly responses = new Map<
+    string,
+    (params: Record<string, unknown>, sessionId?: string) => unknown
+  >();
   public blockCommands = false;
   public readonly blockedCommandNames = new Set<string>();
   public readonly failedCommandNames = new Set<string>();
@@ -34,7 +39,7 @@ class FakeDebugger {
   public failPromptDrain = false;
   public beforeCommand: ((command: string) => void) | null = null;
   private readonly messageListeners = new Set<
-    (event: unknown, method: string, params?: Record<string, unknown>) => void
+    (event: unknown, method: string, params?: Record<string, unknown>, sessionId?: string) => void
   >();
   private readonly detachListeners = new Set<() => void>();
   private readonly blockedCommands: Array<() => void> = [];
@@ -47,8 +52,12 @@ class FakeDebugger {
     this.attachedProtocolVersions.push(protocolVersion ?? "");
   }
 
-  public async sendCommand(command: string, params?: Record<string, unknown>): Promise<unknown> {
-    this.commands.push({ command, params: params ?? {} });
+  public async sendCommand(
+    command: string,
+    params?: Record<string, unknown>,
+    sessionId?: string,
+  ): Promise<unknown> {
+    this.commands.push({ command, params: params ?? {}, ...(sessionId ? { sessionId } : {}) });
     this.beforeCommand?.(command);
     const commandError = this.failedCommandErrors.get(command);
     if (commandError) {
@@ -71,6 +80,8 @@ class FakeDebugger {
       }
       return { result: { value: true } };
     }
+    const response = this.responses.get(command);
+    if (response) return response(params ?? {}, sessionId);
     if (command === "Page.getLayoutMetrics") {
       return { cssLayoutViewport: { clientWidth: 1024, clientHeight: 768 } };
     }
@@ -111,11 +122,11 @@ class FakeDebugger {
     return this.messageListeners.size;
   }
 
-  public emitMessage(method: string, params?: Record<string, unknown>): void {
+  public emitMessage(method: string, params?: Record<string, unknown>, sessionId?: string): void {
     if (this.messageListeners.size === 0) {
       throw new Error("Debugger message listener was not registered");
     }
-    for (const listener of this.messageListeners) listener({}, method, params);
+    for (const listener of this.messageListeners) listener({}, method, params, sessionId);
   }
 
   public emitDetach(): void {
@@ -1360,6 +1371,60 @@ describe("browser live view human control", () => {
     ]);
   });
 
+  test("delivers a tap over a cross-origin iframe to that frame's own session", async () => {
+    const { contents, take, send } = await watchedTab();
+    const cdp = contents.debugger;
+    cdp.responses.set("Target.setAutoAttach", (params, sessionId) => {
+      if (params.autoAttach && !sessionId) {
+        cdp.emitMessage("Target.attachedToTarget", {
+          sessionId: "iframe-session",
+          targetInfo: { targetId: "iframe-frame" },
+        });
+      }
+      return {};
+    });
+    cdp.responses.set("Page.getLayoutMetrics", (_params, sessionId) => ({
+      cssLayoutViewport: { pageX: 0, pageY: sessionId ? 0 : 400 },
+    }));
+    cdp.responses.set("DOM.getNodeForLocation", (_params, sessionId) =>
+      sessionId ? { backendNodeId: 9 } : { backendNodeId: 5 },
+    );
+    cdp.responses.set("DOM.describeNode", (_params, sessionId) =>
+      sessionId ? { node: { nodeName: "INPUT" } } : { node: { frameId: "iframe-frame" } },
+    );
+    cdp.responses.set("DOM.getBoxModel", () => ({
+      model: { content: [42, 368, 542, 368, 542, 468, 42, 468] },
+    }));
+
+    await take();
+    await send({ kind: "tap", x: 92, y: 398 });
+
+    // getNodeForLocation counts from the document, quads and input from the viewport.
+    expect(cdp.commands).toContainEqual({
+      command: "DOM.getNodeForLocation",
+      params: { x: 92, y: 798 },
+    });
+    expect(cdp.commands.filter(({ params }) => params.type === "mousePressed")).toEqual([
+      {
+        command: "Input.dispatchMouseEvent",
+        params: expect.objectContaining({ x: 50, y: 30 }),
+        // The root session can't hit-test into a parked tab's out-of-process iframe.
+        sessionId: "iframe-session",
+      },
+    ]);
+  });
+
+  test("releasing detaches from iframe targets", async () => {
+    const { contents, take, release } = await watchedTab();
+    await take();
+    await release(false);
+    await flushMicrotasks();
+    expect(contents.debugger.commands.at(-1)).toMatchObject({
+      command: "Target.setAutoAttach",
+      params: { autoAttach: false },
+    });
+  });
+
   test("scrolls at the point the finger started", async () => {
     const { contents, take, send } = await watchedTab();
     await take();
@@ -1618,9 +1683,16 @@ describe("browser live view human control", () => {
   test("dismisses page dialogs, which would block every further input", async () => {
     const { contents, take } = await watchedTab();
     await take();
-    contents.debugger.emitMessage("Page.javascriptDialogOpening", { type: "alert", message: "x" });
+    contents.debugger.emitMessage(
+      "Page.javascriptDialogOpening",
+      { type: "alert", message: "x" },
+      "iframe-session",
+    );
     await flushMicrotasks();
-    expect(contents.debugger.commands.at(-1)?.command).toBe("Page.handleJavaScriptDialog");
+    expect(contents.debugger.commands.at(-1)).toMatchObject({
+      command: "Page.handleJavaScriptDialog",
+      sessionId: "iframe-session",
+    });
   });
 
   test("frames carry the committed origin", async () => {
