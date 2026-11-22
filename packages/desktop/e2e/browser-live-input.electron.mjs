@@ -14,6 +14,9 @@ const FIELD_HEIGHT = 80;
 const WAIT_MS = 15_000;
 const QUIET_MS = 1_500;
 const CODE = "482915";
+// The taps aim at fixed page points, so the test sets the viewport. The pane the earlier checks
+// leave can be narrower than those points: 280 px on CI's 1280x800 screen.
+const VIEWPORT = { width: 800, height: 600 };
 // The embedded field's center, in the transformed iframe's own pixels.
 const AIM = { x: 475, y: 230 };
 // Where each transform puts that point on the screen.
@@ -578,6 +581,8 @@ export async function runLiveInputRegression({ daemonPort, client }) {
     await phone.connect();
     await phone.patchDaemonConfig({ browserLiveView: true });
     const browserId = await openPage(client, pages.url);
+    const resized = await callTool(client, "browser_resize", { browserId, ...VIEWPORT });
+    assert(resized.ok, `couldn't size the viewport: ${JSON.stringify(resized.error)}`);
     await waitFor(
       () => evaluate(client, browserId, "() => window.ready === true").catch(() => false),
       "the test page",
