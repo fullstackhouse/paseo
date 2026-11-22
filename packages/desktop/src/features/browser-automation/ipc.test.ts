@@ -1092,15 +1092,19 @@ describe("browser live view screencast", () => {
       expect(forwarded()).toBe(1);
 
       streams.ack({ type: "browser.host.live.frame_ack", streamId: "stream-1", frameSeq: 0 });
-      // A frame arriving during the frame-rate delay is dropped too.
+      // A newer frame replaces the waiting one, also during the frame-rate delay.
       screencastFrame(contents, 3);
       expect(forwarded()).toBe(1);
       await vi.advanceTimersByTimeAsync(250);
-      expect(screencastAcks(contents)).toEqual([1, 2, 3]);
+      expect(screencastAcks(contents)).toEqual([1, 2]);
 
-      screencastFrame(contents, 4);
+      // The newest frame still goes out. A page that stops painting, as one does once a sign-in
+      // lands on a static page, never sends another.
       expect(forwarded()).toBe(2);
-      expect(host.sent.at(-1)?.payload).toMatchObject({ frameSeq: 1 });
+      expect(host.sent.at(-1)?.payload).toMatchObject({
+        frameSeq: 1,
+        jpeg: new Uint8Array([0xff, 0xd8, 3, 0xff, 0xd9]),
+      });
     } finally {
       vi.useRealTimers();
     }

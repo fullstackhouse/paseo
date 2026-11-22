@@ -38,10 +38,17 @@ type LiveViewTab = Pick<TabContents, "invalidate" | "isDestroyed"> & {
 /** Why a stream ended: stopped on request, failed to start, or the tab went away. */
 export type BrowserLiveViewEndReason = "stopped" | "failed" | "gone";
 
+interface ScreencastFrame {
+  sessionId: number;
+  data: string;
+  metadata: unknown;
+}
+
 /**
  * One CDP screencast of a tab. Chromium keeps up to two Page.screencastFrame unacked, so
- * this stream forwards one frame at a time: a frame that arrives while the viewer still
- * holds one, or while the frame-rate delay runs, is dropped and acked with the next ack.
+ * this stream forwards one frame at a time: while the viewer still holds one, or the
+ * frame-rate delay runs, only the newest waits, and older ones are acked with the next ack.
+ * The newest must not be dropped: a page that stops painting never sends another.
  * Exactly one frame is in flight from tab to viewer.
  */
 export class BrowserLiveViewStream {
@@ -49,6 +56,7 @@ export class BrowserLiveViewStream {
   private unackedFrame: { frameSeq: number; sessionId: number; receivedAt: number } | null = null;
   private minFrameIntervalMs = 1000 / DEFAULT_MAX_FPS;
   private ackTimer: ReturnType<typeof setTimeout> | null = null;
+  private waitingFrame: ScreencastFrame | null = null;
   /** Screencast sessions of dropped frames, acked together with the forwarded one. */
   private droppedSessionIds: number[] = [];
   private stopped = false;
@@ -116,6 +124,9 @@ export class BrowserLiveViewStream {
           .sendDebugCommand("Page.screencastFrameAck", { sessionId })
           .catch(() => {});
       }
+      const waiting = this.waitingFrame;
+      this.waitingFrame = null;
+      if (waiting) this.forward(waiting);
     };
     const wait = frame.receivedAt + this.minFrameIntervalMs - Date.now();
     if (wait <= 0) send();
@@ -142,16 +153,22 @@ export class BrowserLiveViewStream {
     if (typeof sessionId !== "number" || typeof data !== "string") {
       return;
     }
-    if (this.unackedFrame || this.ackTimer) {
-      this.droppedSessionIds.push(sessionId);
+    const frame = { sessionId, data, metadata: params.metadata };
+    if (!this.unackedFrame && !this.ackTimer) {
+      this.forward(frame);
       return;
     }
+    if (this.waitingFrame) this.droppedSessionIds.push(this.waitingFrame.sessionId);
+    this.waitingFrame = frame;
+  }
+
+  private forward({ sessionId, data, metadata }: ScreencastFrame): void {
     const frameSeq = this.nextFrameSeq++;
     this.unackedFrame = { frameSeq, sessionId, receivedAt: Date.now() };
     this.params.onFrame({
       streamId: this.params.streamId,
       frameSeq,
-      metadata: readFrameMetadata(params.metadata),
+      metadata: readFrameMetadata(metadata),
       jpeg: new Uint8Array(Buffer.from(data, "base64")),
     });
   }
@@ -162,6 +179,7 @@ export class BrowserLiveViewStream {
     }
     this.stopped = true;
     this.unackedFrame = null;
+    this.waitingFrame = null;
     if (this.ackTimer) clearTimeout(this.ackTimer);
     this.ackTimer = null;
     for (const unsubscribe of this.unsubscribers.splice(0)) unsubscribe();
