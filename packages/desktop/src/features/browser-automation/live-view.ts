@@ -48,7 +48,10 @@ interface ScreencastFrame {
  * One CDP screencast of a tab. Chromium keeps up to two Page.screencastFrame unacked, so
  * this stream forwards one frame at a time: while the viewer still holds one, or the
  * frame-rate delay runs, only the newest waits, and older ones are acked with the next ack.
- * The newest must not be dropped: a page that stops painting never sends another.
+ * The newest must not be dropped: a page that stops painting never sends another. For the
+ * same reason, once two were unacked, when Chromium drops what it paints next, the stream
+ * restarts the screencast after catching up: that begins with the current paint, and
+ * invalidate() doesn't produce one.
  * Exactly one frame is in flight from tab to viewer.
  */
 export class BrowserLiveViewStream {
@@ -57,6 +60,8 @@ export class BrowserLiveViewStream {
   private minFrameIntervalMs = 1000 / DEFAULT_MAX_FPS;
   private ackTimer: ReturnType<typeof setTimeout> | null = null;
   private waitingFrame: ScreencastFrame | null = null;
+  private mayHaveMissedPaint = false;
+  private screencast: Record<string, unknown> = {};
   /** Screencast sessions of dropped frames, acked together with the forwarded one. */
   private droppedSessionIds: number[] = [];
   private stopped = false;
@@ -90,13 +95,14 @@ export class BrowserLiveViewStream {
       // delaying the ack instead.
       this.minFrameIntervalMs = 1000 / (options.maxFps ?? DEFAULT_MAX_FPS);
       const maxWidth = options.maxWidth ?? DEFAULT_MAX_WIDTH;
-      await tab.sendDebugCommand("Page.startScreencast", {
+      this.screencast = {
         format: "jpeg",
         quality: options.jpegQuality ?? DEFAULT_JPEG_QUALITY,
         maxWidth,
         maxHeight: maxWidth * 2,
         everyNthFrame: 1,
-      });
+      };
+      await tab.sendDebugCommand("Page.startScreencast", this.screencast);
       // A static page produces no frame on its own; request one paint.
       tab.invalidate();
       return {
@@ -126,7 +132,12 @@ export class BrowserLiveViewStream {
       }
       const waiting = this.waitingFrame;
       this.waitingFrame = null;
-      if (waiting) this.forward(waiting);
+      if (waiting) {
+        this.forward(waiting);
+      } else if (this.mayHaveMissedPaint) {
+        this.mayHaveMissedPaint = false;
+        this.restartScreencast();
+      }
     };
     const wait = frame.receivedAt + this.minFrameIntervalMs - Date.now();
     if (wait <= 0) send();
@@ -160,6 +171,7 @@ export class BrowserLiveViewStream {
     }
     if (this.waitingFrame) this.droppedSessionIds.push(this.waitingFrame.sessionId);
     this.waitingFrame = frame;
+    this.mayHaveMissedPaint = true;
   }
 
   private forward({ sessionId, data, metadata }: ScreencastFrame): void {
@@ -171,6 +183,15 @@ export class BrowserLiveViewStream {
       metadata: readFrameMetadata(metadata),
       jpeg: new Uint8Array(Buffer.from(data, "base64")),
     });
+  }
+
+  private restartScreencast(): void {
+    const { tab } = this.params;
+    // Queued together, so a stop() can't land between them and leave a screencast running.
+    void Promise.all([
+      tab.sendDebugCommand("Page.stopScreencast"),
+      tab.sendDebugCommand("Page.startScreencast", this.screencast),
+    ]).catch(() => {});
   }
 
   private end(reason: BrowserLiveViewEndReason): void {

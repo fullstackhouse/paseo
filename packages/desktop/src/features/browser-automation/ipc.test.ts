@@ -1110,6 +1110,37 @@ describe("browser live view screencast", () => {
     }
   });
 
+  test("restarts the screencast once after Chromium's buffer was full", async () => {
+    vi.useFakeTimers();
+    try {
+      const { contents, host, streams } = createLiveViews();
+      await streams.start(host, liveStartRequest());
+      const starts = () =>
+        contents.debugger.commands.filter(({ command }) => command === "Page.startScreencast");
+      const ack = async (frameSeq: number) => {
+        streams.ack({ type: "browser.host.live.frame_ack", streamId: "stream-1", frameSeq });
+        await vi.advanceTimersByTimeAsync(250);
+      };
+
+      // With two frames unacked Chromium drops what it paints next, the final paint included, and
+      // invalidate() doesn't bring it back. Only a new screencast starts with the current paint.
+      screencastFrame(contents, 1);
+      screencastFrame(contents, 2);
+      await ack(0);
+      expect(starts()).toHaveLength(1);
+      await ack(1);
+      expect(starts()).toHaveLength(2);
+      expect(starts()[1]).toEqual(starts()[0]);
+
+      // Its first frame arrives alone, so it asks for no other.
+      screencastFrame(contents, 3);
+      await ack(2);
+      expect(starts()).toHaveLength(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   test("delays the CDP ack so frames arrive no faster than maxFps", async () => {
     vi.useFakeTimers();
     try {
