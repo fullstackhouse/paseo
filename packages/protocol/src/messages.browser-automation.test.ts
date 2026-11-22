@@ -277,6 +277,15 @@ describe("browser automation protocol integration", () => {
     });
   });
 
+  test("browser live view host setting is absent by default and patchable", () => {
+    expect(
+      MutableDaemonConfigSchema.parse({ mcp: { injectIntoAgents: false } }).browserLiveView,
+    ).toBeUndefined();
+    expect(MutableDaemonConfigPatchSchema.parse({ browserLiveView: true }).browserLiveView).toBe(
+      true,
+    );
+  });
+
   test("mutable daemon config defaults browser tools off and accepts opt-in patches", () => {
     expect(
       MutableDaemonConfigSchema.parse({
