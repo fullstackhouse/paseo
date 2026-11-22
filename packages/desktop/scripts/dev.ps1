@@ -41,10 +41,9 @@ $env:PASEO_ELECTRON_FLAGS = $DevRuntime.electronFlags
 $env:PASEO_ELECTRON_USER_DATA_DIR = $DevRuntime.userDataDir
 Remove-Item Env:\PASEO_DEV_RUNTIME_FALLBACK_ROOT -ErrorAction SilentlyContinue
 
-# Allow any origin in dev so Electron on random ports works.
-# SECURITY: wildcard CORS is unsafe in production — only acceptable here because
-# the daemon binds to localhost and this script is never used for production.
-$env:PASEO_CORS_ORIGINS = "*"
+# Admit only this window's Metro renderer. The dev home has no password, so "*" would let
+# any website open in your browser drive the daemon.
+$env:PASEO_CORS_ORIGINS = "http://localhost:$($env:EXPO_PORT),http://127.0.0.1:$($env:EXPO_PORT)"
 
 # Fully isolate the dev instance from a production Paseo install so `npm run dev`
 # works while the installed app is open. Without this the dev build loses the
@@ -70,9 +69,9 @@ if (-not $env:PASEO_LISTEN) { $env:PASEO_LISTEN = "127.0.0.1:$DevDaemonPort" }
 # (it does NOT honor the PASEO_LISTEN env var) and probing that address. Without
 # this it reads the default 6767, finds a production daemon there, and connects
 # the dev app to prod — whose CORS allowlist then rejects the Metro origin. Pin
-# the dev port + wildcard CORS in the file so the dev app starts its OWN daemon.
+# the dev port + Metro origin in the file so the dev app starts its OWN daemon.
 # ONLY seed the script-managed home: never rewrite a user-supplied PASEO_HOME
-# (that could clobber a production config.json with the dev port + wildcard CORS).
+# (that could clobber a production config.json with the dev port and origins).
 if ($PaseoHomeManaged) {
     $env:TMP_CFG_PATH = "$($env:PASEO_HOME)/config.json"
     $env:TMP_CFG_PORT = $DevDaemonPort
@@ -87,7 +86,7 @@ cfg.version = cfg.version || 1;
 cfg.daemon = cfg.daemon || {};
 cfg.daemon.listen = '127.0.0.1:' + port;
 cfg.daemon.cors = cfg.daemon.cors || {};
-cfg.daemon.cors.allowedOrigins = ['*'];
+cfg.daemon.cors.allowedOrigins = process.env.PASEO_CORS_ORIGINS.split(',');
 fs.writeFileSync(path, JSON.stringify(cfg, null, 2));
 "@
     Set-Content -Path $TmpScript -Value $ScriptContent

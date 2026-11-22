@@ -1142,7 +1142,7 @@ async function main() {
       PASEO_HOME: paseoHome,
       PASEO_LISTEN: listen,
       PASEO_DAEMON_ENDPOINT: `localhost:${daemonPort}`,
-      PASEO_CORS_ORIGINS: "*",
+      PASEO_CORS_ORIGINS: `http://localhost:${expoPort}`,
       PASEO_LOCAL_SPEECH_AUTO_DOWNLOAD: "0",
       PASEO_DICTATION_ENABLED: "0",
       PASEO_VOICE_MODE_ENABLED: "0",

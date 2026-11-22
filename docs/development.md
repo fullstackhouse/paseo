@@ -70,6 +70,32 @@ PASEO_DEV_RESET_HOME=1 npm run dev            # clear and reseed the derived wor
 
 In Paseo-managed worktree services, use the injected service environment rather than hardcoded root checkout ports.
 
+### Dev daemon network access
+
+Dev homes have no password, so any client that reaches a dev daemon gets full owner access. `scripts/dev-home.sh` (used by every dev script, `paseo.json` service and `npm run cli`) therefore:
+
+- binds the daemon to `127.0.0.1` and refuses to start on another address;
+- admits browser origins from this checkout only, through `PASEO_CORS_ORIGINS` (`scripts/dev-daemon-access.mjs`): `localhost` and `127.0.0.1` on each workspace service port, plus each service's proxy URL. Outside a Paseo workspace it admits Metro ports `8081`–`8089` on `localhost`. Native apps and the CLI send no browser origin, or their own, and are unaffected. `PASEO_CORS_ORIGINS` adds origins; `*` is refused;
+- removes a `*` left in `daemon.cors.allowedOrigins` of a managed home. The daemon merges persisted origins with the variable, so a leftover `*` would admit every website.
+
+The startup banner prints the listen address and the admitted origins. A client rejected with `Origin not allowed` in `daemon.log` is missing from that list.
+
+The iOS simulator shares the Mac's loopback, and the Android emulator reaches it at `10.0.2.2`, so both work with the loopback default.
+
+#### Phone on the LAN
+
+Save a password in the dev home first, then opt in for one run:
+
+```bash
+npm run cli -- daemon set-password --home .dev/paseo-home   # prompts; stored bcrypt-hashed
+PASEO_DEV_LAN=1 PASEO_HOME="$PWD/.dev/paseo-home" npm run dev:server
+```
+
+- Name the home in both commands: inside a Paseo terminal `PASEO_HOME` is the main daemon's home, and `set-password` would change its password.
+- With `PASEO_DEV_LAN=1` the daemon listens on `0.0.0.0` and the banner prints the LAN URLs to add as a direct connection on the phone. It refuses to start without a password in the home's `config.json`. A `PASEO_PASSWORD` variable does not count: it would be readable in the process environment.
+- Workspace scripts the dev daemon runs then get `HOST=0.0.0.0`, and its service proxy answers on the LAN too. The password protects daemon APIs, not proxied services, so don't run services there that hold secrets.
+- `paseo.json` services cannot take the variable. Stop the worktree's `daemon` service and run the command above in a terminal; one daemon per home.
+
 ### Test a change next to your main Paseo
 
 When you work on Paseo from a Paseo workspace, run the branch as a second Paseo beside the one you use. The branch gets its own daemon, port, home, and Electron window; the main daemon on `6767` and its agents are untouched.
@@ -84,7 +110,7 @@ paseo plugin ls --home .dev/paseo-home     # talk to this worktree's daemon
 ```
 
 - Seed before the first `daemon` start. Otherwise the worktree home is seeded from the source checkout's `.dev/paseo-home`, which is empty unless you develop there, so the branch starts with no projects, plugins or providers. Re-run it to pick up later changes in `~/.paseo`.
-- The seed drops `daemon.auth` and `daemon.relay`. The dev desktop app only gets a local credential from daemons it started itself, so a copied password shows "Password required" with no projects. The dev scripts rewrite `daemon.listen` and `daemon.cors` on every start.
+- The seed drops `daemon.auth` and `daemon.relay`. The dev desktop app only gets a local credential from daemons it started itself, so a copied password shows "Password required" with no projects. The dev scripts rewrite `daemon.listen` on every start and drop a `*` from `daemon.cors.allowedOrigins`; see [Dev daemon network access](#dev-daemon-network-access).
 - Projects and workspaces point at your real checkouts and worktrees. Archiving a workspace in the dev Paseo removes the real worktree. Agents and plugin data are not copied; directory plugins run from the same paths as on your main daemon.
 - Inside a Paseo terminal, `PASEO_HOME` is the main daemon's home, so `npm run cli` and a bare `paseo` talk to your main daemon. Pass `--home .dev/paseo-home`.
 - The `daemon` script picks a new port on every start and `desktop` reads it at launch. After restarting `daemon`, restart `desktop`.
