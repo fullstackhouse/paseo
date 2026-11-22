@@ -15,6 +15,7 @@ import type {
 import type { TabContents, BrowserRegistry, TabImage } from "./service.js";
 import type { IsolatedKeyboardInputEvent } from "./trusted-input.js";
 import { CdpSessionQueue } from "./cdp-session-queue.js";
+import { FrameProduction } from "./frame-production.js";
 import {
   dialogAcceptValue,
   handledDialogEvent,
@@ -38,9 +39,7 @@ const consoleMessagesByContentsId = new Map<number, BrowserAutomationConsoleLogE
 const cdpQueuesByContentsId = new Map<number, CdpSessionQueue>();
 const dialogMonitorsByContentsId = new Map<number, DialogMonitor>();
 const observedContentsIds = new Set<number>();
-const paintHoldsByContentsId = new Map<number, number>();
-// A frame subscription keeps a hidden guest compositing; its frames are discarded.
-function discardFrame(): void {}
+const frameProductionByContentsId = new Map<number, FrameProduction>();
 
 interface IpcHandlerRegistry {
   handle(channel: string, listener: (event: unknown, ...args: unknown[]) => unknown): void;
@@ -57,6 +56,7 @@ interface LiveViewHostWebContents extends HostWebContents {
 }
 
 export const BROWSER_LIVE_FRAME_EVENT = "paseo:event:browser-live-frame";
+export const BROWSER_LIVE_ENDED_EVENT = "paseo:event:browser-live-ended";
 
 export class HostSnapshotEngineRegistry {
   private readonly entries = new Map<
@@ -144,6 +144,7 @@ export function adaptWebContents(
   observeConsoleMessages(contents, contentsId);
   const cdpQueue = getCdpQueue(contentsId);
   const dialogMonitor = getDialogMonitor(contents, contentsId, cdpQueue);
+  const frameProduction = getFrameProduction(contents, contentsId);
   return {
     id: contentsId,
     getURL: () => contents.getURL(),
@@ -157,20 +158,19 @@ export function adaptWebContents(
     goBack: () => contents.goBack(),
     goForward: () => contents.goForward(),
     reload: () => contents.reload(),
-    captureFrame: (signal) => captureViewportFrame(contents, signal),
+    captureFrame: (signal) => captureViewportFrame(contents, frameProduction, signal),
     invalidate: () => contents.invalidate(),
     withFrameProduction: async (capture) => {
-      const previous = contents.getBackgroundThrottling();
-      contents.setBackgroundThrottling(false);
+      const release = frameProduction.holdThrottling();
       try {
         return await capture();
       } finally {
-        if (!contents.isDestroyed()) contents.setBackgroundThrottling(previous);
+        release();
       }
     },
     sendInputEvent: (event) => contents.sendInputEvent(event),
     insertText: (text) => contents.insertText(text),
-    holdPainting: () => holdPainting(contents),
+    holdPainting: () => frameProduction.holdPainting(),
     getConsoleMessages: () => consoleMessagesByContentsId.get(contentsId) ?? [],
     captureDialogs: (task) => dialogMonitor.capture(task),
     sendDebugCommand: (command: string, params?: Record<string, unknown>) =>
@@ -185,18 +185,16 @@ export function adaptWebContents(
 
 function captureViewportFrame(
   contents: BrowserAutomationWebContents,
+  frameProduction: FrameProduction,
   signal: AbortSignal,
 ): Promise<TabImage> {
   signal.throwIfAborted();
   return new Promise((resolve, reject) => {
+    let stopFrames = () => {};
     const stop = () => {
       signal.removeEventListener("abort", abort);
       contents.removeListener("destroyed", destroyed);
-      if (contents.isDestroyed()) return;
-      // A live view holds its own subscription; give it back instead of ending it.
-      if (paintHoldsByContentsId.has(contents.id))
-        contents.beginFrameSubscription(false, discardFrame);
-      else contents.endFrameSubscription();
+      stopFrames();
     };
     const abort = () => {
       stop();
@@ -211,7 +209,7 @@ function captureViewportFrame(
     try {
       // A resized resident guest can paint while capturePage's surface-copy
       // request remains pending. Subscribe to its rendered frames instead.
-      contents.beginFrameSubscription(false, (image) => {
+      stopFrames = frameProduction.onFrame((image) => {
         stop();
         resolve(image);
       });
@@ -222,23 +220,17 @@ function captureViewportFrame(
   });
 }
 
-function holdPainting(contents: BrowserAutomationWebContents): () => void {
-  const contentsId = contents.id;
-  const holds = paintHoldsByContentsId.get(contentsId) ?? 0;
-  paintHoldsByContentsId.set(contentsId, holds + 1);
-  if (holds === 0) contents.beginFrameSubscription(false, discardFrame);
-  let released = false;
-  return () => {
-    if (released) return;
-    released = true;
-    const remaining = (paintHoldsByContentsId.get(contentsId) ?? 1) - 1;
-    if (remaining > 0) {
-      paintHoldsByContentsId.set(contentsId, remaining);
-      return;
-    }
-    paintHoldsByContentsId.delete(contentsId);
-    if (!contents.isDestroyed()) contents.endFrameSubscription();
-  };
+function getFrameProduction(
+  contents: BrowserAutomationWebContents,
+  contentsId: number,
+): FrameProduction {
+  const existing = frameProductionByContentsId.get(contentsId);
+  if (existing) {
+    return existing;
+  }
+  const production = new FrameProduction(contents);
+  frameProductionByContentsId.set(contentsId, production);
+  return production;
 }
 
 function getCdpQueue(contentsId: number): CdpSessionQueue {
@@ -267,7 +259,7 @@ function observeConsoleMessages(contents: BrowserAutomationWebContents, contents
     consoleMessagesByContentsId.delete(contentsId);
     cdpQueuesByContentsId.delete(contentsId);
     dialogMonitorsByContentsId.delete(contentsId);
-    paintHoldsByContentsId.delete(contentsId);
+    frameProductionByContentsId.delete(contentsId);
   });
 }
 
@@ -521,6 +513,8 @@ function liveViewEvents(contents: BrowserAutomationWebContents): BrowserLiveView
 export class BrowserLiveViewStreams {
   private readonly streams = new Map<string, BrowserLiveViewStream>();
   private readonly streamIdsByHost = new Map<number, Set<string>>();
+  // CDP allows one screencast per debugger session, so one stream per tab.
+  private readonly streamIdByContentsId = new Map<number, string>();
 
   public constructor(
     private readonly getTabContents: (
@@ -557,6 +551,14 @@ export class BrowserLiveViewStreams {
         `No browser tab found for ID: ${request.browserId}`,
       );
     }
+    const contentsId = contents.id;
+    if (this.streamIdByContentsId.has(contentsId)) {
+      return liveFailure(
+        request.requestId,
+        "browser_denied",
+        `Browser tab ${request.browserId} is already streaming a live view.`,
+      );
+    }
     const hostStreamIds = this.streamIdsOfHost(hostContents);
     const stream = new BrowserLiveViewStream({
       streamId: request.streamId,
@@ -565,14 +567,27 @@ export class BrowserLiveViewStreams {
       onFrame: (frame) => {
         if (!hostContents.isDestroyed()) hostContents.send(BROWSER_LIVE_FRAME_EVENT, frame);
       },
-      onEnded: () => {
+      onEnded: (reason) => {
         if (this.streams.get(request.streamId) !== stream) return;
         this.streams.delete(request.streamId);
         hostStreamIds.delete(request.streamId);
+        this.streamIdByContentsId.delete(contentsId);
+        // Nobody asked for this end; the daemon still thinks the viewer is watching.
+        if (reason === "gone" && !hostContents.isDestroyed()) {
+          hostContents.send(BROWSER_LIVE_ENDED_EVENT, {
+            streamId: request.streamId,
+            error: {
+              code: "browser_tab_closed",
+              message: `Browser tab ${request.browserId} closed.`,
+              retryable: false,
+            },
+          });
+        }
       },
     });
     this.streams.set(request.streamId, stream);
     hostStreamIds.add(request.streamId);
+    this.streamIdByContentsId.set(contentsId, request.streamId);
     try {
       const viewport = await stream.start({
         ...(request.maxFps !== undefined ? { maxFps: request.maxFps } : {}),

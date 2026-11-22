@@ -26,14 +26,17 @@ export interface BrowserLiveViewEvents {
   onGone(listener: () => void): () => void;
 }
 
-type LiveViewTab = Pick<TabContents, "invalidate" | "isDestroyed" | "withFrameProduction"> & {
+type LiveViewTab = Pick<TabContents, "invalidate" | "isDestroyed"> & {
   sendDebugCommand(command: string, params?: Record<string, unknown>): Promise<unknown>;
   /**
-   * Keeps a hidden guest compositing until the returned release runs. A hidden or occluded
-   * <webview> produces no screencast frames on its own, even with background throttling off.
+   * Keeps a hidden guest compositing, unthrottled, until the returned release runs. A hidden
+   * or occluded <webview> produces no screencast frames on its own.
    */
   holdPainting(): () => void;
 };
+
+/** Why a stream ended: stopped on request, failed to start, or the tab went away. */
+export type BrowserLiveViewEndReason = "stopped" | "failed" | "gone";
 
 /**
  * One CDP screencast of a tab. Chromium sends the next Page.screencastFrame only after
@@ -47,7 +50,6 @@ export class BrowserLiveViewStream {
   private ackTimer: ReturnType<typeof setTimeout> | null = null;
   private stopped = false;
   private readonly unsubscribers: Array<() => void> = [];
-  private releaseFrameProduction: () => void = () => {};
 
   public constructor(
     private readonly params: {
@@ -56,7 +58,7 @@ export class BrowserLiveViewStream {
       events: BrowserLiveViewEvents;
       onFrame: (frame: BrowserLiveViewFrame) => void;
       /** Called once when the stream ends for any reason, including stop(). */
-      onEnded: () => void;
+      onEnded: (reason: BrowserLiveViewEndReason) => void;
     },
   ) {}
 
@@ -64,14 +66,9 @@ export class BrowserLiveViewStream {
     const { tab, events } = this.params;
     this.unsubscribers.push(
       events.onMessage((method, params) => this.handleMessage(method, params)),
-      events.onGone(() => this.end()),
+      events.onGone(() => this.end("gone")),
+      tab.holdPainting(),
     );
-    // Hidden tabs throttle and skip painting; keep frames coming for as long as the stream lives.
-    const produced = new Promise<void>((resolve) => {
-      this.releaseFrameProduction = resolve;
-    });
-    void tab.withFrameProduction(() => produced).catch(() => {});
-    this.unsubscribers.push(tab.holdPainting());
 
     try {
       await tab.sendDebugCommand("Page.enable");
@@ -96,7 +93,7 @@ export class BrowserLiveViewStream {
         height: metrics.cssLayoutViewport?.clientHeight ?? 0,
       };
     } catch (error) {
-      this.end();
+      this.end("failed");
       throw error;
     }
   }
@@ -124,7 +121,7 @@ export class BrowserLiveViewStream {
     if (this.stopped) {
       return;
     }
-    this.end();
+    this.end("stopped");
     if (this.params.tab.isDestroyed()) {
       return;
     }
@@ -150,7 +147,7 @@ export class BrowserLiveViewStream {
     });
   }
 
-  private end(): void {
+  private end(reason: BrowserLiveViewEndReason): void {
     if (this.stopped) {
       return;
     }
@@ -159,8 +156,7 @@ export class BrowserLiveViewStream {
     if (this.ackTimer) clearTimeout(this.ackTimer);
     this.ackTimer = null;
     for (const unsubscribe of this.unsubscribers.splice(0)) unsubscribe();
-    this.releaseFrameProduction();
-    this.params.onEnded();
+    this.params.onEnded(reason);
   }
 }
 

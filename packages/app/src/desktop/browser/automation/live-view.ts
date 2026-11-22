@@ -6,6 +6,7 @@ import type { SessionInboundMessage, SessionOutboundMessage } from "@getpaseo/pr
 import type { DesktopHostBridge } from "@/desktop/host";
 
 export const BROWSER_LIVE_FRAME_EVENT = "browser-live-frame";
+export const BROWSER_LIVE_ENDED_EVENT = "browser-live-ended";
 
 type BrowserHostLiveMessage = Extract<
   SessionOutboundMessage,
@@ -18,11 +19,16 @@ type BrowserHostLiveMessage = Extract<
 >;
 type BrowserHostLiveResponse = Extract<
   SessionInboundMessage,
-  { type: "browser.host.live.start.response" | "browser.host.live.stop.response" }
+  {
+    type:
+      | "browser.host.live.start.response"
+      | "browser.host.live.stop.response"
+      | "browser.host.live.ended";
+  }
 >;
 
 export interface BrowserLiveViewHostClient {
-  sendBrowserHostLiveResponse(response: BrowserHostLiveResponse): void;
+  sendBrowserHostLiveMessage(message: BrowserHostLiveResponse): void;
   sendBrowserLiveFrame(frame: Uint8Array): Promise<void>;
 }
 
@@ -36,6 +42,11 @@ interface DesktopLiveFrame {
 export interface BrowserLiveViewHost {
   /** Returns true when the message was a browser.host.live.* message. */
   handle(message: { type: string }): boolean;
+  /**
+   * Stops every stream. Call when the daemon registration is lost or replaced: the daemon
+   * forgot those streams, so nothing would ack or stop them.
+   */
+  reset(): void;
   dispose(): void;
 }
 
@@ -56,20 +67,45 @@ export function createBrowserLiveViewHost(options: {
   const { client, getHost } = options;
   const streamIds = new Set<string>();
   let disposed = false;
-  let unsubscribeFrames: (() => void) | null = null;
+  const unsubscribers: Array<() => void> = [];
 
-  const subscription = getHost()?.events?.on?.(BROWSER_LIVE_FRAME_EVENT, (payload) => {
+  function listen(event: string, handler: (payload: unknown) => void): void {
+    const subscription = getHost()?.events?.on?.(event, handler);
+    void Promise.resolve(subscription).then((unsubscribe) => {
+      if (!unsubscribe) return undefined;
+      if (disposed) unsubscribe();
+      else unsubscribers.push(unsubscribe);
+      return undefined;
+    });
+  }
+
+  listen(BROWSER_LIVE_FRAME_EVENT, (payload) => {
     const frame = payload as DesktopLiveFrame;
     if (!streamIds.has(frame.streamId)) return;
     client
       .sendBrowserLiveFrame(encodeBrowserLiveFrame(frame))
       .catch((error) => console.warn("Failed to send browser live frame", error));
   });
-  void Promise.resolve(subscription).then((unsubscribe) => {
-    if (disposed) unsubscribe?.();
-    else unsubscribeFrames = unsubscribe ?? null;
-    return undefined;
+  listen(BROWSER_LIVE_ENDED_EVENT, (payload) => {
+    const ended = payload as Extract<
+      BrowserHostLiveResponse,
+      { type: "browser.host.live.ended" }
+    >["payload"];
+    if (!streamIds.delete(ended.streamId)) return;
+    client.sendBrowserHostLiveMessage({ type: "browser.host.live.ended", payload: ended });
   });
+
+  function stopAll(): void {
+    const browser = getHost()?.browser;
+    for (const streamId of streamIds) {
+      void browser?.stopLiveView?.({
+        type: "browser.host.live.stop.request",
+        requestId: `reset:${streamId}`,
+        streamId,
+      });
+    }
+    streamIds.clear();
+  }
 
   async function start(
     message: Extract<BrowserHostLiveMessage, { type: "browser.host.live.start.request" }>,
@@ -96,7 +132,7 @@ export function createBrowserLiveViewHost(options: {
       };
     }
     if (payload.error) streamIds.delete(message.streamId);
-    client.sendBrowserHostLiveResponse({
+    client.sendBrowserHostLiveMessage({
       type: "browser.host.live.start.response",
       payload: { ...payload, requestId: message.requestId },
     });
@@ -125,7 +161,7 @@ export function createBrowserLiveViewHost(options: {
         },
       };
     }
-    client.sendBrowserHostLiveResponse({
+    client.sendBrowserHostLiveMessage({
       type: "browser.host.live.stop.response",
       payload: { ...payload, requestId: message.requestId },
     });
@@ -148,18 +184,11 @@ export function createBrowserLiveViewHost(options: {
           return false;
       }
     },
+    reset: stopAll,
     dispose() {
       disposed = true;
-      unsubscribeFrames?.();
-      const browser = getHost()?.browser;
-      for (const streamId of streamIds) {
-        void browser?.stopLiveView?.({
-          type: "browser.host.live.stop.request",
-          requestId: `dispose:${streamId}`,
-          streamId,
-        });
-      }
-      streamIds.clear();
+      for (const unsubscribe of unsubscribers.splice(0)) unsubscribe();
+      stopAll();
     },
   };
 }

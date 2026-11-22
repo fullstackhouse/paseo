@@ -2,6 +2,7 @@ import { describe, expect, test, vi } from "vitest";
 import { executeAutomationCommand, type BrowserRegistry, type TabImage } from "./service.js";
 import {
   adaptWebContents,
+  BROWSER_LIVE_ENDED_EVENT,
   BROWSER_LIVE_FRAME_EVENT,
   BrowserLiveViewStreams,
   HostSnapshotEngineRegistry,
@@ -997,7 +998,7 @@ describe("browser live view screencast", () => {
     expect(contents.frameListener).toBeNull();
   });
 
-  test("ends the stream when the tab is destroyed", async () => {
+  test("ends the stream when the tab is destroyed and reports it to the host window", async () => {
     const { contents, host, streams } = createLiveViews();
     await streams.start(host, liveStartRequest());
     expect(contents.debugger.messageListenerCount).toBeGreaterThan(0);
@@ -1006,6 +1007,71 @@ describe("browser live view screencast", () => {
 
     expect(streams.size).toBe(0);
     expect(contents.debugger.messageListenerCount).toBe(0);
+    expect(host.sent.filter((event) => event.channel === BROWSER_LIVE_ENDED_EVENT)).toEqual([
+      {
+        channel: BROWSER_LIVE_ENDED_EVENT,
+        payload: {
+          streamId: "stream-1",
+          error: expect.objectContaining({ code: "browser_tab_closed" }),
+        },
+      },
+    ]);
+  });
+
+  test("reports a debugger detach as an ended stream, but not a requested stop", async () => {
+    const { contents, host, streams } = createLiveViews();
+    await streams.start(host, liveStartRequest());
+    await streams.stop({
+      type: "browser.host.live.stop.request",
+      requestId: "stop-1",
+      streamId: "stream-1",
+    });
+    expect(host.sent.some((event) => event.channel === BROWSER_LIVE_ENDED_EVENT)).toBe(false);
+
+    await streams.start(host, liveStartRequest("stream-2"));
+    contents.debugger.emitDetach();
+    expect(host.sent.filter((event) => event.channel === BROWSER_LIVE_ENDED_EVENT)).toEqual([
+      expect.objectContaining({ payload: expect.objectContaining({ streamId: "stream-2" }) }),
+    ]);
+    expect(streams.size).toBe(0);
+  });
+
+  test("keeps throttling off until both an overlapping screenshot and live view release it", async () => {
+    const { contents, host, streams } = createLiveViews();
+    const tab = adaptWebContents(contents);
+    await streams.start(host, liveStartRequest());
+    const screenshotDone = deferred<void>();
+    const screenshot = tab.withFrameProduction(() => screenshotDone.promise);
+
+    await streams.stop({
+      type: "browser.host.live.stop.request",
+      requestId: "stop-1",
+      streamId: "stream-1",
+    });
+    expect(contents.backgroundThrottling).toBe(false);
+
+    screenshotDone.resolve();
+    await screenshot;
+    expect(contents.backgroundThrottling).toBe(true);
+  });
+
+  test("a live view starting and stopping mid-capture does not cancel the capture", async () => {
+    const { contents, host, streams } = createLiveViews();
+    const tab = adaptWebContents(contents);
+    const capture = tab.captureFrame(new AbortController().signal);
+
+    await streams.start(host, liveStartRequest());
+    await streams.stop({
+      type: "browser.host.live.stop.request",
+      requestId: "stop-1",
+      streamId: "stream-1",
+    });
+    expect(contents.frameListener).not.toBeNull();
+
+    const image = new FakeImage();
+    contents.frameListener?.(image);
+    await expect(capture).resolves.toBe(image);
+    expect(contents.frameListener).toBeNull();
   });
 
   test("stops streams started from a host window when the window closes", async () => {
@@ -1032,5 +1098,10 @@ describe("browser live view screencast", () => {
     await expect(streams.start(host, liveStartRequest())).resolves.toMatchObject({
       error: { code: "browser_denied" },
     });
+    // A second daemon asking for the same tab would share its one CDP screencast.
+    await expect(streams.start(host, liveStartRequest("stream-2"))).resolves.toMatchObject({
+      error: { code: "browser_denied" },
+    });
+    expect(streams.size).toBe(1);
   });
 });

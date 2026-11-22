@@ -1982,14 +1982,19 @@ export class DaemonClient {
     return this.sendBinaryFrame(frame);
   }
 
-  /** Browser host side: answers a browser.host.live.* request from the daemon. */
-  sendBrowserHostLiveResponse(
-    response: Extract<
+  /** Browser host side: answers a browser.host.live.* request or reports a stream that ended. */
+  sendBrowserHostLiveMessage(
+    message: Extract<
       SessionInboundMessage,
-      { type: "browser.host.live.start.response" | "browser.host.live.stop.response" }
+      {
+        type:
+          | "browser.host.live.start.response"
+          | "browser.host.live.stop.response"
+          | "browser.host.live.ended";
+      }
     >,
   ): void {
-    this.sendSessionMessageStrict(response);
+    this.sendSessionMessageStrict(message);
   }
   subscribeHostFrames(handler: (frame: HostRouteFrame) => void): () => void {
     this.hostFrameListeners.add(handler);

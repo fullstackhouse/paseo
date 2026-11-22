@@ -86,7 +86,8 @@ export function mountBrowserAutomationDaemonClientHandler(
     client: {
       on: (_type, handler) =>
         observation.subscribe({
-          snapshot: () => {},
+          // Each snapshot is a new host registration; the daemon forgot earlier streams.
+          snapshot: () => liveView?.reset(),
           update: (message) => {
             if (message.type === "browser.automation.execute.request") handler(message);
             else liveView?.handle(message);
@@ -97,8 +98,15 @@ export function mountBrowserAutomationDaemonClientHandler(
     },
     ...(options?.serverId ? { serverId: options.serverId } : {}),
   });
+  // A lost connection drops the registration and its streams on the daemon side.
+  const unsubscribeConnection = liveView
+    ? client.subscribeConnectionStatus((state) => {
+        if (state.status !== "connected") liveView.reset();
+      })
+    : () => {};
   return () => {
     unmount();
+    unsubscribeConnection();
     liveView?.dispose();
     void observation
       .release()
