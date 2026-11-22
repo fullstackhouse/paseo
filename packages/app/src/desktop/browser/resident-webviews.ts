@@ -29,6 +29,7 @@ interface BrowserWebviewIdentity {
 export interface BrowserWebviewProfileHost {
   profilePartition: string;
   registerAttachedBrowser(input: DesktopAttachedBrowserRegistration): Promise<void>;
+  waitForPendingIpc(): Promise<void>;
 }
 
 function isAttachedBrowserBridge(
@@ -38,7 +39,8 @@ function isAttachedBrowserBridge(
     browser !== undefined &&
     typeof browser.profilePartition === "string" &&
     browser.profilePartition.startsWith("persist:") &&
-    typeof browser.registerAttachedBrowser === "function"
+    typeof browser.registerAttachedBrowser === "function" &&
+    typeof browser.waitForPendingIpc === "function"
   );
 }
 
@@ -61,16 +63,28 @@ function registerBrowserWhenAttached(
   // Reparenting a webview can replace its guest WebContents without replacing
   // this DOM element, so every attachment needs a fresh main-process registration.
   webview.addEventListener("did-attach", () => {
-    const webContentsId = webview.getWebContentsId();
-    void browser
-      .registerAttachedBrowser({
-        browserId: identity.browserId,
-        workspaceId: identity.workspaceId,
-        webContentsId,
-      })
-      .catch((error) => {
-        console.error("[browser-webview] attached registration failed", error);
-      });
+    void registerAttachedGuest(webview, identity, browser).catch((error) => {
+      console.error("[browser-webview] attached registration failed", error);
+    });
+  });
+}
+
+async function registerAttachedGuest(
+  webview: BrowserWebviewElement,
+  identity: BrowserWebviewIdentity,
+  browser: BrowserWebviewProfileHost,
+): Promise<void> {
+  // Electron sends did-attach before its reply carrying the guest id, on a different pipe, so
+  // getWebContentsId() can throw here. A round trip on the reply's pipe lands after that reply.
+  // Don't wait for dom-ready instead: slow pages, downloads and 204s would time out new_tab.
+  await browser.waitForPendingIpc();
+  if (!webview.isConnected) {
+    return;
+  }
+  await browser.registerAttachedBrowser({
+    browserId: identity.browserId,
+    workspaceId: identity.workspaceId,
+    webContentsId: webview.getWebContentsId(),
   });
 }
 
