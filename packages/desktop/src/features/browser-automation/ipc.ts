@@ -38,6 +38,9 @@ const consoleMessagesByContentsId = new Map<number, BrowserAutomationConsoleLogE
 const cdpQueuesByContentsId = new Map<number, CdpSessionQueue>();
 const dialogMonitorsByContentsId = new Map<number, DialogMonitor>();
 const observedContentsIds = new Set<number>();
+const paintHoldsByContentsId = new Map<number, number>();
+// A frame subscription keeps a hidden guest compositing; its frames are discarded.
+function discardFrame(): void {}
 
 interface IpcHandlerRegistry {
   handle(channel: string, listener: (event: unknown, ...args: unknown[]) => unknown): void;
@@ -136,7 +139,7 @@ interface BrowserAutomationWebContents extends ConsoleMessageEmitter {
 
 export function adaptWebContents(
   contents: BrowserAutomationWebContents,
-): TabContents & Required<Pick<TabContents, "sendDebugCommand">> {
+): TabContents & Required<Pick<TabContents, "sendDebugCommand">> & { holdPainting(): () => void } {
   const contentsId = contents.id;
   observeConsoleMessages(contents, contentsId);
   const cdpQueue = getCdpQueue(contentsId);
@@ -167,6 +170,7 @@ export function adaptWebContents(
     },
     sendInputEvent: (event) => contents.sendInputEvent(event),
     insertText: (text) => contents.insertText(text),
+    holdPainting: () => holdPainting(contents),
     getConsoleMessages: () => consoleMessagesByContentsId.get(contentsId) ?? [],
     captureDialogs: (task) => dialogMonitor.capture(task),
     sendDebugCommand: (command: string, params?: Record<string, unknown>) =>
@@ -188,7 +192,11 @@ function captureViewportFrame(
     const stop = () => {
       signal.removeEventListener("abort", abort);
       contents.removeListener("destroyed", destroyed);
-      if (!contents.isDestroyed()) contents.endFrameSubscription();
+      if (contents.isDestroyed()) return;
+      // A live view holds its own subscription; give it back instead of ending it.
+      if (paintHoldsByContentsId.has(contents.id))
+        contents.beginFrameSubscription(false, discardFrame);
+      else contents.endFrameSubscription();
     };
     const abort = () => {
       stop();
@@ -212,6 +220,25 @@ function captureViewportFrame(
       reject(error);
     }
   });
+}
+
+function holdPainting(contents: BrowserAutomationWebContents): () => void {
+  const contentsId = contents.id;
+  const holds = paintHoldsByContentsId.get(contentsId) ?? 0;
+  paintHoldsByContentsId.set(contentsId, holds + 1);
+  if (holds === 0) contents.beginFrameSubscription(false, discardFrame);
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    const remaining = (paintHoldsByContentsId.get(contentsId) ?? 1) - 1;
+    if (remaining > 0) {
+      paintHoldsByContentsId.set(contentsId, remaining);
+      return;
+    }
+    paintHoldsByContentsId.delete(contentsId);
+    if (!contents.isDestroyed()) contents.endFrameSubscription();
+  };
 }
 
 function getCdpQueue(contentsId: number): CdpSessionQueue {
@@ -240,6 +267,7 @@ function observeConsoleMessages(contents: BrowserAutomationWebContents, contents
     consoleMessagesByContentsId.delete(contentsId);
     cdpQueuesByContentsId.delete(contentsId);
     dialogMonitorsByContentsId.delete(contentsId);
+    paintHoldsByContentsId.delete(contentsId);
   });
 }
 

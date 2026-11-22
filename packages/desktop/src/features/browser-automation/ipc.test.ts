@@ -865,8 +865,11 @@ function liveStartRequest(streamId = "stream-1") {
   };
 }
 
-function createLiveViews(contentsId = 40) {
-  const contents = new FakeWebContents(contentsId);
+let nextLiveContentsId = 400;
+
+function createLiveViews() {
+  // ipc.ts keeps per-contents state by id; a fresh id keeps tests independent.
+  const contents = new FakeWebContents(nextLiveContentsId++);
   const host = new FakeLiveHostWindow(1);
   const streams = new BrowserLiveViewStreams((browserId, hostId) =>
     browserId === LIVE_BROWSER_ID && hostId === host.id ? contents : null,
@@ -907,7 +910,7 @@ describe("browser live view screencast", () => {
 
     expect(contents.debugger.commands).toContainEqual({
       command: "Page.startScreencast",
-      params: { format: "jpeg", quality: 50, maxWidth: 720, everyNthFrame: 12 },
+      params: { format: "jpeg", quality: 50, maxWidth: 720, maxHeight: 1440, everyNthFrame: 1 },
     });
     expect(contents.invalidations).toEqual(["invalidate"]);
     expect(contents.backgroundThrottling).toBe(false);
@@ -927,7 +930,7 @@ describe("browser live view screencast", () => {
 
   test("forwards frames to the host window and acks CDP only after the viewer's ack", async () => {
     const { contents, host, streams } = createLiveViews();
-    await streams.start(host, liveStartRequest());
+    await streams.start(host, { ...liveStartRequest(), maxFps: 1000 });
 
     screencastFrame(contents, 7);
     expect(host.sent).toEqual([
@@ -950,11 +953,48 @@ describe("browser live view screencast", () => {
 
     streams.ack({ type: "browser.host.live.frame_ack", streamId: "stream-1", frameSeq: 0 });
     streams.ack({ type: "browser.host.live.frame_ack", streamId: "stream-1", frameSeq: 0 });
+    await new Promise((resolve) => setTimeout(resolve, 5));
     await flushMicrotasks();
     expect(screencastAcks(contents)).toEqual([7]);
 
     screencastFrame(contents, 8);
     expect(host.sent.at(-1)?.payload).toMatchObject({ frameSeq: 1 });
+  });
+
+  test("delays the CDP ack so frames arrive no faster than maxFps", async () => {
+    vi.useFakeTimers();
+    try {
+      const { contents, host, streams } = createLiveViews();
+      await streams.start(host, liveStartRequest());
+
+      screencastFrame(contents, 3);
+      streams.ack({ type: "browser.host.live.frame_ack", streamId: "stream-1", frameSeq: 0 });
+      await vi.advanceTimersByTimeAsync(150);
+      expect(screencastAcks(contents)).toEqual([]);
+      await vi.advanceTimersByTimeAsync(60);
+      expect(screencastAcks(contents)).toEqual([3]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  test("holds a frame subscription so a hidden tab keeps painting, and restores it after a screenshot", async () => {
+    const { contents, host, streams } = createLiveViews();
+    await streams.start(host, liveStartRequest());
+    expect(contents.frameListener).not.toBeNull();
+
+    const tab = adaptWebContents(contents);
+    const capture = tab.captureFrame(new AbortController().signal);
+    contents.frameListener?.(new FakeImage());
+    await capture;
+    expect(contents.frameListener).not.toBeNull();
+
+    await streams.stop({
+      type: "browser.host.live.stop.request",
+      requestId: "stop-1",
+      streamId: "stream-1",
+    });
+    expect(contents.frameListener).toBeNull();
   });
 
   test("ends the stream when the tab is destroyed", async () => {

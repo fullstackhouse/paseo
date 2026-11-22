@@ -5,8 +5,6 @@ import type { TabContents } from "./service.js";
 const DEFAULT_MAX_FPS = 5;
 const DEFAULT_JPEG_QUALITY = 60;
 const DEFAULT_MAX_WIDTH = 1280;
-// Chromium composites at up to 60 Hz; everyNthFrame approximates a frame-rate cap.
-const COMPOSITOR_FPS = 60;
 
 export interface BrowserLiveViewFrame {
   streamId: string;
@@ -30,6 +28,11 @@ export interface BrowserLiveViewEvents {
 
 type LiveViewTab = Pick<TabContents, "invalidate" | "isDestroyed" | "withFrameProduction"> & {
   sendDebugCommand(command: string, params?: Record<string, unknown>): Promise<unknown>;
+  /**
+   * Keeps a hidden guest compositing until the returned release runs. A hidden or occluded
+   * <webview> produces no screencast frames on its own, even with background throttling off.
+   */
+  holdPainting(): () => void;
 };
 
 /**
@@ -39,7 +42,9 @@ type LiveViewTab = Pick<TabContents, "invalidate" | "isDestroyed" | "withFramePr
  */
 export class BrowserLiveViewStream {
   private nextFrameSeq = 0;
-  private unackedFrame: { frameSeq: number; sessionId: number } | null = null;
+  private unackedFrame: { frameSeq: number; sessionId: number; receivedAt: number } | null = null;
+  private minFrameIntervalMs = 1000 / DEFAULT_MAX_FPS;
+  private ackTimer: ReturnType<typeof setTimeout> | null = null;
   private stopped = false;
   private readonly unsubscribers: Array<() => void> = [];
   private releaseFrameProduction: () => void = () => {};
@@ -61,23 +66,28 @@ export class BrowserLiveViewStream {
       events.onMessage((method, params) => this.handleMessage(method, params)),
       events.onGone(() => this.end()),
     );
-    // Hidden tabs throttle painting; keep frames coming for as long as the stream lives.
+    // Hidden tabs throttle and skip painting; keep frames coming for as long as the stream lives.
     const produced = new Promise<void>((resolve) => {
       this.releaseFrameProduction = resolve;
     });
     void tab.withFrameProduction(() => produced).catch(() => {});
+    this.unsubscribers.push(tab.holdPainting());
 
     try {
       await tab.sendDebugCommand("Page.enable");
       const metrics = (await tab.sendDebugCommand("Page.getLayoutMetrics")) as {
         cssLayoutViewport?: { clientWidth?: number; clientHeight?: number };
       };
-      const maxFps = options.maxFps ?? DEFAULT_MAX_FPS;
+      // everyNthFrame counts painted frames, not time, so the frame rate is capped by
+      // delaying the ack instead.
+      this.minFrameIntervalMs = 1000 / (options.maxFps ?? DEFAULT_MAX_FPS);
+      const maxWidth = options.maxWidth ?? DEFAULT_MAX_WIDTH;
       await tab.sendDebugCommand("Page.startScreencast", {
         format: "jpeg",
         quality: options.jpegQuality ?? DEFAULT_JPEG_QUALITY,
-        maxWidth: options.maxWidth ?? DEFAULT_MAX_WIDTH,
-        everyNthFrame: Math.max(1, Math.round(COMPOSITOR_FPS / maxFps)),
+        maxWidth,
+        maxHeight: maxWidth * 2,
+        everyNthFrame: 1,
       });
       // A static page produces no frame on its own; request one paint.
       tab.invalidate();
@@ -98,9 +108,16 @@ export class BrowserLiveViewStream {
       return;
     }
     this.unackedFrame = null;
-    void this.params.tab
-      .sendDebugCommand("Page.screencastFrameAck", { sessionId: frame.sessionId })
-      .catch(() => {});
+    const send = () => {
+      this.ackTimer = null;
+      if (this.stopped) return;
+      void this.params.tab
+        .sendDebugCommand("Page.screencastFrameAck", { sessionId: frame.sessionId })
+        .catch(() => {});
+    };
+    const wait = frame.receivedAt + this.minFrameIntervalMs - Date.now();
+    if (wait <= 0) send();
+    else this.ackTimer = setTimeout(send, wait);
   }
 
   public async stop(): Promise<void> {
@@ -124,7 +141,7 @@ export class BrowserLiveViewStream {
       return;
     }
     const frameSeq = this.nextFrameSeq++;
-    this.unackedFrame = { frameSeq, sessionId };
+    this.unackedFrame = { frameSeq, sessionId, receivedAt: Date.now() };
     this.params.onFrame({
       streamId: this.params.streamId,
       frameSeq,
@@ -139,6 +156,8 @@ export class BrowserLiveViewStream {
     }
     this.stopped = true;
     this.unackedFrame = null;
+    if (this.ackTimer) clearTimeout(this.ackTimer);
+    this.ackTimer = null;
     for (const unsubscribe of this.unsubscribers.splice(0)) unsubscribe();
     this.releaseFrameProduction();
     this.params.onEnded();
