@@ -3,6 +3,9 @@ import {
   ChunkedTransportProtocolError,
 } from "@getpaseo/protocol/chunked-transport";
 import {
+  BROWSER_LIVE_FRAME_OPCODE,
+  decodeBrowserLiveFrame,
+  type BrowserLiveFrame,
   HOST_ROUTE_OPCODE,
   encodeHostRouteFrame,
   decodeHostRouteFrame,
@@ -1936,6 +1939,58 @@ export class DaemonClient {
     }
   }
   private readonly hostFrameListeners = new Set<(frame: HostRouteFrame) => void>();
+  private readonly browserLiveFrameListeners = new Set<(frame: BrowserLiveFrame) => void>();
+
+  /** Requires server_info.features.browserLiveView. Frames arrive through subscribeBrowserLiveFrames. */
+  startBrowserLiveView(
+    input: Omit<
+      Extract<SessionInboundMessage, { type: "browser.live.start.request" }>,
+      "type" | "requestId"
+    >,
+    requestId?: string,
+  ): Promise<CorrelatedResponsePayload<"browser.live.start.response">> {
+    return this.sendCorrelatedSessionRequest({
+      requestId,
+      message: { type: "browser.live.start.request", ...input },
+      responseType: "browser.live.start.response",
+    });
+  }
+
+  stopBrowserLiveView(
+    streamId: string,
+    requestId?: string,
+  ): Promise<CorrelatedResponsePayload<"browser.live.stop.response">> {
+    return this.sendCorrelatedSessionRequest({
+      requestId,
+      message: { type: "browser.live.stop.request", streamId },
+      responseType: "browser.live.stop.response",
+    });
+  }
+
+  /** Acks a rendered frame; the host sends the next frame only after this. */
+  ackBrowserLiveFrame(streamId: string, frameSeq: number): void {
+    this.sendSessionMessageStrict({ type: "browser.live.frame_ack", streamId, frameSeq });
+  }
+
+  subscribeBrowserLiveFrames(handler: (frame: BrowserLiveFrame) => void): () => void {
+    this.browserLiveFrameListeners.add(handler);
+    return () => this.browserLiveFrameListeners.delete(handler);
+  }
+
+  /** Browser host side: sends an encoded browser_live frame to the daemon. */
+  sendBrowserLiveFrame(frame: Uint8Array): Promise<void> {
+    return this.sendBinaryFrame(frame);
+  }
+
+  /** Browser host side: answers a browser.host.live.* request from the daemon. */
+  sendBrowserHostLiveResponse(
+    response: Extract<
+      SessionInboundMessage,
+      { type: "browser.host.live.start.response" | "browser.host.live.stop.response" }
+    >,
+  ): void {
+    this.sendSessionMessageStrict(response);
+  }
   subscribeHostFrames(handler: (frame: HostRouteFrame) => void): () => void {
     this.hostFrameListeners.add(handler);
     return () => this.hostFrameListeners.delete(handler);
@@ -7327,6 +7382,14 @@ export class DaemonClient {
     }
     if (hostFrame) {
       for (const handler of this.hostFrameListeners) handler(hostFrame);
+      return true;
+    }
+    if (rawBytes[0] === BROWSER_LIVE_FRAME_OPCODE) {
+      const liveFrame = decodeBrowserLiveFrame(rawBytes);
+      if (!liveFrame) return true;
+      this.consecutiveLivenessFailures = 0;
+      for (const handler of this.browserLiveFrameListeners) handler(liveFrame);
+      this.runtimeMetrics?.recordBinaryFrame("other", rawBytes.byteLength, 0);
       return true;
     }
     const fileFrame = decodeFileTransferFrame(rawBytes);
