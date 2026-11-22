@@ -148,6 +148,8 @@ export interface DesktopBrowserBridge {
   setShortcutPolicy?: (input: BrowserKeyboardPolicy) => Promise<void>;
   readonly profilePartition?: string;
   registerAttachedBrowser?: (input: DesktopAttachedBrowserRegistration) => Promise<void>;
+  /** Resolves after every reply main sent before it received this call. */
+  waitForPendingIpc?: () => Promise<void>;
   unregisterWorkspaceBrowser?: (browserId: string) => Promise<void>;
   setWorkspaceActiveBrowser?: (input: {
     workspaceId: string;

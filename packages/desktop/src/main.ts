@@ -398,6 +398,9 @@ ipcMain.handle("paseo:agent-navigation:ready", (event) => {
   return agentNavigationInbox.windowReady(event.sender.id);
 });
 
+// Empty on purpose: invoke replies are ordered, so the round trip is the barrier.
+ipcMain.handle("paseo:browser:wait-for-pending-ipc", () => {});
+
 ipcMain.handle("paseo:browser:register-attached", (event, rawInput: unknown) => {
   const input = readAttachedBrowserInput(rawInput);
   if (!input) {

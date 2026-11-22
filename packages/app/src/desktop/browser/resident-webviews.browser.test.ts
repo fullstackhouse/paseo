@@ -26,6 +26,7 @@ const attachedBrowsers: Array<{
 }> = [];
 const profileHost: BrowserWebviewProfileHost = {
   profilePartition: "persist:paseo-browser",
+  waitForPendingIpc: async () => {},
   registerAttachedBrowser: async (input) => {
     attachedBrowsers.push(input);
   },
@@ -222,7 +223,7 @@ describe("resident browser webviews", () => {
     expectResidentWebviewParking(webview as HTMLElement);
   });
 
-  it("shares one profile and registers attached guests with explicit identity", () => {
+  it("shares one profile and registers attached guests with explicit identity", async () => {
     const firstWebview = ensureTestBrowser({
       browserId: "browser-first",
       workspaceId: "workspace-a",
@@ -244,10 +245,65 @@ describe("resident browser webviews", () => {
 
     expect(firstWebview.getAttribute("partition")).toBe("persist:paseo-browser");
     expect(secondWebview.getAttribute("partition")).toBe("persist:paseo-browser");
-    expect(attachedBrowsers).toEqual([
-      { browserId: "browser-first", workspaceId: "workspace-a", webContentsId: 101 },
-      { browserId: "browser-second", workspaceId: "workspace-b", webContentsId: 202 },
-    ]);
+    await expect
+      .poll(() => attachedBrowsers)
+      .toEqual([
+        { browserId: "browser-first", workspaceId: "workspace-a", webContentsId: 101 },
+        { browserId: "browser-second", workspaceId: "workspace-b", webContentsId: 202 },
+      ]);
+  });
+
+  it("registers a guest whose id arrives after did-attach", async () => {
+    let guestId: number | null = null;
+    const ipc = Promise.withResolvers<void>();
+    const webview = ensureResidentBrowserWebview({
+      browserId: "browser-late-id",
+      workspaceId: "workspace-unopened",
+      url: "https://example.com",
+      profileHost: { ...profileHost, waitForPendingIpc: () => ipc.promise },
+    });
+    if (!webview) {
+      throw new Error("Expected resident webview");
+    }
+    Object.assign(webview, {
+      getWebContentsId: () => {
+        if (guestId === null) {
+          throw new Error("The WebView must be attached to the DOM");
+        }
+        return guestId;
+      },
+    });
+
+    webview.dispatchEvent(new Event("did-attach"));
+    guestId = 303;
+    ipc.resolve();
+
+    await expect
+      .poll(() => attachedBrowsers)
+      .toEqual([
+        { browserId: "browser-late-id", workspaceId: "workspace-unopened", webContentsId: 303 },
+      ]);
+  });
+
+  it("skips registration when the tab closes before the guest id arrives", async () => {
+    const ipc = Promise.withResolvers<void>();
+    const webview = ensureResidentBrowserWebview({
+      browserId: "browser-closed-attaching",
+      workspaceId: "workspace-unopened",
+      url: "https://example.com",
+      profileHost: { ...profileHost, waitForPendingIpc: () => ipc.promise },
+    });
+    if (!webview) {
+      throw new Error("Expected resident webview");
+    }
+    Object.assign(webview, { getWebContentsId: () => 404 });
+
+    webview.dispatchEvent(new Event("did-attach"));
+    removeResidentBrowserWebview("browser-closed-attaching");
+    ipc.resolve();
+    await ipc.promise;
+
+    expect(attachedBrowsers).toEqual([]);
   });
 
   it("normalizes an existing resident host back to permanent parking", () => {
