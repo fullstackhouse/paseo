@@ -5,6 +5,7 @@ import { StyleSheet } from "react-native-unistyles";
 import { IndentRail } from "@/components/indent-rail";
 import { ExpandableBadge } from "@/components/message";
 import { useIsCompactFormFactor } from "@/constants/layout";
+import { useViewLive } from "@/tool-calls/browser-live-view/context";
 import { useOverviewSummaryLabel } from "./label";
 import type { OverviewToolCallGroup } from "./model";
 import { OverviewToolCallGroupSheet } from "./sheet";
@@ -29,6 +30,7 @@ export const OverviewToolCallGroupView = memo(function OverviewToolCallGroupView
   const scrollRef = useRef<ScrollView>(null);
   const isCompact = useIsCompactFormFactor();
   const aggregateSummary = useOverviewSummaryLabel(group.summary);
+  const viewLive = useViewLive(group.liveBrowserId);
   const scrollToLatest = useCallback(() => {
     scrollRef.current?.scrollToEnd({ animated: false });
   }, []);
@@ -65,6 +67,7 @@ export const OverviewToolCallGroupView = memo(function OverviewToolCallGroupView
           isExpanded={false}
           isLastInSequence={isLastInSequence}
           onToggle={toggle}
+          onViewLive={viewLive}
         />
         <OverviewToolCallGroupSheet visible={expanded} summary={aggregateSummary} onClose={close}>
           {children}
@@ -82,6 +85,7 @@ export const OverviewToolCallGroupView = memo(function OverviewToolCallGroupView
       isExpanded={expanded}
       isLastInSequence={isLastInSequence}
       onToggle={toggle}
+      onViewLive={viewLive}
       renderDetails={renderDetails}
       borderlessWhenExpanded
     />

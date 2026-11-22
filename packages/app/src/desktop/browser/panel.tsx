@@ -1,9 +1,11 @@
 import { useMemo } from "react";
 import { Image } from "react-native";
 import { Globe } from "lucide-react-native";
+import { useTranslation } from "react-i18next";
 import invariant from "tiny-invariant";
 import { BrowserPane } from "@/desktop/browser/pane";
 import { usePaneContext, usePaneFocus } from "@/panels/pane-context";
+import { isNative } from "@/constants/platform";
 import { definePanel, type PanelDescriptor, type PanelIconProps } from "@/panels/panel-registry";
 import { useBrowserStore } from "@/desktop/browser/store";
 import { useWorkspaceDirectory } from "@/stores/session-store-hooks";
@@ -39,11 +41,25 @@ function useBrowserPanelDescriptor(target: {
   kind: "browser";
   browserId: string;
 }): PanelDescriptor {
+  const { t } = useTranslation();
   const browser = useBrowserStore((state) => state.browsersById[target.browserId] ?? null);
+  // A tab opened through View live lives on the desktop, so this device has no record of it.
+  const isRemoteTab = isNative && !browser;
   const url = browser?.url ?? "https://example.com";
   const icon = createBrowserTabIcon(browser?.faviconUrl ?? null);
   const label = getBrowserLabel({ title: browser?.title ?? "", url });
 
+  if (isRemoteTab) {
+    const remoteLabel = t("workspace.tabs.fallback.browser");
+    return {
+      label: remoteLabel,
+      tooltip: remoteLabel,
+      subtitle: target.browserId,
+      titleState: "ready",
+      icon,
+      statusBucket: null,
+    };
+  }
   return {
     label,
     subtitle: url,

@@ -355,6 +355,7 @@ export const fr: TranslationResources = {
       forkMissingWorkspace: "Cet agent n’est dans aucun espace de travail.",
       forkFailed: "Impossible de forker la conversation",
       openFile: "Ouvrir le fichier",
+      viewLive: "Voir en direct",
       copied: "Copié",
     },
     attachments: {

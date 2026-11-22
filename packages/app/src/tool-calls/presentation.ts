@@ -1,5 +1,6 @@
 import type { AgentMessage } from "@getpaseo/protocol/agent-message";
 import { buildAgentMessageDisplay } from "@getpaseo/protocol/paseo-tool-presentation/index";
+import { findLiveBrowserId } from "@/tool-calls/browser-live-view/tab";
 import type { PlanOutcome } from "@/components/plan-card";
 import type { ComponentType } from "react";
 import type { ToolCallDetail } from "@getpaseo/protocol/agent-types";
@@ -36,6 +37,7 @@ export interface ToolCallPresentation {
   hasDetails: boolean;
   canOpenDetails: boolean;
   openFilePath: string | null;
+  liveBrowserId: string | null;
   isPlan: boolean;
   planOutcome?: PlanOutcome;
 }
@@ -88,6 +90,7 @@ export function buildToolCallPresentation(
     hasDetails,
     canOpenDetails: hasDetails || isLoadingDetails,
     openFilePath: extractToolCallFilePath(detail),
+    liveBrowserId: findLiveBrowserId([{ name: input.toolName, status: input.status, detail }]),
     isPlan: input.detail?.type === "plan",
     planOutcome: input.detail?.type === "plan" ? resolvePlanOutcome(input) : undefined,
   };

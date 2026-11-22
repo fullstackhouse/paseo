@@ -57,7 +57,8 @@ export function getPaseoToolTargetAgentId(
   return readString(readToolInput(detail).agentId) ?? null;
 }
 
-function paseoLeafName(toolName: string): string | null {
+/** The bare Paseo tool name behind any provider's spelling of it. */
+export function paseoLeafName(toolName: string): string | null {
   if (isPaseoToolName(toolName)) return getPaseoToolLeafName(toolName);
   const normalized = toolName.trim().toLowerCase();
   return normalized.startsWith("paseo_") && !normalized.startsWith("paseo__")

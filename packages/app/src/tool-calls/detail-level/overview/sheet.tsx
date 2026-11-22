@@ -9,6 +9,7 @@ import {
   useIsolatedBottomSheetVisibility,
 } from "@/components/ui/isolated-bottom-sheet-modal";
 import { ToolCallSheetModal, useToolCallSheetContextBridge } from "@/components/tool-call-sheet";
+import { useBrowserLiveViewLinksBridge } from "@/tool-calls/browser-live-view/context";
 import { useToolCallExpansionContextBridge } from "@/tool-calls/expansion-context";
 import type { Theme } from "@/styles/theme";
 
@@ -35,9 +36,10 @@ export function OverviewToolCallGroupSheet({
   const scrollRef = useRef<BottomSheetScrollViewMethods>(null);
   const sheetContextBridge = useToolCallSheetContextBridge();
   const expansionContextBridge = useToolCallExpansionContextBridge();
+  const liveViewLinksBridge = useBrowserLiveViewLinksBridge(onClose);
   const contextBridge = useCallback<ContextBridge>(
-    (content) => sheetContextBridge(expansionContextBridge(content)),
-    [expansionContextBridge, sheetContextBridge],
+    (content) => sheetContextBridge(expansionContextBridge(liveViewLinksBridge(content))),
+    [expansionContextBridge, liveViewLinksBridge, sheetContextBridge],
   );
   const { sheetRef, handleSheetChange, handleSheetDismiss } = useIsolatedBottomSheetVisibility({
     visible,

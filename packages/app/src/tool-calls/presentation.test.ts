@@ -154,3 +154,71 @@ it("shows the target agent title as context for Paseo agent tools", () => {
   expect(presentation.displayName).toBe("Kill agent");
   expect(presentation.summary).toBe("Reviewer");
 });
+
+describe("live view link of browser tool calls", () => {
+  const browserId = "7c8fbc4a-4543-434c-834b-501864c533e5";
+  const url = "http://127.0.0.1:18771/";
+  const created = { ok: true, result: { command: "new_tab", browserId, url } };
+  const createdText = `Created browser tab browserId=${browserId} url=${url}. Use this browserId for tab-scoped browser tools.`;
+
+  function liveBrowserId(
+    toolName: string,
+    detail: { input: unknown; output: unknown },
+    status: "running" | "completed" | "failed" | "canceled" = "completed",
+  ) {
+    return buildToolCallPresentation({
+      toolName,
+      status,
+      error: status === "failed" ? "boom" : null,
+      detail: { type: "unknown", ...detail },
+      resolveIcon: fakeResolveIcon,
+    }).liveBrowserId;
+  }
+
+  it.each([
+    ["Claude", "mcp__paseo__browser_new_tab", { output: created }],
+    ["Claude text", "mcp__paseo__browser_new_tab", { output: createdText }],
+    [
+      "Codex",
+      "paseo.browser_new_tab",
+      { content: [{ type: "text", text: createdText }], structuredContent: created },
+    ],
+    [
+      "MCP text only",
+      "paseo.browser_new_tab",
+      { content: [{ type: "text", text: createdText }], structuredContent: null },
+    ],
+    ["OpenCode", "paseo_browser_new_tab", createdText],
+  ])("links the tab that browser_new_tab created (%s)", (_provider, toolName, output) => {
+    expect(liveBrowserId(toolName, { input: { url }, output })).toBe(browserId);
+  });
+
+  it("links a tab-scoped call by its input while it still runs", () => {
+    const detail = { input: { browserId, ref: "@e3" }, output: null };
+    expect(liveBrowserId("mcp__paseo__browser_click", detail, "running")).toBe(browserId);
+  });
+
+  it("does not link an error result that the provider reports as completed", () => {
+    const output = {
+      output: {
+        ok: false,
+        error: { code: "browser_timeout", message: `browser tab ${browserId} did not register` },
+      },
+    };
+    expect(liveBrowserId("mcp__paseo__browser_new_tab", { input: { url }, output })).toBeNull();
+  });
+
+  it.each(["failed", "canceled"] as const)("does not link a %s call", (status) => {
+    const detail = { input: { browserId }, output: null };
+    expect(liveBrowserId("mcp__paseo__browser_reload", detail, status)).toBeNull();
+  });
+
+  it.each([
+    ["a closed tab", "mcp__paseo__browser_close_tab", { browserId }],
+    ["another MCP server", "mcp__playwright__browser_click", { browserId }],
+    ["a malformed id", "mcp__paseo__browser_click", { browserId: "../settings" }],
+    ["a new tab without a result yet", "mcp__paseo__browser_new_tab", { url }],
+  ])("does not link %s", (_case, toolName, input) => {
+    expect(liveBrowserId(toolName, { input, output: null })).toBeNull();
+  });
+});
