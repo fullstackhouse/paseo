@@ -1,7 +1,7 @@
 import { createServer } from "node:http";
 import { setTimeout as delay } from "node:timers/promises";
 import { DaemonClient } from "@getpaseo/client/internal/daemon-client";
-import WebSocket from "ws";
+import { WebSocket } from "ws";
 
 // Real Electron only: webContents.insertText kills the renderer when a cross-origin iframe has
 // focus, and a cleared field comes back with execCommand("undo"). No fake reproduces either.

@@ -1455,6 +1455,10 @@ describe("BrowserToolsBroker live view", () => {
 });
 
 describe("BrowserToolsBroker human control", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   const GRACE_MS = 5 * 60_000;
   const FOCUS = {
     targetId: "target-1",
