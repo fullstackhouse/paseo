@@ -92,6 +92,33 @@ paseo plugin ls --home .dev/paseo-home     # talk to this worktree's daemon
 - The source desktop profile defaults to your platform's `Paseo` application-data folder. Override it with `PASEO_DEV_SOURCE_DESKTOP_PROFILE`. Host connections, credentials, drafts, browser sessions and workspace navigation are excluded because they belong to the main daemon. The main app's live profile is never opened for writing.
 - Verify a fresh window reload has no React prop warnings; dismissing a toast does not verify a fix.
 - Stop both scripts when you are done. The desktop window holds the worktree's single-instance lock until then.
+- A test daemon binds loopback only. Before you create an agent on it, check that `lsof -nP -iTCP:<port> -sTCP:LISTEN` shows `127.0.0.1` and not `*` or `0.0.0.0`, and that `daemon.cors` in its `config.json` has no `*`. If either check fails, stop the daemon.
+
+#### Test agents
+
+Test agents use the `mock` provider. A separate `PASEO_HOME` does not isolate Claude or Codex: they still read `~/.claude` and `~/.codex`, so a test agent gets your MCP servers (chat, ad accounts, browsers) and can act on them.
+
+`mock` exists only when the daemon runs with `PASEO_NODE_ENV=development`, which the dev scripts set. Start one with `paseo run --provider mock/ten-second-stream --home .dev/paseo-home "<prompt>"`. It streams synthetic text, reasoning and `read`/`grep`/`edit`/`bash` tool calls, and answers the `/mock` command. Prompts containing `emit synthetic plan approval`, `emit synthetic questions` or `emit synthetic turn failure` produce those states; the models and triggers are in `packages/server/src/server/agent/providers/mock-load-test-agent.ts`. It never calls MCP tools, so it cannot exercise a Paseo tool such as `browser_*`.
+
+Use a real provider only when the provider is what you are testing, with the cheapest model, and keep your MCP servers out of the test home's `config.json`:
+
+```json
+{
+  "daemon": { "mcp": { "injectIntoAgents": true } },
+  "agents": {
+    "providers": {
+      "claude": { "options": { "extraArgs": { "strict-mcp-config": null } } },
+      "codex": { "env": { "CODEX_HOME": "/abs/path/codex-test-home" } }
+    }
+  }
+}
+```
+
+- **Claude**: `--strict-mcp-config` makes Claude load only the servers Paseo passes in `--mcp-config`. Your `~/.claude.json` servers, claude.ai connectors and plugin servers are all dropped. User hooks and skills still load.
+- **Codex**: `codex app-server` has no flag that skips the user config, and `-c mcp_servers=...` merges with it. Give Codex its own home instead, at an absolute path. Log in there once with `CODEX_HOME=/abs/path/codex-test-home codex login`, and put `[features]` `apps = false` and `plugins = false` in its `config.toml`, or Codex loads your ChatGPT apps as a `codex_apps` server.
+- Set `enabled: false` on every other provider you don't test. `injectIntoAgents` gives the agent Paseo's own tools; see the [MCP reference](../public-docs/mcp.md).
+
+Check what the agent loaded before trusting a result. The `claude` process the test daemon spawns should show `--strict-mcp-config` and only `paseo` in `--mcp-config`, with no MCP server child processes. For Codex, ask the agent to run `ALL_TOOLS.filter(t => t.name.startsWith("mcp__"))` in its `exec` tool: only `mcp__paseo__*` should come back.
 
 To try a plugin change, see [Test a plugin change](plugins.md#test-a-plugin-change).
 
