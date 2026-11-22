@@ -3,6 +3,7 @@ import type { SessionInboundMessage, SessionOutboundMessage } from "@getpaseo/pr
 import { createJSONStorage, type StateStorage } from "zustand/middleware";
 import { mountBrowserAutomationHandler } from "./handler";
 import {
+  BROWSER_LIVE_CONTROL_ENDED_EVENT,
   BROWSER_LIVE_ENDED_EVENT,
   BROWSER_LIVE_FRAME_EVENT,
   createBrowserLiveViewHost,
@@ -631,6 +632,9 @@ describe("browser live view host", () => {
     const stopped: string[] = [];
     const sentMessages: unknown[] = [];
     const sentFrames: Uint8Array[] = [];
+    const released: Array<[string, boolean]> = [];
+    const inputs: unknown[] = [];
+    const releaseError = { current: null as { code: string; message: string } | null };
     const host: DesktopHostBridge = {
       events: {
         on: (event, handler) => {
@@ -649,6 +653,15 @@ describe("browser live view host", () => {
           return { requestId: request.requestId, error: null };
         },
         ackLiveFrame: async () => {},
+        takeLiveControl: async ({ requestId }) => ({ requestId, focus: null, error: null }),
+        sendLiveInput: async ({ requestId, input }) => {
+          inputs.push(input);
+          return { requestId, focus: null, error: null };
+        },
+        releaseLiveControl: async ({ requestId, controlId, discardInput }) => {
+          released.push([controlId, discardInput]);
+          return { requestId, error: releaseError.current };
+        },
       },
     };
     const live = createBrowserLiveViewHost({
@@ -670,7 +683,30 @@ describe("browser live view host", () => {
       } as { type: string });
       await new Promise((resolve) => setTimeout(resolve, 0));
     };
-    return { live, emit, start, stopped, sentMessages, sentFrames };
+    const forward = async (message: { type: string; [field: string]: unknown }) => {
+      live.handle(message);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    };
+    const take = (controlId: string, streamId = "stream-1") =>
+      forward({
+        type: "browser.host.live.take_control.request",
+        requestId: `take-${controlId}`,
+        streamId,
+        controlId,
+      });
+    return {
+      live,
+      emit,
+      start,
+      stopped,
+      sentMessages,
+      sentFrames,
+      forward,
+      take,
+      released,
+      releaseError,
+      inputs,
+    };
   }
 
   const frame = (streamId: string) => ({
@@ -730,5 +766,79 @@ describe("browser live view host", () => {
 
     expect(harness.stopped.sort()).toEqual(["stream-1", "stream-2"]);
     expect(harness.sentFrames).toEqual([]);
+  });
+
+  test("reset discards and releases the control the lost daemon held", async () => {
+    const harness = createLiveHarness();
+    await harness.start("stream-1");
+    await harness.take("control-1");
+
+    harness.live.reset();
+
+    expect(harness.released).toEqual([["control-1", true]]);
+  });
+
+  test("reset still releases after the stream stopped and after a failed release", async () => {
+    const harness = createLiveHarness();
+    await harness.start("stream-1");
+    await harness.take("control-1");
+    await harness.forward({
+      type: "browser.host.live.stop.request",
+      requestId: "stop",
+      streamId: "stream-1",
+    });
+    harness.releaseError.current = { code: "failed", message: "No." };
+    await harness.forward({
+      type: "browser.host.live.release_control.request",
+      requestId: "release",
+      controlId: "control-1",
+      discardInput: false,
+    });
+
+    harness.live.reset();
+
+    expect(harness.released).toEqual([
+      ["control-1", false],
+      ["control-1", true],
+    ]);
+  });
+
+  test("forwards input only for control this daemon client took", async () => {
+    const harness = createLiveHarness();
+    await harness.start("stream-1");
+    await harness.take("control-1");
+    const send = (controlId: string) =>
+      harness.forward({
+        type: "browser.host.live.send_input.request",
+        requestId: `input-${controlId}`,
+        streamId: "stream-1",
+        controlId,
+        input: { kind: "key", key: "Tab" },
+      });
+
+    await send("another-daemons-control");
+    expect(harness.inputs).toEqual([]);
+    expect(harness.sentMessages.at(-1)).toMatchObject({
+      payload: { error: { code: "not_controller" } },
+    });
+
+    await send("control-1");
+    expect(harness.inputs).toEqual([{ kind: "key", key: "Tab" }]);
+  });
+
+  test("tells the daemon when a controlled tab is gone", async () => {
+    const harness = createLiveHarness();
+    await harness.start("stream-1");
+    await harness.take("control-1");
+
+    harness.emit(BROWSER_LIVE_CONTROL_ENDED_EVENT, { controlId: "someone-elses" });
+    harness.emit(BROWSER_LIVE_CONTROL_ENDED_EVENT, { controlId: "control-1" });
+
+    expect(harness.sentMessages.at(-1)).toEqual({
+      type: "browser.host.live.control_ended",
+      payload: { controlId: "control-1" },
+    });
+    harness.live.reset();
+    expect(harness.released).toEqual([]);
   });
 });

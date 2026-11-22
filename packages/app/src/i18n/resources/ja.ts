@@ -601,6 +601,77 @@ export const ja: TranslationResources = {
         subtitle: "組み込みブラウザを使用するには、このワークスペースをElectronで開いてください。",
       },
       session: "ブラウザセッション{{browserId}}",
+      liveView: {
+        connecting: "デスクトップのブラウザに接続中...",
+        endedTitle: "ライブビューが終了しました",
+        retry: "再試行",
+        ended: {
+          connection: "ホストとの接続が切れました",
+          tabClosed: "ブラウザタブが閉じられました",
+          noDesktop: "このタブがあるデスクトップが接続されていません",
+          inUse: "別のデバイスがこのタブを表示または操作しています",
+          unsupported: "このタブがあるデスクトップの Paseo を更新してください",
+          failed: "ライブビューを継続できませんでした",
+        },
+        hints: {
+          turnOn:
+            "ここでこのタブを見るには、ホスト設定 → エージェントでブラウザのライブビューをオンにしてください",
+          updateHost: "ここでこのタブを見るには、このホストの Paseo を更新してください",
+        },
+        control: {
+          take: "操作を引き継ぐ",
+          taking: "引き継ぎ中...",
+          takeHint:
+            "操作中、エージェントはこのタブを使用できません。5分間離れると操作が終了し、送信していない入力は破棄されます。",
+          updateHost: "操作を引き継ぐには、このホストの Paseo を更新してください",
+          updateDesktop:
+            "操作を引き継ぐには、このタブがあるデスクトップの Paseo を更新してください",
+          heldHint:
+            "入力する欄をタップしてください。5分間離れると操作が終了し、送信していない入力は破棄されます。",
+          handBack: "エージェントに戻す",
+          handingBack: "戻しています...",
+          handBackHint:
+            "戻すと、エージェントはこのページを確認し、このログインを使用できます。送信していないパスワードとコードは消去されます。",
+          pageOrigin: "ページ: {{origin}}",
+          typingInto: "入力先: {{origin}}",
+          embeddedIn: "埋め込み元: {{origin}}",
+          unknownOrigin: "不明なサイト",
+          send: "送信",
+        },
+        fields: {
+          password: "パスワード",
+          newPassword: "新しいパスワード",
+          oneTimeCode: "ワンタイムコード",
+          username: "ユーザー名",
+          email: "メールアドレス",
+          secret: "保護された欄",
+          text: "テキスト",
+        },
+        keys: {
+          enter: "確定",
+          tab: "タブ",
+          backspace: "削除",
+          escape: "エスケープ",
+          arrowUp: "上矢印",
+          arrowDown: "下矢印",
+          arrowLeft: "左矢印",
+          arrowRight: "右矢印",
+        },
+        notices: {
+          released: "操作が終了しました。送信していない入力は破棄された可能性があります。",
+          targetChanged:
+            "ページまたは入力欄が変わったため、入力は拒否されました。もう一度欄をタップしてください。",
+          unconfirmed:
+            "デスクトップが入力を確認できませんでした。再入力する前にページを確認してください。",
+          agentBusy: "エージェントのブラウザ操作がまだ実行中です。もう一度お試しください。",
+          busy: "このタブはすでに操作中です",
+          keyUnsupported:
+            "この埋め込みフレームではキーを使えません。代わりにボタンをタップしてください。",
+          connection: "接続が切れました。もう一度お試しください。",
+          disabled: "このホストではブラウザのライブビューがオフです",
+          failed: "ブラウザが応答しませんでした。もう一度お試しください。",
+        },
+      },
       controls: {
         back: "戻る",
         forward: "進む",
@@ -3038,6 +3109,11 @@ export const ja: TranslationResources = {
       },
       agents: {
         unavailable: "エージェントを管理するにはこのホストに接続してください",
+        browserLiveView: {
+          title: "ブラウザのライブビュー（試験運用）",
+          hint: "エージェントのブラウザタブをスマートフォンから表示・操作できます。初期設定はオフです。",
+          updateFailed: "ブラウザのライブビューを更新できませんでした",
+        },
         resumeOnStartup: {
           title: "再起動後にエージェントを再開",
           info: "ホストの停止時に作業中だったエージェントを開き直し、再開メッセージを送信します。通常の再起動とクラッシュの両方に適用されます。",
