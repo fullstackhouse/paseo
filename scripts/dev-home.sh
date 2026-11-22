@@ -65,7 +65,8 @@ seed_worktree_paseo_home() {
 }
 
 # Sets PASEO_LISTEN (loopback unless PASEO_DEV_LAN=1), PASEO_CORS_ORIGINS (this checkout's own
-# clients) and PASEO_DEV_LAN_URLS. With --write-config, also corrects the home's config.json.
+# clients), PASEO_DEV_LAN_URLS and PASEO_DEV_LOCAL_URL (this service's local proxy URL). With
+# --write-config, also writes the loopback listen and the origins into the home's config.json.
 configure_dev_daemon_access() {
   if [ -z "${PASEO_LISTEN:-}" ]; then
     return
@@ -78,6 +79,7 @@ configure_dev_daemon_access() {
       listen) export PASEO_LISTEN="$value" ;;
       cors) export PASEO_CORS_ORIGINS="$value" ;;
       lan) export PASEO_DEV_LAN_URLS="$value" ;;
+      local_url) export PASEO_DEV_LOCAL_URL="$value" ;;
     esac
   done <<<"$resolved"
 }

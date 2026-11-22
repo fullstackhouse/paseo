@@ -25,6 +25,10 @@ const config = JSON.parse(readFileSync(join(source, "config.json"), "utf8"));
 // password locks it out. The relay would publish the dev daemon as one more remote host.
 delete config.daemon?.auth;
 delete config.daemon?.relay;
+// The dev scripts write the dev daemon's own loopback listen and origins; the main install's
+// would admit its clients to a daemon without a password.
+delete config.daemon?.listen;
+delete config.daemon?.cors;
 writeFileSync(join(target, "config.json"), `${JSON.stringify(config, null, 2)}\n`);
 
 const projects = join(source, "projects");

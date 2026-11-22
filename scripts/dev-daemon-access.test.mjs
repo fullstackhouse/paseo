@@ -7,6 +7,7 @@ import test from "node:test";
 import {
   DevDaemonAccessError,
   correctDevDaemonConfig,
+  parseTcpListen,
   resolveDevDaemonAccess,
 } from "./dev-daemon-access.mjs";
 
@@ -71,24 +72,84 @@ test("the LAN opt-in requires a password saved in the dev home", () => {
   assert.equal(access.listen, "0.0.0.0:6768");
   assert.deepEqual(access.lanUrls, ["http://192.0.2.10:6768"]);
   assert.ok(access.corsOrigins.includes("http://192.0.2.10:8081"));
+  // Later managed launches read config.json without the opt-in, so only loopback is persisted.
+  assert.equal(access.persistedListen, "127.0.0.1:6768");
+  assert.ok(!access.persistedCorsOrigins.includes("http://192.0.2.10:8081"));
+  assert.throws(
+    () => resolve({ ...env, PASEO_LISTEN: "/tmp/paseo.sock" }, withPassword),
+    /needs a TCP PASEO_LISTEN/,
+  );
+  assert.throws(
+    () => resolve({ ...env, PASEO_LISTEN: "nonsense" }, withPassword),
+    /Invalid PASEO_LISTEN/,
+  );
 });
 
-test("existing homes lose the wildcard origin and take the resolved listen", () => {
-  const legacy = {
-    version: 1,
-    daemon: { listen: "0.0.0.0:6768", cors: { allowedOrigins: ["*"] }, auth: { password: "h" } },
-  };
-  assert.deepEqual(correctDevDaemonConfig(legacy, "127.0.0.1:6768"), {
-    version: 1,
-    daemon: { listen: "127.0.0.1:6768", auth: { password: "h" } },
+test("listen parsing matches the server's parseListenString", () => {
+  assert.deepEqual(parseTcpListen("7000"), { host: "127.0.0.1", port: "7000" });
+  assert.deepEqual(parseTcpListen(":7000"), { host: "127.0.0.1", port: "7000" });
+  assert.deepEqual(parseTcpListen("[::1]:7000"), { host: "::1", port: "7000" });
+  assert.equal(parseTcpListen("unix:///tmp/p.sock"), null);
+  assert.equal(parseTcpListen("~/p.sock"), null);
+  assert.equal(parseTcpListen("pipe://paseo"), null);
+  assert.throws(() => parseTcpListen("C:\\paseo"), DevDaemonAccessError);
+  assert.throws(() => parseTcpListen("host:port"), DevDaemonAccessError);
+  assert.equal(resolve({ PASEO_LISTEN: "7000" }).listen, "7000");
+  assert.equal(resolve({ PASEO_LISTEN: ":7000" }).listen, ":7000");
+});
+
+test("a public service proxy keeps the local proxy origin and a local renderer URL", () => {
+  // buildWorkspaceServiceEnv (packages/server) output for the desktop service when the main
+  // daemon sets serviceProxy.publicBaseUrl to https://apps.example.com.
+  const access = resolve({
+    PASEO_LISTEN: "127.0.0.1:6000",
+    HOST: "127.0.0.1",
+    PASEO_PORT: "6002",
+    PASEO_URL: "https://desktop--fix-x--paseo.apps.example.com",
+    PASEO_SERVICE_DAEMON_PORT: "6000",
+    PASEO_SERVICE_DAEMON_URL: "https://daemon--fix-x--paseo.apps.example.com",
+    PASEO_SERVICE_APP_PORT: "6001",
+    PASEO_SERVICE_APP_URL: "https://app--fix-x--paseo.apps.example.com",
+    PASEO_SERVICE_DESKTOP_PORT: "6002",
+    PASEO_SERVICE_DESKTOP_URL: "https://desktop--fix-x--paseo.apps.example.com",
   });
-  assert.deepEqual(
-    correctDevDaemonConfig(
-      { daemon: { cors: { allowedOrigins: ["*", "http://kept.test"] } } },
-      "127.0.0.1:1",
-    ).daemon.cors,
-    { allowedOrigins: ["http://kept.test"] },
+
+  assert.equal(access.localUrl, "http://desktop--fix-x--paseo.localhost:6767");
+  assert.ok(access.corsOrigins.includes("http://app--fix-x--paseo.localhost:6767"));
+  assert.ok(access.corsOrigins.includes("http://desktop--fix-x--paseo.localhost:6767"));
+  assert.ok(access.corsOrigins.includes("https://app--fix-x--paseo.apps.example.com"));
+  assert.equal(
+    resolve({
+      PASEO_LISTEN: "127.0.0.1:6000",
+      PASEO_URL: "https://desktop--a--b.apps.example.com",
+      PASEO_MAIN_DAEMON_ENDPOINT: "localhost:7777",
+    }).localUrl,
+    "http://desktop--a--b.localhost:7777",
   );
+  assert.equal(
+    resolve({ PASEO_LISTEN: "127.0.0.1:6000", PASEO_URL: "http://desktop--a--b.localhost:6767" })
+      .localUrl,
+    "http://desktop--a--b.localhost:6767",
+  );
+});
+
+test("config.json gets exactly the resolved listen and origins", () => {
+  const seeded = {
+    version: 1,
+    daemon: {
+      listen: "0.0.0.0:6768",
+      cors: { allowedOrigins: ["*", "https://main-install.example"] },
+      auth: { password: "h" },
+    },
+  };
+  const access = resolve({ PASEO_LISTEN: "127.0.0.1:6768", EXPO_PORT: "8090" }, seeded);
+  const next = correctDevDaemonConfig(seeded, access);
+  assert.equal(next.daemon.listen, "127.0.0.1:6768");
+  assert.deepEqual(next.daemon.cors.allowedOrigins, access.persistedCorsOrigins);
+  assert.ok(next.daemon.cors.allowedOrigins.includes("http://localhost:8090"));
+  assert.ok(!next.daemon.cors.allowedOrigins.includes("*"));
+  assert.ok(!next.daemon.cors.allowedOrigins.includes("https://main-install.example"));
+  assert.deepEqual(next.daemon.auth, { password: "h" });
 });
 
 test("dev-home.sh exports the resolved access and corrects config.json", () => {
@@ -119,6 +180,7 @@ test("dev-home.sh exports the resolved access and corrects config.json", () => {
   assert.equal(cors, "http://localhost:7001,http://127.0.0.1:7001,http://app--x--y.localhost:6767");
   assert.deepEqual(JSON.parse(readFileSync(join(home, "config.json"), "utf8")).daemon, {
     listen: "127.0.0.1:7000",
+    cors: { allowedOrigins: cors.split(",") },
   });
 
   const refused = spawnSync("bash", ["-c", script], {
@@ -128,6 +190,12 @@ test("dev-home.sh exports the resolved access and corrects config.json", () => {
   assert.notEqual(refused.status, 0);
   assert.match(refused.stderr, /needs a daemon password/);
   assert.equal(refused.stdout, "");
+
+  writeFileSync(join(home, "config.json"), "{ not json");
+  const broken = spawnSync("bash", ["-c", script], { env, encoding: "utf8" });
+  assert.notEqual(broken.status, 0);
+  assert.match(broken.stderr, /Cannot parse/);
+  assert.equal(readFileSync(join(home, "config.json"), "utf8"), "{ not json");
 });
 
 test("paseo.json services never bind the wildcard address", () => {

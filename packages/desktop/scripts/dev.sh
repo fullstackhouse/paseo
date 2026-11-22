@@ -14,11 +14,12 @@ if [ -z "${EXPO_PORT:-}" ]; then
   EXPO_PORT=$(NO_COLOR=1 FORCE_COLOR=0 "$ROOT_DIR/node_modules/.bin/get-port" 8082 8083 8084 8085 8086 8087 8088 8089)
 fi
 export EXPO_PORT
-# As a Paseo service, load the renderer through its proxy URL: that origin is stable, while
-# the service port changes on every start and the dev daemon admits only stable origins.
-export EXPO_DEV_URL="${PASEO_URL:-http://localhost:${EXPO_PORT}}"
 
 configure_dev_paseo_home
+# As a Paseo service, load the renderer through its local proxy URL: that origin is stable,
+# while the service port changes on every start and the dev daemon admits only stable origins.
+# Never the public proxy URL, which would load the renderer through the tunnel.
+export EXPO_DEV_URL="${PASEO_DEV_LOCAL_URL:-http://localhost:${EXPO_PORT}}"
 
 DEV_ROOT="${PASEO_DEV_ROOT:-$(default_dev_paseo_root)}"
 export PASEO_DEV_ROOT="$DEV_ROOT"
