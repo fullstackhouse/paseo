@@ -1,6 +1,11 @@
 import { describe, expect, test, vi } from "vitest";
 import { executeAutomationCommand, type BrowserRegistry, type TabImage } from "./service.js";
-import { adaptWebContents, HostSnapshotEngineRegistry } from "./ipc.js";
+import {
+  adaptWebContents,
+  BROWSER_LIVE_FRAME_EVENT,
+  BrowserLiveViewStreams,
+  HostSnapshotEngineRegistry,
+} from "./ipc.js";
 import type { IsolatedKeyboardInputEvent } from "./trusted-input.js";
 
 class FakeImage implements TabImage {
@@ -23,10 +28,10 @@ class FakeDebugger {
   public readonly promptDialogs: unknown[] = [];
   public failPromptDrain = false;
   public beforeCommand: ((command: string) => void) | null = null;
-  private messageListener:
-    | ((event: unknown, method: string, params?: Record<string, unknown>) => void)
-    | null = null;
-  private detachListener: (() => void) | null = null;
+  private readonly messageListeners = new Set<
+    (event: unknown, method: string, params?: Record<string, unknown>) => void
+  >();
+  private readonly detachListeners = new Set<() => void>();
   private readonly blockedCommands: Array<() => void> = [];
 
   public isAttached(): boolean {
@@ -61,6 +66,9 @@ class FakeDebugger {
       }
       return { result: { value: true } };
     }
+    if (command === "Page.getLayoutMetrics") {
+      return { cssLayoutViewport: { clientWidth: 1024, clientHeight: 768 } };
+    }
     return { ok: true };
   }
 
@@ -71,22 +79,43 @@ class FakeDebugger {
       | (() => void),
   ): void {
     if (event === "detach") {
-      this.detachListener = listener;
+      this.detachListeners.add(listener as () => void);
       return;
     }
-    this.messageListener = listener;
+    this.messageListeners.add(
+      listener as (event: unknown, method: string, params?: Record<string, unknown>) => void,
+    );
+  }
+
+  public removeListener(
+    event: "message" | "detach",
+    listener:
+      | ((event: unknown, method: string, params?: Record<string, unknown>) => void)
+      | (() => void),
+  ): void {
+    if (event === "detach") {
+      this.detachListeners.delete(listener as () => void);
+      return;
+    }
+    this.messageListeners.delete(
+      listener as (event: unknown, method: string, params?: Record<string, unknown>) => void,
+    );
+  }
+
+  public get messageListenerCount(): number {
+    return this.messageListeners.size;
   }
 
   public emitMessage(method: string, params?: Record<string, unknown>): void {
-    if (!this.messageListener) {
+    if (this.messageListeners.size === 0) {
       throw new Error("Debugger message listener was not registered");
     }
-    this.messageListener({}, method, params);
+    for (const listener of this.messageListeners) listener({}, method, params);
   }
 
   public emitDetach(): void {
     this.attachedProtocolVersions.length = 0;
-    this.detachListener?.();
+    for (const listener of this.detachListeners) listener();
   }
 
   public finishNextCommand(): void {
@@ -793,5 +822,175 @@ describe("pixel capture frame production", () => {
         throw new Error("capture closed");
       }),
     ).rejects.toThrow("capture closed");
+  });
+});
+
+class FakeLiveHostWindow {
+  public readonly sent: Array<{ channel: string; payload: unknown }> = [];
+  private readonly destroyedListeners: Array<() => void> = [];
+  public destroyed = false;
+
+  public constructor(public readonly id: number) {}
+
+  public once(event: "destroyed", listener: () => void): void {
+    expect(event).toBe("destroyed");
+    this.destroyedListeners.push(listener);
+  }
+
+  public isDestroyed(): boolean {
+    return this.destroyed;
+  }
+
+  public send(channel: string, payload: unknown): void {
+    this.sent.push({ channel, payload });
+  }
+
+  public destroy(): void {
+    this.destroyed = true;
+    for (const listener of this.destroyedListeners.splice(0)) listener();
+  }
+}
+
+const LIVE_BROWSER_ID = "11111111-1111-4111-8111-111111111111";
+
+function liveStartRequest(streamId = "stream-1") {
+  return {
+    type: "browser.host.live.start.request",
+    requestId: `start-${streamId}`,
+    streamId,
+    browserId: LIVE_BROWSER_ID,
+    maxFps: 5,
+    jpegQuality: 50,
+    maxWidth: 720,
+  };
+}
+
+function createLiveViews(contentsId = 40) {
+  const contents = new FakeWebContents(contentsId);
+  const host = new FakeLiveHostWindow(1);
+  const streams = new BrowserLiveViewStreams((browserId, hostId) =>
+    browserId === LIVE_BROWSER_ID && hostId === host.id ? contents : null,
+  );
+  return { contents, host, streams };
+}
+
+function screencastFrame(contents: FakeWebContents, sessionId: number): void {
+  contents.debugger.emitMessage("Page.screencastFrame", {
+    sessionId,
+    data: Buffer.from([0xff, 0xd8, sessionId, 0xff, 0xd9]).toString("base64"),
+    metadata: {
+      deviceWidth: 1024,
+      deviceHeight: 768,
+      offsetTop: 0,
+      pageScaleFactor: 1,
+      scrollOffsetX: 0,
+      scrollOffsetY: 12,
+    },
+  });
+}
+
+function screencastAcks(contents: FakeWebContents): unknown[] {
+  return contents.debugger.commands
+    .filter((command) => command.command === "Page.screencastFrameAck")
+    .map((command) => command.params.sessionId);
+}
+
+describe("browser live view screencast", () => {
+  test("starts a CDP screencast on the tab and keeps a hidden tab painting until stop", async () => {
+    const { contents, host, streams } = createLiveViews();
+
+    await expect(streams.start(host, liveStartRequest())).resolves.toEqual({
+      requestId: "start-stream-1",
+      viewport: { width: 1024, height: 768 },
+      error: null,
+    });
+
+    expect(contents.debugger.commands).toContainEqual({
+      command: "Page.startScreencast",
+      params: { format: "jpeg", quality: 50, maxWidth: 720, everyNthFrame: 12 },
+    });
+    expect(contents.invalidations).toEqual(["invalidate"]);
+    expect(contents.backgroundThrottling).toBe(false);
+
+    await expect(
+      streams.stop({
+        type: "browser.host.live.stop.request",
+        requestId: "stop-1",
+        streamId: "stream-1",
+      }),
+    ).resolves.toEqual({ requestId: "stop-1", error: null });
+    await flushMicrotasks();
+    expect(contents.debugger.commands.at(-1)?.command).toBe("Page.stopScreencast");
+    expect(contents.backgroundThrottling).toBe(true);
+    expect(streams.size).toBe(0);
+  });
+
+  test("forwards frames to the host window and acks CDP only after the viewer's ack", async () => {
+    const { contents, host, streams } = createLiveViews();
+    await streams.start(host, liveStartRequest());
+
+    screencastFrame(contents, 7);
+    expect(host.sent).toEqual([
+      {
+        channel: BROWSER_LIVE_FRAME_EVENT,
+        payload: {
+          streamId: "stream-1",
+          frameSeq: 0,
+          metadata: expect.objectContaining({ deviceWidth: 1024, scrollOffsetY: 12 }),
+          jpeg: new Uint8Array([0xff, 0xd8, 7, 0xff, 0xd9]),
+        },
+      },
+    ]);
+    await flushMicrotasks();
+    expect(screencastAcks(contents)).toEqual([]);
+
+    streams.ack({ type: "browser.host.live.frame_ack", streamId: "stream-1", frameSeq: 1 });
+    await flushMicrotasks();
+    expect(screencastAcks(contents)).toEqual([]);
+
+    streams.ack({ type: "browser.host.live.frame_ack", streamId: "stream-1", frameSeq: 0 });
+    streams.ack({ type: "browser.host.live.frame_ack", streamId: "stream-1", frameSeq: 0 });
+    await flushMicrotasks();
+    expect(screencastAcks(contents)).toEqual([7]);
+
+    screencastFrame(contents, 8);
+    expect(host.sent.at(-1)?.payload).toMatchObject({ frameSeq: 1 });
+  });
+
+  test("ends the stream when the tab is destroyed", async () => {
+    const { contents, host, streams } = createLiveViews();
+    await streams.start(host, liveStartRequest());
+    expect(contents.debugger.messageListenerCount).toBeGreaterThan(0);
+
+    contents.destroy();
+
+    expect(streams.size).toBe(0);
+    expect(contents.debugger.messageListenerCount).toBe(0);
+  });
+
+  test("stops streams started from a host window when the window closes", async () => {
+    const { contents, host, streams } = createLiveViews();
+    await streams.start(host, liveStartRequest());
+
+    host.destroy();
+    await flushMicrotasks();
+
+    expect(streams.size).toBe(0);
+    expect(contents.debugger.commands.at(-1)?.command).toBe("Page.stopScreencast");
+  });
+
+  test("rejects unknown tabs and duplicate stream ids", async () => {
+    const { host, streams } = createLiveViews();
+    await expect(
+      streams.start(host, {
+        ...liveStartRequest(),
+        browserId: "22222222-2222-4222-8222-222222222222",
+      }),
+    ).resolves.toMatchObject({ viewport: null, error: { code: "browser_tab_not_found" } });
+
+    await streams.start(host, liveStartRequest());
+    await expect(streams.start(host, liveStartRequest())).resolves.toMatchObject({
+      error: { code: "browser_denied" },
+    });
   });
 });

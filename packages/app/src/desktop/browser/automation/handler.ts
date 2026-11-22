@@ -14,6 +14,7 @@ import {
 } from "@/desktop/browser/store";
 import { collectAllTabs, useWorkspaceLayoutStore } from "@/stores/workspace-layout-store";
 import { buildWorkspaceTabPersistenceKey } from "@/workspace-tabs/model";
+import { createBrowserLiveViewHost, isBrowserLiveViewSupported } from "./live-view";
 
 type BrowserAutomationExecuteRequest = Extract<
   SessionOutboundMessage,
@@ -73,9 +74,13 @@ export function mountBrowserAutomationDaemonClientHandler(
   client: import("@getpaseo/client/internal/daemon-client").DaemonClient,
   options?: { serverId?: string },
 ): () => void {
+  const liveView = isBrowserLiveViewSupported(getDesktopHost)
+    ? createBrowserLiveViewHost({ client, getHost: getDesktopHost })
+    : null;
   const observation = client.registerBrowserHost({
     hostKind: "desktop app",
     supportedCommands: [...BROWSER_AUTOMATION_COMMAND_NAMES],
+    ...(liveView ? { liveView: true } : {}),
   });
   const unmount = mountBrowserAutomationHandler({
     client: {
@@ -84,6 +89,7 @@ export function mountBrowserAutomationDaemonClientHandler(
           snapshot: () => {},
           update: (message) => {
             if (message.type === "browser.automation.execute.request") handler(message);
+            else liveView?.handle(message);
           },
         }),
       sendBrowserAutomationExecuteResponse: (response) =>
@@ -93,6 +99,7 @@ export function mountBrowserAutomationDaemonClientHandler(
   });
   return () => {
     unmount();
+    liveView?.dispose();
     void observation
       .release()
       .catch((error) => console.warn("Failed to release browser host", error));

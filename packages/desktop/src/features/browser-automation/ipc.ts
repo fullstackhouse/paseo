@@ -1,5 +1,13 @@
 import { ipcMain } from "electron";
 import { BrowserAutomationExecuteRequestSchema } from "@getpaseo/protocol/browser-automation/rpc-schemas";
+import {
+  BrowserHostLiveFrameAckSchema,
+  BrowserHostLiveStartRequestSchema,
+  BrowserHostLiveStopRequestSchema,
+  type BrowserHostLiveStartResponse,
+  type BrowserHostLiveStopResponse,
+} from "@getpaseo/protocol/browser-automation/live-view";
+import { BrowserLiveViewStream, type BrowserLiveViewEvents } from "./live-view.js";
 import type {
   BrowserAutomationConsoleLogEntry,
   BrowserAutomationDialogEvent,
@@ -40,6 +48,13 @@ interface HostWebContents {
   once(event: "destroyed", listener: () => void): void;
 }
 
+interface LiveViewHostWebContents extends HostWebContents {
+  isDestroyed(): boolean;
+  send(channel: string, payload: unknown): void;
+}
+
+export const BROWSER_LIVE_FRAME_EVENT = "paseo:event:browser-live-frame";
+
 export class HostSnapshotEngineRegistry {
   private readonly entries = new Map<
     number,
@@ -74,6 +89,11 @@ interface WebContentsDebugger {
     listener: (event: unknown, method: string, params?: Record<string, unknown>) => void,
   ): void;
   on?(event: "detach", listener: () => void): void;
+  removeListener?(
+    event: "message",
+    listener: (event: unknown, method: string, params?: Record<string, unknown>) => void,
+  ): void;
+  removeListener?(event: "detach", listener: () => void): void;
 }
 
 interface ConsoleMessageEmitter {
@@ -114,7 +134,9 @@ interface BrowserAutomationWebContents extends ConsoleMessageEmitter {
   insertText(text: string): Promise<void>;
 }
 
-export function adaptWebContents(contents: BrowserAutomationWebContents): TabContents {
+export function adaptWebContents(
+  contents: BrowserAutomationWebContents,
+): TabContents & Required<Pick<TabContents, "sendDebugCommand">> {
   const contentsId = contents.id;
   observeConsoleMessages(contents, contentsId);
   const cdpQueue = getCdpQueue(contentsId);
@@ -448,8 +470,163 @@ function createRegistry(hostWebContentsId: number): BrowserRegistry {
   };
 }
 
+function liveViewEvents(contents: BrowserAutomationWebContents): BrowserLiveViewEvents {
+  return {
+    onMessage(listener) {
+      const handler = (_event: unknown, method: string, params?: Record<string, unknown>) =>
+        listener(method, params ?? {});
+      contents.debugger.on?.("message", handler);
+      return () => contents.debugger.removeListener?.("message", handler);
+    },
+    onGone(listener) {
+      contents.once("destroyed", listener);
+      contents.debugger.on?.("detach", listener);
+      return () => {
+        contents.removeListener("destroyed", listener);
+        contents.debugger.removeListener?.("detach", listener);
+      };
+    },
+  };
+}
+
+/** Live view screencasts by streamId, across host windows. */
+export class BrowserLiveViewStreams {
+  private readonly streams = new Map<string, BrowserLiveViewStream>();
+  private readonly streamIdsByHost = new Map<number, Set<string>>();
+
+  public constructor(
+    private readonly getTabContents: (
+      browserId: string,
+      hostWebContentsId: number,
+    ) => BrowserAutomationWebContents | null,
+  ) {}
+
+  public get size(): number {
+    return this.streams.size;
+  }
+
+  public async start(
+    hostContents: LiveViewHostWebContents,
+    rawRequest: unknown,
+  ): Promise<BrowserHostLiveStartResponse["payload"]> {
+    const parsed = BrowserHostLiveStartRequestSchema.safeParse(rawRequest);
+    if (!parsed.success) {
+      return liveFailure(
+        readRequestId(rawRequest),
+        "browser_unknown_error",
+        "Invalid live view request.",
+      );
+    }
+    const request = parsed.data;
+    if (this.streams.has(request.streamId)) {
+      return liveFailure(request.requestId, "browser_denied", "Live view stream already exists.");
+    }
+    const contents = this.getTabContents(request.browserId, hostContents.id);
+    if (!contents) {
+      return liveFailure(
+        request.requestId,
+        "browser_tab_not_found",
+        `No browser tab found for ID: ${request.browserId}`,
+      );
+    }
+    const hostStreamIds = this.streamIdsOfHost(hostContents);
+    const stream = new BrowserLiveViewStream({
+      streamId: request.streamId,
+      tab: adaptWebContents(contents),
+      events: liveViewEvents(contents),
+      onFrame: (frame) => {
+        if (!hostContents.isDestroyed()) hostContents.send(BROWSER_LIVE_FRAME_EVENT, frame);
+      },
+      onEnded: () => {
+        if (this.streams.get(request.streamId) !== stream) return;
+        this.streams.delete(request.streamId);
+        hostStreamIds.delete(request.streamId);
+      },
+    });
+    this.streams.set(request.streamId, stream);
+    hostStreamIds.add(request.streamId);
+    try {
+      const viewport = await stream.start({
+        ...(request.maxFps !== undefined ? { maxFps: request.maxFps } : {}),
+        ...(request.jpegQuality !== undefined ? { jpegQuality: request.jpegQuality } : {}),
+        ...(request.maxWidth !== undefined ? { maxWidth: request.maxWidth } : {}),
+      });
+      return { requestId: request.requestId, viewport, error: null };
+    } catch (error) {
+      return liveFailure(
+        request.requestId,
+        "browser_unknown_error",
+        error instanceof Error && error.message ? error.message : "Live view failed to start.",
+      );
+    }
+  }
+
+  public async stop(rawRequest: unknown): Promise<BrowserHostLiveStopResponse["payload"]> {
+    const parsed = BrowserHostLiveStopRequestSchema.safeParse(rawRequest);
+    if (!parsed.success) {
+      return {
+        requestId: readRequestId(rawRequest),
+        error: {
+          code: "browser_unknown_error",
+          message: "Invalid live view request.",
+          retryable: false,
+        },
+      };
+    }
+    // Stopping an unknown stream is a no-op: the daemon may stop a stream that already ended.
+    await this.streams.get(parsed.data.streamId)?.stop();
+    return { requestId: parsed.data.requestId, error: null };
+  }
+
+  public ack(rawAck: unknown): void {
+    const parsed = BrowserHostLiveFrameAckSchema.safeParse(rawAck);
+    if (parsed.success) this.streams.get(parsed.data.streamId)?.ack(parsed.data.frameSeq);
+  }
+
+  private streamIdsOfHost(hostContents: LiveViewHostWebContents): Set<string> {
+    const hostId = hostContents.id;
+    const existing = this.streamIdsByHost.get(hostId);
+    if (existing) return existing;
+    const streamIds = new Set<string>();
+    this.streamIdsByHost.set(hostId, streamIds);
+    // Streams started from a window die with it; nothing else would ack or stop them.
+    hostContents.once("destroyed", () => {
+      this.streamIdsByHost.delete(hostId);
+      for (const streamId of streamIds) void this.streams.get(streamId)?.stop();
+    });
+    return streamIds;
+  }
+}
+
+function liveFailure(
+  requestId: string,
+  code: "browser_unknown_error" | "browser_denied" | "browser_tab_not_found",
+  message: string,
+): BrowserHostLiveStartResponse["payload"] {
+  return { requestId, viewport: null, error: { code, message, retryable: false } };
+}
+
 export function registerBrowserAutomationIpc(options?: { ipc?: IpcHandlerRegistry }): void {
   const ipc = options?.ipc ?? ipcMain;
+  const liveViews = new BrowserLiveViewStreams(getPaseoBrowserWebContentsForHostWindow);
+
+  ipc.handle("paseo:browser:live-start", (event, rawRequest: unknown) => {
+    const hostContents = (event as { sender?: LiveViewHostWebContents }).sender;
+    if (!hostContents) {
+      return liveFailure(
+        readRequestId(rawRequest),
+        "browser_unknown_error",
+        "Live view requires a host window.",
+      );
+    }
+    return liveViews.start(hostContents, rawRequest);
+  });
+  ipc.handle("paseo:browser:live-stop", (_event, rawRequest: unknown) =>
+    liveViews.stop(rawRequest),
+  );
+  ipc.handle("paseo:browser:live-frame-ack", (_event, rawAck: unknown) => {
+    liveViews.ack(rawAck);
+  });
 
   ipc.handle("paseo:browser:execute-automation-command", async (event, rawRequest: unknown) => {
     const hostContents = (event as { sender?: HostWebContents }).sender;
