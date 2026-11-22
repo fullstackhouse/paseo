@@ -6,10 +6,13 @@ import { spawn, spawnSync } from "node:child_process";
 
 const rootDir = resolvePath(import.meta.dirname, "..");
 const appDir = join(rootDir, "packages/app");
+const serveSimBin = join(rootDir, "node_modules/.bin/serve-sim");
 const appProductName = "PaseoDebug";
 const appScheme = "paseo";
 const preferredSimulatorType = process.env.PASEO_IOS_DEVICE_TYPE || "iPhone 16 Pro";
 const paseoPort = requiredEnv("PASEO_PORT");
+// Expo's --localhost binds one loopback family, often only ::1, so don't use 127.0.0.1.
+const metroUrl = `http://localhost:${paseoPort}`;
 const worktreePath = process.env.PASEO_WORKTREE_PATH || rootDir;
 const worktreeName = process.env.PASEO_BRANCH_NAME || basename(worktreePath);
 const worktreeHash = createHash("sha1").update(worktreePath).digest("hex").slice(0, 8);
@@ -48,12 +51,12 @@ async function main() {
   hideNativeSimulatorApp();
   bootSimulator(simulatorUdid);
   hideNativeSimulatorApp();
-  run("npx", ["serve-sim", "--detach", "-q", simulatorUdid], { cwd: rootDir });
+  startSimulatorHelper();
   hideNativeSimulatorApp();
 
   metro = startMetro();
-  await waitForUrl(`http://127.0.0.1:${paseoPort}/.sim`);
-  console.log(`iOS preview: ${process.env.PASEO_URL || `http://127.0.0.1:${paseoPort}`}/.sim`);
+  await waitForUrl(`${metroUrl}/.sim`);
+  console.log(`iOS preview: ${process.env.PASEO_URL || metroUrl}/.sim`);
 
   console.log("Building app dependencies...");
   try {
@@ -106,12 +109,21 @@ function installApp(nativeProject) {
 }
 
 function launchApp() {
-  const metroUrl = encodeURIComponent(`http://127.0.0.1:${paseoPort}`);
-  run(
-    "xcrun",
-    ["simctl", "openurl", simulatorUdid, `${appScheme}://expo-development-client/?url=${metroUrl}`],
-    { cwd: appDir },
-  );
+  const url = `${appScheme}://expo-development-client/?url=${encodeURIComponent(metroUrl)}`;
+  run("xcrun", ["simctl", "openurl", simulatorUdid, url], { cwd: appDir });
+}
+
+function startSimulatorHelper() {
+  // serve-sim-bin only has an rpath for Xcode 16.4, and serve-sim only adds Developer/Library/PrivateFrameworks.
+  // Xcode 27 ships SimulatorKit in Contents/SharedFrameworks. Spawn node directly: npx and the bin's
+  // /usr/bin/env shebang both lose DYLD_* variables.
+  const developerDir = run("xcode-select", ["-p"], { capture: true }).trim();
+  const frameworkPath = [resolvePath(developerDir, "../SharedFrameworks"), env.DYLD_FRAMEWORK_PATH]
+    .filter(Boolean)
+    .join(":");
+  run(process.execPath, [serveSimBin, "--detach", "-q", simulatorUdid], {
+    env: { ...env, DYLD_FRAMEWORK_PATH: frameworkPath },
+  });
 }
 
 function startMetro() {
@@ -122,6 +134,8 @@ function startMetro() {
       PASEO_SERVE_SIM_PREVIEW: "1",
       PASEO_SERVE_SIM_DEVICE_UDID: simulatorUdid,
       BROWSER: "none",
+      // Without this Expo rewrites localhost to 127.0.0.1 in the manifest's bundle URL.
+      REACT_NATIVE_PACKAGER_HOSTNAME: "localhost",
     },
     stdio: "inherit",
   });
@@ -231,7 +245,7 @@ async function cleanup() {
     metro.kill("SIGTERM");
   }
   if (simulatorUdid) {
-    spawnSync("npx", ["serve-sim", "--kill", simulatorUdid], {
+    spawnSync(process.execPath, [serveSimBin, "--kill", simulatorUdid], {
       cwd: rootDir,
       stdio: "ignore",
       env,
@@ -252,7 +266,7 @@ function run(command, args, options = {}) {
   const stdio = options.capture || options.logFile ? ["ignore", "pipe", "pipe"] : "inherit";
   const result = spawnSync(command, args, {
     cwd: options.cwd || rootDir,
-    env,
+    env: options.env || env,
     encoding: "utf8",
     stdio,
   });
