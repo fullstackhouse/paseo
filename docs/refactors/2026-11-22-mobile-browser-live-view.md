@@ -67,7 +67,7 @@ Desktop hosts register `liveView` and `liveViewInput`. The daemon advertises `fe
 
 ### Daemon (`packages/server`)
 
-- `BrowserToolsBroker` routes streams, control, and input to the host that owns the tab, and relays frames without decoding them. The phone's ack releases the next frame, so one is in flight end to end. The desktop keeps the newest frame that arrived meanwhile: a page that stops painting never sends another.
+- `BrowserToolsBroker` routes streams, control, and input to the host that owns the tab, and relays frames without decoding them. The phone's ack releases the next frame, so one is in flight end to end. The desktop keeps the newest frame that arrived meanwhile: a page that stops painting never sends another. With two frames unacked Chromium drops what it paints next, so the desktop restarts the screencast once after catching up; `invalidate()` produces no frame.
 - `BrowserHumanControl` holds one controller per tab, keyed by principal and app install so control survives a new session. Only the controller can send input, hand back, or start a stream on a held tab.
 - While held, the broker refuses every command that names the tab, reads included, before host selection. `browser_list_tabs` keeps the entry with `humanControl: true` and withholds its URL and title.
 - All `browser.live.*` and `browser.host.live.*` messages need `workspace.write`. A read-only principal can't watch either: frames show authenticated pages.

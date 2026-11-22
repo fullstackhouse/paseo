@@ -56,6 +56,7 @@ const CONTROL_ENDING_CODES = new Set([
 export type BrowserControlAvailability = "update_host" | "update_desktop" | "unknown" | "ready";
 
 /** The one compatibility gate for control. Past it, the feature assumes support. */
+// COMPAT(browserLiveViewInput): added after v0.15.4, remove gate after 2027-05-22.
 export function getControlAvailability(
   hostSupportsControl: boolean,
   state: Pick<BrowserControlState, "desktopSupportsControl">,
