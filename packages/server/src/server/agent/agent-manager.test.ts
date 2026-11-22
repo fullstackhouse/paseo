@@ -11603,6 +11603,66 @@ test("turn_failed emits a system error assistant timeline message and keeps erro
   expect(systemErrors[0]?.text).toContain("invalid model id");
 });
 
+// FSH: paseo-limits keys its card off the reply; a "[System Error]" copy would hide it.
+test("turn_failed adds no system error row when the provider already showed that error", async () => {
+  const workdir = mkdtempSync(join(tmpdir(), "agent-manager-turn-failed-shown-"));
+  const storage = new AgentStorage(join(workdir, "agents"), logger);
+  const limitText = "You've hit your weekly limit · resets Nov 20 at 12pm (Europe/Warsaw)";
+
+  class LimitSession extends TestAgentSession {
+    override async startTurn(): Promise<{ turnId: string }> {
+      const turnId = "turn-limit-1";
+      setTimeout(() => {
+        this.pushEvent({ type: "turn_started", provider: this.provider, turnId });
+        this.pushEvent({
+          type: "timeline",
+          provider: this.provider,
+          turnId,
+          item: { type: "assistant_message", text: limitText },
+        });
+        this.pushEvent({ type: "turn_failed", provider: this.provider, error: limitText, turnId });
+      }, 0);
+      return { turnId };
+    }
+  }
+
+  class LimitClient implements AgentClient {
+    readonly provider = "codex" as const;
+    readonly capabilities = TEST_CAPABILITIES;
+    async isAvailable(): Promise<boolean> {
+      return true;
+    }
+    async createSession(config: AgentSessionConfig): Promise<AgentSession> {
+      return new LimitSession(config);
+    }
+    async resumeSession(config?: Partial<AgentSessionConfig>): Promise<AgentSession> {
+      return new LimitSession({ provider: "codex", cwd: config?.cwd ?? process.cwd() });
+    }
+  }
+
+  const manager = new AgentManager({
+    clients: { codex: new LimitClient() },
+    registry: storage,
+    logger,
+    idFactory: () => "00000000-0000-4000-8000-000000000133",
+  });
+  const agent = await manager.createAgent(
+    { provider: "codex", cwd: workdir, title: "Limit test" },
+    undefined,
+    { workspaceId: undefined },
+  );
+
+  await expect(manager.runAgent(agent.id, "hello")).rejects.toThrow(limitText);
+
+  expect(manager.getAgent(agent.id)?.lifecycle).toBe("error");
+  expect(
+    manager
+      .getTimeline(agent.id)
+      .filter((item) => item.type === "assistant_message")
+      .map((item) => item.text),
+  ).toEqual([limitText]);
+});
+
 test("turn_failed surfaces provider code and diagnostic in system error message", async () => {
   const workdir = mkdtempSync(join(tmpdir(), "agent-manager-turn-failed-detail-"));
   const storagePath = join(workdir, "agents");

@@ -5414,6 +5414,9 @@ class ClaudeAgentSession implements AgentSession {
         .trim();
       if (usage) events.push({ type: "usage_updated", provider: "claude", usage });
       events.push(...this.sidechainTracker.finishAll("failed"));
+      // FSH: the reply stays in the chat as Claude wrote it, and the agent manager adds no
+      // "[System Error]" copy of the same text. paseo-limits matches the plain reply.
+      for (const item of withheld) events.push({ type: "timeline", item, provider: "claude" });
       events.push(this.buildTurnFailedEvent(resultText || withheldText || "Claude run failed"));
       return;
     }

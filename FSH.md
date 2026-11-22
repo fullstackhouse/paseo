@@ -13,6 +13,9 @@ temporary by design: every patch is meant to go upstream and then drop out of `f
 - FSH-only (upstreamable): a file tab's right-click menu has **Reveal in Finder** (Explorer / Files on other OSes) on desktop with a local daemon, next to **Copy file path**.
 - FSH-only (upstreamable): plugins can render the Explorer pull-request panel through `PullRequestPanel`, using their own checks and activity data without a workspace checkout. Inbox uses it for its read-only GitHub tab.
 
+- FSH-only: `latestTurn()` in `@getpaseo/plugin/server` reads an agent's last turn (its last user message and everything after it). Upstream took the rest of getpaseo/paseo#9307 as #9573 but reads turns with `timeline.refetch({ wholeTurns: true })`; paseo-asks and paseo-status still call `latestTurn()`. Drop it once they don't
+- FSH-only: a Claude turn that ends on a usage limit, login or API error keeps Claude's reply as a plain assistant message and adds no `[System Error]` copy of the same text; the turn still fails (upstream #8480). Upstream shows only the `[System Error]` row, which paseo-limits' anchored patterns don't match, so its Retry / Log in card would never appear
+
 - FSH-only (upstreamable): agent snapshots carry `capabilities.supportsSteering` (Claude, Codex, OpenCode, Pi, OMP, and provider plugins that negotiate `prompt.steer`), so plugins steer a running agent when it joins the turn and wait for the turn to end when a steer would interrupt it.
 
 - FSH-only: don't automatically show the worktree scripts setup callout; configure scripts in project settings.
@@ -209,7 +212,7 @@ Agents that already existed when a plugin was installed don't get its MCP tools.
 - **Upstreamable change**: open the PR against `getpaseo/paseo` from your personal fork, then merge
   its branch into `fsh` and add it to the list above.
 - **FSH-only change**: open a PR against `fsh` on this repo. CI runs on it.
-- **Refresh**: rebase `fsh` onto the latest stable upstream release tag (`v*`, no prerelease), dropping patches upstream merged. A Paseo schedule tries this every Sunday: a low-risk result lands on `fsh` by itself; anything else stays a draft PR for you to land. Keep the
+- **Refresh**: rebase `fsh` onto the latest stable upstream release tag (`v*`, no prerelease), dropping patches upstream merged. Before dropping one as upstreamed, diff what it adds against upstream's version and search the [FSH plugins](#fsh-plugins) for callers of anything upstream left out (#69's `latestTurn()` and #122's plain error text were dropped this way, which would have broken Asks, Status and Limits). A Paseo schedule tries this every Sunday: a low-risk result lands on `fsh` by itself; anything else stays a draft PR for you to land. Keep the
   `fsh`-only commits (this file, the pointers at the top of
   `README.md` / `CLAUDE.md`, `.github/workflows/fsh-desktop.yml`, `.github/workflows/fsh-android.yml`, `.github/workflows/fsh-cli.yml`, `scripts/install-fsh.sh`,
   the `fsh` variant in `packages/app/app.config.js` and `plugins/with-fsh-release-signing.js`).

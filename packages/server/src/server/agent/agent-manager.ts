@@ -5678,12 +5678,19 @@ export class AgentManager {
       agent.lifecycle = "error";
     }
     agent.lastError = event.error;
-    await this.appendSystemErrorTimelineMessage(
-      agent,
-      event.provider,
-      this.formatTurnFailedMessage(event),
-      options,
-    );
+    // FSH: a provider that already put the error in the chat (Claude's usage-limit reply) needs no
+    // second copy; plugins such as paseo-limits key their cards off that reply's exact text.
+    const lastItem = await this.getLastItemFromStores(agent.id);
+    const alreadyShown =
+      lastItem?.type === "assistant_message" && lastItem.text.trim() === event.error.trim();
+    if (!alreadyShown) {
+      await this.appendSystemErrorTimelineMessage(
+        agent,
+        event.provider,
+        this.formatTurnFailedMessage(event),
+        options,
+      );
+    }
     this.resolvePendingPermissionsForAgent(agent, event.provider, options, "Turn failed");
   }
 

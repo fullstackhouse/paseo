@@ -132,7 +132,8 @@ function terminal(events: Awaited<ReturnType<typeof runTurns>>[number]) {
   );
 }
 
-test("a turn Claude Code ends on an API error fails with the error, shown once", async () => {
+// FSH: the error stays a plain reply (paseo-limits matches it); the agent manager skips its copy.
+test("a turn Claude Code ends on an API error fails and keeps the error as its reply", async () => {
   const [limited, overloaded, next] = await runTurns([
     { errorReply: LIMIT, isError: true },
     {
@@ -147,13 +148,16 @@ test("a turn Claude Code ends on an API error fails with the error, shown once",
     type: "turn_failed",
     error: LIMIT,
   });
-  expect(assistantTexts(limited)).toEqual([]);
+  expect(assistantTexts(limited)).toEqual([LIMIT]);
 
   expect(terminal(overloaded)).toMatchObject({
     type: "turn_failed",
     error: "API Error: 529 Overloaded",
   });
-  expect(assistantTexts(overloaded)).toEqual(["Checking the deploy doc."]);
+  expect(assistantTexts(overloaded)).toEqual([
+    "Checking the deploy doc.",
+    "API Error: 529 Overloaded",
+  ]);
 
   // The session keeps working after a failed turn.
   expect(terminal(next)).toMatchObject({ type: "turn_completed" });
@@ -175,7 +179,7 @@ test("a failed turn retains its final token counts and cost", async () => {
     expect.objectContaining({ type: "usage_updated", usage: expect.objectContaining(usage) }),
   );
   expect(terminal(failed)).toMatchObject({ type: "turn_failed", error: LIMIT });
-  expect(assistantTexts(failed)).toEqual(["Checking the deploy doc."]);
+  expect(assistantTexts(failed)).toEqual(["Checking the deploy doc.", LIMIT]);
 });
 
 test("an error reply the turn moves past is still shown", async () => {
