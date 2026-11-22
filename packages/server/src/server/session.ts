@@ -5,6 +5,7 @@ import { ConnectedHostSession } from "./connected-hosts/index.js";
 import type { ConnectedHosts } from "./connected-hosts/index.js";
 import { searchTimeline } from "./agent/chat-search/index.js";
 import type { BrowserToolsBroker } from "./browser-tools/broker.js";
+import { SessionLiveViews } from "./browser-tools/live-view-session.js";
 import { BrowserAutomationHostCapabilitySchema } from "@getpaseo/protocol/browser-automation/capabilities";
 import type {
   ProviderSubagentEventFilter,
@@ -740,6 +741,7 @@ export class Session {
       ),
   );
   private readonly browserToolsBroker: SessionOptions["browserToolsBroker"];
+  private liveViews: SessionLiveViews | null = null;
   private readonly clientId: string;
   private readonly authorization: SessionAuthorization;
   private appVersion: string | null;
@@ -2418,6 +2420,7 @@ export class Session {
         hostKind: request.hostKind,
         supportedCommands: request.supportedCommands,
         sendBrowserAutomationRequest: (message) => owner.emit(message),
+        ...(request.liveView ? { liveView: { send: (message) => owner.emit(message) } } : {}),
       });
       if (respond)
         this.emit({
@@ -2428,6 +2431,18 @@ export class Session {
       await owner.release();
       throw error;
     }
+  }
+
+  private getLiveViews(): SessionLiveViews {
+    if (!this.browserToolsBroker) throw new Error("Browser hosting is unavailable");
+    this.liveViews ??= new SessionLiveViews({
+      broker: this.browserToolsBroker,
+      viewerId: this.sessionId,
+      createStreamId: () => uuidv4(),
+      begin: (stop) => this.delivery.begin("browser-live", undefined, stop),
+      emit: (message) => this.emit(message),
+    });
+    return this.liveViews;
   }
 
   private async subscribeWorkspaceSetup(
@@ -2481,6 +2496,23 @@ export class Session {
           msg,
           this.delivery.subscriptionIds(source, "browser-host"),
         );
+      return Promise.resolve();
+    }
+    if (
+      msg.type === "browser.host.live.start.response" ||
+      msg.type === "browser.host.live.stop.response"
+    ) {
+      if (source)
+        this.browserToolsBroker?.receiveLiveResponse(
+          msg.payload,
+          this.delivery.subscriptionIds(source, "browser-host"),
+        );
+      return Promise.resolve();
+    }
+    if (msg.type === "browser.live.start.request") return this.getLiveViews().start(msg);
+    if (msg.type === "browser.live.stop.request") return this.getLiveViews().stop(msg);
+    if (msg.type === "browser.live.frame_ack") {
+      this.liveViews?.ack(msg);
       return Promise.resolve();
     }
     if (msg.type === "subscription.release.request") {
@@ -3364,6 +3396,14 @@ export class Session {
     }
     if (binaryFrame.kind === "file_transfer") {
       await this.workspaceFilesSession.handleFileTransferFrame(binaryFrame.frame, source);
+      return;
+    }
+    if (binaryFrame.kind === "browser_live") {
+      this.browserToolsBroker?.receiveLiveFrame(
+        binaryFrame.frame,
+        binaryFrame.bytes,
+        this.delivery.subscriptionIds(source, "browser-host"),
+      );
       return;
     }
     this.terminalController.handleBinaryFrame(binaryFrame.frame, source);

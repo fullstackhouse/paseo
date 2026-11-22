@@ -6,7 +6,17 @@ import type {
   BrowserAutomationExecuteResponse,
 } from "@getpaseo/protocol/browser-automation/rpc-schemas";
 import { BROWSER_AUTOMATION_COMMAND_NAMES } from "@getpaseo/protocol/browser-automation/rpc-schemas";
-import { BrowserToolsBroker, type BrowserHostClient } from "./broker.js";
+import type { BrowserHostLiveOutboundMessage } from "@getpaseo/protocol/browser-automation/live-view";
+import {
+  decodeBrowserLiveFrameHeader,
+  encodeBrowserLiveFrame,
+} from "@getpaseo/protocol/binary-frames/browser-live";
+import {
+  BrowserToolsBroker,
+  type BrowserHostClient,
+  type BrowserLiveViewSink,
+  type BrowserLiveViewStartResult,
+} from "./broker.js";
 
 const BROWSER_ID = "11111111-1111-4111-8111-111111111111";
 const SECOND_BROWSER_ID = "22222222-2222-4222-8222-222222222222";
@@ -940,5 +950,365 @@ describe("BrowserToolsBroker", () => {
       },
     });
     expect(broker.getPendingRequestCount()).toBe(0);
+  });
+});
+
+class FakeLiveHost extends FakeBrowserHostClient {
+  public readonly liveMessages: BrowserHostLiveOutboundMessage[] = [];
+  public readonly liveView = {
+    send: (message: BrowserHostLiveOutboundMessage) => {
+      this.liveMessages.push(message);
+    },
+  };
+
+  public lastLiveRequest(
+    type: "browser.host.live.start.request" | "browser.host.live.stop.request",
+  ): Extract<BrowserHostLiveOutboundMessage, { requestId: string }> {
+    const message = this.liveMessages.findLast((candidate) => candidate.type === type);
+    if (!message || !("requestId" in message)) throw new Error(`No ${type} sent`);
+    return message;
+  }
+
+  public acks(): number[] {
+    return this.liveMessages.flatMap((message) =>
+      message.type === "browser.host.live.frame_ack" ? [message.frameSeq] : [],
+    );
+  }
+}
+
+interface RecordingViewer {
+  frames: Uint8Array[];
+  ended: Array<{ code: string }>;
+  results: BrowserLiveViewStartResult[];
+  sink: BrowserLiveViewSink;
+  respond: (result: BrowserLiveViewStartResult) => void;
+}
+
+function createViewer(): RecordingViewer {
+  const viewer: RecordingViewer = {
+    frames: [],
+    ended: [],
+    results: [],
+    sink: {
+      sendFrame: (frame) => viewer.frames.push(frame),
+      ended: (error) => viewer.ended.push(error),
+    },
+    respond: (result) => viewer.results.push(result),
+  };
+  return viewer;
+}
+
+function createLiveBroker(): BrowserToolsBroker {
+  let sequence = 0;
+  return new BrowserToolsBroker({
+    defaultTimeoutMs: 100,
+    createRequestId: () => `req-${++sequence}`,
+  });
+}
+
+function liveFrame(streamId: string, frameSeq: number): Uint8Array {
+  return encodeBrowserLiveFrame({
+    streamId,
+    frameSeq,
+    metadata: {
+      deviceWidth: 800,
+      deviceHeight: 600,
+      offsetTop: 0,
+      pageScaleFactor: 1,
+      scrollOffsetX: 0,
+      scrollOffsetY: 0,
+    },
+    jpeg: new Uint8Array([0xff, 0xd8, frameSeq, 0xff, 0xd9]),
+  });
+}
+
+function relay(broker: BrowserToolsBroker, host: FakeLiveHost, bytes: Uint8Array): boolean {
+  const header = decodeBrowserLiveFrameHeader(bytes);
+  if (!header) throw new Error("invalid frame");
+  return broker.receiveLiveFrame(header, bytes, [host.id]);
+}
+
+async function startStream(params: {
+  broker: BrowserToolsBroker;
+  host: FakeLiveHost;
+  viewer: RecordingViewer;
+  streamId?: string;
+  viewerId?: string;
+  browserId?: string;
+}): Promise<void> {
+  const started = params.broker.startLiveView({
+    streamId: params.streamId ?? "stream-1",
+    browserId: params.browserId ?? BROWSER_ID,
+    viewerId: params.viewerId ?? "viewer-1",
+    options: { maxFps: 5 },
+    sink: params.viewer.sink,
+    respond: params.viewer.respond,
+  });
+  const request = params.host.lastLiveRequest("browser.host.live.start.request");
+  params.broker.receiveLiveResponse(
+    { requestId: request.requestId, viewport: { width: 800, height: 600 }, error: null },
+    [params.host.id],
+  );
+  await started;
+}
+
+describe("BrowserToolsBroker live view", () => {
+  test("routes start to the host that owns the tab and relays its frames to the viewer", async () => {
+    const broker = createLiveBroker();
+    const owner = new FakeLiveHost("host-owner");
+    const other = new FakeLiveHost("host-other");
+    broker.registerClient(owner);
+    const execution = broker.execute({
+      command: { command: "new_tab", args: {} },
+      workspaceId: "workspace-1",
+    });
+    owner.resolveLatestWith(broker, {
+      requestId: "ignored",
+      ok: true,
+      result: {
+        command: "new_tab",
+        browserId: BROWSER_ID,
+        workspaceId: "workspace-1",
+        url: "https://example.com",
+      },
+    });
+    await execution;
+    broker.registerClient(other);
+
+    const viewer = createViewer();
+    await startStream({ broker, host: owner, viewer });
+
+    expect(other.liveMessages).toEqual([]);
+    expect(owner.lastLiveRequest("browser.host.live.start.request")).toMatchObject({
+      streamId: "stream-1",
+      browserId: BROWSER_ID,
+      maxFps: 5,
+    });
+    expect(viewer.results).toEqual([
+      { ok: true, streamId: "stream-1", viewport: { width: 800, height: 600 } },
+    ]);
+
+    const frame = liveFrame("stream-1", 0);
+    expect(broker.receiveLiveFrame({ streamId: "stream-1", frameSeq: 0 }, frame, [other.id])).toBe(
+      false,
+    );
+    expect(relay(broker, owner, frame)).toBe(true);
+    expect(viewer.frames).toEqual([frame]);
+    expect(viewer.frames[0]).toBe(frame);
+  });
+
+  test("hosts registered without liveView answer browser_unsupported", async () => {
+    const broker = createLiveBroker();
+    broker.registerClient(new FakeBrowserHostClient("host-old"));
+    const viewer = createViewer();
+
+    await broker.startLiveView({
+      streamId: "stream-1",
+      browserId: BROWSER_ID,
+      viewerId: "viewer-1",
+      options: {},
+      sink: viewer.sink,
+      respond: viewer.respond,
+    });
+
+    expect(viewer.results).toEqual([
+      { ok: false, error: expect.objectContaining({ code: "browser_unsupported" }) },
+    ]);
+    expect(broker.getLiveViewCount()).toBe(0);
+  });
+
+  test("allows one stream per tab until it stops", async () => {
+    const broker = createLiveBroker();
+    const host = new FakeLiveHost("host-1");
+    broker.registerClient(host);
+    await startStream({ broker, host, viewer: createViewer() });
+
+    const second = createViewer();
+    await broker.startLiveView({
+      streamId: "stream-2",
+      browserId: BROWSER_ID,
+      viewerId: "viewer-2",
+      options: {},
+      sink: second.sink,
+      respond: second.respond,
+    });
+    expect(second.results).toEqual([
+      { ok: false, error: expect.objectContaining({ code: "browser_denied" }) },
+    ]);
+    expect(
+      host.liveMessages.filter((m) => m.type === "browser.host.live.start.request"),
+    ).toHaveLength(1);
+
+    await expect(broker.stopLiveView("stream-1", "viewer-2")).resolves.toMatchObject({
+      error: { code: "browser_tab_not_found" },
+    });
+    const stopping = broker.stopLiveView("stream-1", "viewer-1");
+    broker.receiveLiveResponse(
+      { requestId: host.lastLiveRequest("browser.host.live.stop.request").requestId, error: null },
+      [host.id],
+    );
+    await expect(stopping).resolves.toEqual({ error: null });
+
+    await startStream({ broker, host, viewer: second, streamId: "stream-2", viewerId: "viewer-2" });
+    expect(second.results.at(-1)).toMatchObject({ ok: true, streamId: "stream-2" });
+  });
+
+  test("forwards only the viewer's ack for the frame in flight", async () => {
+    const broker = createLiveBroker();
+    const host = new FakeLiveHost("host-1");
+    broker.registerClient(host);
+    await startStream({ broker, host, viewer: createViewer() });
+
+    relay(broker, host, liveFrame("stream-1", 0));
+    expect(broker.ackLiveFrame("stream-1", 0, "viewer-2")).toBe(false);
+    expect(broker.ackLiveFrame("stream-1", 1, "viewer-1")).toBe(false);
+    expect(host.acks()).toEqual([]);
+
+    expect(broker.ackLiveFrame("stream-1", 0, "viewer-1")).toBe(true);
+    expect(broker.ackLiveFrame("stream-1", 0, "viewer-1")).toBe(false);
+    expect(host.acks()).toEqual([0]);
+
+    relay(broker, host, liveFrame("stream-1", 1));
+    expect(broker.ackLiveFrame("stream-1", 1, "viewer-1")).toBe(true);
+    expect(host.acks()).toEqual([0, 1]);
+  });
+
+  test("delivers a frame that beats the start response only after the viewer's response", async () => {
+    const broker = createLiveBroker();
+    const host = new FakeLiveHost("host-1");
+    broker.registerClient(host);
+    const order: string[] = [];
+    const started = broker.startLiveView({
+      streamId: "stream-1",
+      browserId: BROWSER_ID,
+      viewerId: "viewer-1",
+      options: {},
+      sink: { sendFrame: () => order.push("frame"), ended: () => order.push("ended") },
+      respond: () => order.push("response"),
+    });
+    relay(broker, host, liveFrame("stream-1", 0));
+    broker.receiveLiveResponse(
+      {
+        requestId: host.lastLiveRequest("browser.host.live.start.request").requestId,
+        viewport: { width: 1, height: 1 },
+        error: null,
+      },
+      [host.id],
+    );
+    await started;
+    expect(order).toEqual(["response", "frame"]);
+  });
+
+  test("a host error fails the start and frees the tab", async () => {
+    const broker = createLiveBroker();
+    const host = new FakeLiveHost("host-1");
+    broker.registerClient(host);
+    const viewer = createViewer();
+    const started = broker.startLiveView({
+      streamId: "stream-1",
+      browserId: BROWSER_ID,
+      viewerId: "viewer-1",
+      options: {},
+      sink: viewer.sink,
+      respond: viewer.respond,
+    });
+    broker.receiveLiveResponse(
+      {
+        requestId: host.lastLiveRequest("browser.host.live.start.request").requestId,
+        viewport: null,
+        error: { code: "browser_tab_not_found", message: "gone", retryable: false },
+      },
+      [host.id],
+    );
+    await started;
+    expect(viewer.results).toEqual([
+      { ok: false, error: { code: "browser_tab_not_found", message: "gone", retryable: false } },
+    ]);
+    expect(broker.getLiveViewCount()).toBe(0);
+  });
+
+  test("viewer leaving during start stops the host stream once it starts", async () => {
+    const broker = createLiveBroker();
+    const host = new FakeLiveHost("host-1");
+    broker.registerClient(host);
+    const viewer = createViewer();
+    const started = broker.startLiveView({
+      streamId: "stream-1",
+      browserId: BROWSER_ID,
+      viewerId: "viewer-1",
+      options: {},
+      sink: viewer.sink,
+      respond: viewer.respond,
+    });
+    const startRequest = host.lastLiveRequest("browser.host.live.start.request");
+    void broker.stopLiveView("stream-1", "viewer-1");
+    broker.receiveLiveResponse(
+      { requestId: startRequest.requestId, viewport: { width: 1, height: 1 }, error: null },
+      [host.id],
+    );
+    await started;
+
+    expect(viewer.results).toEqual([{ ok: false, error: expect.anything() }]);
+    expect(
+      host.liveMessages.filter((m) => m.type === "browser.host.live.stop.request"),
+    ).toHaveLength(2);
+    expect(broker.getLiveViewCount()).toBe(0);
+  });
+
+  test("host disconnect ends its streams and tells the viewer", async () => {
+    const broker = createLiveBroker();
+    const host = new FakeLiveHost("host-1");
+    broker.registerClient(host);
+    const viewer = createViewer();
+    await startStream({ broker, host, viewer });
+
+    broker.unregisterClient(host.id);
+
+    expect(viewer.ended).toEqual([expect.objectContaining({ code: "browser_no_host" })]);
+    expect(broker.getLiveViewCount()).toBe(0);
+    expect(relay(broker, host, liveFrame("stream-1", 0))).toBe(false);
+  });
+
+  test("closing the tab through browser tools ends its stream", async () => {
+    const broker = createLiveBroker();
+    const host = new FakeLiveHost("host-1");
+    broker.registerClient(host);
+    const viewer = createViewer();
+    await startStream({ broker, host, viewer });
+
+    const closing = broker.execute({
+      command: { command: "close_tab", args: { browserId: BROWSER_ID } },
+    });
+    host.resolveLatestWith(broker, {
+      requestId: "ignored",
+      ok: true,
+      result: { command: "close_tab", browserId: BROWSER_ID },
+    });
+    await closing;
+
+    expect(viewer.ended).toEqual([expect.objectContaining({ code: "browser_tab_closed" })]);
+    expect(broker.getLiveViewCount()).toBe(0);
+  });
+
+  test("an unanswered start times out and frees the tab", async () => {
+    vi.useFakeTimers();
+    const broker = createLiveBroker();
+    broker.registerClient(new FakeLiveHost("host-1"));
+    const viewer = createViewer();
+    const started = broker.startLiveView({
+      streamId: "stream-1",
+      browserId: BROWSER_ID,
+      viewerId: "viewer-1",
+      options: {},
+      sink: viewer.sink,
+      respond: viewer.respond,
+    });
+    await vi.advanceTimersByTimeAsync(100);
+    await started;
+    expect(viewer.results).toEqual([
+      { ok: false, error: expect.objectContaining({ code: "browser_timeout" }) },
+    ]);
+    expect(broker.getLiveViewCount()).toBe(0);
+    vi.useRealTimers();
   });
 });
