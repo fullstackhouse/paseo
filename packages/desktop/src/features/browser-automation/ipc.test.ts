@@ -218,7 +218,13 @@ class FakeWebContents {
     if (this.destroyed) throw new Error("Object has been destroyed");
     this.backgroundThrottling = allowed;
   }
-  public readonly debugger = new FakeDebugger();
+  private readonly debuggerApi = new FakeDebugger();
+  /** Electron's getter: usable during detach, throwing from "destroyed" on. */
+  public get debugger(): FakeDebugger {
+    if (this.debuggerDisposed) throw new TypeError("Object has been destroyed");
+    return this.debuggerApi;
+  }
+  private debuggerDisposed = false;
   public readonly inputEvents: IsolatedKeyboardInputEvent[] = [];
   public readonly loadedUrls: string[] = [];
   public frameListener: ((image: TabImage) => void) | null = null;
@@ -339,7 +345,8 @@ class FakeWebContents {
 
   public destroy(): void {
     this.destroyed = true;
-    this.debugger.emitDetach();
+    this.debuggerApi.emitDetach();
+    this.debuggerDisposed = true;
     this.frameListener = null;
     for (const listener of this.destroyedListeners) {
       this.destroyedListeners.delete(listener);
@@ -1138,12 +1145,13 @@ describe("browser live view screencast", () => {
   test("ends the stream when the tab is destroyed and reports it to the host window", async () => {
     const { contents, host, streams } = createLiveViews();
     await streams.start(host, liveStartRequest());
-    expect(contents.debugger.messageListenerCount).toBeGreaterThan(0);
+    const tabDebugger = contents.debugger;
+    expect(tabDebugger.messageListenerCount).toBeGreaterThan(0);
 
     contents.destroy();
 
     expect(streams.size).toBe(0);
-    expect(contents.debugger.messageListenerCount).toBe(0);
+    expect(tabDebugger.messageListenerCount).toBe(0);
     expect(host.sent.filter((event) => event.channel === BROWSER_LIVE_ENDED_EVENT)).toEqual([
       {
         channel: BROWSER_LIVE_ENDED_EVENT,

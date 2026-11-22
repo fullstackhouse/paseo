@@ -559,20 +559,24 @@ function humanControlTab(contents: BrowserAutomationWebContents): HumanControlTa
   // Adapting registers the tab's observers; sends share its CDP queue.
   const { id } = adaptWebContents(contents);
   const cdpQueue = getCdpQueue(id);
+  // Read once: the getter throws once the tab is destroyed, when control still has to clean up,
+  // and an exception in that listener takes down Electron main.
+  const debuggerApi = contents.debugger;
   return {
     contents: contents as BrowserAutomationWebContents & HumanControlContents,
     send: (command, params, sessionId) =>
       cdpQueue.run(async () => {
-        if (!contents.debugger.isAttached()) contents.debugger.attach("1.3");
-        return contents.debugger.sendCommand(command, params ?? {}, sessionId);
+        if (contents.isDestroyed()) throw new BrowserTabClosedError();
+        if (!debuggerApi.isAttached()) debuggerApi.attach("1.3");
+        return debuggerApi.sendCommand(command, params ?? {}, sessionId);
       }),
-    answerDialog: (accept, sessionId) =>
-      contents.debugger.sendCommand("Page.handleJavaScriptDialog", { accept }, sessionId),
+    answerDialog: async (accept, sessionId) =>
+      debuggerApi.sendCommand("Page.handleJavaScriptDialog", { accept }, sessionId),
     onMessage: (listener) => {
       const handler: DebuggerMessageListener = (_event, method, params, sessionId) =>
         listener(method, params ?? {}, sessionId);
-      contents.debugger.on?.("message", handler);
-      return () => contents.debugger.removeListener?.("message", handler);
+      debuggerApi.on?.("message", handler);
+      return () => debuggerApi.removeListener?.("message", handler);
     },
   };
 }
