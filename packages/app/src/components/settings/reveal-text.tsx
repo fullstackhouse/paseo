@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Text, type TextProps } from "react-native";
+import type { Text, TextProps } from "react-native";
+import { AppearanceText } from "@/appearance/text";
 import { StyleSheet } from "react-native-unistyles";
 import { usePageScroll } from "@/components/page-layout/page-scroll";
 import {
@@ -52,9 +53,9 @@ export function SettingsRevealText({ style, children, ...props }: TextProps) {
   );
 
   return (
-    <Text ref={ref} style={textStyle} {...props}>
+    <AppearanceText ref={ref} style={textStyle} {...props}>
       {children}
-    </Text>
+    </AppearanceText>
   );
 }
 

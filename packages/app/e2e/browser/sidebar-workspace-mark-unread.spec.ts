@@ -290,7 +290,8 @@ test("reopening a marked unread workspace restores only its agent tab and curren
   });
 });
 
-test("clicking the already focused timeline acknowledges a new completion", async ({
+// FSH: viewing a finished agent is not reviewing it, so these stay Ready to review.
+test("clicking the already focused timeline keeps a new completion ready to review", async ({
   page,
   workspaces,
 }) => {
@@ -303,7 +304,7 @@ test("clicking the already focused timeline acknowledges a new completion", asyn
   await workspaces.subject.client.waitForFinish(workspaces.subject.agentId, 20_000);
   await expectStatus(page, workspaces.subject.workspaceId, "attention");
   await page.getByText("Finish another turn.", { exact: true }).click();
-  await expectStatus(page, workspaces.subject.workspaceId, "done");
+  await expectStatus(page, workspaces.subject.workspaceId, "attention");
 });
 
 async function reconnectWithoutInteracting(
@@ -317,7 +318,7 @@ async function reconnectWithoutInteracting(
   await expect(page.getByRole("alert").filter({ hasText: "Updating messages" })).toHaveCount(0);
 }
 
-test("reconnecting a focused chat preserves its unread completion until another click", async ({
+test("reconnecting a focused chat preserves its unread completion", async ({
   page,
   workspaces,
 }) => {
@@ -333,10 +334,10 @@ test("reconnecting a focused chat preserves its unread completion until another 
   await reconnectWithoutInteracting(page, gate);
   await expectStatus(page, workspaces.subject.workspaceId, "attention");
   await page.getByText("Unread across reconnect.", { exact: true }).click();
-  await expectStatus(page, workspaces.subject.workspaceId, "done");
+  await expectStatus(page, workspaces.subject.workspaceId, "attention");
 });
 
-test("a cached read chat acknowledges a completion that arrived while the app was closed", async ({
+test("a cached read chat keeps a completion that arrived while the app was closed ready to review", async ({
   page,
   workspaces,
 }) => {
@@ -346,5 +347,5 @@ test("a cached read chat acknowledges a completion that arrived while the app wa
   await reopenWorkspaceAfterBackgroundTurn(page, workspaces.subject);
   await expectRestoredCompactChat(page);
   await openMobileAgentSidebar(page);
-  await expectStatus(page, workspaces.subject.workspaceId, "done");
+  await expectStatus(page, workspaces.subject.workspaceId, "attention");
 });

@@ -1620,12 +1620,15 @@ test("worktree includes reach the first agent without copying tracked or unignor
 
 // Archive replies before the worktree directory removal finishes.
 async function expectRemoved(directory: string): Promise<void> {
+  // Archive replies before the worktree removal finishes (FSH), which is slow on Windows.
   await expect
-    .poll(() =>
-      stat(directory).then(
-        () => "present",
-        (error: NodeJS.ErrnoException) => error.code,
-      ),
+    .poll(
+      () =>
+        stat(directory).then(
+          () => "present",
+          (error: NodeJS.ErrnoException) => error.code,
+        ),
+      { timeout: 30_000 },
     )
     .toBe("ENOENT");
 }

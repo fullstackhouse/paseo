@@ -270,7 +270,7 @@ export default function contribute(server) {
     // Archive delegates removal to `wt remove` (run from repoRoot) AFTER Paseo writes refs/paseo/kept-commits/*.
     const archived = await client.archiveWorkspace(workspaceId);
     expect(archived.error).toBeNull();
-    await expect(stat(worktreePath)).rejects.toMatchObject({ code: "ENOENT" });
+    await expectGone(worktreePath);
 
     // Restart daemon and restore: delegates to `wt switch --path <recordedPath> <branch>`.
     await client.close();
@@ -465,13 +465,13 @@ export default function contribute(server) {
 
     const archived = await client.archiveWorkspace(managed.workspace!.id);
     expect(archived.error).toBeNull();
-    await expect(stat(managedPath)).rejects.toMatchObject({ code: "ENOENT" });
+    await expectGone(managedPath);
 
     await client.enablePlugin("custom-manager");
     await expect(client.restoreWorkspace(managed.workspace!.id)).rejects.toThrow(
       "expected branch survive-disable",
     );
-    await expect(stat(managedPath)).rejects.toMatchObject({ code: "ENOENT" });
+    await expectGone(managedPath);
     await client.disablePlugin("custom-manager");
 
     await client.restoreWorkspace(managed.workspace!.id);
@@ -479,7 +479,7 @@ export default function contribute(server) {
     // Re-enabling the plugin must not route removal of a Git-restored worktree back to the plugin.
     await client.enablePlugin("custom-manager");
     await client.archiveWorkspace(managed.workspace!.id);
-    await expect(stat(managedPath)).rejects.toMatchObject({ code: "ENOENT" });
+    await expectGone(managedPath);
 
     const events = (await readFile(eventsFile, "utf8"))
       .trim()
@@ -601,7 +601,7 @@ export default function contribute(server) {
     expect(await readPaseoWorktreeMetadata(existingManual)).toBeNull();
     expect((await stat(existingManual)).isDirectory()).toBe(true);
     // The newly created detached worktree failed adoption and must be rolled back cleanly.
-    await expect(stat(path.join(root, "detached-wt"))).rejects.toMatchObject({ code: "ENOENT" });
+    await expectGone(path.join(root, "detached-wt"));
     expect(git(repository, ["worktree", "list", "--porcelain"])).not.toContain("detached-wt");
     const pending = client.createWorkspace({
       source: { kind: "worktree", cwd: repository, branchName: "concurrent" },
@@ -797,7 +797,7 @@ test("untrusted workspaces pass untrusted=true to worktree manager remove and re
 
     const archived = await client.archiveWorkspace(workspaceId);
     expect(archived.error).toBeNull();
-    await expect(stat(worktreePath)).rejects.toMatchObject({ code: "ENOENT" });
+    await expectGone(worktreePath);
 
     await client.restoreWorkspace(workspaceId);
     expect(git(worktreePath, ["branch", "--show-current"])).toBe("fork-pr-branch");
@@ -834,7 +834,7 @@ test("untrusted workspaces pass untrusted=true to worktree manager remove and re
     expect((await stat(worktreePath)).isDirectory()).toBe(true);
 
     expect((await client.archiveWorkspace(siblingId)).error).toBeNull();
-    await expect(stat(worktreePath)).rejects.toMatchObject({ code: "ENOENT" });
+    await expectGone(worktreePath);
 
     await client.restoreWorkspace(siblingId);
     expect(git(worktreePath, ["branch", "--show-current"])).toBe("fork-pr-branch");
@@ -940,7 +940,7 @@ export default function contribute(server) {
 
     const archived = await client1.archiveWorkspace(workspaceId);
     expect(archived.error).toBeNull();
-    await expect(stat(worktreePath)).rejects.toMatchObject({ code: "ENOENT" });
+    await expectGone(worktreePath);
 
     // Start first restore and wait until the worktree directory exists on disk while setup is still paused.
     const firstRestore = client1.restoreWorkspace(workspaceId);
@@ -976,7 +976,7 @@ export default function contribute(server) {
     await writeFile(releaseMarker, "go");
     await expect(firstRestore).rejects.toThrow("restore setup failed");
     await expect(secondRestore).rejects.toThrow("restore setup failed");
-    await expect(stat(worktreePath)).rejects.toMatchObject({ code: "ENOENT" });
+    await expectGone(worktreePath);
 
     // Workspace remains archived and can be restored cleanly on retry.
     const recovery = await client1.inspectWorkspaceRecovery(workspaceId);
@@ -1194,7 +1194,7 @@ export default function contribute(server) {
     await client.disablePlugin("owner-tracking-manager");
     const archived = await client.archivePaseoWorktree({ worktreePath, scope: "worktree" });
     expect(archived.success).toBe(true);
-    await expect(stat(worktreePath)).rejects.toMatchObject({ code: "ENOENT" });
+    await expectGone(worktreePath);
 
     // First restore recreates via Git fallback; second restore joins the existing checkout.
     await client.restoreWorkspace(firstWorkspaceId);
@@ -1205,7 +1205,7 @@ export default function contribute(server) {
     await client.enablePlugin("owner-tracking-manager");
     expect((await client.archiveWorkspace(firstWorkspaceId)).error).toBeNull();
     expect((await client.archiveWorkspace(secondWorkspaceId)).error).toBeNull();
-    await expect(stat(worktreePath)).rejects.toMatchObject({ code: "ENOENT" });
+    await expectGone(worktreePath);
     await expect(readFile(removeCallsFile, "utf8")).rejects.toMatchObject({ code: "ENOENT" });
   } finally {
     await client.close();
@@ -1275,8 +1275,10 @@ while (!existsSync(${JSON.stringify(releaseTeardownMarker)})) {
     await new Promise((resolve) => setTimeout(resolve, 100));
 
     await writeFile(releaseTeardownMarker, "go");
+    // FSH: the archive replies once its records are archived, before the undo cancels the
+    // teardown still running in the same archive operation.
     const archiveResult = await archivePromise;
-    expect(archiveResult.canceled).toBe(true);
+    expect(archiveResult.error).toBeNull();
     await Promise.all([restorePromise, undoPromise]);
 
     expect(await readFile(uncommittedFile, "utf8")).toBe("keep-me");
@@ -1369,7 +1371,7 @@ export default function contribute(server) {
       source: { kind: "worktree", cwd: repository, branchName: "topic" },
     });
     expect(nested.error).toContain("nested inside an existing worktree");
-    await expect(stat(path.join(teamPath, "topic"))).rejects.toMatchObject({ code: "ENOENT" });
+    await expectGone(path.join(teamPath, "topic"));
     expect(await readFile(path.join(teamPath, "team-dirty.txt"), "utf8")).toBe("team-work");
 
     // 2. Reject creating a worktree enclosing an existing worktree without deleting the inner worktree.
@@ -1430,7 +1432,7 @@ test("built-in archive removes the worktree with dependency clones and recursive
 
     const archived = await client.archiveWorkspace(created.workspace!.id);
     expect(archived.error).toBeNull();
-    await expect(stat(checkout)).rejects.toMatchObject({ code: "ENOENT" });
+    await expectGone(checkout);
     expect(git(repository, ["worktree", "list", "--porcelain"])).not.toContain(
       "refs/heads/built-in",
     );
@@ -1575,13 +1577,35 @@ export default function contribute(server) {
 
     const archivedWithContent = await client.archiveWorkspace(managed.workspace!.id);
     expect(archivedWithContent.error).toBeNull();
-    expect(path.normalize((await readFile(removeCallsFile, "utf8")).trim())).toBe(
-      path.normalize(checkout),
-    );
-    await expect(stat(checkout)).rejects.toMatchObject({ code: "ENOENT" });
+    // Archive replies before the worktree removal finishes (FSH).
+    await expect
+      .poll(
+        () =>
+          readFile(removeCallsFile, "utf8").then(
+            (text) => path.normalize(text.trim()),
+            () => "",
+          ),
+        { timeout: 30_000 },
+      )
+      .toBe(path.normalize(checkout));
+    await expectGone(checkout);
   } finally {
     await client.close();
     await daemon.close();
     await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   }
 }, 60_000);
+
+// FSH: archive replies before the worktree removal finishes, so wait for the directory to go.
+async function expectGone(target: string): Promise<void> {
+  await expect
+    .poll(
+      () =>
+        stat(target).then(
+          () => "present",
+          (error: NodeJS.ErrnoException) => error.code,
+        ),
+      { timeout: 30_000 },
+    )
+    .toBe("ENOENT");
+}
