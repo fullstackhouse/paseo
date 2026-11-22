@@ -92,6 +92,9 @@ interface ReconnectRepairPolicy {
   invalidate(input: { queryClient: QueryClient; serverId: string }): void;
 }
 
+// Unique per diff subscription, so streamed binary revisions never collide across resubscribes.
+let checkoutDiffSubscriptionEpoch = 0;
+
 const RECONNECT_REPAIR_POLICIES: ReconnectRepairPolicy[] = [
   {
     domain: "providersSnapshot",
@@ -347,11 +350,12 @@ function reconcileCheckoutDiffSubscriptions(input: {
       ignoreWhitespace,
     });
     const registration = { ...desired, subscription };
+    const subscriptionEpoch = ++checkoutDiffSubscriptionEpoch;
     input.active.set(key, registration);
     subscription.subscribe({
       snapshot: (state) => {
         if (input.active.get(key) !== registration) return;
-        const snapshot = checkoutDiffSnapshot(desired.cwd, state);
+        const snapshot = checkoutDiffSnapshot(desired.cwd, state, subscriptionEpoch);
         setCheckoutDiffPayload({
           activeCheckoutDiffSubscriptions: input.active,
           queryClient: input.queryClient,

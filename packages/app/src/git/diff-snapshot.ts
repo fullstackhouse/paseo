@@ -13,12 +13,30 @@ export interface CheckoutDiffSnapshot {
   error: DiffError | null;
   diffTooLarge?: boolean;
 }
-export function checkoutDiffSnapshot(cwd: string, state: DiffState): CheckoutDiffSnapshot {
+/**
+ * `subscriptionEpoch` must be unique per diff subscription in this app session: stream
+ * revisions restart at 1 on every subscription.
+ */
+export function checkoutDiffSnapshot(
+  cwd: string,
+  state: DiffState,
+  subscriptionEpoch: number,
+): CheckoutDiffSnapshot {
   const common = { cwd, requestId: `diff:${state.revision}:${state.phase}` };
   if (state.phase === "loading")
     return { ...common, files: [], entries: state.entries, error: null };
   if (state.phase === "error") return { ...common, files: [], error: state.error };
-  return { ...common, files: state.files, error: null, diffTooLarge: state.diffTooLarge };
+  const files = stampBinaryRevisions(state.files, `${subscriptionEpoch}:${state.revision}`);
+  return { ...common, files, error: null, diffTooLarge: state.diffTooLarge };
+}
+
+// FSH: image previews cache by `revision`. Streamed binary entries carry no content identity,
+// so an image rewritten in place yields an identical entry. Stamp them with the snapshot: the
+// daemon commits a new snapshot whenever the worktree changes, so visible previews refetch then.
+function stampBinaryRevisions(files: ParsedDiffFile[], revision: string): ParsedDiffFile[] {
+  return files.map((file) =>
+    file.status === "binary" && file.revision === undefined ? { ...file, revision } : file,
+  );
 }
 export function diffEntryHeaders(entries: DiffEntry[]): DiffFileHeader[] {
   return entries.map((entry) => ({

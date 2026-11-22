@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Image, Text, View, type ViewStyle } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { useTranslation } from "react-i18next";
@@ -58,13 +58,21 @@ export function DiffImagePreview({ preview, path, oldPath, revision }: DiffImage
     retry: 1,
   });
 
-  if (query.error || (!query.data && !isConnected)) {
+  // Streamed diffs bump the revision on every snapshot; keep the last images for this file on
+  // screen while the new revision loads instead of flashing "Loading".
+  const fileKey = JSON.stringify([preview.serverId, preview.cwd, preview.source, path, oldPath]);
+  const lastShown = useRef<{ fileKey: string; data: NonNullable<typeof query.data> } | null>(null);
+  if (query.data) lastShown.current = { fileKey, data: query.data };
+  const data =
+    query.data ?? (lastShown.current?.fileKey === fileKey ? lastShown.current.data : undefined);
+
+  if (query.error || (!data && !isConnected)) {
     return <Message text={t("workspace.git.diff.image.loadFailed")} />;
   }
-  if (!query.data) {
+  if (!data) {
     return <Message text={t("workspace.git.diff.image.loading")} />;
   }
-  const { old: before, new: after } = query.data;
+  const { old: before, new: after } = data;
   if (before.status === "missing" && after.status === "missing") {
     return <Message text={t("workspace.git.diff.binaryFile")} />;
   }
