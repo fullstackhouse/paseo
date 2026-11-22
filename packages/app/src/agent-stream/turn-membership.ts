@@ -35,6 +35,11 @@ export function belongsToTurn(item: StreamItem, turnId: string | null): boolean 
   return turnId !== null && item.turnId === turnId;
 }
 
+/** An info notification isn't work: it can land long after its turn, as a hand-back note does. */
+export function isAside(item: StreamItem): boolean {
+  return item.kind === "notification" && item.level === "info";
+}
+
 /** Inputs that start a turn when older history has no canonical turn IDs. */
 export function isTurnTrigger(item: StreamItem): boolean {
   return isTimelineTurnTrigger(

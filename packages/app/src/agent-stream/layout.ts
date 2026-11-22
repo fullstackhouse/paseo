@@ -2,7 +2,7 @@ import type { TurnTiming } from "@/timeline/turn-time";
 import type { StreamItem } from "@/types/stream";
 import { getAssistantMessageSpacing, getGapBetweenStreamItems } from "./spacing";
 import type { StreamFrameChildOrder, StreamStrategy } from "./strategy";
-import { continuesResponse, continuesTurn, isResponseBoundary } from "./turn-membership";
+import { continuesResponse, continuesTurn, isResponseBoundary, isAside } from "./turn-membership";
 
 export type StreamToolSequence = "single" | "first" | "middle" | "last" | "none";
 
@@ -84,9 +84,8 @@ function findTurnFooterSource(input: {
   boundaryAboveItems?: StreamItem[] | null;
   boundaryAboveIndex?: number | null;
 }): TurnFooterSource | null {
-  const last = input.items[input.startIndex];
-  const toolFallback: TurnFooterSource | null =
-    last?.kind === "tool_call" ? { item: last, items: input.items, index: input.startIndex } : null;
+  let toolFallback: TurnFooterSource | null = null;
+  let foundLastWork = false;
   let items = input.items;
   let index = input.startIndex;
   let canCrossBoundary = true;
@@ -104,6 +103,10 @@ function findTurnFooterSource(input: {
       }
       if (item.kind === "assistant_message") {
         return { item, items, index };
+      }
+      if (!foundLastWork && !isAside(item)) {
+        foundLastWork = true;
+        if (item.kind === "tool_call") toolFallback = { item, items, index };
       }
       laterItem = item;
     }
@@ -128,7 +131,9 @@ function resolveAuxiliaryTurnFooter(input: StreamLayoutInput): TurnFooterHost | 
     return null;
   }
 
-  const footerItems = input.liveHead.length > 0 ? input.liveHead : input.history;
+  // A note that lands after the turn can be all there is in the live head.
+  const headHasWork = input.liveHead.some((item) => !isAside(item));
+  const footerItems = headHasWork || input.history.length === 0 ? input.liveHead : input.history;
   const latestIndex = input.strategy.getLatestItemIndex(footerItems);
   if (latestIndex === null) {
     return null;

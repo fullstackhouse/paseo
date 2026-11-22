@@ -1,5 +1,5 @@
 import type { StreamItem } from "@/types/stream";
-import { startsNewTurn, isTurnTrigger } from "@/agent-stream/turn-membership";
+import { isAside, startsNewTurn, isTurnTrigger } from "@/agent-stream/turn-membership";
 
 export interface TurnTiming {
   completedAt: Date;
@@ -16,6 +16,7 @@ interface OpenTurn {
   lastItemAt: Date | null;
   assistantIds: readonly string[];
   previousItem: StreamItem | null;
+  lastWorkItem: StreamItem | null;
 }
 
 interface HeadTurnTiming {
@@ -34,6 +35,7 @@ const EMPTY_OPEN_TURN: OpenTurn = {
   lastItemAt: null,
   assistantIds: [],
   previousItem: null,
+  lastWorkItem: null,
 };
 
 function closeTurn(turn: OpenTurn, into: Map<string, TurnTiming>): void {
@@ -45,8 +47,8 @@ function closeTurn(turn: OpenTurn, into: Map<string, TurnTiming>): void {
     durationMs: turn.userAt ? Math.max(0, turn.lastItemAt.getTime() - turn.userAt.getTime()) : null,
   };
   let footerIds = turn.assistantIds;
-  if (footerIds.length === 0 && turn.previousItem?.kind === "tool_call") {
-    footerIds = [turn.previousItem.id];
+  if (footerIds.length === 0 && turn.lastWorkItem?.kind === "tool_call") {
+    footerIds = [turn.lastWorkItem.id];
   }
   for (const id of footerIds) {
     into.set(id, timing);
@@ -62,22 +64,24 @@ function walkTurns(
   let lastItemAt = from.lastItemAt;
   let assistantIds = [...from.assistantIds];
   let previousItem = from.previousItem;
+  let lastWorkItem = from.lastWorkItem;
   for (const item of items) {
     if (startsNewTurn(item, previousItem)) {
-      closeTurn({ userAt, lastItemAt, assistantIds, previousItem }, into);
+      closeTurn({ userAt, lastItemAt, assistantIds, previousItem, lastWorkItem }, into);
       userAt = isTurnTrigger(item) ? item.timestamp : null;
       lastItemAt = null;
       assistantIds = [];
+      lastWorkItem = null;
     }
-    // An info notification can land long after the turn, as when a browser tab is handed back.
-    const isAside = item.kind === "notification" && item.level === "info";
-    if (!isAside || !lastItemAt) lastItemAt = item.timestamp;
+    const aside = isAside(item);
+    if (!aside) lastWorkItem = item;
+    if (!aside || !lastItemAt) lastItemAt = item.timestamp;
     if (item.kind === "assistant_message") {
       assistantIds.push(item.id);
     }
     previousItem = item;
   }
-  return { userAt, lastItemAt, assistantIds, previousItem };
+  return { userAt, lastItemAt, assistantIds, previousItem, lastWorkItem };
 }
 
 function areTimingsEqual(a: Map<string, TurnTiming>, b: Map<string, TurnTiming>): boolean {

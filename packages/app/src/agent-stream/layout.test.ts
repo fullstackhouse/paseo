@@ -148,6 +148,32 @@ function findLayoutItem(layout: StreamLayout, id: string): StreamLayoutItem {
 }
 
 describe("layoutStream", () => {
+  it.each(["web", "android"] as const)(
+    "keeps the footer of a tool-ending turn above a later note on %s",
+    (platform) => {
+      const prompt = userMessage("prompt", 1);
+      const tool = toolCall("last-tool", 2);
+      const note: StreamItem = {
+        kind: "notification",
+        sourceType: "notification",
+        id: "note",
+        level: "info",
+        message: "The user handed the browser tab back.",
+        timestamp: timestamp(8),
+      };
+      for (const head of [[], [note]]) {
+        const layout = layoutFor({
+          platform,
+          tail: [prompt, tool, ...(head.length ? [] : [note])],
+          head,
+          timingIds: [tool.id],
+        });
+        expect(layout.auxiliaryTurnFooter?.itemId).toBe(tool.id);
+        expect(layout.auxiliaryTurnFooter?.timing?.durationMs).toBe(8000);
+      }
+    },
+  );
+
   it("keeps separate footers for an assistant turn and an adjacent tool-only turn", () => {
     const priorAssistant = assistantMessage("prior", 1, undefined, "turn-1");
     const nextTool = toolCall("next-tool", 2, "turn-2");
