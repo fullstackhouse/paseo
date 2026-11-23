@@ -212,8 +212,8 @@ export interface PluginWorkspaceSummaryItemState {
    */
   status?: PluginWorkspaceStatus | null;
   /**
-   * The things in this workspace that wait on the human, one Overview row each; the host shows up
-   * to five. FSH-only. An empty list says this plugin has nothing waiting here.
+   * The things in this workspace that wait on the human, one Overview row each. FSH-only. An empty
+   * list says this plugin has nothing waiting here.
    */
   entries?: PluginWorkspaceSummaryEntry[];
 }
