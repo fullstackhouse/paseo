@@ -1111,3 +1111,104 @@ test("scoped descriptor builds allocate independently of archived history", asyn
     await rm(home, { recursive: true, force: true });
   }
 }, 30000);
+
+test("lists archived workspaces newest first, without active or hidden ones", async () => {
+  const project: PersistedProjectRecord = {
+    projectId: "project-1",
+    rootPath: "/repo",
+    kind: "git",
+    displayName: "repo",
+    customName: "My repo",
+    createdAt: NOW,
+    updatedAt: NOW,
+    archivedAt: null,
+  };
+  const record = (
+    workspaceId: string,
+    overrides: Partial<PersistedWorkspaceRecord>,
+  ): PersistedWorkspaceRecord => ({
+    workspaceId,
+    projectId: project.projectId,
+    cwd: `/repo/.paseo/worktrees/${workspaceId}`,
+    kind: "worktree",
+    displayName: workspaceId,
+    title: null,
+    branch: workspaceId,
+    createdAt: NOW,
+    updatedAt: NOW,
+    archivedAt: null,
+    ...overrides,
+  });
+  const workspaces = [
+    record("active", {}),
+    record("older", { archivedAt: "2026-03-02T00:00:00.000Z" }),
+    record("newer", { archivedAt: "2026-03-03T00:00:00.000Z", title: "Fix login" }),
+    record("hidden", { archivedAt: "2026-03-04T00:00:00.000Z", background: true }),
+    record("orphan", {
+      projectId: "gone",
+      cwd: "/elsewhere/orphan",
+      kind: "directory",
+      branch: null,
+      archivedAt: "2026-03-01T00:00:00.000Z",
+    }),
+  ];
+  const unused = async (): Promise<never> => {
+    throw new Error("listArchived must not read live activity");
+  };
+  const directory = new WorkspaceDirectory({
+    logger: createTestLogger(),
+    projectRegistry: { list: async () => [project] },
+    workspaceRegistry: { list: async () => workspaces },
+    listAgentPayloads: unused,
+    workspaceLastUserMessageTimes: unused,
+    listProviderSubagentActivity: unused,
+    listAgentBackgroundWorkActivity: unused,
+    listTerminalActivityContributions: unused,
+    isProviderVisibleToClient: () => true,
+    buildWorkspaceDescriptor: unused,
+  });
+
+  expect(await directory.listArchived()).toEqual({
+    truncated: false,
+    workspaces: [
+      {
+        workspaceId: "newer",
+        name: "Fix login",
+        projectId: "project-1",
+        projectDisplayName: "My repo",
+        branch: "newer",
+        archivedAt: "2026-03-03T00:00:00.000Z",
+      },
+      {
+        workspaceId: "older",
+        name: "older",
+        projectId: "project-1",
+        projectDisplayName: "My repo",
+        branch: "older",
+        archivedAt: "2026-03-02T00:00:00.000Z",
+      },
+      {
+        workspaceId: "orphan",
+        name: "orphan",
+        projectId: "gone",
+        projectDisplayName: "orphan",
+        branch: null,
+        archivedAt: "2026-03-01T00:00:00.000Z",
+      },
+    ],
+  });
+
+  // Archives only grow: the daemon searches all of them, then caps what it sends.
+  expect(await directory.listArchived({ limit: 1 })).toEqual({
+    truncated: true,
+    workspaces: [expect.objectContaining({ workspaceId: "newer" })],
+  });
+  expect(await directory.listArchived({ search: "older repo", limit: 1 })).toEqual({
+    truncated: false,
+    workspaces: [expect.objectContaining({ workspaceId: "older" })],
+  });
+  expect(await directory.listArchived({ search: "no-such-workspace" })).toEqual({
+    truncated: false,
+    workspaces: [],
+  });
+});

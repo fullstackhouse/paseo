@@ -39,9 +39,9 @@ interface AgentListProps {
   search?: string;
 }
 
-type DateSectionKey = "today" | "yesterday" | "thisWeek" | "thisMonth" | "older";
+export type DateSectionKey = "today" | "yesterday" | "thisWeek" | "thisMonth" | "older";
 
-const DATE_SECTION_ORDER = [
+export const DATE_SECTION_ORDER = [
   "today",
   "yesterday",
   "thisWeek",
@@ -55,7 +55,7 @@ type FlatListItem =
   | { type: "header"; key: string; section: DateSectionKey }
   | { type: "agent"; key: string; agent: AggregatedAgent };
 
-function deriveDateSectionKey(lastActivityAt: Date): DateSectionKey {
+export function deriveDateSectionKey(lastActivityAt: Date): DateSectionKey {
   const now = new Date();
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const yesterdayStart = new Date(todayStart.getTime() - 24 * 60 * 60 * 1000);
@@ -83,7 +83,7 @@ function deriveDateSectionKey(lastActivityAt: Date): DateSectionKey {
   return "older";
 }
 
-function formatDateSectionLabel(t: TFunction, section: DateSectionKey): string {
+export function formatDateSectionLabel(t: TFunction, section: DateSectionKey): string {
   switch (section) {
     case "today":
       return t("agentList.dateSections.today");

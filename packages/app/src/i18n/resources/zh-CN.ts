@@ -317,6 +317,20 @@ export const zhCN: TranslationResources = {
     tooManyMatches: "匹配过多 — 请缩小搜索范围",
     hostLoadFailed: "{{host}}：无法加载历史",
     searchPlaceholder: "搜索历史",
+    views: {
+      agents: "代理",
+      archivedWorkspaces: "已归档的工作区",
+    },
+    archived: {
+      empty: "没有已归档的工作区",
+      noMatches: "没有匹配的已归档工作区",
+      searchPlaceholder: "搜索已归档的工作区",
+      loadFailed: "无法加载已归档的工作区",
+      retry: "重试",
+      truncated: "显示每台主机最近归档的 {{count}} 个。搜索以查找更早的工作区。",
+      hostLoadFailed: "{{host}}：无法加载已归档的工作区",
+      needsUpdate: "{{host}}：请更新此主机以查看其已归档的工作区",
+    },
     actions: {
       loadMore: "加载更多",
       clearSearch: "清除搜索",

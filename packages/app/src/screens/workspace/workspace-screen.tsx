@@ -168,6 +168,7 @@ import {
   resolveArchivedPreviewAgentId,
   resolveWorkspaceRouteState,
   type WorkspaceRouteState,
+  shouldInspectWorkspaceRecovery,
 } from "@/screens/workspace/workspace-route-state";
 import { renderWorkspaceRouteGate } from "@/screens/workspace/workspace-route-state-views";
 import { ArchivedWorkspacePreview } from "@/screens/workspace/archived-workspace-preview";
@@ -826,16 +827,6 @@ function useResolvedWorkspaceRouteState(input: {
       input.recovery,
     ],
   );
-}
-
-function shouldInspectWorkspaceRecovery(
-  hasHydratedWorkspaces: boolean,
-  workspace: WorkspaceDescriptor | null,
-  pendingOpenTarget: WorkspaceTabTarget | null,
-  requestedFromLink: boolean,
-): boolean {
-  const explicit = pendingOpenTarget?.kind === "agent" || requestedFromLink;
-  return explicit && hasHydratedWorkspaces && workspace === null;
 }
 
 function WorkspaceScreenGateFrame({ children }: { children: ReactNode }) {

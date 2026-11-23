@@ -317,6 +317,20 @@ export const ar: TranslationResources = {
     tooManyMatches: "نتائج كثيرة جدًا — ضيّق نطاق البحث",
     hostLoadFailed: "{{host}}: تعذر تحميل السجل",
     searchPlaceholder: "البحث في السجل",
+    views: {
+      agents: "الوكلاء",
+      archivedWorkspaces: "مساحات العمل المؤرشفة",
+    },
+    archived: {
+      empty: "لا توجد مساحات عمل مؤرشفة",
+      noMatches: "لا توجد مساحات عمل مؤرشفة مطابقة",
+      searchPlaceholder: "البحث في مساحات العمل المؤرشفة",
+      loadFailed: "تعذر تحميل مساحات العمل المؤرشفة",
+      retry: "إعادة المحاولة",
+      truncated: "يتم عرض أحدث {{count}} مساحة مؤرشفة على كل مضيف. ابحث للعثور على الأقدم.",
+      hostLoadFailed: "{{host}}: تعذر تحميل مساحات العمل المؤرشفة",
+      needsUpdate: "{{host}}: حدّث هذا المضيف لعرض مساحات العمل المؤرشفة",
+    },
     actions: {
       loadMore: "تحميل المزيد",
       clearSearch: "مسح البحث",
