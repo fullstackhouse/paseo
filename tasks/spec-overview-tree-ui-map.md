@@ -1,4 +1,4 @@
-# Overview: tree and PRs — UI map (stage 1)
+# Overview: tree and PRs — UI map
 
 Companion to [the spec](./spec-overview-tree.md). Every view, every change to an existing screen, and how
 you move between them.
@@ -35,23 +35,25 @@ flowchart TD
 
 ## O — Overview tab
 
-- **O1 Overview tab** (P1) — the whole tab in its new order, at desktop and mobile widths. Get here:
-  Overview tab in the Explorer sidebar, or the workspace sheet on mobile.
-- **O2 Tree** (P1) — where the workspace sits: parent chain above, children below, workspaces it is
-  blocked by and that it blocks. Each row: workspace name, one state word, chevron; opens that
-  workspace. Hidden when the workspace has no relations. Get here: section of O1.
-- **O3 Pull requests** (P1) — the workspace's PRs: number, title, checks/review facts in one line, open
-  ones first. With no PR, one row for the branch's unpushed or unreviewed work. Hidden when there is
-  neither. Get here: last section of O1.
+Views: O1 Overview tab, O2 Tree, O3 Pull requests.
 
 ## E — Existing screens
 
-- **E1 Your move** (P1) — loses the git step row (Create PR, Push, Pull, Merge from base) and the
-  failing-checks row. Keeps asks, permissions, failed agents and Archive once the work shipped. Get
-  here: section of O1.
-- **E2 Context footer** (P1) — loses From, Started (now in O2) and the PR/branch row (now O3). Keeps
-  Agents and plugin facts. Get here: section of O1.
+Views: E1 Your move, E2 Context footer.
 
 ## Later phases (scope only)
 
 - Workspace header git button: unchanged by this spec.
+
+## Decisions (stage 1, 2026-11-23)
+
+1. Archive stays in Your move once the work shipped; every other git row goes (A1).
+2. The failing-checks row leaves Your move; the PR row in O3 turns red instead (A2).
+3. O3 lists every PR paseo-prs relates to the workspace (branch, stack, linked); without paseo-prs, the
+   host's branch PR (A3).
+4. With no PR: one "No PR yet" row with the branch facts, branch name muted; opens Changes (A4).
+5. Tree depth: ancestors up to the root, this workspace, direct children with their own child count (A5).
+6. Workspace and agent blockers move into the Tree; PR, person and other blockers stay in the top
+   Blocked by block (A6).
+7. The Tree sits directly after Your move (A7).
+8. The workspace header's git button is out of scope (A8).

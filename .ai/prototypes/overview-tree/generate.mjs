@@ -27,7 +27,7 @@ runAtlas({
   // renders the cards with "mockups pending"; `overview: true` (one file at most) puts that
   // file's area-wide rules and decisions on the overview page instead of an area page.
   areaFiles: [
-    // { file: 'spec-overview-tree-ui-a.md', areas: ['A'], title: 'First area', mockups: true },
+    { file: 'spec-overview-tree-ui-overview.md', areas: ['O', 'E'], title: 'Overview tab', mockups: false },
   ],
   // Stage 3: areas whose every card needs states (and every state a card).
   mockupAreas: [],

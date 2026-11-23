@@ -1,0 +1,110 @@
+# Overview: tree and PRs — cards (O, E)
+
+Map: [spec-overview-tree-ui-map.md](./spec-overview-tree-ui-map.md). Spec: [spec-overview-tree.md](./spec-overview-tree.md).
+
+## Area-wide
+
+- **Who.** The operator, running 10–30 agent workspaces; their agents handle git and PRs.
+- **Device.** Desktop: Overview tab in the Explorer sidebar, ~360–480 px wide. Mobile: the workspace
+  sheet, full width. Same content, same order.
+- **Rows.** Every relation and PR row is one line: a label or name, a muted facts word, a chevron when
+  it opens something. Tones: running blue, waiting amber, blocked/failed red, done green, else muted.
+- **Sections** render nothing when empty: no heading, no "none" placeholder.
+- **Live.** Rows update in place as other workspaces' status cards and PR facts change; no refresh
+  control.
+- **Permissions.** None beyond opening the workspace.
+
+## O1 Overview tab (P1)
+
+- **Short.** The workspace at a glance: what it is, where it stands, what waits on you, where it sits,
+  its PRs.
+- **Extended.** Read top to bottom: Identity (title, goal), Status, Blocked by (PR, person, other
+  blockers only), Your move (E1), Tree (O2), Context (E2), Pull requests (O3). Only Your move has
+  buttons. Git is no longer a move: the agent handles it, and PRs show at the end for information.
+- **Get here.** Overview tab in the Explorer sidebar; on mobile, the workspace sheet.
+- **Shows.** Title; goal as subtitle; state word and summary; Your move rows; Tree; Agents and plugin
+  facts; Pull requests.
+- **Scenarios.** Entering a child workspace that waits on an ask: answer it, glance at the parent
+  above, leave. Checking a finished workspace: Status says done, Archive in Your move, the PR row says
+  merged.
+- **Variants.** Working (no move, tree and PRs below); waiting on an ask (move first, rest below);
+  done and merged (Archive move, merged PR); a bare workspace with no relations and no PR (only
+  identity and status); mobile sheet of the waiting state.
+- **Edge cases.** Status card missing → the state word comes from the agents ("Working", "Idle"), as
+  today. Git status still loading → the Pull requests section is absent until it loads, without a
+  spinner.
+
+## O2 Tree (P1)
+
+- **Short.** Where this workspace sits among others: who started it, what it started, what blocks it,
+  what it blocks.
+- **Extended.** Up to four groups, each only when it has rows, in this order:
+  - **Started by** — the ancestor chain, root first, down to the direct parent. Indented one step per
+    level.
+  - **This workspace** — one highlighted row (name only, not pressable) anchoring the chain.
+  - **Started** — direct children, newest first; five shown, then "Show all (N)". A child that started
+    others shows "· 3 started" after its state word.
+  - **Blocked by** — workspaces and agents named in this workspace's status `blockedBy` (only while the
+    status says blocked). An agent blocker shows the agent's title and its workspace.
+  - **Blocking** — workspaces whose current, blocked status names this workspace or one of its agents.
+    Pressing a workspace row opens that workspace (its Overview); an agent row opens that agent.
+- **Get here.** Section of O1, directly after Your move.
+- **Shows.** Section label "Tree"; per row: name, state word in its tone ("Working", "Waiting",
+  "Blocked", "Done · PR merged"), chevron.
+- **Scenarios.** An impl workspace started by a spec agent: "Started by: Spec — overview rework"
+  above, two review forks below. A workspace waiting on another's PR merge: "Blocked by: Release
+  0.16 · Working".
+- **Variants.** Parent chain + this + children; deep chain (3 ancestors); many children (Show all);
+  blocked by a workspace and an agent; blocking two workspaces; only children (a root).
+- **Edge cases.** An ancestor or child on a host that isn't connected → its row reads "Not loaded",
+  muted, not pressable. An archived parent → the row shows "Archived" and still opens it. A blocker
+  workspace that no longer exists → "Removed workspace", muted, not pressable. A workspace that both
+  blocks and is blocked by the same one shows in both groups.
+
+## O3 Pull requests (P1)
+
+- **Short.** The PRs this workspace's work lives in, for information.
+- **Extended.** Lists every PR paseo-prs relates to the workspace: the branch's PRs, their stack and
+  PRs linked from any repository. Open ones first, then merged/closed. Each row: `#123`, title,
+  facts ("2 failing", "changes requested", "approved", "checks running", "merged", "draft"); the
+  most urgent fact wins the tone. A PR from another repository prefixes `owner/repo`. Without
+  paseo-prs installed, the branch's PR from the host's git status. With no PR, one row "No PR yet"
+  with the branch facts ("3 commits · +120 −8 · uncommitted") and the branch name small and muted at
+  the end. No buttons: fixing and merging is the agent's or the asks' job.
+- **Get here.** Last section of O1.
+- **Shows.** Section label "Pull requests" with a count when more than one; the rows above.
+- **Scenarios.** A stacked 4-PR feature: all four, the failing one red. A multi-repo change: the paseo
+  PR and the paseo-prs plugin PR, the second prefixed `fullstackhouse/paseo-prs`.
+- **Variants.** One open PR with checks passing; failing checks (red) and changes requested; a stack
+  of several PRs, more than five (Show all); merged PR; no PR with branch facts; linked PR from
+  another repo.
+- **Edge cases.** GitHub unreachable or `gh` signed out → rows keep their last facts and the section
+  label adds "· not refreshed"; no error block. A branch with nothing to report and no PR → section
+  hidden. The default branch with no PR → section hidden.
+- **Opens.** Pressing a branch-PR row opens the PR tab in Explorer; any other PR opens on GitHub. The
+  "No PR yet" row opens the Changes tab.
+
+## E1 Your move (P1)
+
+- **Short.** What waits on you, and nothing else.
+- **Extended.** Asks, permissions and failed agents in the attention order, as today. Once the work
+  shipped (PR merged, or status card done) and the workspace is a worktree or its PR merged, Archive
+  closes the list. No Create PR, Push, Pull or Merge from base row and no failing-checks row; the PR
+  row in O3 carries those facts.
+- **Get here.** Section of O1, after Status and Blocked by.
+- **Shows.** Section label "Your move" with a count when more than one; one row open with its
+  buttons, the rest compact.
+- **Variants.** One ask open; ask + permission; failed agent; Archive alone after a merge; empty
+  (section hidden) with an unpushed branch, where the old Push row used to be.
+- **Edge cases.** The PR merged while an agent still runs → no Archive until the agent stops, as
+  today. Archive fails → the row shows the error under its title and stays.
+
+## E2 Context footer (P1)
+
+- **Short.** The remaining one-line facts: agent count and plugin facts.
+- **Extended.** Loses From and Started (now O2) and the PR or branch row (now O3). Keeps "Agents ·
+  3 here" (opens the Lineage tab) and plugin facts without a status or a move.
+- **Get here.** Section of O1, between Tree and Pull requests.
+- **Shows.** Unlabelled rows: label, value, chevron.
+- **Variants.** Agents and two plugin facts; hidden when there is nothing to say.
+- **Edge cases.** None beyond today's.

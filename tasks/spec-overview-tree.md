@@ -1,8 +1,8 @@
 # Spec: Overview without git moves, with the workspace's tree and PRs
 
-Status: design (atlas stage 1) · 2026-11-23
+Status: design (atlas stage 2) · 2026-11-23
 
-Follows [spec-overview-simplify.md](spec-overview-simplify.md). UI map: [spec-overview-tree-ui-map.md](spec-overview-tree-ui-map.md).
+Follows [spec-overview-simplify.md](spec-overview-simplify.md). UI map: [spec-overview-tree-ui-map.md](spec-overview-tree-ui-map.md). Cards: [spec-overview-tree-ui-overview.md](spec-overview-tree-ui-overview.md).
 
 ## Problem
 
@@ -32,6 +32,18 @@ step) → Context footer (From, Started, PR or branch row, Agents, plugin facts)
 `deriveYourMove` (`panels/overview/model.ts`) appends the `checks` and `git` rows; `deriveCodeRow`
 hides the footer's PR row whenever the git move names it.
 
+## Mechanism
+
+- **PR list (A3).** paseo-prs already computes the related PRs (branch, stack, linked). The plugin SDK
+  gets an optional `pullRequests` list on a workspace summary item (number, title, repo, url, state,
+  one facts word, tone); the host renders it in O3 and never in Your move. FSH-only, like
+  `EntryComponent`. Without such an item, O3 falls back to `githubRuntime.pullRequest`.
+- **Blocking (O2).** Client-side reverse index over the workspace summary store: every loaded status
+  card in state `blocked` whose `blockedBy` names this workspace, or an agent in it. No protocol change.
+- **Your move.** `deriveYourMove` drops the `checks` row and emits a `git` row only for
+  `archive-workspace`; `deriveCodeRow` goes away.
+
 ## Changelog
 
-- 2026-11-23 — stage 1 UI map drafted.
+- 2026-11-23 — stage 1 UI map drafted and approved (A1–A9).
+- 2026-11-23 — stage 2 cards drafted; mechanism for the PR list and Blocking.
