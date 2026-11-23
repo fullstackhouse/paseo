@@ -80,6 +80,8 @@ export const ar: TranslationResources = {
       daemonClientUnavailable: "عميل Daemon غير متوفر",
       daemonClientDisconnected: "تم قطع اتصال عميل Daemon",
       noFileFound: "لم يتم العثور على ملف لـ{{token}}",
+      openWithDefaultAppUnsupported:
+        "يفتح Paseo المستندات والصور والوسائط والمجلدات فقط في تطبيقها الافتراضي. {{path}} ليس منها",
       folderOutsideWorkspace: "{{path}} خارج مساحة العمل هذه",
       unexpectedDictationError: "حدث خطأ غير متوقع أثناء معالجة الإملاء.",
     },

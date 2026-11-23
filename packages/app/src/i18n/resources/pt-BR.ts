@@ -81,6 +81,8 @@ export const ptBR: TranslationResources = {
       daemonClientUnavailable: "Cliente do daemon indisponível",
       daemonClientDisconnected: "O cliente do daemon está desconectado",
       noFileFound: "Nenhum arquivo encontrado para {{token}}",
+      openWithDefaultAppUnsupported:
+        "O Paseo só abre documentos, imagens, mídia e pastas no app padrão. {{path}} não é um deles",
       folderOutsideWorkspace: "{{path}} está fora deste workspace",
       unexpectedDictationError: "Ocorreu um erro inesperado ao processar o ditado.",
     },
