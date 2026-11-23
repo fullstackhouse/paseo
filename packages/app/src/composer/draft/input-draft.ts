@@ -28,7 +28,6 @@ import { AfterPaintPublication } from "@/composer/after-paint-publication";
 import { useShallow } from "zustand/shallow";
 import type { ComposerTextSource } from "@/composer/text-source";
 import { isWeb } from "@/constants/platform";
-import { appendQuoteToText } from "@/composer/quote-text";
 
 type AttachmentUpdater =
   | UserComposerAttachment[]
@@ -184,16 +183,6 @@ export function useAgentInputDraft(input: UseAgentInputDraftInput): AgentInputDr
     },
     [draftKey, publishTextReplacement, textPublication],
   );
-
-  const pendingQuotes = useDraftStore((state) => state.pendingQuotesByDraftKey[draftKey]);
-  useEffect(() => {
-    if (!pendingQuotes || !isHydrated) return;
-    // Staged keystrokes land first, so the quote goes after everything already typed.
-    textPublication.flush();
-    const current = useDraftStore.getState().getDraftInput(draftKey)?.text ?? "";
-    replaceText(pendingQuotes.reduce(appendQuoteToText, current));
-    useDraftStore.getState().consumeQuoteInsert(draftKey);
-  }, [draftKey, isHydrated, pendingQuotes, replaceText, textPublication]);
 
   const setAttachments = useCallback(
     (updater: AttachmentUpdater) => {

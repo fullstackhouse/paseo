@@ -134,11 +134,13 @@ import type { ForgeSearchItem } from "@getpaseo/protocol/messages";
 import type {
   AttachmentMetadata,
   ComposerAttachment,
+  QuoteComposerAttachment,
   UserComposerAttachment,
   WorkspaceFileComposerAttachment,
   WorkspaceComposerAttachment,
 } from "@/attachments/types";
 import type { SelectedFile } from "@/attachments/selected-file";
+import { ComposerQuoteList, type ComposerQuoteListHandle } from "@/composer/quote-list";
 import { resolveComposerAttachmentSubmitFormat } from "@/composer/attachments/submit";
 import { composerWorkspaceAttachment } from "@/composer/attachments/workspace";
 import { useWorkspaceAttachmentsForScopes } from "@/attachments/workspace-attachments-store";
@@ -190,6 +192,13 @@ type AttachmentListUpdater =
   | ((prev: UserComposerAttachment[]) => UserComposerAttachment[]);
 
 const EMPTY_ATTACHMENT_SCOPE_KEYS: readonly string[] = [];
+
+function isBackspaceAtStart(event: ComposerKeyPressEvent): boolean {
+  const { selection } = event.input;
+  return (
+    event.key === "Backspace" && !event.hasModifier && selection.start === 0 && selection.end === 0
+  );
+}
 
 function noop() {}
 const noopCallback = () => {};
@@ -346,7 +355,8 @@ function renderAttachmentTray(args: RenderAttachmentTrayArgs): ReactElement | nu
     handleRemoveAttachment,
     labels,
   } = args;
-  if (selectedAttachments.length === 0 && pendingFiles.length === 0) return null;
+  const hasPills = selectedAttachments.some((attachment) => attachment.kind !== "quote");
+  if (!hasPills && pendingFiles.length === 0) return null;
   return (
     <View style={styles.attachmentTray} testID="composer-attachment-tray">
       {selectedAttachments.map((attachment, index) =>
@@ -411,7 +421,7 @@ interface RenderComposerAttachmentPillArgs {
   labels: RenderAttachmentTrayArgs["labels"];
 }
 
-function renderComposerAttachmentPill(args: RenderComposerAttachmentPillArgs): ReactElement {
+function renderComposerAttachmentPill(args: RenderComposerAttachmentPillArgs): ReactElement | null {
   const { attachment, index, disabled, onOpen, onRemove, labels } = args;
   if (attachment.kind === "image") {
     return (
@@ -439,6 +449,8 @@ function renderComposerAttachmentPill(args: RenderComposerAttachmentPillArgs): R
       />
     );
   }
+  // Quotes render in ComposerQuoteList, numbered and with their comments.
+  if (attachment.kind === "quote") return null;
   if (attachment.kind === "workspace_file") {
     return (
       <WorkspaceFileAttachmentPill
@@ -2013,6 +2025,10 @@ function ComposerContentImpl({
   const handleCommandKeyPress = useCallback(
     (event: ComposerKeyPressEvent) => {
       if (autocompleteRef.current?.onKeyPress(event)) return true;
+      if (isBackspaceAtStart(event) && quoteListRef.current?.focusLastComment()) {
+        event.preventDefault();
+        return true;
+      }
       const recalledText = recall.handleKeyPress(event, () =>
         selectAgentSentMessages(useSessionStore.getState().sessions[serverId], agentId),
       );
@@ -2343,6 +2359,35 @@ function ComposerContentImpl({
     [isFullscreen],
   );
 
+  const quoteListRef = useRef<ComposerQuoteListHandle | null>(null);
+  const quotes = useMemo(
+    () =>
+      selectedAttachments.filter(
+        (attachment): attachment is QuoteComposerAttachment => attachment.kind === "quote",
+      ),
+    [selectedAttachments],
+  );
+  const handleChangeQuote = useCallback(
+    (id: string, update: { text?: string; comment?: string }) => {
+      setSelectedAttachments((prev) =>
+        prev.map((attachment) =>
+          attachment.kind === "quote" && attachment.id === id
+            ? { ...attachment, ...update }
+            : attachment,
+        ),
+      );
+    },
+    [setSelectedAttachments],
+  );
+  const handleRemoveQuote = useCallback(
+    (id: string) => {
+      setSelectedAttachments((prev) =>
+        prev.filter((attachment) => attachment.kind !== "quote" || attachment.id !== id),
+      );
+    },
+    [setSelectedAttachments],
+  );
+
   const attachmentTray = useMemo(
     () =>
       renderAttachmentTray({
@@ -2371,6 +2416,26 @@ function ComposerContentImpl({
       pendingFiles,
       t,
     ],
+  );
+
+  const attachmentSlot = useMemo(
+    () =>
+      quotes.length > 0 ? (
+        <View style={styles.attachmentSlot}>
+          <ComposerQuoteList
+            ref={quoteListRef}
+            quotes={quotes}
+            disabled={isComposerLocked}
+            onChangeQuote={handleChangeQuote}
+            onRemove={handleRemoveQuote}
+            onFocusMessage={focusInput}
+          />
+          {attachmentTray}
+        </View>
+      ) : (
+        attachmentTray
+      ),
+    [attachmentTray, focusInput, handleChangeQuote, handleRemoveQuote, isComposerLocked, quotes],
   );
 
   const queueList = useMemo(
@@ -2526,7 +2591,7 @@ function ComposerContentImpl({
                   onFocusChange={handleFocusChange}
                   onHeightChange={onComposerHeightChange}
                   inputWrapperStyle={inputWrapperStyle}
-                  attachmentSlot={attachmentTray}
+                  attachmentSlot={attachmentSlot}
                   inputMode={inputMode}
                   readOnly={readOnly}
                   textReplacement={textReplacement}
@@ -2657,6 +2722,9 @@ const styles = StyleSheet.create((theme: Theme) => ({
   },
   iconButtonHovered: {
     backgroundColor: theme.colors.surface2,
+  },
+  attachmentSlot: {
+    gap: theme.spacing[3],
   },
   attachmentTray: {
     flexDirection: "row",

@@ -486,48 +486,27 @@ describe("useAgentInputDraft live contract", () => {
     });
   });
 
-  it("writes a cited quote into the message text after what was typed", async () => {
-    let latest: ReturnType<typeof useAgentInputDraft> | null = null;
-
-    function Probe() {
-      latest = useAgentInputDraft({ draftKey: "draft:cite" });
-      return null;
-    }
-
-    const container = document.getElementById("root");
-    if (!container) {
-      throw new Error("Missing root container");
-    }
-    const root = createTestRoot(container);
-    await act(async () => {
-      root.render(
-        <QueryClientProvider client={new QueryClient()}>
-          <Probe />
-        </QueryClientProvider>,
-      );
+  it("appends a cited quote to the draft without moving focus to the message", async () => {
+    useDraftStore.getState().saveDraftInput({
+      draftKey: "draft:quote",
+      draft: { text: "my question", attachments: [] },
     });
-    const getLatest = () => {
-      if (!latest) throw new Error("Expected hook result");
-      return latest;
-    };
+    const focusBefore =
+      useDraftStore.getState().attachmentFocusRequestByDraftKey["draft:quote"] ?? 0;
 
-    await act(async () => {
-      getLatest().editText("hey,");
-    });
-    const focusBefore = getLatest().attachmentFocusRequestId;
-    await act(async () => {
-      useDraftStore.getState().requestQuoteInsert({ draftKey: "draft:cite", markdown: "one" });
-      useDraftStore.getState().requestQuoteInsert({ draftKey: "draft:cite", markdown: "two" });
+    await useDraftStore.getState().attachQuote({
+      draftKey: "draft:quote",
+      id: "quote-1",
+      text: "> cited **bit**",
     });
 
-    const expected = "hey,\n\n> one\n\n> two\n\n";
-    expect(getLatest().textSource.getSnapshot()).toBe(expected);
-    expect(getLatest().textReplacement.text).toBe(expected);
-    expect(getLatest().attachmentFocusRequestId).toBe(focusBefore + 2);
-    expect(useDraftStore.getState().pendingQuotesByDraftKey["draft:cite"]).toBeUndefined();
-    await act(async () => {
-      root.unmount();
-    });
+    const draft = useDraftStore.getState().getDraftInput("draft:quote");
+    expect(draft?.text).toBe("my question");
+    expect(draft?.attachments).toEqual([{ kind: "quote", id: "quote-1", text: "> cited **bit**" }]);
+    // The quote's comment field takes focus, so the message input must not grab it.
+    expect(useDraftStore.getState().attachmentFocusRequestByDraftKey["draft:quote"] ?? 0).toBe(
+      focusBefore,
+    );
   });
 
   it("clear resets text and attachments", async () => {
