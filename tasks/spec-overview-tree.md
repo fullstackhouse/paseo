@@ -1,6 +1,6 @@
 # Spec: Overview without git moves, with the workspace's tree and PRs
 
-Status: design (atlas stage 2) · 2026-11-23
+Status: design approved (atlas `.ai/prototypes/overview-tree/`) · 2026-11-23
 
 Follows [spec-overview-simplify.md](spec-overview-simplify.md). UI map: [spec-overview-tree-ui-map.md](spec-overview-tree-ui-map.md). Cards: [spec-overview-tree-ui-overview.md](spec-overview-tree-ui-overview.md).
 
@@ -46,4 +46,5 @@ hides the footer's PR row whenever the git move names it.
 ## Changelog
 
 - 2026-11-23 — stage 1 UI map drafted and approved (A1–A9).
-- 2026-11-23 — stage 2 cards drafted; mechanism for the PR list and Blocking.
+- 2026-11-23 — stage 2 cards approved (A10–A14); mechanism for the PR list and Blocking.
+- 2026-11-23 — stage 3 atlas approved (A15–A18, A17 reply: lineage as indentation and arrows).
