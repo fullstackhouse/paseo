@@ -73,6 +73,7 @@ import {
   canAnswerPermissionInPlace,
   countLabel,
   derivePullRequests,
+  foldsDonePullRequests,
   findBlocking,
   isTreeBlocker,
   orderChildren,
@@ -1428,8 +1429,8 @@ function wordStyle(tone: Tone) {
 
 /**
  * The PRs the work lives in, for information: no buttons, the agent handles git. Open PRs show;
- * merged and closed ones fold behind one row while any is open. With no PR, a "No PR yet" row says
- * what a PR would propose.
+ * merged and closed ones fold behind a toggle row (`foldsDonePullRequests`). With no PR, a
+ * "No PR yet" row says what a PR would propose.
  */
 function PullRequests({
   item,
@@ -1442,7 +1443,8 @@ function PullRequests({
 }): ReactElement | null {
   const { t } = useTranslation();
   const [showDone, setShowDone] = useState(false);
-  const expand = useCallback(() => setShowDone(true), []);
+  const toggleDone = useCallback(() => setShowDone((shown) => !shown), []);
+  const doneState = useMemo(() => ({ expanded: showDone }), [showDone]);
   const openChanges = useCallback(
     () => openExplorerSidebarView({ isCompact: false, workspaceKey, view: "changes" }),
     [workspaceKey],
@@ -1487,8 +1489,8 @@ function PullRequests({
       </Section>
     );
   }
-  const fold = list.open.length > 0 && list.done.length > 0 && !showDone;
-  const rows = fold ? list.open : [...list.open, ...list.done];
+  const foldable = foldsDonePullRequests(list);
+  const rows = foldable && !showDone ? list.open : [...list.open, ...list.done];
   return (
     <Section
       title="panels.overview.pullRequests"
@@ -1500,22 +1502,25 @@ function PullRequests({
         {rows.map((row) => (
           <PullRequestRowView key={row.key} row={row} workspaceKey={workspaceKey} />
         ))}
-        {fold ? (
+        {foldable ? (
           <PressHighlight
             accessibilityRole="button"
-            onPress={expand}
+            accessibilityState={doneState}
+            onPress={toggleDone}
             style={styles.contextRow}
             highlightStyle={styles.pressed}
             testID="overview-pull-requests-done"
           >
             <Text style={styles.word} numberOfLines={1}>
-              {countLabel(
-                t,
-                list.done.every((row) => row.tone === "merged")
-                  ? "panels.overview.prsMerged"
-                  : "panels.overview.prsDone",
-                list.done.length,
-              )}
+              {showDone
+                ? t("panels.overview.prsShowLess")
+                : countLabel(
+                    t,
+                    list.done.every((row) => row.tone === "merged")
+                      ? "panels.overview.prsMerged"
+                      : "panels.overview.prsDone",
+                    list.done.length,
+                  )}
             </Text>
           </PressHighlight>
         ) : null}

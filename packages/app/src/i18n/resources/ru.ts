@@ -2283,6 +2283,7 @@ export const ru: TranslationResources = {
         one: "влит или закрыт {{count}}",
         other: "влито или закрыто: {{count}}",
       },
+      prsShowLess: "Свернуть",
       prState: {
         open: "Открыт",
         draft: "Черновик",

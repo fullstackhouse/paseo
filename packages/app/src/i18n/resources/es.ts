@@ -2298,6 +2298,7 @@ export const es: TranslationResources = {
         one: "{{count}} fusionado o cerrado",
         other: "{{count}} fusionados o cerrados",
       },
+      prsShowLess: "Mostrar menos",
       prState: {
         open: "Abierto",
         draft: "Borrador",

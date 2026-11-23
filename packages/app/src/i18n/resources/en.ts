@@ -2273,6 +2273,7 @@ export const en = {
         one: "{{count}} merged or closed",
         other: "{{count}} merged or closed",
       },
+      prsShowLess: "Show less",
       prState: {
         open: "Open",
         draft: "Draft",
