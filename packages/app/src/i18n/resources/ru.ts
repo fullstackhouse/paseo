@@ -180,8 +180,6 @@ export const ru: TranslationResources = {
       openImage: "Открыть прикрепленное изображение",
       removeImage: "Удалить прикрепленное изображение",
       removeFile: "Удалить прикрепленный файл",
-      quoteComment: "Комментарий к цитате {{number}}",
-      removeQuote: "Удалить цитату {{number}}",
       openGithub: "Открыть {{kind}} {{number}}",
       removeGithub: "Удалить {{kind}} {{number}}",
       element: "Элемент",

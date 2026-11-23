@@ -179,8 +179,6 @@ export const ar: TranslationResources = {
       openImage: "فتح مرفق الصورة",
       removeImage: "إزالة مرفق الصورة",
       removeFile: "Remove file attachment",
-      quoteComment: "تعليق على الاقتباس {{number}}",
-      removeQuote: "إزالة الاقتباس {{number}}",
       openGithub: "افتح {{kind}} {{number}}",
       removeGithub: "إزالة {{kind}} {{number}}",
       element: "عنصر",

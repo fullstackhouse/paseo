@@ -12,7 +12,6 @@ import {
   userAttachmentsOnly,
 } from "@/attachments/workspace-attachment-utils";
 import {
-  prependComposerQuotes,
   splitComposerAttachmentsForSubmit,
   type ComposerAttachmentSubmitFormat,
 } from "@/composer/attachments/submit";
@@ -206,11 +205,10 @@ export async function dispatchComposerAgentMessage(
   const wirePayload = splitComposerAttachmentsForSubmit(input.attachments, {
     format: input.attachmentSubmitFormat,
   });
-  const text = prependComposerQuotes(input.text, input.attachments);
   const clientMessageId = generateMessageId();
   const userMessage = createUserMessage({
     clientMessageId,
-    text,
+    text: input.text,
     timestamp: new Date(),
     images: wirePayload.images,
     attachments: wirePayload.attachments,
@@ -221,7 +219,7 @@ export async function dispatchComposerAgentMessage(
   input.submission.begin(input.agentId, userMessage);
   try {
     const imagesData = await input.encodeImages(wirePayload.images);
-    await input.client.sendAgentMessage(input.agentId, text, {
+    await input.client.sendAgentMessage(input.agentId, input.text, {
       messageId: clientMessageId,
       ...(input.activeTurnBehavior ? { activeTurnBehavior: input.activeTurnBehavior } : {}),
       images: imagesData ?? [],
@@ -350,11 +348,7 @@ export function openComposerAttachment(input: OpenComposerAttachmentInput): void
     input.setLightboxMetadata(input.attachment.metadata);
     return;
   }
-  if (
-    input.attachment.kind === "file" ||
-    input.attachment.kind === "workspace_file" ||
-    input.attachment.kind === "quote"
-  ) {
+  if (input.attachment.kind === "file" || input.attachment.kind === "workspace_file") {
     return;
   }
   if (isWorkspaceAttachment(input.attachment)) {

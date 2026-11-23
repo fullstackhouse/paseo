@@ -175,8 +175,6 @@ export const en = {
       openImage: "Open image attachment",
       removeImage: "Remove image attachment",
       removeFile: "Remove file attachment",
-      quoteComment: "Comment on quote {{number}}",
-      removeQuote: "Remove quote {{number}}",
       openGithub: "Open {{kind}} {{number}}",
       removeGithub: "Remove {{kind}} {{number}}",
       element: "Element",

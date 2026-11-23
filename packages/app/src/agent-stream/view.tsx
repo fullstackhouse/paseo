@@ -41,7 +41,7 @@ import {
   type InlinePathTarget,
 } from "@/components/message";
 import { PlanCard } from "@/components/plan-card";
-import { generateMessageId, getStreamItemMessageId, type StreamItem } from "@/types/stream";
+import { getStreamItemMessageId, type StreamItem } from "@/types/stream";
 import type { PendingMessageSubmission } from "@/composer/submission/model";
 import type { TurnPresentation } from "@/timeline/turn-liveness";
 import type { PendingPermission } from "@/types/shared";
@@ -106,7 +106,6 @@ import { navigateToWorkspace } from "@/stores/navigation-active-workspace-store"
 import { useStableEvent } from "@/hooks/use-stable-event";
 import { useDraftStore } from "@/stores/draft-store";
 import { buildDraftStoreKey } from "@/stores/draft-keys";
-import { requestQuoteCommentFocus } from "@/composer/quote-list";
 import { useForkAgent } from "@/hooks/use-fork-agent";
 import { isWeb } from "@/constants/platform";
 import type { Theme } from "@/styles/theme";
@@ -1952,19 +1951,16 @@ function StreamItemWrapper({ gapBelow, turnIndent, children }: StreamItemWrapper
   }
 }
 
-/** Cite puts the selected fragment in this agent's composer; read-only chats have none. */
+/** Cite quotes the selected fragment into this agent's message; read-only chats have none. */
 function useCiteIntoComposer(input: {
   serverId: string;
   agentId: string;
   readOnly: boolean;
 }): ((markdown: string) => void) | undefined {
   const cite = useStableEvent((markdown: string) => {
-    const id = generateMessageId();
-    requestQuoteCommentFocus(id);
-    void useDraftStore.getState().attachQuote({
+    useDraftStore.getState().requestQuoteInsert({
       draftKey: buildDraftStoreKey({ serverId: input.serverId, agentId: input.agentId }),
-      id,
-      text: markdown,
+      markdown,
     });
   });
   return input.readOnly ? undefined : cite;

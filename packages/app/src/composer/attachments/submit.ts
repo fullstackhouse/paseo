@@ -45,11 +45,6 @@ export function splitComposerAttachmentsForSubmit(
       : buildForgeAttachmentFromSearchItem;
 
   for (const attachment of attachments) {
-    // Quotes travel in the message text; see `prependComposerQuotes`.
-    if (attachment.kind === "quote") {
-      continue;
-    }
-
     if (attachment.kind === "image") {
       images.push(attachment.metadata);
       continue;
@@ -91,27 +86,4 @@ export function splitComposerAttachmentsForSubmit(
     images,
     attachments: agentAttachments,
   };
-}
-
-/**
- * Puts each cited fragment above the message as a markdown blockquote, followed by the
- * user's comment on it, in the order they were cited. Quotes live in the text rather than
- * as attachments so the agent reads them first and the sent message keeps them after the
- * daemon echoes it back.
- */
-export function prependComposerQuotes(text: string, attachments: ComposerAttachment[]): string {
-  const blocks = attachments.flatMap((attachment) => {
-    if (attachment.kind !== "quote" || !attachment.text.trim()) return [];
-    const quote = attachment.text
-      .trim()
-      .split(/\r?\n/)
-      .map((line) => (line.trim() ? `> ${line}` : ">"))
-      .join("\n");
-    const comment = attachment.comment?.trim();
-    return comment ? [quote, comment] : [quote];
-  });
-  if (blocks.length === 0) {
-    return text;
-  }
-  return [...blocks, text.trim()].filter(Boolean).join("\n\n");
 }

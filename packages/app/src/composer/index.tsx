@@ -134,13 +134,11 @@ import type { ForgeSearchItem } from "@getpaseo/protocol/messages";
 import type {
   AttachmentMetadata,
   ComposerAttachment,
-  QuoteComposerAttachment,
   UserComposerAttachment,
   WorkspaceFileComposerAttachment,
   WorkspaceComposerAttachment,
 } from "@/attachments/types";
 import type { SelectedFile } from "@/attachments/selected-file";
-import { ComposerQuoteList } from "@/composer/quote-list";
 import { resolveComposerAttachmentSubmitFormat } from "@/composer/attachments/submit";
 import { composerWorkspaceAttachment } from "@/composer/attachments/workspace";
 import { useWorkspaceAttachmentsForScopes } from "@/attachments/workspace-attachments-store";
@@ -348,8 +346,7 @@ function renderAttachmentTray(args: RenderAttachmentTrayArgs): ReactElement | nu
     handleRemoveAttachment,
     labels,
   } = args;
-  const hasPills = selectedAttachments.some((attachment) => attachment.kind !== "quote");
-  if (!hasPills && pendingFiles.length === 0) return null;
+  if (selectedAttachments.length === 0 && pendingFiles.length === 0) return null;
   return (
     <View style={styles.attachmentTray} testID="composer-attachment-tray">
       {selectedAttachments.map((attachment, index) =>
@@ -414,7 +411,7 @@ interface RenderComposerAttachmentPillArgs {
   labels: RenderAttachmentTrayArgs["labels"];
 }
 
-function renderComposerAttachmentPill(args: RenderComposerAttachmentPillArgs): ReactElement | null {
+function renderComposerAttachmentPill(args: RenderComposerAttachmentPillArgs): ReactElement {
   const { attachment, index, disabled, onOpen, onRemove, labels } = args;
   if (attachment.kind === "image") {
     return (
@@ -442,8 +439,6 @@ function renderComposerAttachmentPill(args: RenderComposerAttachmentPillArgs): R
       />
     );
   }
-  // Quotes render in ComposerQuoteList, numbered and with their comments.
-  if (attachment.kind === "quote") return null;
   if (attachment.kind === "workspace_file") {
     return (
       <WorkspaceFileAttachmentPill
@@ -2348,34 +2343,6 @@ function ComposerContentImpl({
     [isFullscreen],
   );
 
-  const quotes = useMemo(
-    () =>
-      selectedAttachments.filter(
-        (attachment): attachment is QuoteComposerAttachment => attachment.kind === "quote",
-      ),
-    [selectedAttachments],
-  );
-  const handleChangeQuoteComment = useCallback(
-    (id: string, comment: string) => {
-      setSelectedAttachments((prev) =>
-        prev.map((attachment) =>
-          attachment.kind === "quote" && attachment.id === id
-            ? { ...attachment, comment }
-            : attachment,
-        ),
-      );
-    },
-    [setSelectedAttachments],
-  );
-  const handleRemoveQuote = useCallback(
-    (id: string) => {
-      setSelectedAttachments((prev) =>
-        prev.filter((attachment) => attachment.kind !== "quote" || attachment.id !== id),
-      );
-    },
-    [setSelectedAttachments],
-  );
-
   const attachmentTray = useMemo(
     () =>
       renderAttachmentTray({
@@ -2403,32 +2370,6 @@ function ComposerContentImpl({
       selectedAttachments,
       pendingFiles,
       t,
-    ],
-  );
-
-  const attachmentSlot = useMemo(
-    () =>
-      quotes.length > 0 ? (
-        <View style={styles.attachmentSlot}>
-          <ComposerQuoteList
-            quotes={quotes}
-            disabled={isComposerLocked}
-            onChangeComment={handleChangeQuoteComment}
-            onRemove={handleRemoveQuote}
-            onSubmitComment={focusInput}
-          />
-          {attachmentTray}
-        </View>
-      ) : (
-        attachmentTray
-      ),
-    [
-      attachmentTray,
-      focusInput,
-      handleChangeQuoteComment,
-      handleRemoveQuote,
-      isComposerLocked,
-      quotes,
     ],
   );
 
@@ -2585,7 +2526,7 @@ function ComposerContentImpl({
                   onFocusChange={handleFocusChange}
                   onHeightChange={onComposerHeightChange}
                   inputWrapperStyle={inputWrapperStyle}
-                  attachmentSlot={attachmentSlot}
+                  attachmentSlot={attachmentTray}
                   inputMode={inputMode}
                   readOnly={readOnly}
                   textReplacement={textReplacement}
@@ -2716,9 +2657,6 @@ const styles = StyleSheet.create((theme: Theme) => ({
   },
   iconButtonHovered: {
     backgroundColor: theme.colors.surface2,
-  },
-  attachmentSlot: {
-    gap: theme.spacing[3],
   },
   attachmentTray: {
     flexDirection: "row",

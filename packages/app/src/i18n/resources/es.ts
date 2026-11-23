@@ -180,8 +180,6 @@ export const es: TranslationResources = {
       openImage: "Abrir imagen adjunta",
       removeImage: "Quitar imagen adjunta",
       removeFile: "Remove file attachment",
-      quoteComment: "Comenta la cita {{number}}",
-      removeQuote: "Quitar cita {{number}}",
       openGithub: "Abrir {{kind}} {{number}}",
       removeGithub: "Quitar {{kind}} {{number}}",
       element: "Elemento",
