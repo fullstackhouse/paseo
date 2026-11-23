@@ -103,8 +103,17 @@ export interface WorkspaceFileComposerAttachment {
   selection: WorkspaceFileSelection;
 }
 
+/** A fragment of an agent's reply the user cited; sent as a blockquote above their message. */
+export interface QuoteComposerAttachment {
+  kind: "quote";
+  id: string;
+  /** Markdown of the selected fragment. */
+  text: string;
+}
+
 export type UserComposerAttachment =
   | { kind: "image"; metadata: AttachmentMetadata }
+  | QuoteComposerAttachment
   | { kind: "file"; attachment: UploadedFileAttachment }
   | WorkspaceFileComposerAttachment
   | PluginResourceComposerAttachment

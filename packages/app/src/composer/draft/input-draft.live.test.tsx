@@ -486,6 +486,28 @@ describe("useAgentInputDraft live contract", () => {
     });
   });
 
+  it("appends a cited quote to the draft and asks the composer to focus", async () => {
+    useDraftStore.getState().saveDraftInput({
+      draftKey: "draft:quote",
+      draft: { text: "my question", attachments: [] },
+    });
+    const focusBefore =
+      useDraftStore.getState().attachmentFocusRequestByDraftKey["draft:quote"] ?? 0;
+
+    await useDraftStore
+      .getState()
+      .attachQuote({ draftKey: "draft:quote", text: "> cited **bit**" });
+
+    const draft = useDraftStore.getState().getDraftInput("draft:quote");
+    expect(draft?.text).toBe("my question");
+    expect(draft?.attachments).toEqual([
+      { kind: "quote", id: expect.any(String), text: "> cited **bit**" },
+    ]);
+    expect(useDraftStore.getState().attachmentFocusRequestByDraftKey["draft:quote"]).toBe(
+      focusBefore + 1,
+    );
+  });
+
   it("clear resets text and attachments", async () => {
     let latest: ReturnType<typeof useAgentInputDraft> | null = null;
     const image: AttachmentMetadata = {

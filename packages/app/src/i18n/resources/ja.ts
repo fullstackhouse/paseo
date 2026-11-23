@@ -180,6 +180,8 @@ export const ja: TranslationResources = {
       openImage: "画像添付ファイルを開く",
       removeImage: "画像添付ファイルを削除",
       removeFile: "ファイル添付ファイルを削除",
+      quote: "引用",
+      removeQuote: "引用を削除",
       openGithub: "{{kind}} {{number}}を開く",
       removeGithub: "{{kind}} {{number}}を削除",
       element: "要素",
@@ -248,6 +250,7 @@ export const ja: TranslationResources = {
   agentStream: {
     empty: "このエージェントとチャットを始めましょう...",
     scrollToBottom: "下にスクロール",
+    cite: "引用",
     historyLoadFailed: "エージェントの履歴を読み込めませんでした",
     messageCapped: "このメッセージは上限で切り詰められました（{{bytes}}バイト）。",
     permission: {

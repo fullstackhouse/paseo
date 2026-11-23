@@ -181,6 +181,8 @@ export const fr: TranslationResources = {
       openImage: "Ouvrir l’image jointe",
       removeImage: "Retirer l’image jointe",
       removeFile: "Retirer le fichier joint",
+      quote: "Citation",
+      removeQuote: "Retirer la citation",
       openGithub: "Ouvrir {{kind}} {{number}}",
       removeGithub: "Retirer {{kind}} {{number}}",
       element: "Élément",
@@ -249,6 +251,7 @@ export const fr: TranslationResources = {
   agentStream: {
     empty: "Commencez à discuter avec cet agent…",
     scrollToBottom: "Faire défiler vers le bas",
+    cite: "Citer",
     historyLoadFailed: "Impossible de charger l’historique de l’agent",
     messageCapped: "Ce message a été tronqué ({{bytes}} octets).",
     permission: {

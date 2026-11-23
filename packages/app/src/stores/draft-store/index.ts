@@ -1,7 +1,12 @@
-import { create } from "zustand";
+import { create, type StoreApi } from "zustand";
 import { persist } from "zustand/middleware";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import type { AttachmentMetadata, WorkspaceFileComposerAttachment } from "@/attachments/types";
+import type {
+  AttachmentMetadata,
+  UserComposerAttachment,
+  WorkspaceFileComposerAttachment,
+} from "@/attachments/types";
+import { generateMessageId } from "@/types/stream";
 import { appendWorkspaceFileAttachment } from "@/attachments/workspace-file";
 import {
   garbageCollectAttachments,
@@ -53,6 +58,8 @@ interface DraftStoreActions {
     draftKey: string;
     attachment: WorkspaceFileComposerAttachment;
   }) => Promise<void>;
+  /** Adds a cited fragment of an agent's reply to that chat's draft and focuses its composer. */
+  attachQuote: (input: { draftKey: string; text: string }) => Promise<void>;
   getCreateModalDraft: () => DraftInput | null;
   saveCreateModalDraft: (draft: DraftInput | null) => void;
   collectActiveAttachmentIds: () => string[];
@@ -250,6 +257,34 @@ async function migrateAllLegacyDrafts(): Promise<void> {
   }
 }
 
+async function appendDraftAttachment(
+  set: StoreApi<DraftStore>["setState"],
+  get: StoreApi<DraftStore>["getState"],
+  draftKey: string,
+  append: (attachments: UserComposerAttachment[]) => UserComposerAttachment[],
+): Promise<void> {
+  await get().hydrateDraftInput({ draftKey });
+  set((state) => {
+    const existing = state.drafts[draftKey];
+    const draft = toDraftInputIfReady(existing) ?? { text: "", attachments: [] };
+    return {
+      drafts: {
+        ...state.drafts,
+        [draftKey]: createDraftRecord({
+          draft: { ...draft, attachments: append(draft.attachments) },
+          lifecycle: "active",
+          previousVersion: existing?.version,
+        }),
+      },
+      attachmentFocusRequestByDraftKey: {
+        ...state.attachmentFocusRequestByDraftKey,
+        [draftKey]: (state.attachmentFocusRequestByDraftKey[draftKey] ?? 0) + 1,
+      },
+    };
+  });
+  scheduleAttachmentGc();
+}
+
 export const useDraftStore = create<DraftStore>()(
   persist(
     (set, get) => ({
@@ -374,31 +409,16 @@ export const useDraftStore = create<DraftStore>()(
         scheduleAttachmentGc();
       },
 
-      attachWorkspaceFile: async ({ draftKey, attachment }) => {
-        await get().hydrateDraftInput({ draftKey });
-        set((state) => {
-          const existing = state.drafts[draftKey];
-          const draft = toDraftInputIfReady(existing) ?? { text: "", attachments: [] };
-          return {
-            drafts: {
-              ...state.drafts,
-              [draftKey]: createDraftRecord({
-                draft: {
-                  ...draft,
-                  attachments: appendWorkspaceFileAttachment(draft.attachments, attachment),
-                },
-                lifecycle: "active",
-                previousVersion: existing?.version,
-              }),
-            },
-            attachmentFocusRequestByDraftKey: {
-              ...state.attachmentFocusRequestByDraftKey,
-              [draftKey]: (state.attachmentFocusRequestByDraftKey[draftKey] ?? 0) + 1,
-            },
-          };
-        });
-        scheduleAttachmentGc();
-      },
+      attachWorkspaceFile: ({ draftKey, attachment }) =>
+        appendDraftAttachment(set, get, draftKey, (attachments) =>
+          appendWorkspaceFileAttachment(attachments, attachment),
+        ),
+
+      attachQuote: ({ draftKey, text }) =>
+        appendDraftAttachment(set, get, draftKey, (attachments) => [
+          ...attachments,
+          { kind: "quote", id: generateMessageId(), text },
+        ]),
 
       getCreateModalDraft: () => {
         const record = get().createModalDraft;

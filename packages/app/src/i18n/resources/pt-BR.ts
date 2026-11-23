@@ -180,6 +180,8 @@ export const ptBR: TranslationResources = {
       openImage: "Abrir anexo de imagem",
       removeImage: "Remover anexo de imagem",
       removeFile: "Remover anexo de arquivo",
+      quote: "Citação",
+      removeQuote: "Remover citação",
       openGithub: "Abrir {{kind}} {{number}}",
       removeGithub: "Remover {{kind}} {{number}}",
       element: "Elemento",
@@ -247,6 +249,7 @@ export const ptBR: TranslationResources = {
   agentStream: {
     empty: "Comece a conversar com este agente...",
     scrollToBottom: "Rolar para o fim",
+    cite: "Citar",
     historyLoadFailed: "Não foi possível carregar o histórico do agente",
     messageCapped: "Esta mensagem foi truncada ({{bytes}} bytes).",
     permission: {

@@ -46,6 +46,7 @@ import {
   ClipboardPaste,
   Camera,
   Paperclip,
+  Quote,
 } from "lucide-react-native";
 import * as Clipboard from "expo-clipboard";
 import { FOOTER_HEIGHT } from "@/constants/layout";
@@ -331,6 +332,8 @@ interface RenderAttachmentTrayArgs {
     openImage: string;
     removeImage: string;
     removeFile: string;
+    quote: string;
+    removeQuote: string;
     openGithub: (kind: string, numberLabel: string) => string;
     removeGithub: (kind: string, numberLabel: string) => string;
   };
@@ -436,6 +439,19 @@ function renderComposerAttachmentPill(args: RenderComposerAttachmentPillArgs): R
         disabled={disabled}
         onRemove={onRemove}
         removeLabel={labels.removeFile}
+      />
+    );
+  }
+  if (attachment.kind === "quote") {
+    return (
+      <QuoteAttachmentPill
+        key={`quote:${attachment.id}`}
+        attachment={attachment}
+        index={index}
+        disabled={disabled}
+        onRemove={onRemove}
+        label={labels.quote}
+        removeLabel={labels.removeQuote}
       />
     );
   }
@@ -746,6 +762,44 @@ function ImageAttachmentPill({
       disabled={disabled}
     >
       <AttachmentThumbnail metadata={attachment.metadata} />
+    </AttachmentPill>
+  );
+}
+
+interface QuoteAttachmentPillProps {
+  attachment: Extract<ComposerAttachment, { kind: "quote" }>;
+  index: number;
+  disabled: boolean;
+  onRemove: (index: number) => void;
+  label: string;
+  removeLabel: string;
+}
+
+function QuoteAttachmentPill({
+  attachment,
+  index,
+  disabled,
+  onRemove,
+  label,
+  removeLabel,
+}: QuoteAttachmentPillProps) {
+  const handleRemove = useCallback(() => {
+    onRemove(index);
+  }, [onRemove, index]);
+  return (
+    <AttachmentPill
+      testID="composer-quote-attachment-pill"
+      onOpen={noop}
+      onRemove={handleRemove}
+      openAccessibilityLabel={label}
+      removeAccessibilityLabel={removeLabel}
+      disabled={disabled}
+    >
+      <AttachmentLabel
+        icon={quotePillIcon}
+        title={attachment.text.replace(/\s+/g, " ").trim()}
+        subtitle={label}
+      />
     </AttachmentPill>
   );
 }
@@ -2356,6 +2410,8 @@ function ComposerContentImpl({
           openImage: t("composer.attachments.openImage"),
           removeImage: t("composer.attachments.removeImage"),
           removeFile: t("composer.attachments.removeFile"),
+          quote: t("composer.attachments.quote"),
+          removeQuote: t("composer.attachments.removeQuote"),
           openGithub: (kind: string, numberLabel: string) =>
             t("composer.attachments.openGithub", { kind, number: numberLabel }),
           removeGithub: (kind: string, numberLabel: string) =>
@@ -2729,6 +2785,7 @@ const ThemedCamera = withUnistyles(Camera);
 const ThemedImageIcon = withUnistyles(ImageIcon);
 const ThemedClipboardPaste = withUnistyles(ClipboardPaste);
 const ThemedFileText = withUnistyles(FileText);
+const ThemedQuote = withUnistyles(Quote);
 const iconForegroundMapping = (theme: Theme) => ({ color: theme.colors.foreground });
 const iconForegroundMutedMapping = (theme: Theme) => ({ color: theme.colors.foregroundMuted });
 const iconAccentForegroundMapping = (theme: Theme) => ({ color: theme.colors.accentForeground });
@@ -2745,6 +2802,7 @@ const githubPrPillIcon = (
 const githubIssuePillIcon = (
   <ThemedCircleDot size={ICON_SIZE.sm} uniProps={iconForegroundMutedMapping} />
 );
+const quotePillIcon = <ThemedQuote size={ICON_SIZE.sm} uniProps={iconForegroundMutedMapping} />;
 const filePillIcon = <ThemedFileText size={ICON_SIZE.sm} uniProps={iconForegroundMutedMapping} />;
 
 const pendingFilePillIcon = (

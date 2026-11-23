@@ -14,6 +14,7 @@ temporary by design: every patch is meant to go upstream and then drop out of `f
 
 - FSH-only (upstreamable): a file tab's right-click menu has **Reveal in Finder** (Explorer / Files on other OSes) on desktop with a local daemon, next to **Copy file path**.
 - FSH-only (upstreamable): plugins get the app's menu as `Menu` from `@getpaseo/plugin/client/ui`: rows as data (icon, destructive, disabled, separators), a host-drawn icon trigger, a popover on wide layouts and a bottom sheet on compact ones. Older hosts leave the export undefined
+- FSH-only (upstreamable): select text in an agent's reply and a **Cite** button appears next to it. It adds the fragment to that agent's composer as a quote chip. On send, each quote goes above your message as a `> ` blockquote, inside the message text, so the agent reads it first and it stays in the history after a reload. Your message bubble draws those leading `>` lines as a quote block. Web and desktop only, because native has no selection there
 - FSH-only (upstreamable): plugins can render the Explorer pull-request panel through `PullRequestPanel`, using their own checks and activity data without a workspace checkout. Inbox uses it for its read-only GitHub tab.
 
 - FSH-only (upstreamable): agent snapshots carry `capabilities.supportsSteering` (Claude, Codex, OpenCode, Pi, OMP, and provider plugins that negotiate `prompt.steer`), so plugins steer a running agent when it joins the turn and wait for the turn to end when a steer would interrupt it.

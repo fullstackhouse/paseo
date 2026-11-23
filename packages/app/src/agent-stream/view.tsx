@@ -104,6 +104,8 @@ import {
 } from "@/workspace/file-open";
 import { navigateToWorkspace } from "@/stores/navigation-active-workspace-store";
 import { useStableEvent } from "@/hooks/use-stable-event";
+import { useDraftStore } from "@/stores/draft-store";
+import { buildDraftStoreKey } from "@/stores/draft-keys";
 import { useForkAgent } from "@/hooks/use-fork-agent";
 import { isWeb } from "@/constants/platform";
 import type { Theme } from "@/styles/theme";
@@ -496,6 +498,8 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
         if (isActive) void inlinePathOpener.open(target, disposition);
       },
     );
+
+    const handleCite = useCiteIntoComposer({ serverId: resolvedServerId, agentId, readOnly });
 
     const handleToolCallOpenFile = useStableEvent((filePath: string) => {
       handleInlinePathPress({ raw: filePath, path: filePath }, "preferred");
@@ -1222,7 +1226,7 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
         visibleMessageIds={mountedMessageIds}
       >
         <ToolCallSheetProvider>
-          <AssistantSelectionCopySurface style={stylesheet.container}>
+          <AssistantSelectionCopySurface style={stylesheet.container} onCite={handleCite}>
             <MessageOuterSpacingProvider disableOuterSpacing>
               <ToolCallExpansionContext.Provider value={toolCallExpansion}>
                 {streamRenderStrategy.render({
@@ -1945,4 +1949,19 @@ function StreamItemWrapper({ gapBelow, turnIndent, children }: StreamItemWrapper
         </View>
       );
   }
+}
+
+/** Cite puts the selected fragment in this agent's composer; read-only chats have none. */
+function useCiteIntoComposer(input: {
+  serverId: string;
+  agentId: string;
+  readOnly: boolean;
+}): ((markdown: string) => void) | undefined {
+  const cite = useStableEvent((markdown: string) => {
+    void useDraftStore.getState().attachQuote({
+      draftKey: buildDraftStoreKey({ serverId: input.serverId, agentId: input.agentId }),
+      text: markdown,
+    });
+  });
+  return input.readOnly ? undefined : cite;
 }
