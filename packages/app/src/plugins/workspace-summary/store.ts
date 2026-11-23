@@ -141,10 +141,13 @@ function cleanEntries(
 ): PluginWorkspaceSummaryEntry[] {
   if (!Array.isArray(entries)) return [];
   const clean: PluginWorkspaceSummaryEntry[] = [];
+  // Ids key the Overview rows; a repeated id would render two rows under one React key.
+  const seen = new Set<string>();
   for (const entry of entries) {
     const id = typeof entry?.id === "string" ? entry.id.trim() : "";
     const title = typeof entry?.title === "string" ? entry.title.trim() : "";
-    if (!id || !title) continue;
+    if (!id || !title || seen.has(id)) continue;
+    seen.add(id);
     const detail = typeof entry.detail === "string" ? entry.detail.trim() : "";
     clean.push(detail ? { id, title, detail } : { id, title });
   }

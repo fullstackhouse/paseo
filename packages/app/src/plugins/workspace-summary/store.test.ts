@@ -153,6 +153,24 @@ describe("WorkspaceSummaryStore", () => {
     ]);
   });
 
+  it("keeps the first entry when ids repeat", () => {
+    const store = new WorkspaceSummaryStore();
+    store.add(owner, {
+      id: "asks",
+      workspaceId: "w",
+      title: "Asks",
+      entries: [
+        { id: "A1", title: "First" },
+        { id: "A2", title: "Other" },
+        { id: " A1 ", title: "Repeat" },
+      ],
+    });
+    expect(store.forWorkspace("s", "w")[0]?.entries).toEqual([
+      { id: "A1", title: "First" },
+      { id: "A2", title: "Other" },
+    ]);
+  });
+
   it("keeps the entry component across updates", () => {
     const store = new WorkspaceSummaryStore();
     const EntryComponent = () => null;
