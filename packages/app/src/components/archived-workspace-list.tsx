@@ -9,7 +9,6 @@ import {
   type StyleProp,
   type TextStyle,
 } from "react-native";
-import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { RECALL_MATCH_OPTIONS } from "@getpaseo/protocol/search/text-match";
@@ -25,7 +24,7 @@ import { findHighlightRanges } from "@/components/ui/highlighted-text-segments";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import type { ArchivedWorkspace } from "@/hooks/use-archived-workspaces";
 import { useTimeAgo } from "@/hooks/use-time-ago";
-import { buildHostWorkspaceRoute } from "@/utils/host-routes";
+import { navigateToWorkspace } from "@/stores/navigation-active-workspace-store";
 
 const ThemedRefreshControl = withUnistyles(RefreshControl, (theme) => ({
   tintColor: theme.colors.foregroundMuted,
@@ -82,9 +81,14 @@ function ArchivedWorkspaceRow({
     ],
     [],
   );
-  // The workspace route shows an archived workspace read-only with its Unarchive/Restore banner.
+  // Opening on a tab is the explicit intent that makes the route offer Unarchive or Restore;
+  // once recovered, the workspace opens on its Overview.
   const handlePress = useCallback(() => {
-    router.navigate(buildHostWorkspaceRoute(workspace.serverId, workspace.workspaceId));
+    navigateToWorkspace({
+      serverId: workspace.serverId,
+      workspaceId: workspace.workspaceId,
+      target: { kind: "overview" },
+    });
   }, [workspace.serverId, workspace.workspaceId]);
   const testID = `archived-workspace-row-${workspace.serverId}-${workspace.workspaceId}`;
 

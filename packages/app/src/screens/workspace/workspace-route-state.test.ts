@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { WorkspaceDescriptor } from "@/stores/session-store";
 import type { WorkspaceRecoveryModel } from "@/workspace-recovery/model";
-import { resolveArchivedPreviewAgentId, resolveWorkspaceRouteState } from "./workspace-route-state";
+import {
+  resolveArchivedPreviewAgentId,
+  resolveWorkspaceRouteState,
+  shouldInspectWorkspaceRecovery,
+} from "./workspace-route-state";
 
 function createWorkspaceDescriptor(): WorkspaceDescriptor {
   return {
@@ -226,5 +230,20 @@ describe("resolveArchivedPreviewAgentId", () => {
         agent,
       ),
     ).toBeNull();
+  });
+});
+
+describe("shouldInspectWorkspaceRecovery", () => {
+  it("inspects a missing workspace opened from an archived workspace row", () => {
+    expect(shouldInspectWorkspaceRecovery(true, null, { kind: "overview" })).toBe(true);
+    expect(shouldInspectWorkspaceRecovery(true, null, { kind: "agent", agentId: "a" })).toBe(true);
+  });
+
+  it("leaves a plain link, a live workspace and an unhydrated host alone", () => {
+    expect(shouldInspectWorkspaceRecovery(true, null, null)).toBe(false);
+    expect(
+      shouldInspectWorkspaceRecovery(true, createWorkspaceDescriptor(), { kind: "overview" }),
+    ).toBe(false);
+    expect(shouldInspectWorkspaceRecovery(false, null, { kind: "overview" })).toBe(false);
   });
 });
