@@ -20,6 +20,7 @@ import { useSessionStore } from "@/stores/session-store";
 import { useWorkspaceLayoutStore } from "@/stores/workspace-layout-store";
 import { stripHostWorkspaceRouteEchoSearchFromBrowserUrlAfterCommit } from "@/utils/host-route-browser";
 import { navigateToHostWorkspaceRoute } from "@/navigation/workspace-route-navigation";
+import { useHasHydratedWorkspaces, useWorkspaceExists } from "@/stores/session-store-hooks";
 
 export type { ActiveWorkspaceSelection } from "@/stores/last-workspace-selection";
 export type { NavigateToWorkspaceInput } from "./navigation";
@@ -63,6 +64,15 @@ export function getLastWorkspaceSelection(): ActiveWorkspaceSelection | null {
   return lastWorkspaceSelectionStore.getSelection();
 }
 
+/**
+ * Forgets the workspace the app reopened at startup, so a workspace that no longer exists on
+ * its host is not reopened on every launch. Returns false when the user has since navigated
+ * to another workspace.
+ */
+export function forgetRestoredWorkspaceSelection(selection: ActiveWorkspaceSelection): boolean {
+  return lastWorkspaceSelectionStore.forgetRestored(selection);
+}
+
 export function getIsLastWorkspaceSelectionHydrated(): boolean {
   return lastWorkspaceSelectionStore.isHydrated();
 }
@@ -86,12 +96,19 @@ export function useActiveWorkspaceSelection(): ActiveWorkspaceSelection | null {
   const selection = parseActiveWorkspaceSelection({ pathname: usePathname(), params });
   const serverId = selection?.serverId ?? null;
   const workspaceId = selection?.workspaceId ?? null;
+  // Save only a workspace the host's loaded list confirms. A route can point at a workspace
+  // archived elsewhere (a reload, a link): saving it before the list arrives, or from a cached
+  // list that still has it, would make the next launch reopen "Workspace unavailable" and
+  // replace a live saved workspace. In-app navigation saves through `navigateToWorkspace`.
+  const hasHydratedWorkspaces = useHasHydratedWorkspaces(serverId);
+  const workspaceExists = useWorkspaceExists(serverId, workspaceId);
+  const isConfirmed = hasHydratedWorkspaces && workspaceExists;
   useEffect(() => {
-    if (!serverId || !workspaceId) {
+    if (!serverId || !workspaceId || !isConfirmed) {
       return;
     }
     lastWorkspaceSelectionStore.remember({ serverId, workspaceId });
-  }, [serverId, workspaceId]);
+  }, [isConfirmed, serverId, workspaceId]);
   return selection;
 }
 

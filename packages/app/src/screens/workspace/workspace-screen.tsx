@@ -214,7 +214,13 @@ import {
 import { findAdjacentPane } from "@/utils/split-navigation";
 import { supportsDesktopPaneSplits, useIsCompactFormFactor } from "@/constants/layout";
 import { getIsElectron, isNative, isWeb } from "@/constants/platform";
-import { buildHostRootRoute, buildSettingsHostRoute } from "@/utils/host-routes";
+import {
+  buildHostRootRoute,
+  buildNewWorkspaceRoute,
+  buildOpenProjectRoute,
+  buildSettingsHostRoute,
+} from "@/utils/host-routes";
+import { forgetRestoredWorkspaceSelection } from "@/stores/navigation-active-workspace-store";
 import { useWorkspaceTerminals } from "@/screens/workspace/terminals/use-workspace-terminals";
 import type { TerminalProfile } from "@getpaseo/protocol/messages";
 import {
@@ -741,6 +747,8 @@ function useWorkspaceRouteActions(normalizedServerId: string): {
   handleRetryHost: () => void;
   handleManageHost: () => void;
   handleDismissMissingWorkspace: () => void;
+  handleGoHome: () => void;
+  handleNewWorkspace: () => void;
 } {
   const router = useRouter();
   const handleRetryHost = useCallback(() => {
@@ -766,11 +774,22 @@ function useWorkspaceRouteActions(normalizedServerId: string): {
     }
     router.replace("/" as Href);
   }, [normalizedServerId, router]);
+  // Replace, not push: Back from either destination must not return to the missing workspace.
+  const handleGoHome = useCallback(() => {
+    router.replace(buildOpenProjectRoute());
+  }, [router]);
+  const handleNewWorkspace = useCallback(() => {
+    router.replace(
+      buildNewWorkspaceRoute(normalizedServerId ? { serverId: normalizedServerId } : {}),
+    );
+  }, [normalizedServerId, router]);
 
   return {
     handleRetryHost,
     handleManageHost,
     handleDismissMissingWorkspace,
+    handleGoHome,
+    handleNewWorkspace,
   };
 }
 
@@ -1155,8 +1174,13 @@ function WorkspaceScreenContent({
     );
   }, [isRouteFocused, normalizedServerId, normalizedWorkspaceId]);
   const workspaceScripts = getWorkspaceScripts(workspaceDescriptor);
-  const { handleRetryHost, handleManageHost, handleDismissMissingWorkspace } =
-    useWorkspaceRouteActions(normalizedServerId);
+  const {
+    handleRetryHost,
+    handleManageHost,
+    handleDismissMissingWorkspace,
+    handleGoHome,
+    handleNewWorkspace,
+  } = useWorkspaceRouteActions(normalizedServerId);
 
   const client = useHostRuntimeClient(normalizedServerId);
   const isConnected = useHostRuntimeIsConnected(normalizedServerId);
@@ -1339,6 +1363,17 @@ function WorkspaceScreenContent({
     hasHydratedWorkspaces,
     recovery: workspaceRecovery.state,
   });
+  const isWorkspaceMissing = workspaceRouteState.kind === "missing";
+  // The app reopens the last workspace on launch. If it was archived elsewhere, forget it so
+  // the next launch does not land on this screen again. Only the selection restored from
+  // storage qualifies: one opened this session may just not have arrived yet.
+  useEffect(() => {
+    if (!isWorkspaceMissing) return;
+    forgetRestoredWorkspaceSelection({
+      serverId: normalizedServerId,
+      workspaceId: normalizedWorkspaceId,
+    });
+  }, [isWorkspaceMissing, normalizedServerId, normalizedWorkspaceId]);
   const workspaceHeaderCheckoutState = buildWorkspaceHeaderCheckoutState({
     isCheckoutStatusLoading,
     isError: checkoutQuery.isError,
@@ -3288,6 +3323,8 @@ function WorkspaceScreenContent({
     onRetryHost: handleRetryHost,
     onManageHost: handleManageHost,
     onDismissMissingWorkspace: handleDismissMissingWorkspace,
+    onGoHome: handleGoHome,
+    onNewWorkspace: handleNewWorkspace,
     onRecoverWorkspace: workspaceRecovery.restore,
     onRecreateWorkspace: workspaceRecovery.recreate,
     onRetryRecoveryInspection: workspaceRecovery.retryInspection,
