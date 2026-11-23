@@ -283,6 +283,48 @@ describe("useFileLink", () => {
     expect(getDirectorySuggestions).toHaveBeenCalledTimes(1);
   });
 
+  it("resolves a bare file name on the daemon without opening it", async () => {
+    const getDirectorySuggestions = vi.fn(async () =>
+      resolvedSuggestions([{ path: "docs/dumm.md", kind: "file" }]),
+    );
+    const openedFiles: OpenedFile[] = [];
+    const { result } = renderHook(() => useFileLink(SOURCE), {
+      wrapper: createWrapper({ client: { getDirectorySuggestions }, openedFiles }),
+    });
+
+    expect(result.current.isFileLink).toBe(true);
+    const target = await result.current.resolve();
+
+    expect(target?.path).toBe("/Users/test/project/docs/dumm.md");
+    expect(openedFiles).toEqual([]);
+  });
+
+  it("resolves to null and shows the not-found toast when the daemon has no match", async () => {
+    const getDirectorySuggestions = vi.fn(async () => resolvedSuggestions([]));
+    const toast = createToast();
+    const { result } = renderHook(() => useFileLink(SOURCE), {
+      wrapper: createWrapper({ client: { getDirectorySuggestions }, openedFiles: [], toast }),
+    });
+
+    await expect(result.current.resolve()).resolves.toBeNull();
+    expect(toast.show).toHaveBeenCalledWith(
+      expect.stringContaining("dumm.md"),
+      expect.objectContaining({ testID: "assistant-file-link-not-found-toast" }),
+    );
+  });
+
+  it("does not treat a web link as a file", async () => {
+    const getDirectorySuggestions = vi.fn(async () => resolvedSuggestions([]));
+    const { result } = renderHook(
+      () => useFileLink({ href: "https://example.com/docs", text: "docs" }),
+      { wrapper: createWrapper({ client: { getDirectorySuggestions }, openedFiles: [] }) },
+    );
+
+    expect(result.current.isFileLink).toBe(false);
+    await expect(result.current.resolve()).resolves.toBeNull();
+    expect(getDirectorySuggestions).not.toHaveBeenCalled();
+  });
+
   it("opens a paseo:// workspace link inside the app", async () => {
     const getDirectorySuggestions = vi.fn(async () => resolvedSuggestions([]));
     const { result } = renderHook(

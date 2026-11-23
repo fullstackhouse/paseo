@@ -76,6 +76,8 @@ export const ru: TranslationResources = {
       daemonClientUnavailable: "Daemon клиента недоступен",
       daemonClientDisconnected: "Daemon клиента отключен",
       noFileFound: "Файл для {{token}} не найден",
+      openWithDefaultAppUnsupported:
+        "Paseo открывает в приложении по умолчанию только документы, изображения, медиафайлы и папки. {{path}} к ним не относится",
       folderOutsideWorkspace: "{{path}} находится вне этого рабочего пространства",
       unexpectedDictationError: "При обработке диктовки произошла непредвиденная ошибка.",
     },
@@ -180,6 +182,9 @@ export const ru: TranslationResources = {
       openImage: "Открыть прикрепленное изображение",
       removeImage: "Удалить прикрепленное изображение",
       removeFile: "Удалить прикрепленный файл",
+      quoteText: "Цитата {{number}}",
+      quoteComment: "Комментарий к цитате {{number}}",
+      removeQuote: "Удалить цитату {{number}}",
       openGithub: "Открыть {{kind}} {{number}}",
       removeGithub: "Удалить {{kind}} {{number}}",
       element: "Элемент",
@@ -248,6 +253,7 @@ export const ru: TranslationResources = {
   agentStream: {
     empty: "Начните общаться с этим агентом...",
     scrollToBottom: "Прокрутить вниз",
+    cite: "Цитировать",
     historyLoadFailed: "Не удалось загрузить историю агента",
     messageCapped: "Это сообщение было обрезано ({{bytes}} байт).",
     permission: {
@@ -2289,6 +2295,7 @@ export const ru: TranslationResources = {
         one: "влит или закрыт {{count}}",
         other: "влито или закрыто: {{count}}",
       },
+      prsShowLess: "Свернуть",
       prState: {
         open: "Открыт",
         draft: "Черновик",

@@ -11,7 +11,7 @@ import { inheritLoginShellEnv } from "./login-shell-env.js";
 
 import path from "node:path";
 import { pathToFileURL } from "node:url";
-import { existsSync } from "node:fs";
+import { existsSync, realpathSync, statSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import {
   app,
@@ -56,6 +56,8 @@ import {
 import { createExternalUrlOpener } from "./features/opener.js";
 import { createBrowserCaptureService } from "./features/browser-capture.js";
 import { registerEditorTargetHandlers } from "./features/editor-targets/ipc.js";
+import { createEditorTargetRuntime } from "./features/editor-targets/runtime.js";
+import { createDefaultAppOpener } from "./features/open-with-default-app.js";
 import { resolveAppIconPath } from "./features/stamped-icon.js";
 import { setupApplicationMenu } from "./features/menu.js";
 import {
@@ -982,6 +984,21 @@ async function bootstrap(): Promise<void> {
   registerNotificationHandlers();
   const openExternalUrl = createExternalUrlOpener({ open: shell.openExternal });
   ipcMain.handle("paseo:opener:openUrl", (_event, value: unknown) => openExternalUrl(value));
+  const editorTargetRuntime = createEditorTargetRuntime();
+  const openWithDefaultApp = createDefaultAppOpener({
+    expandHomePath: editorTargetRuntime.expandHomePath,
+    isAbsolutePath: editorTargetRuntime.isAbsolutePath,
+    realPath: (targetPath) => {
+      try {
+        return realpathSync(targetPath);
+      } catch {
+        return null;
+      }
+    },
+    stat: (targetPath) => statSync(targetPath, { throwIfNoEntry: false }) ?? null,
+    openPath: (targetPath) => editorTargetRuntime.openPath(targetPath),
+  });
+  ipcMain.handle("paseo:opener:openPath", (_event, value: unknown) => openWithDefaultApp(value));
   registerEditorTargetHandlers();
   registerBrowserAutomationIpc();
 

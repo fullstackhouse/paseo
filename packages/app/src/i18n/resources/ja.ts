@@ -76,6 +76,8 @@ export const ja: TranslationResources = {
       daemonClientUnavailable: "デーモンクライアントが利用できません",
       daemonClientDisconnected: "デーモンクライアントが切断されています",
       noFileFound: "{{token}}のファイルが見つかりません",
+      openWithDefaultAppUnsupported:
+        "Paseo が既定のアプリで開くのはドキュメント、画像、メディア、フォルダーだけです。{{path}} は対象外です",
       folderOutsideWorkspace: "{{path}} はこのワークスペースの外にあります",
       unexpectedDictationError: "音声入力処理中に予期しないエラーが発生しました。",
     },
@@ -180,6 +182,9 @@ export const ja: TranslationResources = {
       openImage: "画像添付ファイルを開く",
       removeImage: "画像添付ファイルを削除",
       removeFile: "ファイル添付ファイルを削除",
+      quoteText: "引用 {{number}}",
+      quoteComment: "引用 {{number}} へのコメント",
+      removeQuote: "引用 {{number}} を削除",
       openGithub: "{{kind}} {{number}}を開く",
       removeGithub: "{{kind}} {{number}}を削除",
       element: "要素",
@@ -248,6 +253,7 @@ export const ja: TranslationResources = {
   agentStream: {
     empty: "このエージェントとチャットを始めましょう...",
     scrollToBottom: "下にスクロール",
+    cite: "引用",
     historyLoadFailed: "エージェントの履歴を読み込めませんでした",
     messageCapped: "このメッセージは上限で切り詰められました（{{bytes}}バイト）。",
     permission: {
@@ -2276,6 +2282,7 @@ export const ja: TranslationResources = {
         one: "{{count}}件マージ済みまたはクローズ",
         other: "{{count}}件マージ済みまたはクローズ",
       },
+      prsShowLess: "表示を減らす",
       prState: {
         open: "オープン",
         draft: "ドラフト",

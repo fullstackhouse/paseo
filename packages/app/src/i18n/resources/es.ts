@@ -76,6 +76,8 @@ export const es: TranslationResources = {
       daemonClientUnavailable: "ClienteDaemonno disponible",
       daemonClientDisconnected: "El clienteDaemonestá desconectado",
       noFileFound: "No se encontró ningún archivo para{{token}}",
+      openWithDefaultAppUnsupported:
+        "Paseo solo abre documentos, imágenes, archivos multimedia y carpetas en su app predeterminada. {{path}} no es uno de ellos",
       folderOutsideWorkspace: "{{path}} está fuera de este espacio de trabajo",
       unexpectedDictationError: "Se produjo un error inesperado al manejar el dictado.",
     },
@@ -180,6 +182,9 @@ export const es: TranslationResources = {
       openImage: "Abrir imagen adjunta",
       removeImage: "Quitar imagen adjunta",
       removeFile: "Remove file attachment",
+      quoteText: "Cita {{number}}",
+      quoteComment: "Comenta la cita {{number}}",
+      removeQuote: "Quitar cita {{number}}",
       openGithub: "Abrir {{kind}} {{number}}",
       removeGithub: "Quitar {{kind}} {{number}}",
       element: "Elemento",
@@ -248,6 +253,7 @@ export const es: TranslationResources = {
   agentStream: {
     empty: "Comience a chatear con este agente...",
     scrollToBottom: "Desplazarse hacia abajo",
+    cite: "Citar",
     historyLoadFailed: "No se pudo cargar el historial del agente",
     messageCapped: "Este mensaje fue truncado ({{bytes}} bytes).",
     permission: {
@@ -2304,6 +2310,7 @@ export const es: TranslationResources = {
         one: "{{count}} fusionado o cerrado",
         other: "{{count}} fusionados o cerrados",
       },
+      prsShowLess: "Mostrar menos",
       prState: {
         open: "Abierto",
         draft: "Borrador",

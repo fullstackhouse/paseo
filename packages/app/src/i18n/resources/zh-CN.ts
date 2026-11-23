@@ -75,6 +75,8 @@ export const zhCN: TranslationResources = {
       daemonClientUnavailable: "Daemon client 不可用",
       daemonClientDisconnected: "Daemon client 已断开连接",
       noFileFound: "未找到 {{token}} 对应的文件",
+      openWithDefaultAppUnsupported:
+        "Paseo 只会用默认应用打开文档、图片、媒体和文件夹。{{path}} 不在其中",
       folderOutsideWorkspace: "{{path}} 不在此工作区内",
       unexpectedDictationError: "处理听写时发生意外错误。",
     },
@@ -179,6 +181,9 @@ export const zhCN: TranslationResources = {
       openImage: "打开图片附件",
       removeImage: "移除图片附件",
       removeFile: "Remove file attachment",
+      quoteText: "引用 {{number}}",
+      quoteComment: "评论引用 {{number}}",
+      removeQuote: "移除引用 {{number}}",
       openGithub: "打开 {{kind}} {{number}}",
       removeGithub: "移除 {{kind}} {{number}}",
       element: "元素",
@@ -246,6 +251,7 @@ export const zhCN: TranslationResources = {
   agentStream: {
     empty: "开始和这个 Agent 对话...",
     scrollToBottom: "滚动到底部",
+    cite: "引用",
     historyLoadFailed: "无法加载智能体历史记录",
     messageCapped: "此消息已被截断（{{bytes}} 字节）。",
     permission: {
@@ -2227,6 +2233,7 @@ export const zhCN: TranslationResources = {
         one: "{{count}} 个已合并或关闭",
         other: "{{count}} 个已合并或关闭",
       },
+      prsShowLess: "收起",
       prState: {
         open: "打开",
         draft: "草稿",

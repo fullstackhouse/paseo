@@ -201,12 +201,20 @@ const darkStatusTints = statusTints(darkStatusColors, "29"); // 16%
 // at hue 250, clear of
 // identity-colors' blue at 256.6 so a blue host badge and a working dot on the same row do not
 // read as related.
+//
+// Blocked is the one hue off the band. It is yellow at hue ~95, only 25° from warning's amber at
+// 70, and at the band's lightness yellow is mustard that reads as the same amber at 6pt. Yellow
+// only looks yellow when it is lighter, so blocked sits higher: L=0.80 dark, and in light mode
+// L=0.64, the brightest step that still clears 3:1 on surface2 (3.04). It is drawn as a pause
+// glyph rather than a dot, so its shape separates it from needs-input's alert circle as well.
 const lightStatusDotColors = {
   // L=0.62, chroma 90% of gamut max
   statusDotSuccess: "#299f51",
   statusDotDanger: "#f12e2f",
   statusDotWarning: "#b37824",
   statusDotRunning: "#268ae0",
+  // L=0.64, hue 95, chroma 90% of gamut max
+  statusDotBlocked: "#a38b26",
 };
 
 const darkStatusDotColors = {
@@ -215,6 +223,8 @@ const darkStatusDotColors = {
   statusDotDanger: "#f7796d",
   statusDotWarning: "#db932e",
   statusDotRunning: "#5caaf6",
+  // L=0.80, hue 98, chroma 90% of gamut max
+  statusDotBlocked: "#d7be37",
 };
 
 export interface LightThemeConfig {

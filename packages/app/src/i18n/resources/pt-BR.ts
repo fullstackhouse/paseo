@@ -76,6 +76,8 @@ export const ptBR: TranslationResources = {
       daemonClientUnavailable: "Cliente do daemon indisponível",
       daemonClientDisconnected: "O cliente do daemon está desconectado",
       noFileFound: "Nenhum arquivo encontrado para {{token}}",
+      openWithDefaultAppUnsupported:
+        "O Paseo só abre documentos, imagens, mídia e pastas no app padrão. {{path}} não é um deles",
       folderOutsideWorkspace: "{{path}} está fora deste workspace",
       unexpectedDictationError: "Ocorreu um erro inesperado ao processar o ditado.",
     },
@@ -180,6 +182,9 @@ export const ptBR: TranslationResources = {
       openImage: "Abrir anexo de imagem",
       removeImage: "Remover anexo de imagem",
       removeFile: "Remover anexo de arquivo",
+      quoteText: "Citação {{number}}",
+      quoteComment: "Comente a citação {{number}}",
+      removeQuote: "Remover citação {{number}}",
       openGithub: "Abrir {{kind}} {{number}}",
       removeGithub: "Remover {{kind}} {{number}}",
       element: "Elemento",
@@ -247,6 +252,7 @@ export const ptBR: TranslationResources = {
   agentStream: {
     empty: "Comece a conversar com este agente...",
     scrollToBottom: "Rolar para o fim",
+    cite: "Citar",
     historyLoadFailed: "Não foi possível carregar o histórico do agente",
     messageCapped: "Esta mensagem foi truncada ({{bytes}} bytes).",
     permission: {
@@ -2289,6 +2295,7 @@ export const ptBR: TranslationResources = {
         one: "{{count}} mesclado ou fechado",
         other: "{{count}} mesclados ou fechados",
       },
+      prsShowLess: "Mostrar menos",
       prState: {
         open: "Aberto",
         draft: "Rascunho",
