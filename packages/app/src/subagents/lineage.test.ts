@@ -306,6 +306,25 @@ describe("deriveWorkspaceLineage", () => {
     expect(result.parent).toEqual({ serverId: SERVER_ID, workspaceId: "ws-a" });
   });
 
+  it("lists ancestor workspaces root first, each once, without this one", () => {
+    const result = deriveWorkspaceLineage(
+      {
+        ancestors: [
+          node("root", "ws-root"),
+          node("root-helper", "ws-root"),
+          node("mid", "ws-a"),
+          node("near", "ws-b"),
+        ],
+        children: [],
+      },
+      here,
+    );
+    expect(result.ancestors).toEqual([
+      { serverId: SERVER_ID, workspaceId: "ws-root" },
+      { serverId: SERVER_ID, workspaceId: "ws-a" },
+    ]);
+  });
+
   it("skips missing ancestors", () => {
     const result = deriveWorkspaceLineage(
       { ancestors: [node("root", "ws-a"), node("gone", null, { missing: true })], children: [] },
@@ -330,6 +349,7 @@ describe("deriveWorkspaceLineage", () => {
     );
     expect(result).toEqual({
       parent: null,
+      ancestors: [],
       children: [
         { serverId: SERVER_ID, workspaceId: "ws-c" },
         { serverId: SERVER_ID, workspaceId: "ws-d" },

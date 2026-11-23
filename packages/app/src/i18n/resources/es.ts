@@ -2258,8 +2258,6 @@ export const es: TranslationResources = {
       approved: "Aprobado",
       changesRequested: "Cambios solicitados",
       reviewRequired: "Revisión requerida",
-      from: "Desde",
-      started: "Iniciados",
       showAll: "Mostrar todo ({{count}})",
       prMerged: "PR fusionada",
       word: {
@@ -2285,8 +2283,6 @@ export const es: TranslationResources = {
       prMergedTitle: "PR #{{number}} fusionada",
       outdated: "Respondiste {{time}}; el agente no lo ha actualizado desde entonces.",
       readyToArchive: "Listo para archivar",
-      contextAgents: "Agentes",
-      agentsHere: "{{count}} en este espacio de trabajo",
       pullRequests: "Pull requests",
       noPrYet: "Aún sin PR",
       notRefreshed: "sin actualizar",
@@ -2307,6 +2303,17 @@ export const es: TranslationResources = {
         draft: "Borrador",
         merged: "Fusionado",
         closed: "Cerrado",
+      },
+      tree: "Árbol",
+      waitingOn: "Esperando a",
+      blocking: "Bloqueando",
+      agents: {
+        one: "{{count}} agente",
+        other: "{{count}} agentes",
+      },
+      startedCount: {
+        one: "{{count}} iniciado",
+        other: "{{count}} iniciados",
       },
     },
     lineage: {

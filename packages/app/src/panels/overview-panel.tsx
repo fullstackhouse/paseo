@@ -1,4 +1,11 @@
-import { useCallback, useMemo, useState, type ReactElement, type ReactNode } from "react";
+import {
+  useCallback,
+  useMemo,
+  useState,
+  useSyncExternalStore,
+  type ReactElement,
+  type ReactNode,
+} from "react";
 import { Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import {
@@ -35,6 +42,7 @@ import { usePaneContext } from "@/panels/pane-context";
 import { definePanel, type PanelPresentation } from "@/panels/panel-registry";
 import {
   useWorkspaceSummaryItems,
+  workspaceSummaryStore,
   type WorkspaceSummaryItem,
 } from "@/plugins/workspace-summary/store";
 import { WorkspaceSummaryEntryView } from "@/plugins/workspace-summary/entry-view";
@@ -65,6 +73,9 @@ import {
   canAnswerPermissionInPlace,
   countLabel,
   derivePullRequests,
+  findBlocking,
+  isTreeBlocker,
+  orderChildren,
   deriveWorkspaceStateWord,
   deriveYourMove,
   openMoveKey,
@@ -102,7 +113,9 @@ const mergedColorMapping = (theme: Theme) => ({ color: theme.colors.statusMerged
 const ICON_SIZE = 16;
 const SMALL_ICON_SIZE = 14;
 /** Child workspaces listed before "Show all". */
-const VISIBLE_CHILDREN = 4;
+const VISIBLE_CHILDREN = 5;
+/** How far each generation steps in, in the Tree: the ↳ and the gap after it. */
+const TREE_INDENT = 16;
 const PERMISSION_TIMEOUT_MS = 15_000;
 
 export const overviewPanelPresentation = {
@@ -135,8 +148,8 @@ function selectWorkspaceFacts(workspace: WorkspaceDescriptor) {
 type WorkspaceFacts = ReturnType<typeof selectWorkspaceFacts>;
 
 /**
- * Four blocks, each answering one question: what is this (title, goal), where does it stand
- * (status), what do I do (Your move), then context the first three don't already say.
+ * Top to bottom: what is this (title, goal), where does it stand (status, what it waits on), what
+ * do I do (Your move), where it sits (Tree), other plugins' facts, then its PRs for information.
  */
 function OverviewPanel(): ReactElement {
   const { serverId, workspaceId, target } = usePaneContext();
@@ -166,18 +179,21 @@ function OverviewPanel(): ReactElement {
     gitActions: git,
     status: status?.status ?? null,
   });
+  const statusCard = status?.status ?? null;
+  const name = facts?.name ?? null;
+  const showPullRequests = isGitWorkspace && (gitStatusLoaded || pullRequests !== null);
 
   return (
     // Themed insets sit on a View: contentContainerStyle drops them on web (docs/unistyles.md).
     <ScrollView testID="overview-panel">
       <View style={styles.body}>
         <Identity
-          name={facts?.name ?? null}
+          name={name}
           subtitle={overviewSubtitle({
-            goal: status?.status?.goal ?? null,
+            goal: statusCard?.goal ?? null,
             project: facts?.project ?? null,
           })}
-          isGoal={Boolean(status?.status?.goal)}
+          isGoal={Boolean(statusCard?.goal)}
         />
         <StatusBlock
           item={status}
@@ -186,7 +202,7 @@ function OverviewPanel(): ReactElement {
           agentRunning={agentRunning}
           workspaceKey={workspaceKey}
         />
-        <BlockedBy item={status} serverId={serverId} />
+        <WaitingOn item={status} serverId={serverId} />
         <YourMove
           rows={moves}
           serverId={serverId}
@@ -194,13 +210,15 @@ function OverviewPanel(): ReactElement {
           facts={facts}
           gitActions={git}
         />
-        <ContextFooter
+        <Tree
           serverId={serverId}
           workspaceId={workspaceId}
           workspaceKey={workspaceKey}
-          more={more}
+          name={name}
+          status={statusCard}
         />
-        {isGitWorkspace && (gitStatusLoaded || pullRequests) ? (
+        <ContextFooter workspaceKey={workspaceKey} more={more} />
+        {showPullRequests ? (
           <PullRequests item={pullRequests} facts={facts} workspaceKey={workspaceKey} />
         ) : null}
       </View>
@@ -384,17 +402,20 @@ function dotStyle(state: StatusTone) {
 }
 
 /** What a blocked status waits on, under its card: each row opens the PR, agent or workspace. */
-function BlockedBy({
+/** What a blocked workspace waits on besides other workspaces and agents, which the Tree lists. */
+function WaitingOn({
   item,
   serverId,
 }: {
   item: WorkspaceSummaryItem | null;
   serverId: string;
 }): ReactElement | null {
-  const blockers = statusBlockers(item?.status ?? null);
+  const blockers = statusBlockers(item?.status ?? null).filter(
+    (blocker) => !isTreeBlocker(blocker),
+  );
   if (blockers.length === 0) return null;
   return (
-    <Section title="panels.overview.blockedBy">
+    <Section title="panels.overview.waitingOn" testID="overview-waiting-on">
       {blockers.map((blocker) => (
         <BlockerRow key={blockerKey(blocker)} blocker={blocker} serverId={serverId} />
       ))}
@@ -895,90 +916,279 @@ function countWorkspaceRootAgents(
   return count;
 }
 
+function selectAgentIdsHere(
+  agents: ReadonlyMap<string, Agent> | undefined,
+  workspaceId: string,
+): string {
+  if (!agents) return "";
+  const target = normalizeWorkspaceOpaqueId(workspaceId);
+  const ids: string[] = [];
+  for (const agent of agents.values()) {
+    if (normalizeWorkspaceOpaqueId(agent.workspaceId) === target) ids.push(agent.id);
+  }
+  return ids.sort().join("\n");
+}
+
+function useAllSummaryItems(): readonly WorkspaceSummaryItem[] {
+  return useSyncExternalStore(
+    workspaceSummaryStore.subscribe,
+    workspaceSummaryStore.getSnapshot,
+    workspaceSummaryStore.getSnapshot,
+  );
+}
+
+function useWorkspaceLineage(serverId: string, workspaceId: string) {
+  const focus = useLineageFocus(serverId, workspaceId);
+  const selectLineage = useMemo(() => createLineageSelector(focus), [focus]);
+  const lineage = useSessionStore(selectLineage);
+  return useMemo(
+    () => deriveWorkspaceLineage(lineage, { serverId, workspaceId }),
+    [lineage, serverId, workspaceId],
+  );
+}
+
+/** Children that need the human first, then newest first (orderChildren). */
+function useOrderedChildren(children: WorkspaceRef[]): WorkspaceRef[] {
+  // Re-read the status cards whenever any changes; the words key below keeps the order stable.
+  useAllSummaryItems();
+  const wordsKey = useSessionStore((state) =>
+    children
+      .map((child) =>
+        workspaceStateWord(state.sessions[child.serverId]?.agents, child, (ref) =>
+          workspaceSummaryStore.forWorkspace(ref.serverId, ref.workspaceId),
+        ),
+      )
+      .join(","),
+  );
+  return useMemo(() => {
+    const words = wordsKey.split(",") as WorkspaceStateWord[];
+    const pairs = children.map((child, index) => ({ child, word: words[index] ?? "idle" }));
+    return orderChildren(pairs, (pair) => pair.word).map((pair) => pair.child);
+  }, [children, wordsKey]);
+}
+
 /**
- * One-line facts the blocks above don't already say: where the work came from, what it started,
- * several agents, other plugins' facts. Renders nothing when there is nothing to say.
+ * Where the workspace sits: its lineage as one indented chain (ancestors root first, this
+ * workspace, its children), then the workspaces and agents it is blocked by and the ones it blocks.
+ * Renders nothing when there is none of that.
  */
-function ContextFooter({
+function Tree({
   serverId,
   workspaceId,
   workspaceKey,
-  more,
+  name,
+  status,
 }: {
   serverId: string;
   workspaceId: string;
   workspaceKey: string | null;
-  more: WorkspaceSummaryItem[];
+  name: string | null;
+  status: PluginWorkspaceStatus | null;
 }): ReactElement | null {
   const { t } = useTranslation();
-  const focus = useLineageFocus(serverId, workspaceId);
-  const selectLineage = useMemo(() => createLineageSelector(focus), [focus]);
-  const lineage = useSessionStore(selectLineage);
-  const { parent, children } = useMemo(
-    () => deriveWorkspaceLineage(lineage, { serverId, workspaceId }),
-    [lineage, serverId, workspaceId],
-  );
+  const { ancestors, children } = useWorkspaceLineage(serverId, workspaceId);
+  const orderedChildren = useOrderedChildren(children);
   const rootAgentCount = useSessionStore((state) =>
     countWorkspaceRootAgents(state.sessions[serverId]?.agents, workspaceId),
   );
+  const agentIdsKey = useSessionStore((state) =>
+    selectAgentIdsHere(state.sessions[serverId]?.agents, workspaceId),
+  );
+  const allItems = useAllSummaryItems();
+  const blocking = useMemo(
+    () =>
+      findBlocking({
+        items: allItems,
+        serverId,
+        workspaceId,
+        agentIdsHere: new Set(agentIdsKey ? agentIdsKey.split("\n") : []),
+        normalize: normalizeWorkspaceOpaqueId,
+      }),
+    [agentIdsKey, allItems, serverId, workspaceId],
+  );
+  const blockers = statusBlockers(status).filter(isTreeBlocker);
+  const hasLineage = ancestors.length > 0 || children.length > 0 || rootAgentCount > 1;
+  if (!hasLineage && blockers.length === 0 && blocking.length === 0) return null;
+  return (
+    <Section title="panels.overview.tree" testID="overview-tree">
+      {hasLineage ? (
+        <View style={styles.context}>
+          {ancestors.map((ref, index) => (
+            <LineageRow
+              key={`${ref.serverId}:${ref.workspaceId}`}
+              workspace={ref}
+              level={index}
+              testID={`overview-lineage-up-${ref.workspaceId}`}
+            />
+          ))}
+          <HereRow
+            name={name}
+            level={ancestors.length}
+            agents={rootAgentCount}
+            workspaceKey={workspaceKey}
+          />
+          <ChildRows workspaces={orderedChildren} level={ancestors.length + 1} />
+        </View>
+      ) : null}
+      {blockers.length > 0 ? (
+        <View style={styles.context} testID="overview-tree-blocked-by">
+          <Text style={styles.groupLabel}>{t("panels.overview.blockedBy")}</Text>
+          {blockers.map((blocker) => (
+            <BlockerRow key={blockerKey(blocker)} blocker={blocker} serverId={serverId} />
+          ))}
+        </View>
+      ) : null}
+      {blocking.length > 0 ? (
+        <View style={styles.context} testID="overview-tree-blocking">
+          <Text style={styles.groupLabel}>{t("panels.overview.blocking")}</Text>
+          {blocking.map((ref) => (
+            <LineageRow
+              key={`${ref.serverId}:${ref.workspaceId}`}
+              workspace={ref}
+              level={0}
+              testID={`overview-blocking-${ref.workspaceId}`}
+            />
+          ))}
+        </View>
+      ) : null}
+    </Section>
+  );
+}
+
+function Spacer({ width }: { width: number }): ReactElement {
+  const style = useMemo(() => ({ width }), [width]);
+  return <View style={style} />;
+}
+
+/** Steps a Tree row in one level per generation; levels past the root sit behind a ↳. */
+function Indent({ level }: { level: number }): ReactElement | null {
+  if (level === 0) return null;
+  return (
+    <>
+      {level > 1 ? <Spacer width={(level - 1) * TREE_INDENT} /> : null}
+      <Text style={styles.treeArrow}>↳</Text>
+    </>
+  );
+}
+
+/** This workspace in its own lineage. With several agents it names them and opens Lineage. */
+function HereRow({
+  name,
+  level,
+  agents,
+  workspaceKey,
+}: {
+  name: string | null;
+  level: number;
+  agents: number;
+  workspaceKey: string | null;
+}): ReactElement {
+  const { t } = useTranslation();
   const openLineage = useCallback(
     () => openExplorerSidebarView({ isCompact: false, workspaceKey, view: "lineage" }),
     [workspaceKey],
   );
-  const showAgents = rootAgentCount > 1;
-  if (!parent && children.length === 0 && !showAgents && more.length === 0) {
-    return null;
+  const content = (
+    <>
+      <Indent level={level} />
+      <Text style={styles.hereName} numberOfLines={1}>
+        {name ?? ""}
+        {agents > 1 ? (
+          <Text style={styles.hereAgents}>
+            {" · "}
+            {countLabel(t, "panels.overview.agents", agents)}
+          </Text>
+        ) : null}
+      </Text>
+      {agents > 1 ? (
+        <ThemedChevronRight size={SMALL_ICON_SIZE} uniProps={extraMutedColorMapping} />
+      ) : null}
+    </>
+  );
+  if (agents <= 1) {
+    return (
+      <View style={styles.hereRow} testID="overview-tree-here">
+        {content}
+      </View>
+    );
   }
   return (
-    <View style={styles.context} testID="overview-context">
-      {parent ? (
-        <LineageRow label={t("panels.overview.from")} workspace={parent} direction="up" />
-      ) : null}
-      {children.length > 0 ? <StartedRows workspaces={children} /> : null}
-      {showAgents ? (
-        <ContextRow
-          label={t("panels.overview.contextAgents")}
-          value={t("panels.overview.agentsHere", { count: rootAgentCount })}
-          onPress={openLineage}
-          testID="overview-agents"
-        />
-      ) : null}
-      {more.map((item) => (
-        <PluginContextRow key={item.entryKey} item={item} workspaceKey={workspaceKey} />
-      ))}
-    </View>
+    <PressHighlight
+      accessibilityRole="button"
+      accessibilityLabel={`${name ?? ""}, ${countLabel(t, "panels.overview.agents", agents)}`}
+      onPress={openLineage}
+      style={styles.hereRow}
+      highlightStyle={styles.pressed}
+      testID="overview-tree-here"
+    >
+      {content}
+    </PressHighlight>
   );
 }
 
-function StartedRows({ workspaces }: { workspaces: WorkspaceRef[] }): ReactElement {
+function ChildRows({
+  workspaces,
+  level,
+}: {
+  workspaces: WorkspaceRef[];
+  level: number;
+}): ReactElement | null {
   const { t } = useTranslation();
   const [showAll, setShowAll] = useState(false);
   const expand = useCallback(() => setShowAll(true), []);
+  if (workspaces.length === 0) return null;
   const visible = showAll ? workspaces : workspaces.slice(0, VISIBLE_CHILDREN);
   return (
     <>
-      <ContextRow label={t("panels.overview.started")} testID="overview-started" />
       {visible.map((child) => (
-        <LineageRow
-          key={`${child.serverId}:${child.workspaceId}`}
-          workspace={child}
-          direction="down"
-        />
+        <ChildRow key={`${child.serverId}:${child.workspaceId}`} workspace={child} level={level} />
       ))}
       {visible.length < workspaces.length ? (
         <PressHighlight
           accessibilityRole="button"
           onPress={expand}
-          style={styles.showAll}
+          style={styles.contextRow}
           highlightStyle={styles.pressed}
           testID="overview-lineage-show-all"
         >
+          <Spacer width={level * TREE_INDENT} />
           <Text style={styles.showAllText}>
             {t("panels.overview.showAll", { count: workspaces.length })}
           </Text>
         </PressHighlight>
       ) : null}
     </>
+  );
+}
+
+/** A child workspace, with how many workspaces it started in turn. */
+function ChildRow({ workspace, level }: { workspace: WorkspaceRef; level: number }): ReactElement {
+  const { children } = useWorkspaceLineage(workspace.serverId, workspace.workspaceId);
+  return (
+    <LineageRow
+      workspace={workspace}
+      level={level}
+      started={children.length}
+      testID={`overview-lineage-down-${workspace.workspaceId}`}
+    />
+  );
+}
+
+/** Plugins' one-line facts that are neither a status, a move nor PRs. Renders nothing without any. */
+function ContextFooter({
+  workspaceKey,
+  more,
+}: {
+  workspaceKey: string | null;
+  more: WorkspaceSummaryItem[];
+}): ReactElement | null {
+  if (more.length === 0) return null;
+  return (
+    <View style={styles.context} testID="overview-context">
+      {more.map((item) => (
+        <PluginContextRow key={item.entryKey} item={item} workspaceKey={workspaceKey} />
+      ))}
+    </View>
   );
 }
 
@@ -1065,30 +1275,40 @@ function selectLineageWorkspace(workspace: WorkspaceDescriptor) {
   };
 }
 
-function useWorkspaceStateWord(workspace: WorkspaceRef): WorkspaceStateWord {
-  const items = useWorkspaceSummaryItems(workspace.serverId, workspace.workspaceId);
-  const status = useMemo(() => partitionSummaryItems(items).status?.status ?? null, [items]);
-  return useSessionStore((state) => {
-    const agents = state.sessions[workspace.serverId]?.agents;
-    const target = normalizeWorkspaceOpaqueId(workspace.workspaceId);
-    const inWorkspace = agents
-      ? [...agents.values()].filter(
-          (agent) => normalizeWorkspaceOpaqueId(agent.workspaceId) === target,
-        )
-      : [];
-    return deriveWorkspaceStateWord({ status, agents: inWorkspace });
-  });
+function workspaceStateWord(
+  agents: ReadonlyMap<string, Agent> | undefined,
+  workspace: WorkspaceRef,
+  summaryItems: (workspace: WorkspaceRef) => readonly WorkspaceSummaryItem[],
+): WorkspaceStateWord {
+  const status = partitionSummaryItems(summaryItems(workspace)).status?.status ?? null;
+  const target = normalizeWorkspaceOpaqueId(workspace.workspaceId);
+  const inWorkspace = agents
+    ? [...agents.values()].filter(
+        (agent) => normalizeWorkspaceOpaqueId(agent.workspaceId) === target,
+      )
+    : [];
+  return deriveWorkspaceStateWord({ status, agents: inWorkspace });
 }
 
-/** A parent (`From`) or child workspace with its one state word; pressing it opens that workspace. */
+function useWorkspaceStateWord(workspace: WorkspaceRef): WorkspaceStateWord {
+  const items = useWorkspaceSummaryItems(workspace.serverId, workspace.workspaceId);
+  return useSessionStore((state) =>
+    workspaceStateWord(state.sessions[workspace.serverId]?.agents, workspace, () => items),
+  );
+}
+
+/** A workspace in the Tree with its one state word; pressing it opens that workspace. */
 function LineageRow({
-  label,
   workspace,
-  direction,
+  level,
+  started = 0,
+  testID,
 }: {
-  label?: string;
   workspace: WorkspaceRef;
-  direction: "up" | "down";
+  level: number;
+  /** How many workspaces it started in turn. */
+  started?: number;
+  testID: string;
 }): ReactElement {
   const { t } = useTranslation();
   const fields = useWorkspaceFields(
@@ -1105,26 +1325,24 @@ function LineageRow({
   const wordText = fields?.prMerged
     ? `${t(`panels.overview.word.${word}`)} · ${t("panels.overview.prMerged")}`
     : t(`panels.overview.word.${word}`);
+  const startedText = started > 0 ? countLabel(t, "panels.overview.startedCount", started) : "";
   return (
     <PressHighlight
       accessibilityRole="button"
-      accessibilityLabel={`${name}, ${wordText}`}
+      accessibilityLabel={[name, wordText, startedText].filter(Boolean).join(", ")}
       disabled={!fields}
       onPress={open}
-      style={label ? styles.contextRow : styles.childRow}
+      style={styles.contextRow}
       highlightStyle={styles.pressed}
-      testID={`overview-lineage-${direction}-${workspace.workspaceId}`}
+      testID={testID}
     >
-      {label ? (
-        <Text style={styles.contextLabel} numberOfLines={1}>
-          {label}
-        </Text>
-      ) : null}
-      <Text style={styles.contextValue} numberOfLines={1}>
+      <Indent level={level} />
+      <Text style={fields ? styles.contextValue : styles.offName} numberOfLines={1}>
         {name}
       </Text>
       <Text style={wordStyle(toneOfWord(word))} numberOfLines={1}>
         {wordText}
+        {startedText ? <Text style={styles.word}>{` · ${startedText}`}</Text> : null}
       </Text>
       {fields ? (
         <ThemedChevronRight size={SMALL_ICON_SIZE} uniProps={extraMutedColorMapping} />
@@ -1459,7 +1677,37 @@ const styles = StyleSheet.create((theme) => {
       gap: theme.spacing[0.5],
     },
     contextRow,
-    childRow: { ...contextRow, paddingLeft: theme.spacing[1.5] + 60 },
+    hereRow: {
+      ...contextRow,
+      backgroundColor: theme.colors.surface1,
+    },
+    hereName: {
+      flex: 1,
+      minWidth: 0,
+      fontSize: theme.fontSize.sm,
+      fontWeight: theme.fontWeight.medium,
+      color: theme.colors.foreground,
+    },
+    hereAgents: {
+      fontWeight: theme.fontWeight.normal,
+      color: theme.colors.foregroundMuted,
+    },
+    offName: {
+      flex: 1,
+      minWidth: 0,
+      fontSize: theme.fontSize.sm,
+      color: theme.colors.foregroundExtraMuted,
+    },
+    treeArrow: {
+      width: TREE_INDENT - theme.spacing[2],
+      fontSize: theme.fontSize.sm,
+      color: theme.colors.foregroundExtraMuted,
+    },
+    groupLabel: {
+      fontSize: theme.fontSize.sm,
+      color: theme.colors.foregroundExtraMuted,
+      paddingTop: theme.spacing[1],
+    },
     contextLabel: {
       width: 60,
       flexShrink: 0,
@@ -1501,11 +1749,6 @@ const styles = StyleSheet.create((theme) => {
       fontFamily: theme.fontFamily.mono,
       fontSize: theme.fontSize.sm,
       color: theme.colors.foregroundExtraMuted,
-    },
-    showAll: {
-      paddingLeft: theme.spacing[1.5] + 60,
-      paddingVertical: theme.spacing[1],
-      borderRadius: theme.borderRadius.md,
     },
     showAllText: {
       fontSize: theme.fontSize.sm,
