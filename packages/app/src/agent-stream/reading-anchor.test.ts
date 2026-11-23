@@ -5,7 +5,7 @@ describe("reading anchor", () => {
   it("pins the folded turn host when a prepend replaces the row being read", () => {
     const anchor = createReadingAnchor();
     anchor.reconcile(0, [{ id: "tool", top: 48, height: 200 }]);
-    const replacements = new Map([["tool", "prompt"]]);
+    const replacements = new Map([["tool", { id: "prompt", folds: true }]]);
     expect(anchor.getRowId(replacements)).toBe("prompt");
     expect(anchor.project(0, { id: "prompt", top: 1048 }, replacements)).toBe(1000);
     // Projection does not consume the correction; an unmounted host keeps the pin.
@@ -18,6 +18,28 @@ describe("reading anchor", () => {
     expect(
       anchor.reconcile(1000, [{ id: "prompt", top: 1048, height: 100 }], false, replacements),
     ).toBe(1000);
+  });
+
+  it("starts the folded turn host at the viewport top when the reader was inside the hidden row", () => {
+    const anchor = createReadingAnchor();
+    // The reader is 150px into the tool row that the fold will hide.
+    anchor.reconcile(198, [{ id: "tool", top: 48, height: 400 }]);
+    const replacements = new Map([["tool", { id: "prompt", folds: true }]]);
+    const folded = [{ id: "prompt", top: 1048, height: 100 }];
+    expect(anchor.project(198, folded[0], replacements)).toBe(1048);
+    expect(anchor.reconcile(198, folded, false, replacements)).toBe(1048);
+    expect(anchor.getRowId()).toBe("prompt");
+    expect(anchor.reconcile(1048, folded, false, replacements)).toBe(1048);
+  });
+
+  it("keeps the reader's place inside a tool group that an older page extends", () => {
+    const anchor = createReadingAnchor();
+    anchor.reconcile(198, [{ id: "partial-group", top: 48, height: 400 }]);
+    // The extended group still shows the calls being read, so the offset into it carries over.
+    const replacements = new Map([["partial-group", { id: "group", folds: false }]]);
+    expect(
+      anchor.reconcile(198, [{ id: "group", top: 1048, height: 600 }], false, replacements),
+    ).toBe(1198);
   });
 
   const rows = [
