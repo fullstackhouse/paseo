@@ -1,6 +1,6 @@
 import { router, useGlobalSearchParams, usePathname } from "expo-router";
 import { SquarePen, X } from "lucide-react-native";
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Text,
@@ -26,7 +26,6 @@ import { buildNewWorkspaceRoute } from "@/utils/host-routes";
 
 const ThemedSquarePen = withUnistyles(SquarePen);
 const ThemedX = withUnistyles(X);
-type HoverState = PressableStateCallbackType & { hovered?: boolean };
 
 const foregroundMutedColorMapping = (theme: Theme) => ({ color: theme.colors.foregroundMuted });
 
@@ -58,6 +57,11 @@ function DraftRow({ draft, selected }: { draft: ListedNewWorkspaceDraft; selecte
   const { t } = useTranslation();
   const isCompact = useIsCompactFormFactor();
   const alwaysShowDiscard = isNative || isCompact;
+  // Hover lives on a wrapper, not the row's pressable: on web, moving onto the X counts as
+  // leaving the pressable, which hid the X under the pointer.
+  const [isHovered, setIsHovered] = useState(false);
+  const handlePointerEnter = useCallback(() => setIsHovered(true), []);
+  const handlePointerLeave = useCallback(() => setIsHovered(false), []);
 
   const handlePress = useCallback(() => {
     restoreNewWorkspaceDraftSetup(draft);
@@ -86,25 +90,25 @@ function DraftRow({ draft, selected }: { draft: ListedNewWorkspaceDraft; selecte
 
   const accessibilityState = useMemo(() => ({ selected }), [selected]);
   const rowStyle = useCallback(
-    ({ hovered, pressed }: HoverState) => [
+    ({ pressed }: PressableStateCallbackType) => [
       styles.row,
-      hovered && styles.rowHovered,
+      isHovered && styles.rowHovered,
       selected && styles.rowSelected,
       pressed && styles.rowPressed,
     ],
-    [selected],
+    [isHovered, selected],
   );
 
   return (
-    <PressHighlight
-      accessibilityRole="button"
-      accessibilityState={accessibilityState}
-      onPress={handlePress}
-      style={rowStyle}
-      highlightStyle={styles.rowPressed}
-      testID={`sidebar-draft-row-${draft.draftKey}`}
-    >
-      {({ hovered }: HoverState) => (
+    <View onPointerEnter={handlePointerEnter} onPointerLeave={handlePointerLeave}>
+      <PressHighlight
+        accessibilityRole="button"
+        accessibilityState={accessibilityState}
+        onPress={handlePress}
+        style={rowStyle}
+        highlightStyle={styles.rowPressed}
+        testID={`sidebar-draft-row-${draft.draftKey}`}
+      >
         <>
           <View style={styles.text}>
             <View style={styles.projectLine}>
@@ -117,7 +121,7 @@ function DraftRow({ draft, selected }: { draft: ListedNewWorkspaceDraft; selecte
               {draft.preview || t("sidebar.drafts.attachmentsOnly")}
             </Text>
           </View>
-          {hovered || alwaysShowDiscard ? (
+          {isHovered || alwaysShowDiscard ? (
             <ToolbarButton
               label={t("sidebar.drafts.discard")}
               onPressIn={stopPropagation}
@@ -131,8 +135,8 @@ function DraftRow({ draft, selected }: { draft: ListedNewWorkspaceDraft; selecte
             </ToolbarButton>
           ) : null}
         </>
-      )}
-    </PressHighlight>
+      </PressHighlight>
+    </View>
   );
 }
 
