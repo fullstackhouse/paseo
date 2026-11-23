@@ -75,7 +75,8 @@ export const zhCN: TranslationResources = {
       daemonClientUnavailable: "Daemon client 不可用",
       daemonClientDisconnected: "Daemon client 已断开连接",
       noFileFound: "未找到 {{token}} 对应的文件",
-      executableBlocked: "{{path}} 是程序或脚本，Paseo 不会打开它",
+      openWithDefaultAppUnsupported:
+        "Paseo 只会用默认应用打开文档、图片、媒体和文件夹。{{path}} 不在其中",
       folderOutsideWorkspace: "{{path}} 不在此工作区内",
       unexpectedDictationError: "处理听写时发生意外错误。",
     },

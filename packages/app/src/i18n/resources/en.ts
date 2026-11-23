@@ -71,7 +71,8 @@ export const en = {
       daemonClientUnavailable: "Daemon client unavailable",
       daemonClientDisconnected: "Daemon client is disconnected",
       noFileFound: "No file found for {{token}}",
-      executableBlocked: "{{path}} is a program or script, so Paseo won't open it",
+      openWithDefaultAppUnsupported:
+        "Paseo only opens documents, images, media and folders in their default app. {{path}} isn't one of them",
       folderOutsideWorkspace: "{{path}} is outside this workspace",
       unexpectedDictationError: "An unexpected error occurred while handling dictation.",
     },

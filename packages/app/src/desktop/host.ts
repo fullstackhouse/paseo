@@ -60,11 +60,11 @@ export interface DesktopNotificationBridge {
   ) => Promise<boolean>;
 }
 
-export type DesktopOpenPathResult = { opened: true } | { opened: false; reason: "executable" };
+export type DesktopOpenPathResult = { opened: true } | { opened: false; reason: "unsupported" };
 
 export interface DesktopOpenerBridge {
   openUrl?: (url: string) => Promise<void>;
-  /** Opens a local path in the app the OS picks for it. Refuses executables. */
+  /** Opens a document, image, media file or folder in the app the OS picks for it. */
   openPath?: (path: string) => Promise<DesktopOpenPathResult>;
 }
 

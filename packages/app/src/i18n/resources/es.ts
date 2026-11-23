@@ -76,7 +76,8 @@ export const es: TranslationResources = {
       daemonClientUnavailable: "ClienteDaemonno disponible",
       daemonClientDisconnected: "El clienteDaemonestá desconectado",
       noFileFound: "No se encontró ningún archivo para{{token}}",
-      executableBlocked: "{{path}} es un programa o script, así que Paseo no lo abrirá",
+      openWithDefaultAppUnsupported:
+        "Paseo solo abre documentos, imágenes, archivos multimedia y carpetas en su app predeterminada. {{path}} no es uno de ellos",
       folderOutsideWorkspace: "{{path}} está fuera de este espacio de trabajo",
       unexpectedDictationError: "Se produjo un error inesperado al manejar el dictado.",
     },

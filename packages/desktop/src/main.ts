@@ -11,7 +11,7 @@ import { inheritLoginShellEnv } from "./login-shell-env.js";
 
 import path from "node:path";
 import { pathToFileURL } from "node:url";
-import { existsSync, statSync } from "node:fs";
+import { existsSync, realpathSync, statSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import {
   app,
@@ -986,9 +986,15 @@ async function bootstrap(): Promise<void> {
   ipcMain.handle("paseo:opener:openUrl", (_event, value: unknown) => openExternalUrl(value));
   const editorTargetRuntime = createEditorTargetRuntime();
   const openWithDefaultApp = createDefaultAppOpener({
-    platform: editorTargetRuntime.platform,
     expandHomePath: editorTargetRuntime.expandHomePath,
     isAbsolutePath: editorTargetRuntime.isAbsolutePath,
+    realPath: (targetPath) => {
+      try {
+        return realpathSync(targetPath);
+      } catch {
+        return null;
+      }
+    },
     stat: (targetPath) => statSync(targetPath, { throwIfNoEntry: false }) ?? null,
     openPath: (targetPath) => editorTargetRuntime.openPath(targetPath),
   });

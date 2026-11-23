@@ -112,7 +112,7 @@ export function useFileLinkDesktopActions(input: {
   );
 }
 
-/** Cmd/Ctrl+click on a chat file link: open it in the OS default app, never run it. */
+/** Cmd/Ctrl+click on a chat file link: open a document, image or folder in its default app. */
 export function useOpenFileLinkWithDefaultApp(): (target: InlinePathTarget) => void {
   const { t } = useTranslation();
   const toast = useToast();
@@ -124,7 +124,7 @@ export function useOpenFileLinkWithDefaultApp(): (target: InlinePathTarget) => v
         try {
           const result = await openPath(target.path);
           if (!result.opened) {
-            toast.error(t("common.errors.executableBlocked", { path: target.path }));
+            toast.error(t("common.errors.openWithDefaultAppUnsupported", { path: target.path }));
           }
         } catch (cause) {
           toast.error(cause instanceof Error ? cause.message : t("common.errors.error"));

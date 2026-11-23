@@ -76,7 +76,8 @@ export const ja: TranslationResources = {
       daemonClientUnavailable: "デーモンクライアントが利用できません",
       daemonClientDisconnected: "デーモンクライアントが切断されています",
       noFileFound: "{{token}}のファイルが見つかりません",
-      executableBlocked: "{{path}} はプログラムまたはスクリプトのため、Paseo では開きません",
+      openWithDefaultAppUnsupported:
+        "Paseo が既定のアプリで開くのはドキュメント、画像、メディア、フォルダーだけです。{{path}} は対象外です",
       folderOutsideWorkspace: "{{path}} はこのワークスペースの外にあります",
       unexpectedDictationError: "音声入力処理中に予期しないエラーが発生しました。",
     },
