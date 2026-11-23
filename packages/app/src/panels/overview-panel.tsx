@@ -63,6 +63,7 @@ import {
   blockerTarget,
   branchFacts,
   canAnswerPermissionInPlace,
+  countLabel,
   derivePullRequests,
   deriveWorkspaceStateWord,
   deriveYourMove,
@@ -1212,10 +1213,10 @@ function PullRequests({
           highlightStyle={styles.pressed}
           testID="overview-no-pr"
         >
-          <Text style={styles.contextValue} numberOfLines={1}>
+          <Text style={styles.noPrLabel} numberOfLines={1}>
             {t("panels.overview.noPrYet")}
           </Text>
-          <Text style={styles.word} numberOfLines={1}>
+          <Text style={styles.noPrFacts} numberOfLines={1}>
             {branchFactsText}
           </Text>
           {facts?.branch ? (
@@ -1250,11 +1251,12 @@ function PullRequests({
             testID="overview-pull-requests-done"
           >
             <Text style={styles.word} numberOfLines={1}>
-              {t(
+              {countLabel(
+                t,
                 list.done.every((row) => row.tone === "merged")
                   ? "panels.overview.prsMerged"
                   : "panels.overview.prsDone",
-                { count: list.done.length },
+                list.done.length,
               )}
             </Text>
           </PressHighlight>
@@ -1479,6 +1481,17 @@ const styles = StyleSheet.create((theme) => {
     prRef: {
       flexShrink: 0,
       fontFamily: theme.fontFamily.mono,
+      fontSize: theme.fontSize.sm,
+      color: theme.colors.foregroundMuted,
+    },
+    noPrLabel: {
+      flexShrink: 0,
+      fontSize: theme.fontSize.sm,
+      color: theme.colors.foreground,
+    },
+    noPrFacts: {
+      flex: 1,
+      minWidth: 0,
       fontSize: theme.fontSize.sm,
       color: theme.colors.foregroundMuted,
     },

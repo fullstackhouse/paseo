@@ -203,6 +203,11 @@ export function overviewSubtitle(input: {
 
 type Translate = (key: string, options?: Record<string, unknown>) => string;
 
+/** A counted label from a key with `one` and `other` forms, as the app's resources spell plurals. */
+export function countLabel(t: Translate, key: string, count: number): string {
+  return t(`${key}.${count === 1 ? "one" : "other"}`, { count });
+}
+
 export interface PullRequestFacts {
   isMerged: boolean;
   checksStatus?: "none" | "pending" | "success" | "failure";
@@ -367,7 +372,7 @@ export function noPullRequestFacts(
       ? `+${input.diffStat.additions} −${input.diffStat.deletions}`
       : "";
   return [
-    t("panels.overview.commits", { count: input.aheadOfBase }),
+    countLabel(t, "panels.overview.commits", input.aheadOfBase),
     diff,
     input.isDirty ? t("panels.overview.uncommitted") : "",
   ]
