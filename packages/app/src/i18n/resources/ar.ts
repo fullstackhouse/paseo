@@ -2344,6 +2344,7 @@ export const ar: TranslationResources = {
         one: "{{count}} مدموج أو مغلق",
         other: "{{count}} مدموجة أو مغلقة",
       },
+      prsShowLess: "عرض أقل",
       prState: {
         open: "مفتوح",
         draft: "مسودة",

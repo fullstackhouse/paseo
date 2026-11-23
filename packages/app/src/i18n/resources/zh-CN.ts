@@ -2320,6 +2320,7 @@ export const zhCN: TranslationResources = {
         one: "{{count}} 个已合并或关闭",
         other: "{{count}} 个已合并或关闭",
       },
+      prsShowLess: "收起",
       prState: {
         open: "打开",
         draft: "草稿",

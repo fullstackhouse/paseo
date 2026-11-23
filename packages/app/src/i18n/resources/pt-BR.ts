@@ -2382,6 +2382,7 @@ export const ptBR: TranslationResources = {
         one: "{{count}} mesclado ou fechado",
         other: "{{count}} mesclados ou fechados",
       },
+      prsShowLess: "Mostrar menos",
       prState: {
         open: "Aberto",
         draft: "Rascunho",
