@@ -18,6 +18,10 @@ describe("Explorer sidebar layout", () => {
     expect(wide[1] * 1520).toBeCloseTo(320);
   });
 
+  it("opens at 420px when no width was saved", () => {
+    expect(resolveExplorerSidebarWidth({ containerWidth: 1600 })).toBe(420);
+  });
+
   it("has no fixed maximum while preserving room for the workspace body", () => {
     expect(resolveExplorerSidebarWidth({ requestedWidth: 100, containerWidth: 1200 })).toBe(240);
     expect(resolveExplorerSidebarWidth({ requestedWidth: 900, containerWidth: 1600 })).toBe(900);
