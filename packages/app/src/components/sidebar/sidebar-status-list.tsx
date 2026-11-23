@@ -96,6 +96,9 @@ const attentionGroupIconProps = densityIconProps("sm", (theme) => ({
 const runningGroupIconProps = densityIconProps("sm", (theme) => ({
   color: getStatusDotColor({ theme, bucket: "running" }) ?? undefined,
 }));
+const blockedGroupIconProps = densityIconProps("sm", (theme) => ({
+  color: getStatusDotColor({ theme, bucket: "blocked" }) ?? undefined,
+}));
 
 const ThemedChevronDown = withUnistyles(ChevronDown);
 const ThemedChevronRight = withUnistyles(ChevronRight);
@@ -542,7 +545,7 @@ function StatusGroupIcon({ bucket }: { bucket: StatusBucket }): ReactElement {
     case "done":
       return <ThemedCircleCheck uniProps={mutedGroupIconProps} />;
     case "blocked":
-      return <ThemedCirclePause uniProps={mutedGroupIconProps} />;
+      return <ThemedCirclePause uniProps={blockedGroupIconProps} />;
   }
 }
 
