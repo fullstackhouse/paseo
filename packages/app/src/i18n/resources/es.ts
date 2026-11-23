@@ -301,6 +301,19 @@ export const es: TranslationResources = {
     tooManyMatches: "Demasiadas coincidencias: acota la búsqueda",
     hostLoadFailed: "{{host}}: No se pudo cargar el historial",
     searchPlaceholder: "Buscar en el historial",
+    views: {
+      agents: "Agentes",
+      archivedWorkspaces: "Espacios de trabajo archivados",
+    },
+    archived: {
+      empty: "No hay espacios de trabajo archivados",
+      noMatches: "No hay espacios de trabajo archivados que coincidan",
+      searchPlaceholder: "Buscar espacios de trabajo archivados",
+      loadFailed: "No se pudieron cargar los espacios de trabajo archivados",
+      retry: "Reintentar",
+      hostLoadFailed: "{{host}}: No se pudieron cargar los espacios de trabajo archivados",
+      needsUpdate: "{{host}}: Actualiza este host para ver sus espacios de trabajo archivados",
+    },
     actions: {
       loadMore: "Cargar más",
       clearSearch: "Borrar búsqueda",

@@ -301,6 +301,20 @@ export const ja: TranslationResources = {
     tooManyMatches: "一致が多すぎます — 検索条件を絞ってください",
     hostLoadFailed: "{{host}}: 履歴を読み込めませんでした",
     searchPlaceholder: "履歴を検索",
+    views: {
+      agents: "エージェント",
+      archivedWorkspaces: "アーカイブ済みワークスペース",
+    },
+    archived: {
+      empty: "アーカイブ済みのワークスペースはありません",
+      noMatches: "一致するアーカイブ済みワークスペースはありません",
+      searchPlaceholder: "アーカイブ済みワークスペースを検索",
+      loadFailed: "アーカイブ済みワークスペースを読み込めませんでした",
+      retry: "再試行",
+      hostLoadFailed: "{{host}}: アーカイブ済みワークスペースを読み込めませんでした",
+      needsUpdate:
+        "{{host}}: アーカイブ済みワークスペースを表示するにはこのホストを更新してください",
+    },
     actions: {
       loadMore: "さらに読み込む",
       clearSearch: "検索をクリア",

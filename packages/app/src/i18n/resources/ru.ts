@@ -300,6 +300,19 @@ export const ru: TranslationResources = {
     tooManyMatches: "Слишком много совпадений — уточните запрос",
     hostLoadFailed: "{{host}}: не удалось загрузить историю",
     searchPlaceholder: "Поиск по истории",
+    views: {
+      agents: "Агенты",
+      archivedWorkspaces: "Архивные рабочие пространства",
+    },
+    archived: {
+      empty: "Нет архивных рабочих пространств",
+      noMatches: "Подходящих архивных рабочих пространств не найдено",
+      searchPlaceholder: "Поиск по архивным рабочим пространствам",
+      loadFailed: "Не удалось загрузить архивные рабочие пространства",
+      retry: "Повторить",
+      hostLoadFailed: "{{host}}: не удалось загрузить архивные рабочие пространства",
+      needsUpdate: "{{host}}: обновите этот хост, чтобы видеть его архивные рабочие пространства",
+    },
     actions: {
       loadMore: "Загрузить ещё",
       clearSearch: "Очистить поиск",

@@ -301,6 +301,19 @@ export const fr: TranslationResources = {
     tooManyMatches: "Trop de résultats — affinez la recherche",
     hostLoadFailed: "{{host}} : impossible de charger l’historique",
     searchPlaceholder: "Rechercher dans l’historique",
+    views: {
+      agents: "Agents",
+      archivedWorkspaces: "Espaces de travail archivés",
+    },
+    archived: {
+      empty: "Aucun espace de travail archivé",
+      noMatches: "Aucun espace de travail archivé correspondant",
+      searchPlaceholder: "Rechercher dans les espaces de travail archivés",
+      loadFailed: "Impossible de charger les espaces de travail archivés",
+      retry: "Réessayer",
+      hostLoadFailed: "{{host}} : impossible de charger les espaces de travail archivés",
+      needsUpdate: "{{host}} : mettez à jour cet hôte pour voir ses espaces de travail archivés",
+    },
     actions: {
       loadMore: "Charger plus",
       clearSearch: "Effacer la recherche",

@@ -297,6 +297,19 @@ export const ko: TranslationResources = {
     tooManyMatches: "일치 항목이 너무 많습니다 — 검색 범위를 좁히세요",
     hostLoadFailed: "{{host}}: 기록을 불러오지 못했습니다",
     searchPlaceholder: "기록 검색",
+    views: {
+      agents: "에이전트",
+      archivedWorkspaces: "보관된 워크스페이스",
+    },
+    archived: {
+      empty: "보관된 워크스페이스가 없습니다",
+      noMatches: "일치하는 보관된 워크스페이스가 없습니다",
+      searchPlaceholder: "보관된 워크스페이스 검색",
+      loadFailed: "보관된 워크스페이스를 불러오지 못했습니다",
+      retry: "다시 시도",
+      hostLoadFailed: "{{host}}: 보관된 워크스페이스를 불러오지 못했습니다",
+      needsUpdate: "{{host}}: 보관된 워크스페이스를 보려면 이 호스트를 업데이트하세요",
+    },
     actions: {
       loadMore: "더 불러오기",
       clearSearch: "검색 지우기",
