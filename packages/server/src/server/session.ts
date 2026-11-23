@@ -4290,7 +4290,10 @@ export class Session {
       type: "workspace.archived.list.response",
       payload: {
         requestId: request.requestId,
-        workspaces: await this.workspaceDirectory.listArchived(),
+        ...(await this.workspaceDirectory.listArchived({
+          search: request.search,
+          limit: request.limit,
+        })),
       },
     });
   }

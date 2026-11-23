@@ -21,13 +21,14 @@ import {
   useAgentHistory,
 } from "@/hooks/use-agent-history";
 import {
+  ARCHIVED_WORKSPACES_LIMIT,
   type ArchivedWorkspacesHostIssue,
+  useAnyHostSupportsArchivedWorkspaces,
   useArchivedWorkspaces,
 } from "@/hooks/use-archived-workspaces";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { useImportSession } from "@/hooks/use-import-session";
 import { useHosts } from "@/runtime/host-runtime";
-import { useSessionStore } from "@/stores/session-store";
 import { useHasFinePointer } from "@/hooks/use-fine-pointer";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { buildOpenProjectRoute } from "@/utils/host-routes";
@@ -108,7 +109,7 @@ function ArchivedWorkspacesContent({
   onClearSearch: () => void;
 }): ReactElement {
   const { t } = useTranslation();
-  const archived = useArchivedWorkspaces({ serverId, enabled: true, search });
+  const archived = useArchivedWorkspaces({ serverId, search });
   const [isManualRefresh, setIsManualRefresh] = useState(false);
   const { refresh } = archived;
   const handleRefresh = useCallback(() => {
@@ -116,8 +117,11 @@ function ArchivedWorkspacesContent({
     void refresh().finally(() => setIsManualRefresh(false));
   }, [refresh]);
 
-  let body: ReactElement;
-  if (archived.isInitialLoad) {
+  let body: ReactElement | null;
+  if (archived.nothingSearched) {
+    // No host could be asked; the banner says why. "No archived workspaces" would be a claim.
+    body = null;
+  } else if (archived.isInitialLoad) {
     body = (
       <View style={styles.loadingContainer}>
         <ThemedLoadingSpinner size="large" />
@@ -153,6 +157,11 @@ function ArchivedWorkspacesContent({
         showHostColumn={showHostColumn}
         isRefreshing={isManualRefresh}
         onRefresh={handleRefresh}
+        footerHint={
+          archived.truncated
+            ? t("sessions.archived.truncated", { count: ARCHIVED_WORKSPACES_LIMIT })
+            : undefined
+        }
       />
     );
   }
@@ -323,11 +332,7 @@ function SessionsScreenContent() {
   const [selectedHost, setSelectedHost] = useState(ALL_HOSTS_OPTION_ID);
   const [view, setView] = useState<HistoryView>("agents");
   // Gate on any host that can list them; hosts that can't are named inside the view.
-  const canShowArchived = useSessionStore((store) =>
-    Object.values(store.sessions).some(
-      (session) => session?.serverInfo?.features?.archivedWorkspaces === true,
-    ),
-  );
+  const canShowArchived = useAnyHostSupportsArchivedWorkspaces();
   const activeView: HistoryView = canShowArchived ? view : "agents";
   const viewOptions = useMemo(
     (): SegmentedControlOption<HistoryView>[] => [

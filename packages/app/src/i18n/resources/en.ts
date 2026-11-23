@@ -305,6 +305,8 @@ export const en = {
       retry: "Try again",
       hostLoadFailed: "{{host}}: Could not load archived workspaces",
       needsUpdate: "{{host}}: Update this host to see its archived workspaces",
+      truncated:
+        "Showing the {{count}} most recently archived on each host. Search to find older ones.",
     },
     actions: {
       loadMore: "Load more",

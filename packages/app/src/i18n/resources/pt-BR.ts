@@ -312,6 +312,8 @@ export const ptBR: TranslationResources = {
       retry: "Tentar novamente",
       hostLoadFailed: "{{host}}: Não foi possível carregar os workspaces arquivados",
       needsUpdate: "{{host}}: Atualize este host para ver os workspaces arquivados",
+      truncated:
+        "Mostrando os {{count}} arquivados mais recentes de cada host. Pesquise para encontrar os mais antigos.",
     },
     actions: {
       loadMore: "Carregar mais",

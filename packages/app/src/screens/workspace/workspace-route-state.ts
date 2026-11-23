@@ -125,5 +125,7 @@ export function shouldInspectWorkspaceRecovery(
   workspace: WorkspaceDescriptor | null,
   pendingOpenTarget: WorkspaceTabTarget | null,
 ): boolean {
-  return pendingOpenTarget !== null && hasHydratedWorkspaces && workspace === null;
+  const isHistoryOpen =
+    pendingOpenTarget?.kind === "agent" || pendingOpenTarget?.kind === "overview";
+  return isHistoryOpen && hasHydratedWorkspaces && workspace === null;
 }

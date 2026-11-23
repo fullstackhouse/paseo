@@ -239,8 +239,12 @@ describe("shouldInspectWorkspaceRecovery", () => {
     expect(shouldInspectWorkspaceRecovery(true, null, { kind: "agent", agentId: "a" })).toBe(true);
   });
 
-  it("leaves a plain link, a live workspace and an unhydrated host alone", () => {
+  it("leaves other opens, a live workspace and an unhydrated host alone", () => {
     expect(shouldInspectWorkspaceRecovery(true, null, null)).toBe(false);
+    // A just-created workspace opening on a terminal or file has not arrived yet; it is not archived.
+    expect(shouldInspectWorkspaceRecovery(true, null, { kind: "terminal", terminalId: "t" })).toBe(
+      false,
+    );
     expect(
       shouldInspectWorkspaceRecovery(true, createWorkspaceDescriptor(), { kind: "overview" }),
     ).toBe(false);

@@ -313,6 +313,8 @@ export const es: TranslationResources = {
       retry: "Reintentar",
       hostLoadFailed: "{{host}}: No se pudieron cargar los espacios de trabajo archivados",
       needsUpdate: "{{host}}: Actualiza este host para ver sus espacios de trabajo archivados",
+      truncated:
+        "Se muestran los {{count}} archivados más recientes de cada host. Busca para encontrar los anteriores.",
     },
     actions: {
       loadMore: "Cargar más",

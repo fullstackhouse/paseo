@@ -3697,14 +3697,24 @@ export class DaemonClient {
     return payload.state;
   }
 
-  /** Archived workspaces, newest first. Gate on `server_info.features.archivedWorkspaces`. */
-  async listArchivedWorkspaces(requestId?: string): Promise<ArchivedWorkspaceEntry[]> {
+  /**
+   * Archived workspaces, newest first, at most `limit` of those matching `search`.
+   * Gate on `server_info.features.archivedWorkspaces`.
+   */
+  async listArchivedWorkspaces(
+    options: { search?: string; limit?: number } = {},
+    requestId?: string,
+  ): Promise<{ workspaces: ArchivedWorkspaceEntry[]; truncated: boolean }> {
     const payload =
       await this.sendNamespacedCorrelatedSessionRequest<"workspace.archived.list.response">({
         requestId,
-        message: { type: "workspace.archived.list.request" },
+        message: {
+          type: "workspace.archived.list.request",
+          ...(options.search ? { search: options.search } : {}),
+          ...(options.limit ? { limit: options.limit } : {}),
+        },
       });
-    return payload.workspaces;
+    return { workspaces: payload.workspaces, truncated: payload.truncated };
   }
 
   async restoreWorkspace(workspaceId: string, requestId?: string): Promise<void> {

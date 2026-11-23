@@ -313,6 +313,8 @@ export const fr: TranslationResources = {
       retry: "Réessayer",
       hostLoadFailed: "{{host}} : impossible de charger les espaces de travail archivés",
       needsUpdate: "{{host}} : mettez à jour cet hôte pour voir ses espaces de travail archivés",
+      truncated:
+        "Affichage des {{count}} plus récemment archivés sur chaque hôte. Recherchez pour trouver les plus anciens.",
     },
     actions: {
       loadMore: "Charger plus",

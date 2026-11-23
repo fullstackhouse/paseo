@@ -306,6 +306,7 @@ export const zhCN: TranslationResources = {
       searchPlaceholder: "搜索已归档的工作区",
       loadFailed: "无法加载已归档的工作区",
       retry: "重试",
+      truncated: "显示每台主机最近归档的 {{count}} 个。搜索以查找更早的工作区。",
       hostLoadFailed: "{{host}}：无法加载已归档的工作区",
       needsUpdate: "{{host}}：请更新此主机以查看其已归档的工作区",
     },

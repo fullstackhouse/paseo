@@ -983,36 +983,47 @@ test("lists archived workspaces newest first, without active or hidden ones", as
     buildWorkspaceDescriptor: unused,
   });
 
-  expect(await directory.listArchived()).toEqual([
-    {
-      workspaceId: "newer",
-      name: "Fix login",
-      projectId: "project-1",
-      projectDisplayName: "My repo",
-      cwd: "/repo/.paseo/worktrees/newer",
-      workspaceKind: "worktree",
-      branch: "newer",
-      archivedAt: "2026-03-03T00:00:00.000Z",
-    },
-    {
-      workspaceId: "older",
-      name: "older",
-      projectId: "project-1",
-      projectDisplayName: "My repo",
-      cwd: "/repo/.paseo/worktrees/older",
-      workspaceKind: "worktree",
-      branch: "older",
-      archivedAt: "2026-03-02T00:00:00.000Z",
-    },
-    {
-      workspaceId: "orphan",
-      name: "orphan",
-      projectId: "gone",
-      projectDisplayName: "orphan",
-      cwd: "/elsewhere/orphan",
-      workspaceKind: "directory",
-      branch: null,
-      archivedAt: "2026-03-01T00:00:00.000Z",
-    },
-  ]);
+  expect(await directory.listArchived()).toEqual({
+    truncated: false,
+    workspaces: [
+      {
+        workspaceId: "newer",
+        name: "Fix login",
+        projectId: "project-1",
+        projectDisplayName: "My repo",
+        branch: "newer",
+        archivedAt: "2026-03-03T00:00:00.000Z",
+      },
+      {
+        workspaceId: "older",
+        name: "older",
+        projectId: "project-1",
+        projectDisplayName: "My repo",
+        branch: "older",
+        archivedAt: "2026-03-02T00:00:00.000Z",
+      },
+      {
+        workspaceId: "orphan",
+        name: "orphan",
+        projectId: "gone",
+        projectDisplayName: "orphan",
+        branch: null,
+        archivedAt: "2026-03-01T00:00:00.000Z",
+      },
+    ],
+  });
+
+  // Archives only grow: the daemon searches all of them, then caps what it sends.
+  expect(await directory.listArchived({ limit: 1 })).toEqual({
+    truncated: true,
+    workspaces: [expect.objectContaining({ workspaceId: "newer" })],
+  });
+  expect(await directory.listArchived({ search: "older repo", limit: 1 })).toEqual({
+    truncated: false,
+    workspaces: [expect.objectContaining({ workspaceId: "older" })],
+  });
+  expect(await directory.listArchived({ search: "no-such-workspace" })).toEqual({
+    truncated: false,
+    workspaces: [],
+  });
 });

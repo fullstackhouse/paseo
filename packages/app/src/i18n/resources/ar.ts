@@ -306,6 +306,7 @@ export const ar: TranslationResources = {
       searchPlaceholder: "البحث في مساحات العمل المؤرشفة",
       loadFailed: "تعذر تحميل مساحات العمل المؤرشفة",
       retry: "إعادة المحاولة",
+      truncated: "يتم عرض أحدث {{count}} مساحة مؤرشفة على كل مضيف. ابحث للعثور على الأقدم.",
       hostLoadFailed: "{{host}}: تعذر تحميل مساحات العمل المؤرشفة",
       needsUpdate: "{{host}}: حدّث هذا المضيف لعرض مساحات العمل المؤرشفة",
     },

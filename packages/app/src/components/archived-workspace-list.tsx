@@ -171,12 +171,15 @@ export function ArchivedWorkspaceList({
   showHostColumn,
   isRefreshing,
   onRefresh,
+  footerHint,
 }: {
   workspaces: ArchivedWorkspace[];
   search?: string;
   showHostColumn: boolean;
   isRefreshing: boolean;
   onRefresh: () => void;
+  /** Shown under the list, e.g. when hosts held back older matches. */
+  footerHint?: string;
 }): ReactElement {
   const { t } = useTranslation();
   const isMobile = useIsCompactFormFactor();
@@ -223,6 +226,15 @@ export function ArchivedWorkspaceList({
     [isMobile, search, showHostColumn, t],
   );
   const keyExtractor = useCallback((item: ListItem) => item.key, []);
+  const footer = useMemo(
+    () =>
+      footerHint ? (
+        <View style={styles.footer}>
+          <Text style={styles.footerHint}>{footerHint}</Text>
+        </View>
+      ) : null,
+    [footerHint],
+  );
   const refreshControl = useMemo(
     () => <ThemedRefreshControl refreshing={isRefreshing} onRefresh={onRefresh} />,
     [isRefreshing, onRefresh],
@@ -238,6 +250,7 @@ export function ArchivedWorkspaceList({
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
       refreshControl={refreshControl}
+      ListFooterComponent={footer}
       testID="archived-workspace-list"
     />
   );
@@ -256,6 +269,14 @@ const styles = StyleSheet.create((theme) => ({
     paddingTop: theme.spacing[4],
     paddingBottom: theme.spacing[6],
     gap: theme.spacing[1],
+  },
+  footer: {
+    alignItems: "center",
+    paddingVertical: theme.spacing[4],
+  },
+  footerHint: {
+    color: theme.colors.foregroundMuted,
+    fontSize: theme.fontSize.base,
   },
   sectionHeading: {
     marginTop: theme.spacing[2],

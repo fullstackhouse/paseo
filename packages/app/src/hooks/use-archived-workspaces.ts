@@ -1,22 +1,25 @@
 import type { ArchivedWorkspaceEntry } from "@getpaseo/protocol/messages";
 import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
-import { RECALL_MATCH_OPTIONS, scoreTextFields } from "@getpaseo/protocol/search/text-match";
 import { useMemo, useSyncExternalStore } from "react";
 import { useFetchQuery } from "@/data/query";
 import { getHostRuntimeStore, isHostRuntimeConnected, useHosts } from "@/runtime/host-runtime";
 import { useSessionStore } from "@/stores/session-store";
 
 const ALL_HOSTS_FAILED_MESSAGE = "No connected hosts could load archived workspaces";
+/** Per host. Archives only grow; older ones are reached by searching. */
+export const ARCHIVED_WORKSPACES_LIMIT = 200;
 
 export interface ArchivedWorkspace extends ArchivedWorkspaceEntry {
   serverId: string;
   serverLabel: string;
 }
 
+type ArchivedWorkspacesClient = Pick<DaemonClient, "listArchivedWorkspaces">;
+
 export interface ArchivedWorkspacesHost {
   serverId: string;
   serverLabel: string;
-  client: Pick<DaemonClient, "listArchivedWorkspaces">;
+  client: ArchivedWorkspacesClient;
 }
 
 /** A host whose archived workspaces are missing from the list, and why. */
@@ -29,63 +32,94 @@ export interface ArchivedWorkspacesHostIssue {
 export interface ArchivedWorkspacesBatch {
   workspaces: ArchivedWorkspace[];
   failedHosts: ArchivedWorkspacesHostIssue[];
+  /** Some host had more matches than it sent. */
+  truncated: boolean;
 }
 
-export async function fetchArchivedWorkspacesBatch(
-  hosts: readonly ArchivedWorkspacesHost[],
-): Promise<ArchivedWorkspacesBatch> {
+export async function fetchArchivedWorkspacesBatch(input: {
+  hosts: readonly ArchivedWorkspacesHost[];
+  search: string;
+}): Promise<ArchivedWorkspacesBatch> {
+  const { hosts } = input;
+  const search = input.search.trim();
   const settled = await Promise.allSettled(
-    hosts.map((host) => host.client.listArchivedWorkspaces()),
+    hosts.map((host) =>
+      host.client.listArchivedWorkspaces({
+        ...(search ? { search } : {}),
+        limit: ARCHIVED_WORKSPACES_LIMIT,
+      }),
+    ),
   );
   if (hosts.length > 0 && settled.every((result) => result.status === "rejected")) {
     throw new Error(ALL_HOSTS_FAILED_MESSAGE);
   }
   const workspaces: ArchivedWorkspace[] = [];
   const failedHosts: ArchivedWorkspacesHostIssue[] = [];
+  let truncated = false;
   settled.forEach((result, index) => {
     const host = hosts[index];
     if (result.status === "rejected") {
       failedHosts.push({ serverId: host.serverId, serverName: host.serverLabel, reason: "failed" });
       return;
     }
-    for (const entry of result.value) {
+    truncated ||= result.value.truncated;
+    for (const entry of result.value.workspaces) {
       workspaces.push({ ...entry, serverId: host.serverId, serverLabel: host.serverLabel });
     }
   });
   workspaces.sort((a, b) => b.archivedAt.localeCompare(a.archivedAt));
-  return { workspaces, failedHosts };
+  return { workspaces, failedHosts, truncated };
 }
 
-/** Typo-tolerant, like History's agent search; every query word must hit some field. */
-export function filterArchivedWorkspaces(
-  workspaces: readonly ArchivedWorkspace[],
-  search: string,
-): ArchivedWorkspace[] {
-  const query = search.trim();
-  if (!query) return [...workspaces];
-  return workspaces.filter(
-    (workspace) =>
-      scoreTextFields(
-        query,
-        [workspace.name, workspace.projectDisplayName, workspace.branch ?? ""],
-        RECALL_MATCH_OPTIONS,
-      ) !== null,
-  );
+/** Which hosts can be asked, and why the rest are missing from the list. */
+export function classifyArchivedWorkspacesHosts(input: {
+  hosts: readonly { serverId: string; label: string }[];
+  serverId: string | null;
+  supportingServerIds: ReadonlySet<string>;
+  getClient: (serverId: string) => ArchivedWorkspacesClient | null;
+  isConnected: (serverId: string) => boolean;
+}): { targetHosts: ArchivedWorkspacesHost[]; skippedHosts: ArchivedWorkspacesHostIssue[] } {
+  const targets = input.serverId
+    ? input.hosts.filter((host) => host.serverId === input.serverId)
+    : input.hosts;
+  const targetHosts: ArchivedWorkspacesHost[] = [];
+  const skippedHosts: ArchivedWorkspacesHostIssue[] = [];
+  for (const host of targets) {
+    const client = input.getClient(host.serverId);
+    const serverName = host.label;
+    if (!client || !input.isConnected(host.serverId)) {
+      skippedHosts.push({ serverId: host.serverId, serverName, reason: "unreachable" });
+    } else if (!input.supportingServerIds.has(host.serverId)) {
+      skippedHosts.push({ serverId: host.serverId, serverName, reason: "needsUpdate" });
+    } else {
+      targetHosts.push({ serverId: host.serverId, serverLabel: serverName, client });
+    }
+  }
+  return { targetHosts, skippedHosts };
 }
 
 export interface ArchivedWorkspacesResult {
-  /** At least one target host can list archived workspaces. */
-  isSupported: boolean;
   workspaces: ArchivedWorkspace[];
+  /** No host could be asked, so an empty list says nothing about what is archived. */
+  nothingSearched: boolean;
+  truncated: boolean;
   isInitialLoad: boolean;
   isError: boolean;
   hostIssues: ArchivedWorkspacesHostIssue[];
   refresh: () => Promise<void>;
 }
 
+/** Any host can list archived workspaces; hosts that can't are named inside the view. */
+export function useAnyHostSupportsArchivedWorkspaces(): boolean {
+  return useSessionStore((store) =>
+    Object.values(store.sessions).some(
+      (session) => session?.serverInfo?.features?.archivedWorkspaces === true,
+    ),
+  );
+}
+
 export function useArchivedWorkspaces(options: {
   serverId: string | null;
-  enabled: boolean;
   search: string;
 }): ArchivedWorkspacesResult {
   const daemons = useHosts();
@@ -106,38 +140,24 @@ export function useArchivedWorkspaces(options: {
 
   const { targetHosts, skippedHosts } = useMemo(() => {
     void runtimeVersion;
-    const supporting = new Set(supportingServerIds.split("\n"));
-    const targets = options.serverId
-      ? daemons.filter((daemon) => daemon.serverId === options.serverId)
-      : daemons;
-    const hosts: ArchivedWorkspacesHost[] = [];
-    const skipped: ArchivedWorkspacesHostIssue[] = [];
-    for (const daemon of targets) {
-      const client = runtime.getClient(daemon.serverId);
-      const serverName = daemon.label;
-      if (!client || !isHostRuntimeConnected(runtime.getSnapshot(daemon.serverId))) {
-        skipped.push({ serverId: daemon.serverId, serverName, reason: "unreachable" });
-      } else if (!supporting.has(daemon.serverId)) {
-        skipped.push({ serverId: daemon.serverId, serverName, reason: "needsUpdate" });
-      } else {
-        hosts.push({ serverId: daemon.serverId, serverLabel: serverName, client });
-      }
-    }
-    return { targetHosts: hosts, skippedHosts: skipped };
+    return classifyArchivedWorkspacesHosts({
+      hosts: daemons,
+      serverId: options.serverId,
+      supportingServerIds: new Set(supportingServerIds.split("\n")),
+      getClient: (serverId) => runtime.getClient(serverId),
+      isConnected: (serverId) => isHostRuntimeConnected(runtime.getSnapshot(serverId)),
+    });
   }, [daemons, options.serverId, runtime, runtimeVersion, supportingServerIds]);
 
+  const search = options.search.trim();
   const query = useFetchQuery({
-    queryKey: ["archivedWorkspaces", ...targetHosts.map((host) => host.serverId)],
+    queryKey: ["archivedWorkspaces", search, ...targetHosts.map((host) => host.serverId)],
     dataShape: "list",
     staleTimeMs: 5_000,
-    enabled: options.enabled && targetHosts.length > 0,
-    queryFn: () => fetchArchivedWorkspacesBatch(targetHosts),
+    enabled: targetHosts.length > 0,
+    queryFn: () => fetchArchivedWorkspacesBatch({ hosts: targetHosts, search }),
   });
 
-  const workspaces = useMemo(
-    () => filterArchivedWorkspaces(query.data?.workspaces ?? [], options.search),
-    [options.search, query.data],
-  );
   const hostIssues = useMemo(
     () => [...skippedHosts, ...(query.data?.failedHosts ?? [])],
     [query.data, skippedHosts],
@@ -145,8 +165,9 @@ export function useArchivedWorkspaces(options: {
   const { refetch } = query;
 
   return {
-    isSupported: supportingServerIds.length > 0,
-    workspaces,
+    workspaces: query.data?.workspaces ?? [],
+    nothingSearched: targetHosts.length === 0,
+    truncated: query.data?.truncated ?? false,
     isInitialLoad: targetHosts.length > 0 && query.isPending,
     isError: query.isError,
     hostIssues,

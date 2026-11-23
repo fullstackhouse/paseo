@@ -307,6 +307,7 @@ export const ko: TranslationResources = {
       searchPlaceholder: "보관된 워크스페이스 검색",
       loadFailed: "보관된 워크스페이스를 불러오지 못했습니다",
       retry: "다시 시도",
+      truncated: "각 호스트에서 최근 보관된 {{count}}개를 표시합니다. 이전 항목은 검색하세요.",
       hostLoadFailed: "{{host}}: 보관된 워크스페이스를 불러오지 못했습니다",
       needsUpdate: "{{host}}: 보관된 워크스페이스를 보려면 이 호스트를 업데이트하세요",
     },

@@ -1162,10 +1162,14 @@ export const WorkspaceRecoveryInspectRequestSchema = z.object({
   requestId: z.string(),
 });
 
-// COMPAT(archivedWorkspaces): FSH-only, added in v0.15.3, remove gate after 2027-05-23.
+// COMPAT(archivedWorkspaces): FSH-only, added after v0.15.3, remove gate after 2027-05-23.
 export const WorkspaceArchivedListRequestSchema = z.object({
   type: z.literal("workspace.archived.list.request"),
   requestId: z.string(),
+  // Typo-tolerant match on name, project and branch; the daemon filters before limiting.
+  search: z.string().optional(),
+  // Newest-archived first; the daemon caps it and reports `truncated`.
+  limit: z.number().int().positive().optional(),
 });
 
 export const WorkspaceRecoveryRestoreRequestSchema = z.object({
@@ -2372,8 +2376,6 @@ export const ArchivedWorkspaceEntrySchema = z.object({
   name: z.string(),
   projectId: z.string(),
   projectDisplayName: z.string(),
-  cwd: z.string(),
-  workspaceKind: z.enum(["directory", "local_checkout", "worktree"]),
   branch: z.string().nullable(),
   archivedAt: z.string(),
 });
@@ -2383,6 +2385,8 @@ export const WorkspaceArchivedListResponseSchema = z.object({
   payload: z.object({
     requestId: z.string(),
     workspaces: z.array(ArchivedWorkspaceEntrySchema),
+    // More archived workspaces matched than `limit` allowed.
+    truncated: z.boolean(),
   }),
 });
 
@@ -4039,7 +4043,7 @@ export const ServerInfoStatusPayloadSchema = z
         worktreeRestore: z.boolean().optional(),
         // COMPAT(workspaceRecovery): added in v0.1.105, remove after 2027-01-11 once daemon floor >= v0.1.105.
         workspaceRecovery: z.boolean().optional(),
-        // COMPAT(archivedWorkspaces): FSH-only, added in v0.15.3, remove gate after 2027-05-23.
+        // COMPAT(archivedWorkspaces): FSH-only, added after v0.15.3, remove gate after 2027-05-23.
         archivedWorkspaces: z.boolean().optional(),
         // COMPAT(workspaceFileEditing): added in v0.2.0, remove after 2027-01-18 once daemon floor >= v0.2.0.
         workspaceFileEditing: z.boolean().optional(),
