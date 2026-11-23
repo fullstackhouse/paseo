@@ -795,7 +795,8 @@ describe("evaluatePluginClientBundle", () => {
         `(function(require) {
       const shared = require("@getpaseo/plugin");
       const client = require("@getpaseo/plugin/client");
-      const { ExternalLink, Loading, Markdown, PullRequestPanel } = require("@getpaseo/plugin/client/ui");
+      const { ExternalLink, Loading, Markdown, Menu, PullRequestPanel } = require("@getpaseo/plugin/client/ui");
+      if (typeof Menu !== "function") throw new Error("Menu");
       if (typeof Markdown !== "function") throw new Error("Markdown");
       if (typeof PullRequestPanel !== "function") throw new Error("PullRequestPanel");
       if (typeof ExternalLink !== "function") throw new Error("ExternalLink");

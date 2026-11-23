@@ -280,7 +280,8 @@ Shared files import contract helpers and types from `@getpaseo/plugin`. Server h
 icon set, or any `PluginIcon` through its `icon` prop; an unknown name or unsafe SVG renders nothing
 so it cannot break the plugin surface.
 Its controlled modal keeps presentation metadata on `<Modal title="…" icon={…}>` and body UI in
-`<Modal.Content>`. Body layout, sheet-aware scrolling, and clipboard actions follow the
+`<Modal.Content>`. Its `Menu` is the app's [menu engine](menus.md) behind a host-drawn trigger, so plugin
+menus get the same popover, sheet and iOS selection timing; it is undefined on older hosts. Body layout, sheet-aware scrolling, and clipboard actions follow the
 [host UI contract](../public-docs/plugins/reference.md#host-ui).
 Plugin UI runs on desktop and mobile across multiple themes: color every `Text` from
 `theme.colors.foreground` or `theme.colors.foregroundMuted`, and size layout from `layout.compact`.
