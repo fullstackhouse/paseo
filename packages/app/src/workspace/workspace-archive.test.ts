@@ -1,4 +1,6 @@
 import { seedSessionHosts } from "@/test/seed-session";
+import { queryClient } from "@/data/query-client";
+import { ARCHIVED_WORKSPACES_QUERY_ROOT } from "@/hooks/archived-workspaces-query";
 import { getHostRuntimeStore } from "@/runtime/host-runtime";
 import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -91,6 +93,21 @@ function storedWorkspaceOn(serverId: string, id: string): WorkspaceDescriptor | 
   return useSessionStore.getState().sessions[serverId]?.workspaces.get(id);
 }
 
+const ARCHIVED_LIST_KEY = [...ARCHIVED_WORKSPACES_QUERY_ROOT, "", SERVER_ID];
+
+/** Seeds History's archived list so a test can see whether archiving refetches it. */
+function seedArchivedList(): void {
+  queryClient.setQueryData(ARCHIVED_LIST_KEY, {
+    workspaces: [],
+    failedHosts: [],
+    truncated: false,
+  });
+}
+
+function archivedListInvalidated(): boolean {
+  return queryClient.getQueryState(ARCHIVED_LIST_KEY)?.isInvalidated === true;
+}
+
 function storedWorkspace(id: string): WorkspaceDescriptor | undefined {
   return storedWorkspaceOn(SERVER_ID, id);
 }
@@ -107,6 +124,7 @@ afterEach(() => {
   clearWorkspaceArchivePending({ serverId: SECOND_SERVER_ID, workspaceId: "workspace-1" });
   clearWorkspaceArchivePending({ serverId: SECOND_SERVER_ID, workspaceId: "workspace-2" });
   useSessionStore.setState((state) => ({ ...state, sessions: {} }));
+  queryClient.clear();
 });
 
 describe("archiveWorkspaceOptimistically", () => {
@@ -129,10 +147,12 @@ describe("archiveWorkspaceOptimistically", () => {
       }),
     ).toBe(true);
 
+    seedArchivedList();
     releaseArchive.resolve(archivePayload({ workspaceId: archived.id }));
     await archive;
 
     expect(storedWorkspace(archived.id)).toBeUndefined();
+    expect(archivedListInvalidated()).toBe(true);
   });
 
   it("marks cached agent history stale once the host has archived the workspace", async () => {
@@ -153,6 +173,7 @@ describe("archiveWorkspaceOptimistically", () => {
       vi.fn(async () => archivePayload({ workspaceId: archived.id, error: "nope" })),
     );
 
+    seedArchivedList();
     await expect(
       archiveWorkspaceOptimistically({
         client,
@@ -161,6 +182,7 @@ describe("archiveWorkspaceOptimistically", () => {
     ).rejects.toThrow("nope");
 
     expect(storedWorkspace(archived.id)).toEqual(archived);
+    expect(archivedListInvalidated()).toBe(false);
     expect(
       isWorkspaceArchivePending({
         serverId: SERVER_ID,

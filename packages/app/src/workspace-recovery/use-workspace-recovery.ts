@@ -1,6 +1,7 @@
 import { useCallback, useMemo } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { useFetchQuery } from "@/data/query";
+import { invalidateArchivedWorkspaces } from "@/hooks/archived-workspaces-query";
 import { useHostRuntimeClient, useHostRuntimeIsConnected } from "@/runtime/host-runtime";
 import { useSessionStore } from "@/stores/session-store";
 import { toErrorMessage } from "@/utils/error-messages";
@@ -58,6 +59,7 @@ export function useWorkspaceRecovery(input: {
       await waitForMinimumRecoveryLoadingTime();
       await client.restoreWorkspace(input.workspaceId);
     },
+    onSuccess: invalidateArchivedWorkspaces,
   });
 
   const recreateMutation = useMutation({
@@ -67,6 +69,7 @@ export function useWorkspaceRecovery(input: {
       }
       await client.recreateWorkspace(input.workspaceId);
     },
+    onSuccess: invalidateArchivedWorkspaces,
   });
 
   const state = useMemo(

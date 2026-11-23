@@ -2,6 +2,7 @@ import type { ArchivedWorkspaceEntry } from "@getpaseo/protocol/messages";
 import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
 import { useMemo, useSyncExternalStore } from "react";
 import { useFetchQuery } from "@/data/query";
+import { ARCHIVED_WORKSPACES_QUERY_ROOT } from "@/hooks/archived-workspaces-query";
 import { getHostRuntimeStore, isHostRuntimeConnected, useHosts } from "@/runtime/host-runtime";
 import { useSessionStore } from "@/stores/session-store";
 
@@ -151,7 +152,11 @@ export function useArchivedWorkspaces(options: {
 
   const search = options.search.trim();
   const query = useFetchQuery({
-    queryKey: ["archivedWorkspaces", search, ...targetHosts.map((host) => host.serverId)],
+    queryKey: [
+      ...ARCHIVED_WORKSPACES_QUERY_ROOT,
+      search,
+      ...targetHosts.map((host) => host.serverId),
+    ],
     dataShape: "list",
     staleTimeMs: 5_000,
     enabled: targetHosts.length > 0,

@@ -342,6 +342,10 @@ export const ptBR: TranslationResources = {
       searchPlaceholder: "Buscar workspaces arquivados",
       loadFailed: "Não foi possível carregar os workspaces arquivados",
       retry: "Tentar novamente",
+      truncatedSearch:
+        "Mostrando as {{count}} correspondências mais recentes de cada host. Refine a busca para ver as mais antigas.",
+      refreshFailed:
+        "Não foi possível atualizar os workspaces arquivados. Mostrando a última lista.",
       hostLoadFailed: "{{host}}: Não foi possível carregar os workspaces arquivados",
       needsUpdate: "{{host}}: Atualize este host para ver os workspaces arquivados",
       truncated:

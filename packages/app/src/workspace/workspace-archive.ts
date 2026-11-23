@@ -10,6 +10,7 @@ import {
 } from "@/contexts/session-workspace-upserts";
 import { useSessionStore, type WorkspaceDescriptor } from "@/stores/session-store";
 import { resolveWorkspaceMapKeyByIdentity } from "@/utils/workspace-identity";
+import { invalidateArchivedWorkspaces } from "@/hooks/archived-workspaces-query";
 import { i18n } from "@/i18n/i18next";
 
 export interface WorkspaceArchiveTarget {
@@ -139,6 +140,7 @@ async function archiveWorkspaceOrThrow(input: {
   if (payload.error) {
     throw new Error(payload.error);
   }
+  invalidateArchivedWorkspaces();
   return "archived";
 }
 

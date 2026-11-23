@@ -343,6 +343,10 @@ export const fr: TranslationResources = {
       searchPlaceholder: "Rechercher dans les espaces de travail archivés",
       loadFailed: "Impossible de charger les espaces de travail archivés",
       retry: "Réessayer",
+      truncatedSearch:
+        "Affichage des {{count}} correspondances les plus récentes sur chaque hôte. Affinez la recherche pour voir les plus anciennes.",
+      refreshFailed:
+        "Impossible d’actualiser les espaces de travail archivés. Affichage de la dernière liste.",
       hostLoadFailed: "{{host}} : impossible de charger les espaces de travail archivés",
       needsUpdate: "{{host}} : mettez à jour cet hôte pour voir ses espaces de travail archivés",
       truncated:
