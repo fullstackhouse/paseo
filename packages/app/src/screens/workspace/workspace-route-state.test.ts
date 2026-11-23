@@ -237,6 +237,8 @@ describe("shouldInspectWorkspaceRecovery", () => {
   it("inspects a missing workspace opened from an archived workspace row", () => {
     expect(shouldInspectWorkspaceRecovery(true, null, { kind: "overview" })).toBe(true);
     expect(shouldInspectWorkspaceRecovery(true, null, { kind: "agent", agentId: "a" })).toBe(true);
+    // A paseo:// link to an archived workspace asks too, with no tab to open.
+    expect(shouldInspectWorkspaceRecovery(true, null, null, true)).toBe(true);
   });
 
   it("leaves other opens, a live workspace and an unhydrated host alone", () => {

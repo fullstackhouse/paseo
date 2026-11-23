@@ -170,6 +170,7 @@ import {
 import { renderWorkspaceRouteGate } from "@/screens/workspace/workspace-route-state-views";
 import { ArchivedWorkspacePreview } from "@/screens/workspace/archived-workspace-preview";
 import { useWorkspaceRecovery } from "@/workspace-recovery/use-workspace-recovery";
+import { useWorkspaceRecoveryRequestedFromLink } from "@/workspace-recovery/link-requests";
 import type { WorkspaceRecoveryModel } from "@/workspace-recovery/model";
 import {
   buildWorkspaceTabSnapshot,
@@ -1234,6 +1235,10 @@ function WorkspaceScreenContent({
     hasHydratedWorkspaces,
     workspaceExists: workspaceDescriptor !== null,
   });
+  const recoveryRequestedFromLink = useWorkspaceRecoveryRequestedFromLink(
+    normalizedServerId,
+    normalizedWorkspaceId,
+  );
   const workspaceRecovery = useWorkspaceRecovery({
     serverId: normalizedServerId,
     workspaceId: normalizedWorkspaceId,
@@ -1241,6 +1246,7 @@ function WorkspaceScreenContent({
       hasHydratedWorkspaces,
       workspaceDescriptor,
       pendingOpenTarget,
+      recoveryRequestedFromLink,
     ),
   });
 

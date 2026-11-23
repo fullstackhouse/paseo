@@ -117,15 +117,18 @@ export function resolveArchivedPreviewAgentId(
 }
 
 /**
- * Only an explicit open (a History agent row, or an archived workspace row) asks the host about
- * recovery; a plain link to a missing workspace stays "missing".
+ * Only an explicit open (a History agent row, an archived workspace row, or a paseo:// link) asks
+ * the host about recovery; any other route to a missing workspace stays "missing".
  */
 export function shouldInspectWorkspaceRecovery(
   hasHydratedWorkspaces: boolean,
   workspace: WorkspaceDescriptor | null,
   pendingOpenTarget: WorkspaceTabTarget | null,
+  requestedFromLink = false,
 ): boolean {
-  const isHistoryOpen =
-    pendingOpenTarget?.kind === "agent" || pendingOpenTarget?.kind === "overview";
-  return isHistoryOpen && hasHydratedWorkspaces && workspace === null;
+  const explicit =
+    pendingOpenTarget?.kind === "agent" ||
+    pendingOpenTarget?.kind === "overview" ||
+    requestedFromLink;
+  return explicit && hasHydratedWorkspaces && workspace === null;
 }
