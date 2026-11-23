@@ -63,7 +63,8 @@ export type YourMoveRow =
   | { kind: "entry"; key: string; item: WorkspaceSummaryItem; entry: PluginWorkspaceSummaryEntry }
   | { kind: "plugin"; key: string; item: WorkspaceSummaryItem }
   | { kind: "failed"; key: string; agentId: string }
-  | { kind: "archive"; key: string };
+  | { kind: "archive"; key: string }
+  | { kind: "archive-held"; key: string };
 
 /**
  * Everything that waits on the human, in the attention ladder's order, then Archive. Git steps and
@@ -74,20 +75,13 @@ export type YourMoveRow =
  * checkout doesn't offer Archive just because an agent finished, as in the header (git/policy.ts).
  * Never while other work in the workspace is still open (`isWorkStillOpen`): a merged PR finishes one
  * agent's job, and archiving would stop the rest. Nor while a permission prompt or a failed agent is
- * listed (`masksRunningWork`).
+ * listed (`masksRunningWork`). When live background work is what holds it, an `archive-held` row says
+ * so in its place: a dev server a finished agent left running would otherwise hide Archive with
+ * nothing on screen to say why, while the sidebar already shows the workspace as Done.
  */
-export function deriveYourMove(input: {
-  items: readonly AttentionItem[];
-  agentRunning: boolean;
-  gitPrimaryId: GitActionId | null;
-  /** The archive git action exists and is enabled (or running), whether or not it is the primary. */
-  canArchive: boolean;
-  isWorktree: boolean;
-  prMerged: boolean;
-  statusDone: boolean;
-  /** Work in the workspace is still under way although no agent runs a turn (`isWorkStillOpen`). */
-  workOpen: boolean;
-}): YourMoveRow[] {
+export function deriveYourMove(
+  input: ArchiveInput & { items: readonly AttentionItem[] },
+): YourMoveRow[] {
   const rows: YourMoveRow[] = [];
   for (const item of input.items) {
     if (item.kind === "permission" || item.kind === "failed") {
@@ -103,18 +97,36 @@ export function deriveYourMove(input: {
       }
     }
   }
-  if (input.agentRunning || input.workOpen || rows.some(masksRunningWork)) return rows;
+  if (input.agentRunning || rows.some(masksRunningWork) || !archiveFits(input)) return rows;
+  if (!input.workOpen) rows.push({ kind: "archive", key: `git:${ARCHIVE_ACTION_ID}` });
+  else if (input.liveWork) rows.push({ kind: "archive-held", key: `held:${ARCHIVE_ACTION_ID}` });
+  return rows;
+}
+
+interface ArchiveInput {
+  agentRunning: boolean;
+  gitPrimaryId: GitActionId | null;
+  /** The archive git action exists and is enabled (or running), whether or not it is the primary. */
+  canArchive: boolean;
+  isWorktree: boolean;
+  prMerged: boolean;
+  statusDone: boolean;
+  /** Work in the workspace is still under way although no agent runs a turn (`isWorkStillOpen`). */
+  workOpen: boolean;
+  /** The host still counts the workspace running: a background shell, monitor or subagent. */
+  liveWork: boolean;
+}
+
+/** Whether the work shipped and Archive fits the branch, before anything holds it back. */
+function archiveFits(input: ArchiveInput): boolean {
   const shipped = input.prMerged || input.statusDone;
-  if (
+  return (
     shipped &&
     input.canArchive &&
     (input.isWorktree || input.prMerged) &&
     input.gitPrimaryId !== null &&
     ARCHIVABLE_GIT_STEPS.has(input.gitPrimaryId)
-  ) {
-    rows.push({ kind: "archive", key: `git:${ARCHIVE_ACTION_ID}` });
-  }
-  return rows;
+  );
 }
 
 /**

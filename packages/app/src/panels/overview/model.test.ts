@@ -106,6 +106,7 @@ describe("deriveYourMove", () => {
       prMerged: false,
       statusDone: false,
       workOpen: false,
+      liveWork: false,
     });
     expect(rows.map((row) => row.kind)).toEqual([
       "permission",
@@ -124,6 +125,7 @@ describe("deriveYourMove", () => {
       prMerged: false,
       statusDone: false,
       workOpen: false,
+      liveWork: false,
     });
     expect(rows).toEqual([{ kind: "plugin", key: "x", item: expect.anything() }]);
   });
@@ -138,6 +140,7 @@ describe("deriveYourMove", () => {
       prMerged: false,
       statusDone: true,
       workOpen: false,
+      liveWork: false,
     };
     const archive = [{ kind: "archive", key: "git:archive-workspace" }];
 
@@ -183,6 +186,21 @@ describe("deriveYourMove", () => {
         item: summaryItem({ needsYou: true }),
       };
       expect(rowKinds(deriveYourMove({ ...base, items: [ask] }))).toEqual(["plugin", "archive"]);
+    });
+
+    it("says Archive waits when live background work holds it", () => {
+      // A dev server a finished agent left running: the card says done, the shell still runs.
+      const held = [{ kind: "archive-held", key: "held:archive-workspace" }];
+      expect(deriveYourMove({ ...base, workOpen: true, liveWork: true })).toEqual(held);
+      // Held by a card or the report only: the status card above already says why.
+      expect(deriveYourMove({ ...base, workOpen: true, liveWork: false })).toEqual([]);
+      // No hint where Archive wouldn't be offered anyway.
+      expect(
+        deriveYourMove({ ...base, workOpen: true, liveWork: true, statusDone: false }),
+      ).toEqual([]);
+      expect(
+        deriveYourMove({ ...base, workOpen: true, liveWork: true, agentRunning: true }),
+      ).toEqual([]);
     });
 
     it("waits while other work in the workspace is open", () => {

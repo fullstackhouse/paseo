@@ -2268,6 +2268,9 @@ export const en = {
       prMergedTitle: "PR #{{number}} merged",
       outdated: "You replied {{time}}; the agent hasn't updated this since.",
       readyToArchive: "Ready to archive",
+      archiveHeldTitle: "Archive waits for background work",
+      archiveHeldFacts:
+        "A shell, monitor or subagent is still running. Archiving from the header stops it.",
       pullRequests: "Pull requests",
       noPrYet: "No PR yet",
       notRefreshed: "not refreshed",

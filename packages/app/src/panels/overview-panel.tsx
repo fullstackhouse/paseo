@@ -264,6 +264,7 @@ function useYourMove(input: {
       workspaceRunning: Boolean(input.facts?.isRunning),
       cardState: input.status?.state ?? null,
     }),
+    liveWork: Boolean(input.facts?.isRunning),
   });
 }
 
@@ -636,8 +637,8 @@ interface MoveView {
   tone: Tone;
   title: string;
   facts?: string;
-  action: string;
-  run: () => void;
+  /** Omitted for a row that only explains (Archive held back): no button, not pressable. */
+  press?: { action: string; run: () => void };
 }
 
 function MoveRow({
@@ -657,12 +658,23 @@ function MoveRow({
 }): ReactElement | null {
   const view = useMoveView(row, { serverId, workspaceKey, facts, gitActions });
   if (!view) return null;
-  if (!lead) {
+  const { press } = view;
+  if (!lead && !press) {
+    return (
+      <View style={styles.next} testID={`overview-move-${row.kind}`}>
+        {view.icon}
+        <Text style={styles.nextTitleMuted} numberOfLines={1}>
+          {view.title}
+        </Text>
+      </View>
+    );
+  }
+  if (!lead && press) {
     return (
       <PressHighlight
         accessibilityRole="button"
-        accessibilityLabel={`${view.action}: ${view.title}`}
-        onPress={view.run}
+        accessibilityLabel={`${press.action}: ${view.title}`}
+        onPress={press.run}
         style={styles.next}
         highlightStyle={styles.pressed}
         testID={`overview-move-${row.kind}`}
@@ -684,15 +696,34 @@ function MoveRow({
           {view.facts ? <Text style={styles.leadFacts}>{view.facts}</Text> : null}
         </View>
       </View>
+      <LeadActions row={row} view={view} serverId={serverId} />
+    </View>
+  );
+}
+
+/** A permission is answered in place; other rows press their action; an explaining row has none. */
+function LeadActions({
+  row,
+  view,
+  serverId,
+}: {
+  row: YourMoveRow;
+  view: MoveView;
+  serverId: string;
+}): ReactElement | null {
+  if (row.kind === "permission") {
+    return (
       <View style={styles.leadActions}>
-        {row.kind === "permission" ? (
-          <PermissionActions serverId={serverId} agentId={row.agentId} fallback={view} />
-        ) : (
-          <Button variant="default" onPress={view.run} testID="overview-next-step-button">
-            {view.action}
-          </Button>
-        )}
+        <PermissionActions serverId={serverId} agentId={row.agentId} fallback={view} />
       </View>
+    );
+  }
+  if (!view.press) return null;
+  return (
+    <View style={styles.leadActions}>
+      <Button variant="default" onPress={view.press.run} testID="overview-next-step-button">
+        {view.press.action}
+      </Button>
     </View>
   );
 }
@@ -739,8 +770,8 @@ function PermissionActions({
   );
   if (!request || !canAnswerPermissionInPlace(request)) {
     return (
-      <Button variant="default" onPress={fallback.run} testID="overview-next-step-button">
-        {fallback.action}
+      <Button variant="default" onPress={fallback.press?.run} testID="overview-next-step-button">
+        {fallback.press?.action}
       </Button>
     );
   }
@@ -824,6 +855,8 @@ function useMoveView(
         const action = gitActions && findGitAction(gitActions, "archive-workspace");
         return action ? archiveMoveView(action, runGitAction, input) : null;
       }
+      case "archive-held":
+        return archiveHeldMoveView(input);
     }
   }, [agent.label, facts, gitActions, permission, row, runGitAction, serverId, t, workspaceKey]);
 }
@@ -847,8 +880,10 @@ function permissionMoveView(
     tone: "warn",
     title: permission?.title ?? permission?.name ?? t("panels.overview.permissionTitle"),
     facts: (permission && permissionFacts(permission, workspaceCwd)) || agentLabel || undefined,
-    action: t("panels.overview.reviewPermission"),
-    run: () => navigateToAgent({ serverId, agentId }),
+    press: {
+      action: t("panels.overview.reviewPermission"),
+      run: () => navigateToAgent({ serverId, agentId }),
+    },
   };
 }
 
@@ -858,8 +893,10 @@ function failedMoveView(agentId: string, { t, serverId, agentLabel }: MoveViewIn
     tone: "danger",
     title: t("panels.overview.failedReason"),
     facts: agentLabel || undefined,
-    action: t("panels.overview.openAgent"),
-    run: () => navigateToAgent({ serverId, agentId }),
+    press: {
+      action: t("panels.overview.openAgent"),
+      run: () => navigateToAgent({ serverId, agentId }),
+    },
   };
 }
 
@@ -872,15 +909,17 @@ function pluginMoveView(
     tone: "warn",
     title: row.kind === "entry" ? row.entry.title : row.item.title,
     facts: row.kind === "entry" ? row.entry.detail : row.item.label,
-    action: t("panels.overview.open"),
-    run: () => {
-      if (workspaceKey) {
-        showExplorerForAttention(workspaceKey, {
-          kind: "plugin",
-          key: row.item.key ?? "",
-          item: row.item,
-        });
-      }
+    press: {
+      action: t("panels.overview.open"),
+      run: () => {
+        if (workspaceKey) {
+          showExplorerForAttention(workspaceKey, {
+            kind: "plugin",
+            key: row.item.key ?? "",
+            item: row.item,
+          });
+        }
+      },
     },
   };
 }
@@ -888,6 +927,19 @@ function pluginMoveView(
 function findGitAction(gitActions: GitActions, id: GitActionId): GitAction | null {
   if (gitActions.primary?.id === id) return gitActions.primary;
   return gitActions.secondary.find((action) => action.id === id) ?? null;
+}
+
+/**
+ * In Archive's place while live background work holds it (deriveYourMove): says why, offers nothing.
+ * Archiving from the header stays possible and stops that work.
+ */
+function archiveHeldMoveView({ t }: MoveViewInput): MoveView {
+  return {
+    icon: <ThemedArchive size={ICON_SIZE} uniProps={mutedColorMapping} />,
+    tone: "muted",
+    title: t("panels.overview.archiveHeldTitle"),
+    facts: t("panels.overview.archiveHeldFacts"),
+  };
 }
 
 /** Archive is only a move once the work shipped: a merged PR, or a done status card (deriveYourMove). */
@@ -905,8 +957,7 @@ function archiveMoveView(
       pr?.isMerged && pr.number
         ? t("panels.overview.prMergedTitle", { number: pr.number })
         : branchFacts(facts, t) || undefined,
-    action: action.label,
-    run: () => runGitAction(action),
+    press: { action: action.label, run: () => runGitAction(action) },
   };
 }
 
@@ -1706,6 +1757,12 @@ const styles = StyleSheet.create((theme) => {
       minWidth: 0,
       fontSize: theme.fontSize.sm,
       color: theme.colors.foreground,
+    },
+    nextTitleMuted: {
+      flex: 1,
+      minWidth: 0,
+      fontSize: theme.fontSize.sm,
+      color: theme.colors.foregroundMuted,
     },
     blocker: {
       flexDirection: "row",

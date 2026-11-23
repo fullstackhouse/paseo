@@ -2278,6 +2278,9 @@ export const ru: TranslationResources = {
       prMergedTitle: "PR #{{number}} слит",
       outdated: "Вы ответили {{time}}; агент с тех пор это не обновлял.",
       readyToArchive: "Можно архивировать",
+      archiveHeldTitle: "Архивация ждёт фоновую работу",
+      archiveHeldFacts:
+        "Shell, монитор или субагент ещё работает. Архивация из заголовка остановит его.",
       pullRequests: "Pull requests",
       noPrYet: "PR ещё нет",
       notRefreshed: "не обновлено",
