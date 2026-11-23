@@ -1027,3 +1027,45 @@ test("lists archived workspaces newest first, without active or hidden ones", as
     workspaces: [],
   });
 });
+
+test("caps an archived listing at 500 however many are asked for", async () => {
+  const project: PersistedProjectRecord = {
+    projectId: "project-1",
+    rootPath: "/repo",
+    kind: "git",
+    displayName: "repo",
+    createdAt: NOW,
+    updatedAt: NOW,
+    archivedAt: null,
+  };
+  const workspaces: PersistedWorkspaceRecord[] = Array.from({ length: 501 }, (_, index) => ({
+    workspaceId: `archived-${index}`,
+    projectId: project.projectId,
+    cwd: `/repo/.paseo/worktrees/archived-${index}`,
+    kind: "worktree",
+    displayName: `archived-${index}`,
+    createdAt: NOW,
+    updatedAt: NOW,
+    archivedAt: new Date(Date.UTC(2026, 0, 1, 0, 0, index)).toISOString(),
+  }));
+  const unused = async (): Promise<never> => {
+    throw new Error("listArchived must not read live activity");
+  };
+  const directory = new WorkspaceDirectory({
+    logger: createTestLogger(),
+    projectRegistry: { list: async () => [project] },
+    workspaceRegistry: { list: async () => workspaces },
+    listAgentPayloads: unused,
+    workspaceLastUserMessageTimes: unused,
+    listProviderSubagentActivity: unused,
+    listAgentBackgroundWorkActivity: unused,
+    listTerminalActivityContributions: unused,
+    isProviderVisibleToClient: () => true,
+    buildWorkspaceDescriptor: unused,
+  });
+
+  const result = await directory.listArchived({ limit: 10_000 });
+  expect(result.workspaces).toHaveLength(500);
+  expect(result.truncated).toBe(true);
+  expect(result.workspaces[0]?.workspaceId).toBe("archived-500");
+});

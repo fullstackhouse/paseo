@@ -10,6 +10,8 @@ import { MenuHeader } from "@/components/headers/menu-header";
 import { Button } from "@/components/ui/button";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { AgentList } from "@/components/agent-list";
+import { resolveArchivedViewState } from "@/history/archived-view-state";
+import { type HistoryView, useHistoryViewStore } from "@/history/history-view-store";
 import { ArchivedWorkspaceList } from "@/components/archived-workspace-list";
 import { SegmentedControl, type SegmentedControlOption } from "@/components/ui/segmented-control";
 import { SearchField } from "@/components/ui/search-field";
@@ -67,8 +69,6 @@ function SessionHostErrorsBanner({
   );
 }
 
-type HistoryView = "agents" | "archived";
-
 function hostIssueText(t: TFunction, issue: ArchivedWorkspacesHostIssue): string {
   if (issue.reason === "needsUpdate") {
     return t("sessions.archived.needsUpdate", { host: issue.serverName });
@@ -96,6 +96,17 @@ function ArchivedHostIssuesBanner({
   );
 }
 
+/** Under a search, older matches are reached by narrowing it, not by searching. */
+function resolveTruncatedHint(input: {
+  t: TFunction;
+  truncated: boolean;
+  search: string;
+}): string | undefined {
+  if (!input.truncated) return undefined;
+  const key = input.search ? "sessions.archived.truncatedSearch" : "sessions.archived.truncated";
+  return input.t(key, { count: ARCHIVED_WORKSPACES_LIMIT });
+}
+
 /** Archived workspaces open on their own route, which offers Unarchive or Restore. */
 function ArchivedWorkspacesContent({
   serverId,
@@ -117,17 +128,15 @@ function ArchivedWorkspacesContent({
     void refresh().finally(() => setIsManualRefresh(false));
   }, [refresh]);
 
-  let body: ReactElement | null;
-  if (archived.nothingSearched) {
-    // No host could be asked; the banner says why. "No archived workspaces" would be a claim.
-    body = null;
-  } else if (archived.isInitialLoad) {
+  const state = resolveArchivedViewState(archived);
+  let body: ReactElement | null = null;
+  if (state === "loading") {
     body = (
       <View style={styles.loadingContainer}>
         <ThemedLoadingSpinner size="large" />
       </View>
     );
-  } else if (archived.isError) {
+  } else if (state === "error") {
     body = (
       <View style={styles.emptyContainer}>
         <Text style={styles.emptyText}>{t("sessions.archived.loadFailed")}</Text>
@@ -136,7 +145,7 @@ function ArchivedWorkspacesContent({
         </Button>
       </View>
     );
-  } else if (archived.workspaces.length === 0) {
+  } else if (state === "empty") {
     body = (
       <View style={styles.emptyContainer} testID="archived-workspaces-empty">
         <Text style={styles.emptyText}>
@@ -149,7 +158,7 @@ function ArchivedWorkspacesContent({
         ) : null}
       </View>
     );
-  } else {
+  } else if (state === "list") {
     body = (
       <ArchivedWorkspaceList
         workspaces={archived.workspaces}
@@ -157,11 +166,7 @@ function ArchivedWorkspacesContent({
         showHostColumn={showHostColumn}
         isRefreshing={isManualRefresh}
         onRefresh={handleRefresh}
-        footerHint={
-          archived.truncated
-            ? t("sessions.archived.truncated", { count: ARCHIVED_WORKSPACES_LIMIT })
-            : undefined
-        }
+        footerHint={resolveTruncatedHint({ t, truncated: archived.truncated, search })}
       />
     );
   }
@@ -170,6 +175,13 @@ function ArchivedWorkspacesContent({
     <>
       {archived.hostIssues.length > 0 ? (
         <ArchivedHostIssuesBanner issues={archived.hostIssues} t={t} />
+      ) : null}
+      {state === "list" && archived.isError ? (
+        <View style={styles.errorsBannerWrap}>
+          <View style={styles.errorsBanner} testID="archived-workspaces-refresh-failed">
+            <Text style={styles.errorsBannerText}>{t("sessions.archived.refreshFailed")}</Text>
+          </View>
+        </View>
       ) : null}
       {body}
     </>
@@ -330,7 +342,8 @@ function SessionsScreenContent() {
   const hosts = useHosts();
   const autoFocusSearch = useShouldAutoFocusSearch();
   const [selectedHost, setSelectedHost] = useState(ALL_HOSTS_OPTION_ID);
-  const [view, setView] = useState<HistoryView>("agents");
+  const view = useHistoryViewStore((state) => state.view);
+  const setView = useHistoryViewStore((state) => state.setView);
   // Gate on any host that can list them; hosts that can't are named inside the view.
   const canShowArchived = useAnyHostSupportsArchivedWorkspaces();
   const activeView: HistoryView = canShowArchived ? view : "agents";
@@ -383,6 +396,7 @@ function SessionsScreenContent() {
               value={activeView}
               onValueChange={setView}
               options={viewOptions}
+              style={styles.viewSwitch}
               testID="sessions-view"
             />
           ) : null}
@@ -434,6 +448,11 @@ const styles = StyleSheet.create((theme) => ({
   },
   filterContainer: {
     flexDirection: "row",
+    // On a phone the view switch takes its own line, so the search field keeps its width.
+    flexWrap: {
+      xs: "wrap",
+      md: "nowrap",
+    },
     alignItems: "center",
     gap: theme.spacing[2],
     paddingHorizontal: {
@@ -441,6 +460,12 @@ const styles = StyleSheet.create((theme) => ({
       md: theme.spacing[6],
     },
     paddingTop: theme.spacing[4],
+  },
+  viewSwitch: {
+    flexBasis: {
+      xs: "100%",
+      md: "auto",
+    },
   },
   emptyContainer: {
     flex: 1,
