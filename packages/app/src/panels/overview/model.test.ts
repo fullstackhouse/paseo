@@ -19,7 +19,6 @@ import {
   gitMoveFacts,
   isStatusDone,
   isStatusOutdated,
-  MAX_ENTRIES_PER_ITEM,
   openMoveKey,
   pinOpenMove,
   overviewSubtitle,
@@ -100,7 +99,7 @@ describe("deriveYourMove", () => {
     });
     expect(rows.map((row) => row.kind)).toEqual([
       "permission",
-      ...Array(MAX_ENTRIES_PER_ITEM).fill("entry"),
+      ...Array(7).fill("entry"),
       "failed",
       "checks",
       "git",

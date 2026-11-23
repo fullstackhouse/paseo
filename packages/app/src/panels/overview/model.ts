@@ -13,9 +13,6 @@ import type { WorkspaceSummaryItem } from "@/plugins/workspace-summary/store";
 import type { Agent } from "@/stores/session-store";
 import type { AttentionItem } from "@/workspace-attention/model";
 
-/** Most rows a single plugin item adds to Your move; the rest are one press away in its panel. */
-export const MAX_ENTRIES_PER_ITEM = 5;
-
 const ARCHIVE_ACTION_ID: GitActionId = "archive-workspace";
 
 /** Git steps that only sync a branch. Once the work shipped, Archive replaces them; commit and PR steps stay. */
@@ -92,7 +89,7 @@ export function deriveYourMove(input: {
         rows.push({ kind: "plugin", key: item.key, item: item.item });
         continue;
       }
-      for (const entry of entries.slice(0, MAX_ENTRIES_PER_ITEM)) {
+      for (const entry of entries) {
         rows.push({ kind: "entry", key: `${item.key}:${entry.id}`, item: item.item, entry });
       }
     }
