@@ -8,7 +8,6 @@ import {
   CircleAlert,
   CircleDashed,
   FolderOpen,
-  GitBranch,
   GitPullRequest,
   LayoutDashboard,
   MessageCircleQuestion,
@@ -64,29 +63,27 @@ import {
   blockerTarget,
   branchFacts,
   canAnswerPermissionInPlace,
-  compactMoveWord,
-  deriveCodeRow,
+  derivePullRequests,
   deriveWorkspaceStateWord,
   deriveYourMove,
   openMoveKey,
   pinOpenMove,
-  gitMoveFacts,
   isStatusDone,
   isStatusOutdated,
+  noPullRequestFacts,
   overviewSubtitle,
   partitionSummaryItems,
   permissionActions,
   permissionFacts,
   permissionResponse,
-  pullRequestFacts,
   statusBlockers,
+  type PullRequestRow,
   type WorkspaceStateWord,
   type YourMoveRow,
 } from "./overview/model";
 
 const ThemedLayoutDashboard = withUnistyles(LayoutDashboard);
 const ThemedChevronRight = withUnistyles(ChevronRight);
-const ThemedGitBranch = withUnistyles(GitBranch);
 const ThemedArchive = withUnistyles(Archive);
 const ThemedAsk = withUnistyles(MessageCircleQuestion);
 const ThemedShield = withUnistyles(ShieldQuestion);
@@ -114,7 +111,6 @@ export const overviewPanelPresentation = {
   icon: ThemedLayoutDashboard,
 } satisfies PanelPresentation;
 
-type PullRequest = NonNullable<NonNullable<WorkspaceDescriptor["githubRuntime"]>["pullRequest"]>;
 type Translate = (key: string, options?: Record<string, unknown>) => string;
 type Tone = "run" | "warn" | "danger" | "ok" | "muted" | "merged";
 
@@ -128,6 +124,7 @@ function selectWorkspaceFacts(workspace: WorkspaceDescriptor) {
     isWorktree: workspace.workspaceKind === "worktree",
     branch: workspace.gitRuntime?.currentBranch ?? null,
     ahead: workspace.gitRuntime?.aheadOfOrigin ?? null,
+    aheadOfBase: workspace.gitRuntime?.aheadBehind?.ahead ?? null,
     behind: workspace.gitRuntime?.behindOfOrigin ?? null,
     isDirty: workspace.gitRuntime?.isDirty ?? null,
     diffStat: workspace.diffStat,
@@ -146,7 +143,10 @@ function OverviewPanel(): ReactElement {
   const workspaceKey = buildWorkspaceTabPersistenceKey({ serverId, workspaceId });
   const facts = useWorkspaceFields(serverId, workspaceId, selectWorkspaceFacts);
   const summaryItems = useWorkspaceSummaryItems(serverId, workspaceId);
-  const { status, more } = useMemo(() => partitionSummaryItems(summaryItems), [summaryItems]);
+  const { status, pullRequests, more } = useMemo(
+    () => partitionSummaryItems(summaryItems),
+    [summaryItems],
+  );
   const agentRunning = useSessionStore((state) =>
     hasRunningAgent(state.sessions[serverId]?.agents, workspaceId),
   );
@@ -197,16 +197,16 @@ function OverviewPanel(): ReactElement {
           serverId={serverId}
           workspaceId={workspaceId}
           workspaceKey={workspaceKey}
-          codeRow={isGitWorkspace && gitStatusLoaded ? overviewCodeRow(facts, moves) : null}
-          facts={facts}
           more={more}
         />
+        {isGitWorkspace && (gitStatusLoaded || pullRequests) ? (
+          <PullRequests item={pullRequests} facts={facts} workspaceKey={workspaceKey} />
+        ) : null}
       </View>
     </ScrollView>
   );
 }
 
-/** Your move, shared with the context footer so it can skip a code row that repeats the git move. */
 function useYourMove(input: {
   serverId: string;
   workspaceId: string;
@@ -233,18 +233,6 @@ function useYourMove(input: {
       agentRunning: input.agentRunning,
       lastPromptAt,
     }),
-  });
-}
-
-function overviewCodeRow(
-  facts: WorkspaceFacts | null,
-  moves: readonly YourMoveRow[],
-): "pr" | "branch" | null {
-  if (!facts) return null;
-  return deriveCodeRow({
-    hasPullRequest: Boolean(facts.pullRequest),
-    gitMoveShown: moves.some((move) => move.kind === "git"),
-    branchHasFacts: branchFacts(facts, (key) => key) !== "",
   });
 }
 
@@ -503,18 +491,25 @@ function blockerDetailStyle(tone: PluginWorkspaceBlocker["tone"]) {
 function Section({
   title,
   count,
+  suffix,
   children,
+  testID,
 }: {
   title: string;
   count?: number;
+  /** An i18n key appended after the count, such as "not refreshed". */
+  suffix?: string;
   children: ReactNode;
+  testID?: string;
 }): ReactElement {
   const { t } = useTranslation();
-  const label = count ? `${t(title)} · ${count}` : t(title);
+  const label = [t(title), count ? String(count) : "", suffix ? t(suffix) : ""]
+    .filter(Boolean)
+    .join(" · ");
   // A label on the panel's rail, like the agent list's section headings: SettingsSection insets
   // its title for settings cards, which put it off the title and card rail here.
   return (
-    <View style={styles.section}>
+    <View style={styles.section} testID={testID}>
       <Text style={styles.sectionLabel}>{label}</Text>
       <View style={styles.moves}>{children}</View>
     </View>
@@ -630,7 +625,6 @@ function MoveRow({
   const view = useMoveView(row, { serverId, workspaceKey, facts, gitActions });
   if (!view) return null;
   if (!lead) {
-    const word = compactMoveWord(row.kind, view.action);
     return (
       <PressHighlight
         accessibilityRole="button"
@@ -644,11 +638,6 @@ function MoveRow({
         <Text style={styles.nextTitle} numberOfLines={1}>
           {view.title}
         </Text>
-        {word ? (
-          <Text style={styles.word} numberOfLines={1}>
-            {word}
-          </Text>
-        ) : null}
         <ThemedChevronRight size={SMALL_ICON_SIZE} uniProps={extraMutedColorMapping} />
       </PressHighlight>
     );
@@ -798,11 +787,9 @@ function useMoveView(
       case "entry":
       case "plugin":
         return pluginMoveView(row, input);
-      case "checks":
-        return checksMoveView(input);
-      case "git": {
-        const action = gitActions && findGitAction(gitActions, row.actionId);
-        return action ? gitMoveView(action, runGitAction, input) : null;
+      case "archive": {
+        const action = gitActions && findGitAction(gitActions, "archive-workspace");
+        return action ? archiveMoveView(action, runGitAction, input) : null;
       }
     }
   }, [agent.label, facts, gitActions, permission, row, runGitAction, serverId, t, workspaceKey]);
@@ -865,60 +852,29 @@ function pluginMoveView(
   };
 }
 
-function checksMoveView({ t, workspaceKey, facts }: MoveViewInput): MoveView {
-  const failing = (facts?.pullRequest?.checks ?? [])
-    .filter((check) => check.status === "failure")
-    .map((check) => check.name);
-  return {
-    icon: <ThemedAlert size={ICON_SIZE} uniProps={dangerColorMapping} />,
-    tone: "danger",
-    title: t("panels.overview.checksFailedReason"),
-    facts: failing.join(", ") || undefined,
-    action: t("panels.overview.openPullRequest"),
-    run: () => openExplorerSidebarView({ isCompact: false, workspaceKey, view: "pr" }),
-  };
-}
-
 function findGitAction(gitActions: GitActions, id: GitActionId): GitAction | null {
   if (gitActions.primary?.id === id) return gitActions.primary;
   return gitActions.secondary.find((action) => action.id === id) ?? null;
 }
 
-function gitMoveView(
+/** Archive is only a move once the work shipped: a merged PR, or a done status card (deriveYourMove). */
+function archiveMoveView(
   action: GitAction,
   runGitAction: (action: GitAction) => void,
   { t, facts }: MoveViewInput,
 ): MoveView {
   const pr = facts?.pullRequest;
-  const run = () => runGitAction(action);
-  // Archive is only a move once the work shipped: a merged PR, or a done status card (deriveYourMove).
-  if (action.id === "archive-workspace") {
-    // The Code row hides behind a git move, so an open PR is named here.
-    const openPr = pr && !pr.isMerged ? pullRequestTitle(pr) : "";
-    return {
-      icon: <ThemedArchive size={ICON_SIZE} uniProps={mergedColorMapping} />,
-      tone: "merged",
-      title: t("panels.overview.readyToArchive"),
-      facts:
-        pr?.isMerged && pr.number
-          ? t("panels.overview.prMergedTitle", { number: pr.number })
-          : [openPr, branchFacts(facts, t)].filter(Boolean).join(" · ") || undefined,
-      action: action.label,
-      run,
-    };
-  }
   return {
-    icon: action.icon ?? <ThemedGitBranch size={ICON_SIZE} uniProps={mutedColorMapping} />,
-    tone: "ok",
-    title: pr ? pullRequestTitle(pr) : (facts?.branch ?? t("panels.overview.noBranch")),
-    facts: gitMoveFacts(facts, t) || undefined,
+    icon: <ThemedArchive size={ICON_SIZE} uniProps={mergedColorMapping} />,
+    tone: "merged",
+    title: t("panels.overview.readyToArchive"),
+    facts:
+      pr?.isMerged && pr.number
+        ? t("panels.overview.prMergedTitle", { number: pr.number })
+        : branchFacts(facts, t) || undefined,
     action: action.label,
-    run,
+    run: () => runGitAction(action),
   };
-}
-
-function pullRequestTitle(pr: PullRequest): string {
-  return pr.number ? `#${pr.number} ${pr.title}` : pr.title;
 }
 
 // ── 4. Context ───────────────────────────────────────────────────────────
@@ -940,22 +896,17 @@ function countWorkspaceRootAgents(
 
 /**
  * One-line facts the blocks above don't already say: where the work came from, what it started,
- * a PR or branch that isn't the move, several agents, other plugins' facts. Renders nothing when
- * there is nothing to say.
+ * several agents, other plugins' facts. Renders nothing when there is nothing to say.
  */
 function ContextFooter({
   serverId,
   workspaceId,
   workspaceKey,
-  codeRow,
-  facts,
   more,
 }: {
   serverId: string;
   workspaceId: string;
   workspaceKey: string | null;
-  codeRow: "pr" | "branch" | null;
-  facts: WorkspaceFacts | null;
   more: WorkspaceSummaryItem[];
 }): ReactElement | null {
   const { t } = useTranslation();
@@ -973,10 +924,8 @@ function ContextFooter({
     () => openExplorerSidebarView({ isCompact: false, workspaceKey, view: "lineage" }),
     [workspaceKey],
   );
-  const showCode =
-    codeRow !== null && facts !== null && (codeRow === "branch" || facts.pullRequest !== null);
   const showAgents = rootAgentCount > 1;
-  if (!parent && children.length === 0 && !showCode && !showAgents && more.length === 0) {
+  if (!parent && children.length === 0 && !showAgents && more.length === 0) {
     return null;
   }
   return (
@@ -985,9 +934,6 @@ function ContextFooter({
         <LineageRow label={t("panels.overview.from")} workspace={parent} direction="up" />
       ) : null}
       {children.length > 0 ? <StartedRows workspaces={children} /> : null}
-      {showCode ? (
-        <CodeContextRow kind={codeRow} facts={facts} workspaceKey={workspaceKey} />
-      ) : null}
       {showAgents ? (
         <ContextRow
           label={t("panels.overview.contextAgents")}
@@ -1033,53 +979,6 @@ function StartedRows({ workspaces }: { workspaces: WorkspaceRef[] }): ReactEleme
       ) : null}
     </>
   );
-}
-
-/** The PR, or else a branch with something to report: only when the git move doesn't already name it. */
-function CodeContextRow({
-  kind,
-  facts,
-  workspaceKey,
-}: {
-  kind: "pr" | "branch" | null;
-  facts: WorkspaceFacts | null;
-  workspaceKey: string | null;
-}): ReactElement | null {
-  const { t } = useTranslation();
-  const openChanges = useCallback(
-    () => openExplorerSidebarView({ isCompact: false, workspaceKey, view: "changes" }),
-    [workspaceKey],
-  );
-  const openPullRequest = useCallback(
-    () => openExplorerSidebarView({ isCompact: false, workspaceKey, view: "pr" }),
-    [workspaceKey],
-  );
-  const pr = facts?.pullRequest ?? null;
-  if (kind === "pr" && pr) {
-    const attention = pr.checksStatus === "failure" || pr.reviewDecision === "changes_requested";
-    return (
-      <ContextRow
-        label={t("panels.overview.contextPr")}
-        value={pullRequestTitle(pr)}
-        word={pullRequestFacts(pr, t)}
-        tone={attention ? "danger" : "muted"}
-        onPress={openPullRequest}
-        testID="overview-pull-request"
-      />
-    );
-  }
-  if (kind === "branch" && facts) {
-    return (
-      <ContextRow
-        label={t("panels.overview.contextBranch")}
-        value={facts.branch ?? t("panels.overview.noBranch")}
-        word={branchFacts(facts, t)}
-        onPress={openChanges}
-        testID="overview-branch"
-      />
-    );
-  }
-  return null;
 }
 
 function ContextRow({
@@ -1259,9 +1158,148 @@ function wordStyle(tone: Tone) {
       return styles.wordDanger;
     case "ok":
       return styles.wordOk;
+    case "merged":
+      return styles.wordMerged;
     default:
       return styles.word;
   }
+}
+
+// ── 5. Pull requests ─────────────────────────────────────────────────────
+
+/**
+ * The PRs the work lives in, for information: no buttons, the agent handles git. Open PRs show;
+ * merged and closed ones fold behind one row while any is open. With no PR, a "No PR yet" row says
+ * what a PR would propose.
+ */
+function PullRequests({
+  item,
+  facts,
+  workspaceKey,
+}: {
+  item: WorkspaceSummaryItem | null;
+  facts: WorkspaceFacts | null;
+  workspaceKey: string | null;
+}): ReactElement | null {
+  const { t } = useTranslation();
+  const [showDone, setShowDone] = useState(false);
+  const expand = useCallback(() => setShowDone(true), []);
+  const openChanges = useCallback(
+    () => openExplorerSidebarView({ isCompact: false, workspaceKey, view: "changes" }),
+    [workspaceKey],
+  );
+  const list = useMemo(
+    () =>
+      derivePullRequests({
+        plugin: item?.pullRequests ?? null,
+        host: facts?.pullRequest ?? null,
+        t,
+      }),
+    [facts?.pullRequest, item?.pullRequests, t],
+  );
+  const total = list.open.length + list.done.length;
+  const suffix = item?.pullRequestsStale ? "panels.overview.notRefreshed" : undefined;
+  if (total === 0) {
+    const branchFactsText = facts ? noPullRequestFacts(facts, t) : null;
+    if (!branchFactsText) return null;
+    return (
+      <Section title="panels.overview.pullRequests" suffix={suffix} testID="overview-pull-requests">
+        <PressHighlight
+          accessibilityRole="button"
+          accessibilityLabel={`${t("panels.overview.noPrYet")}, ${branchFactsText}`}
+          onPress={openChanges}
+          style={styles.contextRow}
+          highlightStyle={styles.pressed}
+          testID="overview-no-pr"
+        >
+          <Text style={styles.contextValue} numberOfLines={1}>
+            {t("panels.overview.noPrYet")}
+          </Text>
+          <Text style={styles.word} numberOfLines={1}>
+            {branchFactsText}
+          </Text>
+          {facts?.branch ? (
+            <Text style={styles.prBranch} numberOfLines={1}>
+              {facts.branch}
+            </Text>
+          ) : null}
+          <ThemedChevronRight size={SMALL_ICON_SIZE} uniProps={extraMutedColorMapping} />
+        </PressHighlight>
+      </Section>
+    );
+  }
+  const fold = list.open.length > 0 && list.done.length > 0 && !showDone;
+  const rows = fold ? list.open : [...list.open, ...list.done];
+  return (
+    <Section
+      title="panels.overview.pullRequests"
+      count={total > 1 ? total : undefined}
+      suffix={suffix}
+      testID="overview-pull-requests"
+    >
+      <View style={styles.context}>
+        {rows.map((row) => (
+          <PullRequestRowView key={row.key} row={row} workspaceKey={workspaceKey} />
+        ))}
+        {fold ? (
+          <PressHighlight
+            accessibilityRole="button"
+            onPress={expand}
+            style={styles.contextRow}
+            highlightStyle={styles.pressed}
+            testID="overview-pull-requests-done"
+          >
+            <Text style={styles.word} numberOfLines={1}>
+              {t(
+                list.done.every((row) => row.tone === "merged")
+                  ? "panels.overview.prsMerged"
+                  : "panels.overview.prsDone",
+                { count: list.done.length },
+              )}
+            </Text>
+          </PressHighlight>
+        ) : null}
+      </View>
+    </Section>
+  );
+}
+
+function PullRequestRowView({
+  row,
+  workspaceKey,
+}: {
+  row: PullRequestRow;
+  workspaceKey: string | null;
+}): ReactElement {
+  const open = useCallback(() => {
+    if (row.isBranchPr) openExplorerSidebarView({ isCompact: false, workspaceKey, view: "pr" });
+    else void openExternalUrl(row.url);
+  }, [row.isBranchPr, row.url, workspaceKey]);
+  return (
+    <PressHighlight
+      accessibilityRole={row.isBranchPr ? "button" : "link"}
+      accessibilityLabel={[row.ref, row.title, row.facts].filter(Boolean).join(", ")}
+      onPress={open}
+      style={styles.contextRow}
+      highlightStyle={styles.pressed}
+      testID={`overview-pull-request-${row.key}`}
+    >
+      {row.ref ? (
+        <Text style={styles.prRef} numberOfLines={1}>
+          {row.ref}
+        </Text>
+      ) : null}
+      <Text style={styles.contextValue} numberOfLines={1}>
+        {row.title}
+      </Text>
+      {row.facts ? (
+        <Text style={wordStyle(row.tone)} numberOfLines={1}>
+          {row.facts}
+        </Text>
+      ) : null}
+      <ThemedChevronRight size={SMALL_ICON_SIZE} uniProps={extraMutedColorMapping} />
+    </PressHighlight>
+  );
 }
 
 export const overviewPanelRegistration = definePanel("overview", {
@@ -1437,6 +1475,20 @@ const styles = StyleSheet.create((theme) => {
     wordWarn: { ...word, color: theme.colors.statusWarning },
     wordDanger: { ...word, color: theme.colors.statusDanger },
     wordOk: { ...word, color: theme.colors.statusSuccess },
+    wordMerged: { ...word, color: theme.colors.statusMerged },
+    prRef: {
+      flexShrink: 0,
+      fontFamily: theme.fontFamily.mono,
+      fontSize: theme.fontSize.sm,
+      color: theme.colors.foregroundMuted,
+    },
+    prBranch: {
+      flexShrink: 1,
+      minWidth: 0,
+      fontFamily: theme.fontFamily.mono,
+      fontSize: theme.fontSize.sm,
+      color: theme.colors.foregroundExtraMuted,
+    },
     showAll: {
       paddingLeft: theme.spacing[1.5] + 60,
       paddingVertical: theme.spacing[1],

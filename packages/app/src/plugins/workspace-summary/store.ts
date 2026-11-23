@@ -7,6 +7,7 @@ import type {
   PluginWorkspaceStatus,
   PluginWorkspaceBlocker,
   PluginWorkspaceSummaryEntry,
+  PluginWorkspacePullRequest,
   PluginWorkspaceWorkState,
   PluginWorkspaceSummaryEntryProps,
 } from "@getpaseo/plugin/client";
@@ -59,6 +60,9 @@ function cleanState(patch: PluginWorkspaceSummaryItemState): PluginWorkspaceSumm
   }
   if (patch.status !== undefined) state.status = cleanStatus(patch.status);
   if (patch.entries !== undefined) state.entries = cleanEntries(patch.entries);
+  if (patch.pullRequests !== undefined) state.pullRequests = cleanPullRequests(patch.pullRequests);
+  if (patch.pullRequestsStale !== undefined)
+    state.pullRequestsStale = patch.pullRequestsStale === true;
   return state;
 }
 
@@ -150,6 +154,37 @@ function cleanEntries(
     seen.add(id);
     const detail = typeof entry.detail === "string" ? entry.detail.trim() : "";
     clean.push(detail ? { id, title, detail } : { id, title });
+  }
+  return clean;
+}
+
+const PR_STATES = new Set<PluginWorkspacePullRequest["state"]>([
+  "open",
+  "draft",
+  "merged",
+  "closed",
+]);
+
+/** Drops malformed PRs one by one, and links that aren't http(s). Ids key the Overview rows. */
+function cleanPullRequests(prs: unknown): PluginWorkspacePullRequest[] {
+  if (!Array.isArray(prs)) return [];
+  const clean: PluginWorkspacePullRequest[] = [];
+  const seen = new Set<string>();
+  for (const pr of prs as Partial<PluginWorkspacePullRequest>[]) {
+    const id = optionalText(pr?.id);
+    const title = optionalText(pr?.title);
+    const url = optionalText(pr?.url);
+    if (!id || !title || !url || !isHttpUrl(url) || seen.has(id)) continue;
+    if (typeof pr.number !== "number" || !Number.isFinite(pr.number)) continue;
+    if (!pr.state || !PR_STATES.has(pr.state)) continue;
+    seen.add(id);
+    const item: PluginWorkspacePullRequest = { id, number: pr.number, title, url, state: pr.state };
+    const repo = optionalText(pr.repo);
+    if (repo) item.repo = repo;
+    const facts = optionalText(pr.facts);
+    if (facts) item.facts = facts;
+    if (pr.tone && BLOCKER_TONES.has(pr.tone)) item.tone = pr.tone;
+    clean.push(item);
   }
   return clean;
 }

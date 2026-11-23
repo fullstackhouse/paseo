@@ -5,6 +5,7 @@ import type {
 } from "@getpaseo/protocol/agent-types";
 import type {
   PluginWorkspaceBlocker,
+  PluginWorkspacePullRequest,
   PluginWorkspaceStatus,
   PluginWorkspaceSummaryEntry,
 } from "@getpaseo/plugin/client";
@@ -15,8 +16,12 @@ import type { AttentionItem } from "@/workspace-attention/model";
 
 const ARCHIVE_ACTION_ID: GitActionId = "archive-workspace";
 
-/** Git steps that only sync a branch. Once the work shipped, Archive replaces them; commit and PR steps stay. */
-const LEFTOVER_GIT_STEPS: ReadonlySet<GitActionId> = new Set([
+/**
+ * Git steps that only sync a branch. Once the work shipped, Archive is offered over them; a commit or
+ * PR step means work that isn't in the PR yet, so Archive waits for the agent to finish it.
+ */
+const ARCHIVABLE_GIT_STEPS: ReadonlySet<GitActionId> = new Set([
+  ARCHIVE_ACTION_ID,
   "pull",
   "push",
   "pull-and-push",
@@ -57,17 +62,15 @@ export type YourMoveRow =
   | { kind: "entry"; key: string; item: WorkspaceSummaryItem; entry: PluginWorkspaceSummaryEntry }
   | { kind: "plugin"; key: string; item: WorkspaceSummaryItem }
   | { kind: "failed"; key: string; agentId: string }
-  | { kind: "checks"; key: string }
-  | { kind: "git"; key: string; actionId: GitActionId };
+  | { kind: "archive"; key: string };
 
 /**
- * Everything that waits on the human, in the attention ladder's order, then the git step.
- * While an agent runs only blocking items show: failing checks and git actions would race it.
+ * Everything that waits on the human, in the attention ladder's order, then Archive. Git steps and
+ * failing checks are not moves: the agent handles git, and the Pull requests section shows the facts.
  * Archive is only a move once the work shipped: the PR merged, or the status card says done (work whose
- * PRs live in other repos has no branch PR to merge). Before that it lives in the workspace header.
- * Once shipped it replaces a leftover sync step (a pull or push of a stale branch), never a commit or a
- * PR step. Only in a worktree, or after a merge: a regular checkout doesn't offer Archive just because an
- * agent finished, as in the header (git/policy.ts).
+ * PRs live in other repos has no branch PR to merge), and never while an agent runs. Not over a commit
+ * or PR step, which means work not in the PR yet. Only in a worktree, or after a merge: a regular
+ * checkout doesn't offer Archive just because an agent finished, as in the header (git/policy.ts).
  */
 export function deriveYourMove(input: {
   items: readonly AttentionItem[];
@@ -95,28 +98,17 @@ export function deriveYourMove(input: {
     }
   }
   if (input.agentRunning) return rows;
-  const checks = input.items.find((item) => item.kind === "pr-checks-failed");
-  if (checks) rows.push({ kind: "checks", key: checks.key });
   const shipped = input.prMerged || input.statusDone;
-  const archiveFits =
+  if (
     shipped &&
     input.canArchive &&
     (input.isWorktree || input.prMerged) &&
     input.gitPrimaryId !== null &&
-    LEFTOVER_GIT_STEPS.has(input.gitPrimaryId);
-  const actionId = archiveFits ? ARCHIVE_ACTION_ID : input.gitPrimaryId;
-  if (actionId && (actionId !== ARCHIVE_ACTION_ID || shipped)) {
-    rows.push({ kind: "git", key: `git:${actionId}`, actionId });
+    ARCHIVABLE_GIT_STEPS.has(input.gitPrimaryId)
+  ) {
+    rows.push({ kind: "archive", key: `git:${ARCHIVE_ACTION_ID}` });
   }
   return rows;
-}
-
-/**
- * The word a compact (non-lead) Your move row trails with. A git row's title is only the PR or
- * branch, so without its action ("Create PR", "Push") it reads as a plain link.
- */
-export function compactMoveWord(kind: YourMoveRow["kind"], action: string): string | null {
-  return kind === "git" ? action : null;
 }
 
 /**
@@ -148,24 +140,31 @@ export function pinOpenMove(
 }
 
 /**
- * Where each plugin summary item renders: an item with a status is the Status card; one that can
- * need the human (`needsYou`, `entries`) belongs to Your move; anything else is a context footer fact.
+ * Where each plugin summary item renders: an item with a status is the Status card; one with
+ * `pullRequests` feeds the Pull requests section; one that can need the human (`needsYou`, `entries`)
+ * belongs to Your move; anything else is a context footer fact.
  */
 export function partitionSummaryItems(items: readonly WorkspaceSummaryItem[]): {
   status: WorkspaceSummaryItem | null;
+  pullRequests: WorkspaceSummaryItem | null;
   more: WorkspaceSummaryItem[];
 } {
   let status: WorkspaceSummaryItem | null = null;
+  let pullRequests: WorkspaceSummaryItem | null = null;
   const more: WorkspaceSummaryItem[] = [];
   for (const item of items) {
     if (item.status) {
       status ??= item;
       continue;
     }
+    if (item.pullRequests !== undefined) {
+      pullRequests ??= item;
+      continue;
+    }
     if (item.needsYou || item.entries !== undefined) continue;
     more.push(item);
   }
-  return { status, more };
+  return { status, pullRequests, more };
 }
 
 /**
@@ -202,21 +201,7 @@ export function overviewSubtitle(input: {
   return input.goal || input.project || null;
 }
 
-/**
- * The one Code row worth showing, if any. The git move already names the PR (or, without one, the
- * branch), so the row would repeat it; a branch row with nothing to report is skipped too.
- */
-export function deriveCodeRow(input: {
-  hasPullRequest: boolean;
-  gitMoveShown: boolean;
-  branchHasFacts: boolean;
-}): "pr" | "branch" | null {
-  if (input.gitMoveShown) return null;
-  if (input.hasPullRequest) return "pr";
-  return input.branchHasFacts ? "branch" : null;
-}
-
-type Translate = (key: string) => string;
+type Translate = (key: string, options?: Record<string, unknown>) => string;
 
 export interface PullRequestFacts {
   isMerged: boolean;
@@ -259,11 +244,135 @@ export function branchFacts(facts: BranchFactsInput | null, t: Translate): strin
   return [sync, diff, dirty].filter(Boolean).join(" · ");
 }
 
-/** The git move names the PR, so it carries the PR's checks and review state the Code row would have. */
-export function gitMoveFacts(facts: BranchFactsInput | null, t: Translate): string {
-  const pr = facts?.pullRequest;
-  const prFacts = pr && !pr.isMerged ? pullRequestFacts(pr, t) : "";
-  return [prFacts, branchFacts(facts, t)].filter(Boolean).join(" · ");
+/** Same words as the panel's row tones. */
+export type PullRequestTone = "danger" | "warn" | "run" | "ok" | "merged" | "muted";
+
+export interface PullRequestRow {
+  key: string;
+  /** `#123`, or `paseo-prs#58` for a PR outside the workspace's repository. */
+  ref: string;
+  title: string;
+  facts: string;
+  tone: PullRequestTone;
+  url: string;
+  /** The workspace branch's own PR: it opens the Explorer PR tab instead of the browser. */
+  isBranchPr: boolean;
+}
+
+export interface PullRequestList {
+  open: PullRequestRow[];
+  /** Merged and closed PRs: folded behind one row while any PR is open. */
+  done: PullRequestRow[];
+}
+
+export interface HostPullRequest extends PullRequestFacts {
+  number?: number;
+  url: string;
+  title: string;
+  state: string;
+  isDraft?: boolean;
+}
+
+const PLUGIN_TONES: Record<NonNullable<PluginWorkspacePullRequest["tone"]>, PullRequestTone> = {
+  danger: "danger",
+  warning: "warn",
+  success: "ok",
+  muted: "muted",
+};
+
+function hostTone(pr: HostPullRequest): PullRequestTone {
+  if (pr.isMerged) return "merged";
+  if (pr.checksStatus === "failure" || pr.reviewDecision === "changes_requested") return "danger";
+  if (pr.checksStatus === "pending") return "run";
+  if (pr.reviewDecision === "approved" || pr.checksStatus === "success") return "ok";
+  return "muted";
+}
+
+function isClosed(state: string): boolean {
+  return state.toLowerCase() === "closed";
+}
+
+function pluginPullRequestRow(
+  pr: PluginWorkspacePullRequest,
+  host: HostPullRequest | null,
+  t: Translate,
+): PullRequestRow {
+  return {
+    key: pr.id,
+    ref: `${pr.repo ?? ""}#${pr.number}`,
+    title: pr.title,
+    facts: pr.facts ?? t(`panels.overview.prState.${pr.state}`),
+    tone: pr.state === "merged" ? "merged" : PLUGIN_TONES[pr.tone ?? "muted"],
+    url: pr.url,
+    isBranchPr: !pr.repo && host?.number === pr.number,
+  };
+}
+
+function hostFacts(pr: HostPullRequest, closed: boolean, t: Translate): string {
+  if (pr.isMerged) return t("panels.overview.prState.merged");
+  if (closed) return t("panels.overview.prState.closed");
+  const facts = pullRequestFacts(pr, t);
+  if (facts) return facts;
+  return pr.isDraft ? t("panels.overview.prState.draft") : "";
+}
+
+/**
+ * The PRs the work lives in. A plugin's list (paseo-prs: the branch's PRs, their stack, linked PRs)
+ * wins over the host's one branch PR; a plugin that sends an empty list says there are none.
+ */
+export function derivePullRequests(input: {
+  plugin: readonly PluginWorkspacePullRequest[] | null;
+  host: HostPullRequest | null;
+  t: Translate;
+}): PullRequestList {
+  const { plugin, host, t } = input;
+  const list: PullRequestList = { open: [], done: [] };
+  if (plugin) {
+    for (const pr of plugin) {
+      const row = pluginPullRequestRow(pr, host, t);
+      (pr.state === "merged" || pr.state === "closed" ? list.done : list.open).push(row);
+    }
+    return list;
+  }
+  if (!host) return list;
+  const closed = isClosed(host.state) && !host.isMerged;
+  const row: PullRequestRow = {
+    key: host.url,
+    ref: host.number ? `#${host.number}` : "",
+    title: host.title,
+    facts: hostFacts(host, closed, t),
+    tone: closed ? "muted" : hostTone(host),
+    url: host.url,
+    isBranchPr: true,
+  };
+  (host.isMerged || closed ? list.done : list.open).push(row);
+  return list;
+}
+
+/**
+ * The "No PR yet" row: only with no PR at all and commits on the branch that a PR would propose.
+ * The default branch and a branch level with its base have nothing to propose, so no row.
+ */
+export function noPullRequestFacts(
+  input: {
+    aheadOfBase: number | null;
+    isDirty: boolean | null;
+    diffStat: { additions: number; deletions: number } | null;
+  },
+  t: Translate,
+): string | null {
+  if (!input.aheadOfBase) return null;
+  const diff =
+    input.diffStat && (input.diffStat.additions > 0 || input.diffStat.deletions > 0)
+      ? `+${input.diffStat.additions} −${input.diffStat.deletions}`
+      : "";
+  return [
+    t("panels.overview.commits", { count: input.aheadOfBase }),
+    diff,
+    input.isDirty ? t("panels.overview.uncommitted") : "",
+  ]
+    .filter(Boolean)
+    .join(" · ");
 }
 
 type PermissionRequest = Pick<AgentPermissionRequest, "kind" | "detail" | "actions">;

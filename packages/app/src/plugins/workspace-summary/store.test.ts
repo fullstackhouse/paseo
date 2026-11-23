@@ -136,6 +136,69 @@ describe("WorkspaceSummaryStore", () => {
     expect(store.forWorkspace("s", "w")[0]?.status?.blockedBy).toBeUndefined();
   });
 
+  it("keeps well-formed pull requests and the stale flag", () => {
+    const store = new WorkspaceSummaryStore();
+    const item = store.add(owner, {
+      id: "prs",
+      workspaceId: "w",
+      title: "PRs",
+      pullRequestsStale: true,
+      pullRequests: [
+        {
+          id: "a",
+          number: 231,
+          title: " Tree ",
+          url: "https://github.test/pull/231",
+          state: "open",
+          facts: "2 failing",
+          tone: "danger",
+        },
+        {
+          id: "a",
+          number: 232,
+          title: "Repeat",
+          url: "https://github.test/pull/232",
+          state: "open",
+        },
+        { id: "b", number: 58, title: "Linked", url: "javascript:alert(1)", state: "open" },
+        { id: "c", number: 59, title: "Odd", url: "https://github.test/pull/59", state: "weird" },
+        {
+          id: "d",
+          number: 60,
+          title: "Plugin",
+          url: "https://github.test/pull/60",
+          state: "merged",
+          repo: "paseo-prs",
+          tone: "loud",
+        },
+      ] as never,
+    });
+    expect(store.forWorkspace("s", "w")[0]).toMatchObject({
+      pullRequestsStale: true,
+      pullRequests: [
+        {
+          id: "a",
+          number: 231,
+          title: "Tree",
+          url: "https://github.test/pull/231",
+          state: "open",
+          facts: "2 failing",
+          tone: "danger",
+        },
+        {
+          id: "d",
+          number: 60,
+          title: "Plugin",
+          url: "https://github.test/pull/60",
+          state: "merged",
+          repo: "paseo-prs",
+        },
+      ],
+    });
+    item.update({ pullRequests: [] });
+    expect(store.forWorkspace("s", "w")[0]?.pullRequests).toEqual([]);
+  });
+
   it("drops entries without an id or title", () => {
     const store = new WorkspaceSummaryStore();
     store.add(owner, {
