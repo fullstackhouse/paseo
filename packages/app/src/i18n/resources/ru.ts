@@ -2249,8 +2249,6 @@ export const ru: TranslationResources = {
       approved: "Одобрено",
       changesRequested: "Запрошены изменения",
       reviewRequired: "Нужно ревью",
-      from: "Откуда",
-      started: "Запущены",
       showAll: "Показать все ({{count}})",
       prMerged: "PR слит",
       word: {
@@ -2276,8 +2274,6 @@ export const ru: TranslationResources = {
       prMergedTitle: "PR #{{number}} слит",
       outdated: "Вы ответили {{time}}; агент с тех пор это не обновлял.",
       readyToArchive: "Можно архивировать",
-      contextAgents: "Агенты",
-      agentsHere: "{{count}} в этом рабочем пространстве",
       pullRequests: "Pull requests",
       noPrYet: "PR ещё нет",
       notRefreshed: "не обновлено",
@@ -2298,6 +2294,17 @@ export const ru: TranslationResources = {
         draft: "Черновик",
         merged: "Влит",
         closed: "Закрыт",
+      },
+      tree: "Дерево",
+      waitingOn: "Ожидает",
+      blocking: "Блокирует",
+      agents: {
+        one: "{{count}} агент",
+        other: "агентов: {{count}}",
+      },
+      startedCount: {
+        one: "запущен {{count}}",
+        other: "запущено: {{count}}",
       },
     },
     lineage: {

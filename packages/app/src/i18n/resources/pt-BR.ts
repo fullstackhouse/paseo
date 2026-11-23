@@ -2249,8 +2249,6 @@ export const ptBR: TranslationResources = {
       approved: "Aprovado",
       changesRequested: "Alterações solicitadas",
       reviewRequired: "Revisão necessária",
-      from: "Origem",
-      started: "Iniciados",
       showAll: "Mostrar tudo ({{count}})",
       prMerged: "PR mesclado",
       word: {
@@ -2276,8 +2274,6 @@ export const ptBR: TranslationResources = {
       prMergedTitle: "PR #{{number}} mesclado",
       outdated: "Você respondeu {{time}}; o agente não atualizou isto desde então.",
       readyToArchive: "Pronto para arquivar",
-      contextAgents: "Agentes",
-      agentsHere: "{{count}} neste workspace",
       pullRequests: "Pull requests",
       noPrYet: "Ainda sem PR",
       notRefreshed: "não atualizado",
@@ -2298,6 +2294,17 @@ export const ptBR: TranslationResources = {
         draft: "Rascunho",
         merged: "Mesclado",
         closed: "Fechado",
+      },
+      tree: "Árvore",
+      waitingOn: "Aguardando",
+      blocking: "Bloqueando",
+      agents: {
+        one: "{{count}} agente",
+        other: "{{count}} agentes",
+      },
+      startedCount: {
+        one: "{{count}} iniciado",
+        other: "{{count}} iniciados",
       },
     },
     lineage: {
