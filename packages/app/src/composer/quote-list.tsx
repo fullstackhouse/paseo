@@ -207,10 +207,12 @@ function QuoteRow({
   );
   const handleRemove = useCallback(() => onRemove(id), [id, onRemove]);
 
-  // Backspace in an empty quote removes it, like deleting an emptied paragraph.
+  // Backspace in an empty quote removes the row, like deleting an emptied paragraph, but
+  // only once its comment is empty too, so a written comment is never thrown away.
   const handleQuoteKeyPress = useCallback(
     (event: NativeSyntheticEvent<TextInputKeyPressEventData>) => {
-      if (event.nativeEvent.key !== "Backspace" || quoteRef.current?.getText()) return;
+      if (event.nativeEvent.key !== "Backspace") return;
+      if (quoteRef.current?.getText() || commentRef.current?.getText()) return;
       event.preventDefault();
       onRemove(id);
     },

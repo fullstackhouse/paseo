@@ -101,14 +101,15 @@ export function splitComposerAttachmentsForSubmit(
  */
 export function prependComposerQuotes(text: string, attachments: ComposerAttachment[]): string {
   const blocks = attachments.flatMap((attachment) => {
-    if (attachment.kind !== "quote" || !attachment.text.trim()) return [];
+    if (attachment.kind !== "quote") return [];
     const quote = attachment.text
       .trim()
       .split(/\r?\n/)
       .map((line) => (line.trim() ? `> ${line}` : ">"))
       .join("\n");
     const comment = attachment.comment?.trim();
-    return comment ? [quote, comment] : [quote];
+    // A comment whose quote was cleared still goes out, as plain text.
+    return [attachment.text.trim() ? quote : "", comment ?? ""].filter(Boolean);
   });
   if (blocks.length === 0) {
     return text;

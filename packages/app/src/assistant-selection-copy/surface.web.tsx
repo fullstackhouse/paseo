@@ -32,16 +32,24 @@ const DISPLAY_CONTENTS: CSSProperties = { display: "contents" };
 const CITE_BUTTON_WIDTH = 72;
 const CITE_BUTTON_HEIGHT = 28;
 
-/** The Cite button sits just after the selection's last line, kept on screen. */
-function citeAnchorFromSelection(selection: Selection | null): CiteAnchor | null {
-  const content = createAssistantSelectionClipboardContent(selection);
-  if (!content || !selection) return null;
+/**
+ * The Cite button sits just after the selection's last line, kept on screen. Null once the
+ * selection is gone or that line has scrolled out of view.
+ */
+function citePosition(selection: Selection | null): { x: number; y: number } | null {
+  if (!selection || selection.rangeCount === 0 || selection.isCollapsed) return null;
   const rects = selection.getRangeAt(0).getClientRects();
   const last = rects[rects.length - 1];
-  if (!last) return null;
+  if (!last || last.bottom < 0 || last.top > window.innerHeight) return null;
   const x = Math.min(last.right + 6, window.innerWidth - CITE_BUTTON_WIDTH - 8);
   const y = Math.max(8, last.top + last.height / 2 - CITE_BUTTON_HEIGHT / 2);
-  return { markdown: content.plainText, x, y };
+  return { x, y };
+}
+
+function citeAnchorFromSelection(selection: Selection | null): CiteAnchor | null {
+  const content = createAssistantSelectionClipboardContent(selection);
+  const position = content ? citePosition(selection) : null;
+  return content && position ? { markdown: content.plainText, ...position } : null;
 }
 
 export function AssistantSelectionCopySurface({
@@ -69,21 +77,29 @@ export function AssistantSelectionCopySurface({
     setCite(citeAnchorFromSelection(window.getSelection()));
   }, [onCite]);
 
+  // The button follows the selection through scrolls (including the chat's own auto-scroll
+  // while a reply streams) and goes away when the selection is cleared or scrolls out of view.
+  const isCiteShown = cite !== null;
   useEffect(() => {
-    if (!cite) return;
-    const hideWhenCleared = () => {
-      if (window.getSelection()?.isCollapsed ?? true) setCite(null);
+    if (!isCiteShown) return;
+    let frame = 0;
+    const follow = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        const position = citePosition(window.getSelection());
+        setCite((current) => (current && position ? { ...current, ...position } : null));
+      });
     };
-    const hide = () => setCite(null);
-    document.addEventListener("selectionchange", hideWhenCleared);
-    window.addEventListener("scroll", hide, true);
-    window.addEventListener("resize", hide);
+    document.addEventListener("selectionchange", follow);
+    window.addEventListener("scroll", follow, true);
+    window.addEventListener("resize", follow);
     return () => {
-      document.removeEventListener("selectionchange", hideWhenCleared);
-      window.removeEventListener("scroll", hide, true);
-      window.removeEventListener("resize", hide);
+      cancelAnimationFrame(frame);
+      document.removeEventListener("selectionchange", follow);
+      window.removeEventListener("scroll", follow, true);
+      window.removeEventListener("resize", follow);
     };
-  }, [cite]);
+  }, [isCiteShown]);
 
   const handleCite = useCallback(() => {
     if (!cite || !onCite) return;
