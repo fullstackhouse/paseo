@@ -11,10 +11,10 @@ reads top to bottom:
 
 1. Identity — title, goal (unchanged).
 2. Status — state word, summary (unchanged).
-3. Blocked by — only non-workspace blockers (a person, a PR, other); see O2.
+3. Waiting on — non-workspace blockers (a person, a PR, other); workspaces are in O2 (A15).
 4. Your move — asks, permissions, failed agents, Archive once shipped (E1).
 5. Tree — parent chain, children, blocked by, blocking (O2).
-6. Context — Agents count and plugin facts (unchanged, minus From/Started/PR/branch rows).
+6. Context — plugin facts only; From, Started and Agents move to O2, PR/branch to O3 (A18).
 7. Pull requests — last thing on the tab (O3).
 
 No permissions: everything on Overview is visible to whoever can open the workspace.

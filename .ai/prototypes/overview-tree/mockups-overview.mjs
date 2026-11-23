@@ -55,8 +55,8 @@ export function overviewStates({ ic, esc }) {
   const ARCHIVE = { icon: 'archive', tone: 'merged', title: 'Ready to archive', sub: 'PR #231 merged · nothing uncommitted', actions: [{ label: 'Archive workspace', primary: true }] }
 
   // Tree (O2). level indents the ancestor chain; off = muted and not pressable; here = the anchor row.
-  const trow = ({ name, word, tone = 'muted', started, level = 0, here, off, agent }) =>
-    `<div class="ot-row ${here ? 'is-here' : ''} ${off ? 'is-off' : ''}" style="--lv:${level}">${agent ? `<span class="ot-ricon">${ic('agent')}</span>` : ''}<span class="ot-name">${esc(name)}</span>${word ? `<span class="ot-word"><span class="ot-t-${tone}">${esc(word)}</span>${started ? `<span class="ot-dim"> · ${started} started</span>` : ''}</span>` : ''}${here || off ? '' : CH}</div>`
+  const trow = ({ name, word, tone = 'muted', started, level = 0, here, off, agent, link, dim }) =>
+    `<div class="ot-row ${here ? 'is-here' : ''} ${off ? 'is-off' : ''}" style="--lv:${level}">${agent ? `<span class="ot-ricon">${ic('agent')}</span>` : ''}<span class="ot-name">${esc(name)}${dim ? `<span class="ot-dim"> · ${esc(dim)}</span>` : ''}</span>${word ? `<span class="ot-word"><span class="ot-t-${tone}">${esc(word)}</span>${started ? `<span class="ot-dim"> · ${started} started</span>` : ''}</span>` : ''}${(here && !link) || off ? '' : CH}</div>`
   const grp = (label, rows) => `<div class="ot-grp"><div class="ot-grp-label">${esc(label)}</div>${rows.join('')}</div>`
   const more = (n) => `<div class="ot-row ot-more"><span class="ot-name">Show all (${n})</span>${CH}</div>`
   const tree = (groups) => sec('Tree', groups.join(''))
@@ -68,18 +68,20 @@ export function overviewStates({ ic, esc }) {
   ]
   const startedBy = (rows) => grp('Started by', rows.map((r, i) => trow({ ...r, level: i })))
   const hereRow = grp('This workspace', [trow({ name: IMPL.name, here: true, level: 1 })])
+  const hereAgents = grp('This workspace', [trow({ name: IMPL.name, dim: '3 agents', here: true, link: true, level: 1 })])
+  const agentsRow = (level = 0) => `<div class="ot-grp">${trow({ name: 'Agents', dim: '3 here', word: '1 working', tone: 'run', agent: true, level })}</div>`
   const started = (rows, extra = []) => grp('Started', [...rows.map((r) => trow(r)), ...extra])
 
   // Pull requests (O3)
   const prow = ({ num, repo, title, facts, tone = 'muted', indent }) =>
     `<div class="ot-row ${indent ? 'is-indent' : ''}"><span class="ot-pr">${repo ? `<span class="ot-dim">${esc(repo)}</span>` : ''}#${num}</span><span class="ot-name">${esc(title)}</span><span class="ot-word ot-t-${tone}">${esc(facts)}</span>${CH}</div>`
   const fold = (n, open) => `<div class="ot-row ot-fold"><span class="ot-ricon">${ic(open ? 'chevron-down' : 'chevron-right')}</span><span class="ot-name">${n} merged</span></div>`
+  const waitingOn = (rows) => sec('Waiting on', rows.map((r) => `<div class="ot-row"><span class="ot-ricon">${ic(r.icon)}</span><span class="ot-name">${esc(r.name)}</span><span class="ot-word ot-t-warn">${esc(r.word)}</span>${CH}</div>`).join(''))
   const nopr = (facts, branch) => `<div class="ot-row"><span class="ot-pr ot-fix">No PR yet</span><span class="ot-word ot-t-muted ot-facts">${esc(facts)}</span><span class="ot-branch">${esc(branch)}</span>${CH}</div>`
   const prs = (rows, { count, suffix } = {}) => sec('Pull requests', rows.join(''), { count, suffix })
 
   // Context footer (E2)
   const ctx = (rows) => `<footer class="ot-ctx">${rows.map((c) => `<div class="ot-ctx-row"><span class="ot-k">${esc(c.k)}</span><span class="ot-v">${esc(c.v)}</span>${c.w ? `<span class="ot-word ot-t-muted">${esc(c.w)}</span>` : ''}${CH}</div>`).join('')}</footer>`
-  const AGENTS = { k: 'Agents', v: '3 here', w: '1 working' }
   const PLUG = [
     { k: 'Release', v: 'Lane 2 of 4', w: 'on track' },
     { k: 'Budget', v: '62% of daily cap' },
@@ -107,18 +109,18 @@ export function overviewStates({ ic, esc }) {
       {
         id: 's1',
         caption: 'Working — no move; tree and PRs below',
-        html: desktop(full([impl.head, STATUS_WORK, tree([startedBy([PARENT]), hereRow, started(KIDS2)]), ctx([AGENTS]), PR_MAIN])),
+        html: desktop(full([impl.head, STATUS_WORK, tree([startedBy([PARENT]), hereAgents, started(KIDS2)]), ctx(PLUG), PR_MAIN])),
         notes: ['Rows and facts update in place; there is no refresh control.'],
       },
       {
         id: 's2',
         caption: 'Waiting on an ask — move first, rest below',
-        html: desktop(full([impl.head, STATUS_WAIT, move([ASK, ASK2]), tree([startedBy([PARENT])]), ctx([AGENTS]), prs([prow({ num: 231, title: 'feat(app): tree and PRs on Overview', facts: 'draft', tone: 'muted' })])])),
+        html: desktop(full([impl.head, STATUS_WAIT, move([ASK, ASK2]), tree([startedBy([PARENT]), agentsRow()]), prs([prow({ num: 231, title: 'feat(app): tree and PRs on Overview', facts: 'draft', tone: 'muted' })])])),
       },
       {
         id: 's3',
         caption: 'Done and merged — Archive move, merged PR',
-        html: desktop(full([impl.head, status({ word: 'Done', tone: 'ok', summary: 'PR #231 is merged. Overview now shows the tree and PRs; git moves are gone.' }), move([ARCHIVE]), tree([startedBy([PARENT]), hereRow, started([{ name: 'Review fork — tree rows', word: 'Done · PR merged', tone: 'ok' }, { name: 'Review fork — PR facts', word: 'Done', tone: 'ok' }])]), ctx([AGENTS]), prs([prow({ num: 231, title: 'feat(app): tree and PRs on Overview', facts: 'merged', tone: 'merged' })])])),
+        html: desktop(full([impl.head, status({ word: 'Done', tone: 'ok', summary: 'PR #231 is merged. Overview now shows the tree and PRs; git moves are gone.' }), move([ARCHIVE]), tree([startedBy([PARENT]), hereRow, started([{ name: 'Review fork — tree rows', word: 'Done · PR merged', tone: 'ok' }, { name: 'Review fork — PR facts', word: 'Done', tone: 'ok' }])]), prs([prow({ num: 231, title: 'feat(app): tree and PRs on Overview', facts: 'merged', tone: 'merged' })])])),
       },
       {
         id: 's4',
@@ -128,14 +130,20 @@ export function overviewStates({ ic, esc }) {
       {
         id: 's5',
         caption: 'Mobile sheet — waiting on an ask',
-        html: mobile(IMPL.name, full([impl.head, STATUS_WAIT, move([ASK, ASK2]), tree([startedBy([PARENT])]), ctx([AGENTS]), prs([prow({ num: 231, title: 'feat(app): tree and PRs on Overview', facts: 'draft', tone: 'muted' })])])),
+        html: mobile(IMPL.name, full([impl.head, STATUS_WAIT, move([ASK, ASK2]), tree([startedBy([PARENT]), agentsRow()]), prs([prow({ num: 231, title: 'feat(app): tree and PRs on Overview', facts: 'draft', tone: 'muted' })])])),
         notes: ['Same content and order as the desktop panel; buttons fill the row width.'],
       },
       {
         id: 's6',
         caption: 'No status card, git loading — state from agents, no PR section',
-        html: desktop(full([impl.head, status({ word: 'Working', tone: 'run', pulse: true }), tree([startedBy([PARENT])]), ctx([AGENTS])])),
+        html: desktop(full([impl.head, status({ word: 'Working', tone: 'run', pulse: true }), tree([startedBy([PARENT]), agentsRow()])])),
         notes: ['The Pull requests section appears once git status loads, without a spinner.'],
+      },
+      {
+        id: 's7',
+        caption: 'Waiting on a PR review and a person, plus Tree Blocked by a workspace',
+        html: desktop(full([impl.head, status({ word: 'Blocked', tone: 'danger', summary: 'Tree and PR sections are done. Release needs a review and a sign-off before the PR can open.' }), waitingOn([{ icon: 'pr', name: '#240 release notes', word: 'waiting on review' }, { icon: 'agent', name: 'Maya · design sign-off', word: 'person' }]), tree([grp('Blocked by', [trow({ name: 'Release 0.16', word: 'Working', tone: 'run' })])]), PR_MAIN])),
+        notes: ['Waiting on holds PR, person and other blockers; workspace and agent blockers sit in the Tree.'],
       },
     ],
 
@@ -194,6 +202,12 @@ export function overviewStates({ ic, esc }) {
         caption: 'Blocks and is blocked by the same workspace',
         html: crop(tree([grp('Blocked by', [trow({ name: 'Release 0.16', word: 'Blocked', tone: 'danger' })]), grp('Blocking', [trow({ name: 'Release 0.16', word: 'Blocked', tone: 'danger' })])])),
       },
+      {
+        id: 's9',
+        caption: 'Several agents, no This workspace row (Agents row)',
+        html: crop(tree([startedBy([PARENT]), agentsRow()])),
+        notes: ['The Agents row opens the Lineage tab; the This workspace row takes its place once there are children.'],
+      },
     ],
 
     O3: [
@@ -232,7 +246,7 @@ export function overviewStates({ ic, esc }) {
       {
         id: 's7',
         caption: 'Linked PR from another repository',
-        html: crop(prs([prow({ num: 231, title: 'feat(app): tree and PRs', facts: 'approved', tone: 'ok' }), prow({ repo: 'fullstackhouse/paseo-prs', num: 58, title: 'feat: relate PRs to workspaces', facts: 'checks running', tone: 'run' })], { count: 2 })),
+        html: crop(prs([prow({ num: 231, title: 'feat(app): tree and PRs', facts: 'approved', tone: 'ok' }), prow({ repo: 'paseo-prs', num: 58, title: 'feat: relate PRs to workspaces', facts: 'checks running', tone: 'run' })], { count: 2 })),
       },
       {
         id: 's8',
@@ -272,9 +286,8 @@ export function overviewStates({ ic, esc }) {
     E2: [
       {
         id: 's1',
-        caption: 'Agents and two plugin facts',
-        html: crop(tree([startedBy([PARENT])]), ctx([AGENTS, ...PLUG]), PR_MAIN),
-        notes: ['Agents opens the Lineage tab.'],
+        caption: 'Two plugin facts',
+        html: crop(tree([startedBy([PARENT])]), ctx(PLUG), PR_MAIN),
       },
       {
         id: 's2',
