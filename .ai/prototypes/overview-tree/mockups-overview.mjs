@@ -54,11 +54,12 @@ export function overviewStates({ ic, esc }) {
   const ASK2 = { icon: 'ask', tone: 'warn', title: 'Name the group "Blocking" or "Unblocks"?' }
   const ARCHIVE = { icon: 'archive', tone: 'merged', title: 'Ready to archive', sub: 'PR #231 merged · nothing uncommitted', actions: [{ label: 'Archive workspace', primary: true }] }
 
-  // Tree (O2). Flat: labels and rows share one left edge; ancestors listed root first. off = muted and not pressable; here = the anchor row.
+  // Tree (O2). Lineage is one block: ancestors root first, this workspace, children; each level
+  // indents one step behind a ↳ arrow. No group labels for lineage. off = muted and not pressable; here = the anchor row.
   const trow = ({ name, word, tone = 'muted', started, level = 0, here, off, agent, link, dim }) =>
-    `<div class="ot-row ${here ? 'is-here' : ''} ${off ? 'is-off' : ''}" style="--lv:${level}">${agent ? `<span class="ot-ricon">${ic('agent')}</span>` : ''}<span class="ot-name">${esc(name)}${dim ? `<span class="ot-dim"> · ${esc(dim)}</span>` : ''}</span>${word ? `<span class="ot-word"><span class="ot-t-${tone}">${esc(word)}</span>${started ? `<span class="ot-dim"> · ${started} started</span>` : ''}</span>` : ''}${(here && !link) || off ? '' : CH}</div>`
+    `<div class="ot-row ${here ? 'is-here' : ''} ${off ? 'is-off' : ''} ${level > 0 ? 'is-sub' : ''}" style="--lv:${level}">${level > 0 ? '<span class="ot-arr">↳</span>' : ''}${agent ? `<span class="ot-ricon">${ic('agent')}</span>` : ''}<span class="ot-name">${esc(name)}${dim ? `<span class="ot-dim"> · ${esc(dim)}</span>` : ''}</span>${word ? `<span class="ot-word"><span class="ot-t-${tone}">${esc(word)}</span>${started ? `<span class="ot-dim"> · ${started} started</span>` : ''}</span>` : ''}${(here && !link) || off ? '' : CH}</div>`
   const grp = (label, rows) => `<div class="ot-grp"><div class="ot-grp-label">${esc(label)}</div>${rows.join('')}</div>`
-  const more = (n) => `<div class="ot-row ot-more"><span class="ot-name">Show all (${n})</span>${CH}</div>`
+  const more = (n) => (level = 0) => `<div class="ot-row ot-more ${level > 0 ? 'is-sub is-nogl' : ''}" style="--lv:${level}"><span class="ot-name">Show all (${n})</span>${CH}</div>`
   const tree = (groups) => sec('Tree', groups.join(''))
 
   const PARENT = { name: SPEC, word: 'Done · PR merged', tone: 'ok' }
@@ -66,11 +67,14 @@ export function overviewStates({ ic, esc }) {
     { name: 'Review fork — tree rows', word: 'Working', tone: 'run' },
     { name: 'Review fork — PR facts', word: 'Working', tone: 'run' },
   ]
-  const startedBy = (rows) => grp('Started by', rows.map((r, i) => trow({ ...r, level: i })))
-  const hereRow = grp('This workspace', [trow({ name: IMPL.name, here: true, level: 1 })])
-  const hereAgents = grp('This workspace', [trow({ name: IMPL.name, dim: '3 agents', here: true, link: true, level: 1 })])
-  const agentsRow = (level = 0) => `<div class="ot-grp">${trow({ name: 'Agents', dim: '3 here', word: '1 working', tone: 'run', agent: true, level })}</div>`
-  const started = (rows, extra = []) => grp('Started', [...rows.map((r) => trow(r)), ...extra])
+  // up: ancestors root first; here: overrides for this workspace's row (agents: count); down: children.
+  const lin = ({ up = [], here = {}, down = [], extra = [] } = {}) => {
+    const n = up.length
+    const { agents, ...hereRest } = here
+    const self = trow({ name: IMPL.name, here: true, level: n, ...(agents ? { dim: `${agents} agents`, link: true } : {}), ...hereRest })
+    const kids = [...down.map((r) => trow({ ...r, level: n + 1 })), ...extra.map((x) => x(n + 1))]
+    return `<div class="ot-grp">${up.map((r, i) => trow({ ...r, level: i })).join('')}${self}${kids.join('')}</div>`
+  }
 
   // Pull requests (O3)
   const prow = ({ num, repo, title, facts, tone = 'muted', indent }) =>
@@ -109,18 +113,18 @@ export function overviewStates({ ic, esc }) {
       {
         id: 's1',
         caption: 'Working — no move; tree and PRs below',
-        html: desktop(full([impl.head, STATUS_WORK, tree([startedBy([PARENT]), hereAgents, started(KIDS2)]), PR_MAIN])),
+        html: desktop(full([impl.head, STATUS_WORK, tree([lin({ up: [PARENT], here: { agents: 3 }, down: KIDS2 })]), PR_MAIN])),
         notes: ['Rows and facts update in place; there is no refresh control.'],
       },
       {
         id: 's2',
         caption: 'Waiting on an ask — move first, rest below',
-        html: desktop(full([impl.head, STATUS_WAIT, move([ASK, ASK2]), tree([startedBy([PARENT]), agentsRow()]), prs([prow({ num: 231, title: 'feat(app): tree and PRs on Overview', facts: 'draft', tone: 'muted' })])])),
+        html: desktop(full([impl.head, STATUS_WAIT, move([ASK, ASK2]), tree([lin({ up: [PARENT], here: { agents: 3 } })]), prs([prow({ num: 231, title: 'feat(app): tree and PRs on Overview', facts: 'draft', tone: 'muted' })])])),
       },
       {
         id: 's3',
         caption: 'Done and merged — Archive move, merged PR',
-        html: desktop(full([impl.head, status({ word: 'Done', tone: 'ok', summary: 'PR #231 is merged. Overview now shows the tree and PRs; git moves are gone.' }), move([ARCHIVE]), tree([startedBy([PARENT]), hereRow, started([{ name: 'Review fork — tree rows', word: 'Done · PR merged', tone: 'ok' }, { name: 'Review fork — PR facts', word: 'Done', tone: 'ok' }])]), prs([prow({ num: 231, title: 'feat(app): tree and PRs on Overview', facts: 'merged', tone: 'merged' })])])),
+        html: desktop(full([impl.head, status({ word: 'Done', tone: 'ok', summary: 'PR #231 is merged. Overview now shows the tree and PRs; git moves are gone.' }), move([ARCHIVE]), tree([lin({ up: [PARENT], down: [{ name: 'Review fork — tree rows', word: 'Done · PR merged', tone: 'ok' }, { name: 'Review fork — PR facts', word: 'Done', tone: 'ok' }] })]), prs([prow({ num: 231, title: 'feat(app): tree and PRs on Overview', facts: 'merged', tone: 'merged' })])])),
       },
       {
         id: 's4',
@@ -130,13 +134,13 @@ export function overviewStates({ ic, esc }) {
       {
         id: 's5',
         caption: 'Mobile sheet — waiting on an ask',
-        html: mobile(IMPL.name, full([impl.head, STATUS_WAIT, move([ASK, ASK2]), tree([startedBy([PARENT]), agentsRow()]), prs([prow({ num: 231, title: 'feat(app): tree and PRs on Overview', facts: 'draft', tone: 'muted' })])])),
+        html: mobile(IMPL.name, full([impl.head, STATUS_WAIT, move([ASK, ASK2]), tree([lin({ up: [PARENT], here: { agents: 3 } })]), prs([prow({ num: 231, title: 'feat(app): tree and PRs on Overview', facts: 'draft', tone: 'muted' })])])),
         notes: ['Same content and order as the desktop panel; buttons fill the row width.'],
       },
       {
         id: 's6',
         caption: 'No status card, git loading — state from agents, no PR section',
-        html: desktop(full([impl.head, status({ word: 'Working', tone: 'run', pulse: true }), tree([startedBy([PARENT]), agentsRow()])])),
+        html: desktop(full([impl.head, status({ word: 'Working', tone: 'run', pulse: true }), tree([lin({ up: [PARENT], here: { agents: 3 } })])])),
         notes: ['The Pull requests section appears once git status loads, without a spinner.'],
       },
       {
@@ -151,24 +155,24 @@ export function overviewStates({ ic, esc }) {
       {
         id: 's1',
         caption: 'Parent chain, this workspace, children',
-        html: crop(tree([startedBy([PARENT]), hereRow, started([{ name: 'Review fork — tree rows', word: 'Waiting', tone: 'warn' }, { name: 'Review fork — PR facts', word: 'Working', tone: 'run', started: 3 }])])),
+        html: crop(tree([lin({ up: [PARENT], down: [{ name: 'Review fork — tree rows', word: 'Waiting', tone: 'warn' }, { name: 'Review fork — PR facts', word: 'Working', tone: 'run', started: 3 }] })])),
         notes: ['Pressing a workspace row opens that workspace (its Overview).'],
       },
       {
         id: 's2',
         caption: 'Deep chain — three ancestors, no children',
-        html: crop(tree([startedBy([{ name: 'Overview roadmap', word: 'Working', tone: 'run' }, { name: SPEC, word: 'Done', tone: 'ok' }, { name: 'Impl — overview shell', word: 'Working', tone: 'run' }])])),
+        html: crop(tree([lin({ up: [{ name: 'Overview roadmap', word: 'Working', tone: 'run' }, { name: SPEC, word: 'Done', tone: 'ok' }, { name: 'Impl — overview shell', word: 'Working', tone: 'run' }] })])),
       },
       {
         id: 's3',
         caption: 'Many children — five shown, then Show all',
-        html: crop(tree([started([
+        html: crop(tree([lin({ up: [PARENT], down: [
           { name: 'Fork — empty states', word: 'Blocked', tone: 'danger' },
           { name: 'Fork — mobile sheet', word: 'Waiting', tone: 'warn' },
           { name: 'Fork — PR rows', word: 'Failed', tone: 'danger' },
           { name: 'Fork — tree rows', word: 'Working', tone: 'run', started: 2 },
           { name: 'Fork — docs', word: 'Done · PR merged', tone: 'ok' },
-        ], [more(8)])])),
+        ], extra: [more(8)] })])),
         notes: ['Children needing you (Waiting, Blocked, Failed) come first, then newest first.'],
       },
       {
@@ -185,14 +189,13 @@ export function overviewStates({ ic, esc }) {
       {
         id: 's6',
         caption: 'Only children — a root workspace',
-        html: crop(tree([started([{ name: 'Impl — tree section', word: 'Waiting', tone: 'warn', started: 2 }, { name: 'Impl — PR section', word: 'Working', tone: 'run' }, { name: 'Impl — Your move cleanup', word: 'Done · PR merged', tone: 'ok' }])])),
+        html: crop(tree([lin({ here: { name: SPEC }, down: [{ name: 'Impl — tree section', word: 'Waiting', tone: 'warn', started: 2 }, { name: 'Impl — PR section', word: 'Working', tone: 'run' }, { name: 'Impl — Your move cleanup', word: 'Done · PR merged', tone: 'ok' }] })])),
       },
       {
         id: 's7',
         caption: 'Not loaded, Archived, Removed workspace',
         html: crop(tree([
-          startedBy([{ name: 'Overview roadmap', word: 'Not loaded', off: true }, { name: 'Overview v3', word: 'Archived', tone: 'muted' }]),
-          started([{ name: 'Fix stale PR facts', word: 'Not loaded', off: true }]),
+          lin({ up: [{ name: 'Overview roadmap', word: 'Not loaded', off: true }, { name: 'Overview v3', word: 'Archived', tone: 'muted' }], down: [{ name: 'Fix stale PR facts', word: 'Not loaded', off: true }] }),
           grp('Blocked by', [trow({ name: 'Removed workspace', off: true })]),
         ])),
         notes: ['Not loaded and Removed workspace are muted and not pressable; Archived still opens the workspace.'],
@@ -204,9 +207,9 @@ export function overviewStates({ ic, esc }) {
       },
       {
         id: 's9',
-        caption: 'Several agents, no This workspace row (Agents row)',
-        html: crop(tree([startedBy([PARENT]), agentsRow()])),
-        notes: ['The Agents row opens the Lineage tab; the This workspace row takes its place once there are children.'],
+        caption: 'Several agents — count on this workspace\'s row',
+        html: crop(tree([lin({ up: [PARENT], here: { agents: 3 } })])),
+        notes: ['With more than one top-level agent, this workspace\'s row shows the count and opens the Lineage tab.'],
       },
     ],
 
@@ -267,7 +270,7 @@ export function overviewStates({ ic, esc }) {
       {
         id: 's5',
         caption: 'Empty — section hidden, branch unpushed',
-        html: crop(status({ word: 'Working', tone: 'run', pulse: true, summary: 'Tree rows done. Wiring the PR section.' }), tree([startedBy([PARENT])]), prs([nopr('2 commits · +64 −3 · unpushed', 'feat/overview-tree')])),
+        html: crop(status({ word: 'Working', tone: 'run', pulse: true, summary: 'Tree rows done. Wiring the PR section.' }), tree([lin({ up: [PARENT] })]), prs([nopr('2 commits · +64 −3 · unpushed', 'feat/overview-tree')])),
         notes: ['The old Push row is gone; the PR row carries the branch facts.'],
       },
       {
@@ -287,13 +290,13 @@ export function overviewStates({ ic, esc }) {
       {
         id: 's1',
         caption: 'Two plugin facts (a third-party plugin)',
-        html: crop(tree([startedBy([PARENT])]), ctx(PLUG), PR_MAIN),
+        html: crop(tree([lin({ up: [PARENT] })]), ctx(PLUG), PR_MAIN),
         notes: ['Only plugins that publish plain facts show here. paseo-status and paseo-asks do not, so with today\'s plugins the footer stays hidden.'],
       },
       {
         id: 's2',
         caption: 'Nothing to say — footer hidden',
-        html: crop(tree([startedBy([PARENT])]), PR_MAIN),
+        html: crop(tree([lin({ up: [PARENT] })]), PR_MAIN),
       },
     ],
   }

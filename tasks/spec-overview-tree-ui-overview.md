@@ -39,18 +39,14 @@ Map: [spec-overview-tree-ui-map.md](./spec-overview-tree-ui-map.md). Spec: [spec
 
 - **Short.** Where this workspace sits among others: who started it, what it started, what blocks it,
   what it blocks, and how many agents work in it.
-- **Extended.** Up to five groups, each only when it has rows, in this order:
-  - **Started by** — the ancestor chain, root first, down to the direct parent. No indentation: every label and row
-    starts at the same left edge; the order and the group labels carry the hierarchy.
-  - **This workspace** — one highlighted row anchoring the chain; only when there are both ancestors
-    and children. With more than one top-level agent it reads "Impl — tree section · 3 agents" and
-    opens the Lineage tab; otherwise it is not pressable.
-  - **Agents** — "Agents · 3 here", opening the Lineage tab: only with more than one top-level agent
-    and no This workspace row. Placed where This workspace would be (after Started by, before
-    Started).
-  - **Started** — direct children: needing you first (Waiting, Blocked, Failed), then newest first;
-    five shown, then "Show all (N)". A child that started
-    others shows "· 3 started" after its state word.
+- **Extended.** The lineage is one unlabelled block, then up to two labelled groups:
+  - **Lineage** — ancestors root first, then this workspace, then its direct children. Each level
+    indents one step behind a ↳ arrow; no "Started by" / "Started" labels. This workspace's row is
+    highlighted, has no state word (Status above says it) and shows whenever the workspace has an
+    ancestor, a child or more than one top-level agent. With more than one top-level agent it reads
+    "Impl — tree section · 3 agents" and opens the Lineage tab; otherwise it is not pressable.
+    Children: needing you first (Waiting, Blocked, Failed), then newest first; five shown, then
+    "Show all (N)". A child that started others shows "· 3 started" after its state word.
   - **Blocked by** — workspaces and agents named in this workspace's status `blockedBy` (only while the
     status says blocked). An agent blocker shows the agent's title and its workspace.
   - **Blocking** — workspaces whose current, blocked status names this workspace or one of its agents.
@@ -58,11 +54,11 @@ Map: [spec-overview-tree-ui-map.md](./spec-overview-tree-ui-map.md). Spec: [spec
 - **Get here.** Section of O1, directly after Your move.
 - **Shows.** Section label "Tree"; per row: name, state word in its tone ("Working", "Waiting",
   "Blocked", "Done · PR merged"), chevron.
-- **Scenarios.** An impl workspace started by a spec agent: "Started by: Spec — overview rework"
-  above, two review forks below. A workspace waiting on another's PR merge: "Blocked by: Schema — relations model · Working".
+- **Scenarios.** An impl workspace started by a spec agent: "Spec — overview rework" above, ↳ this
+  workspace, ↳ two review forks below. A workspace waiting on another's PR merge: "Blocked by: Schema — relations model · Working".
 - **Variants.** Parent chain + this + children; deep chain (3 ancestors); many children (Show all);
   blocked by a workspace and an agent; blocking two workspaces; only children (a root); several
-  agents with no This workspace row (Agents row).
+  agents (count on this workspace's row).
 - **Edge cases.** An ancestor or child on a host that isn't connected → its last known name, muted, with the
   word "Not loaded"; not pressable. An archived parent → the row shows "Archived" and still opens it. A blocker
   workspace that no longer exists → "Removed workspace", muted, not pressable. A workspace that both
@@ -137,3 +133,7 @@ Map: [spec-overview-tree-ui-map.md](./spec-overview-tree-ui-map.md). Spec: [spec
    (A16).
 3. Agents fold into the Tree: on the This workspace row ("· 3 agents"), else an "Agents · 3 here" row;
    the footer keeps only plugin facts (A18).
+4. Lineage reads as a tree: indentation and ↳ arrows instead of "Started by", "This workspace" and
+   "Started" labels. This workspace's row shows whenever there is any lineage or several agents and
+   carries the agent count; the separate Agents row is gone. Supersedes A12, A13 and the Agents-row
+   part of A18 (A17 reply).

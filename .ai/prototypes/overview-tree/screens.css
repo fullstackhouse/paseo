@@ -548,6 +548,9 @@
 .ot-row.is-off { color: var(--app-fg-xmuted); }
 .ot-row.is-off:hover { background: transparent; }
 .ot-row.is-indent { padding-left: 28px; }
+.ot-row.is-sub { padding-left: calc(8px + (var(--lv) - 1) * 20px); }
+.ot-row.is-nogl { padding-left: calc(8px + var(--lv) * 20px); }
+.ot-arr { flex-shrink: 0; width: 12px; color: var(--app-fg-xmuted); font-size: 12px; }
 .ot-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ot-word { flex-shrink: 0; font-size: 12px; white-space: nowrap; }
 .ot-ricon { display: inline-flex; color: var(--app-fg-xmuted); }
