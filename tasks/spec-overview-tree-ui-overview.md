@@ -59,8 +59,7 @@ Map: [spec-overview-tree-ui-map.md](./spec-overview-tree-ui-map.md). Spec: [spec
 - **Shows.** Section label "Tree"; per row: name, state word in its tone ("Working", "Waiting",
   "Blocked", "Done · PR merged"), chevron.
 - **Scenarios.** An impl workspace started by a spec agent: "Started by: Spec — overview rework"
-  above, two review forks below. A workspace waiting on another's PR merge: "Blocked by: Release
-  0.16 · Working".
+  above, two review forks below. A workspace waiting on another's PR merge: "Blocked by: Schema — relations model · Working".
 - **Variants.** Parent chain + this + children; deep chain (3 ancestors); many children (Show all);
   blocked by a workspace and an agent; blocking two workspaces; only children (a root); several
   agents with no This workspace row (Agents row).
@@ -118,6 +117,8 @@ Map: [spec-overview-tree-ui-map.md](./spec-overview-tree-ui-map.md). Spec: [spec
 - **Get here.** Section of O1, between Tree and Pull requests.
 - **Shows.** Unlabelled rows: label, value, chevron.
 - **Variants.** Two plugin facts; hidden when there is nothing to say.
+- **Note.** None of the installed plugins publish plain facts (paseo-status fills Status, paseo-asks
+  fills Your move), so today the footer stays hidden; it remains for third-party plugins.
 - **Edge cases.** None beyond today's.
 
 ## Decisions (cards, 2026-11-23)

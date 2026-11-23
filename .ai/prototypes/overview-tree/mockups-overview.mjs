@@ -83,8 +83,8 @@ export function overviewStates({ ic, esc }) {
   // Context footer (E2)
   const ctx = (rows) => `<footer class="ot-ctx">${rows.map((c) => `<div class="ot-ctx-row"><span class="ot-k">${esc(c.k)}</span><span class="ot-v">${esc(c.v)}</span>${c.w ? `<span class="ot-word ot-t-muted">${esc(c.w)}</span>` : ''}${CH}</div>`).join('')}</footer>`
   const PLUG = [
-    { k: 'Release', v: 'Lane 2 of 4', w: 'on track' },
-    { k: 'Budget', v: '62% of daily cap' },
+    { k: 'Preview', v: 'Deployed 4 min ago' },
+    { k: 'Tests', v: '214 passed', w: 'local' },
   ]
 
   // ── frames ─────────────────────────────────────────────────────────────
@@ -109,7 +109,7 @@ export function overviewStates({ ic, esc }) {
       {
         id: 's1',
         caption: 'Working — no move; tree and PRs below',
-        html: desktop(full([impl.head, STATUS_WORK, tree([startedBy([PARENT]), hereAgents, started(KIDS2)]), ctx(PLUG), PR_MAIN])),
+        html: desktop(full([impl.head, STATUS_WORK, tree([startedBy([PARENT]), hereAgents, started(KIDS2)]), PR_MAIN])),
         notes: ['Rows and facts update in place; there is no refresh control.'],
       },
       {
@@ -142,7 +142,7 @@ export function overviewStates({ ic, esc }) {
       {
         id: 's7',
         caption: 'Waiting on a PR review and a person, plus Tree Blocked by a workspace',
-        html: desktop(full([impl.head, status({ word: 'Blocked', tone: 'danger', summary: 'Tree and PR sections are done. Release needs a review and a sign-off before the PR can open.' }), waitingOn([{ icon: 'pr', name: '#240 release notes', word: 'waiting on review' }, { icon: 'agent', name: 'Maya · design sign-off', word: 'person' }]), tree([grp('Blocked by', [trow({ name: 'Release 0.16', word: 'Working', tone: 'run' })])]), PR_MAIN])),
+        html: desktop(full([impl.head, status({ word: 'Blocked', tone: 'danger', summary: 'Tree and PR sections are done. The schema change needs a review and a design sign-off before the PR can open.' }), waitingOn([{ icon: 'pr', name: '#240 relations schema', word: 'waiting on review' }, { icon: 'agent', name: 'Maya · design sign-off', word: 'person' }]), tree([grp('Blocked by', [trow({ name: 'Schema — relations model', word: 'Working', tone: 'run' })])]), PR_MAIN])),
         notes: ['Waiting on holds PR, person and other blockers; workspace and agent blockers sit in the Tree.'],
       },
     ],
@@ -174,7 +174,7 @@ export function overviewStates({ ic, esc }) {
       {
         id: 's4',
         caption: 'Blocked by a workspace and an agent',
-        html: crop(status({ word: 'Blocked', tone: 'danger', summary: 'Waiting for the release branch before opening the PR.' }), tree([grp('Blocked by', [trow({ name: 'Release 0.16', word: 'Working', tone: 'run' }), trow({ name: 'Reviewer · Docs: screenshots', word: 'Waiting', tone: 'warn', agent: true })])])),
+        html: crop(status({ word: 'Blocked', tone: 'danger', summary: 'Waiting for the relations schema to land before opening the PR.' }), tree([grp('Blocked by', [trow({ name: 'Schema — relations model', word: 'Working', tone: 'run' }), trow({ name: 'Reviewer · Docs: screenshots', word: 'Waiting', tone: 'warn', agent: true })])])),
         notes: ['An agent row opens that agent; a workspace row opens its Overview.'],
       },
       {
@@ -191,7 +191,7 @@ export function overviewStates({ ic, esc }) {
         id: 's7',
         caption: 'Not loaded, Archived, Removed workspace',
         html: crop(tree([
-          startedBy([{ name: 'Overview roadmap', word: 'Not loaded', off: true }, { name: 'Release 0.15', word: 'Archived', tone: 'muted' }]),
+          startedBy([{ name: 'Overview roadmap', word: 'Not loaded', off: true }, { name: 'Overview v3', word: 'Archived', tone: 'muted' }]),
           started([{ name: 'Fix stale PR facts', word: 'Not loaded', off: true }]),
           grp('Blocked by', [trow({ name: 'Removed workspace', off: true })]),
         ])),
@@ -200,7 +200,7 @@ export function overviewStates({ ic, esc }) {
       {
         id: 's8',
         caption: 'Blocks and is blocked by the same workspace',
-        html: crop(tree([grp('Blocked by', [trow({ name: 'Release 0.16', word: 'Blocked', tone: 'danger' })]), grp('Blocking', [trow({ name: 'Release 0.16', word: 'Blocked', tone: 'danger' })])])),
+        html: crop(tree([grp('Blocked by', [trow({ name: 'Schema — relations model', word: 'Blocked', tone: 'danger' })]), grp('Blocking', [trow({ name: 'Schema — relations model', word: 'Blocked', tone: 'danger' })])])),
       },
       {
         id: 's9',
@@ -286,8 +286,9 @@ export function overviewStates({ ic, esc }) {
     E2: [
       {
         id: 's1',
-        caption: 'Two plugin facts',
+        caption: 'Two plugin facts (a third-party plugin)',
         html: crop(tree([startedBy([PARENT])]), ctx(PLUG), PR_MAIN),
+        notes: ['Only plugins that publish plain facts show here. paseo-status and paseo-asks do not, so with today\'s plugins the footer stays hidden.'],
       },
       {
         id: 's2',
