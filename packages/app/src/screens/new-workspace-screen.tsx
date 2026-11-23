@@ -50,6 +50,7 @@ import {
 import { normalizeWorkspaceDescriptor, type WorkspaceDescriptor } from "@/stores/session-store";
 import { useWorkspace } from "@/stores/session-store-hooks";
 import { buildNewWorkspaceDraftKey, generateDraftId } from "@/stores/draft-keys";
+import { useRecordNewWorkspaceDraft } from "@/stores/new-workspace-drafts-store";
 import { useOpenAddProject } from "@/hooks/use-open-add-project";
 import { isActiveCreateFlowForDraft, useCreateFlowStore } from "@/stores/create-flow-store";
 import {
@@ -1046,6 +1047,15 @@ export function NewWorkspaceScreen({
     }),
   });
   const composerState = chatDraft.composerState;
+  useRecordNewWorkspaceDraft({
+    draftKey,
+    draftId,
+    serverId: selectedServerId,
+    sourceDirectory: selectedSourceDirectory,
+    project: selectedProject,
+    routeProjectName: displayNameProp,
+    forkSetup: forkDraftSetup,
+  });
   const [pickerSelection, dispatchPickerSelection] = useReducer(
     reducePickerSelection,
     initialPickerSelectionState,

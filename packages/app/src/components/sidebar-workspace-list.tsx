@@ -71,6 +71,7 @@ import { useSidebarOrderStore } from "@/stores/sidebar-order-store";
 import { useSidebarViewStore, type SidebarGroupMode } from "@/stores/sidebar-view-store";
 import { useShowShortcutBadges } from "@/hooks/use-show-shortcut-badges";
 import { SidebarSnoozedSection } from "@/components/sidebar/sidebar-snoozed-section";
+import { SidebarDraftsSection } from "@/components/sidebar/sidebar-drafts-section";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -2561,6 +2562,7 @@ function ProjectModeList({
 
   const content = (
     <>
+      <SidebarDraftsSection onDraftPress={onWorkspacePress} />
       {pinnedChats.length > 0 ? (
         <View style={styles.pinnedSection} testID="sidebar-pinned-section">
           <SidebarSectionHeader

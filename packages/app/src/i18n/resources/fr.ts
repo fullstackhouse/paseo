@@ -1321,6 +1321,12 @@ export const fr: TranslationResources = {
     schedules: {
       needsYou: "Exécutions planifiées qui vous attendent : {{count}}",
     },
+    drafts: {
+      title: "Brouillons",
+      discard: "Supprimer le brouillon",
+      noProject: "Aucun projet",
+      attachmentsOnly: "Pièces jointes uniquement",
+    },
     snoozed: {
       title: "En veille",
       blocked: "En attente de vous : {{count}}",

@@ -1298,6 +1298,12 @@ export const ko: TranslationResources = {
     schedules: {
       needsYou: "확인이 필요한 예약 실행: {{count}}",
     },
+    drafts: {
+      title: "초안",
+      discard: "초안 삭제",
+      noProject: "프로젝트 없음",
+      attachmentsOnly: "첨부 파일만",
+    },
     snoozed: {
       title: "다시 알림",
       blocked: "응답 대기: {{count}}",
