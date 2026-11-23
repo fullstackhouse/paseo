@@ -1,15 +1,31 @@
 import { Text } from "react-native";
-import { forwardRef, useCallback, useMemo, useState, type ComponentProps } from "react";
+import {
+  forwardRef,
+  useCallback,
+  useMemo,
+  useState,
+  type ComponentProps,
+  type MouseEvent,
+} from "react";
 import type {
   CodeBlockRendererProps,
   LinkRendererProps,
   MarkdownRenderers,
 } from "react-native-enriched-markdown";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
-import { useFileLink } from "@/assistant-file-links";
+import {
+  canOpenFileLinkWithDefaultApp,
+  useAssistantFileLinkEnvironment,
+  useFileLink,
+  useOpenFileLinkWithDefaultApp,
+} from "@/assistant-file-links";
+import { ContextMenu, useContextMenu } from "@/components/ui/context-menu";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { HighlightedCodeBlock } from "@/components/highlighted-code-block";
+import { useIsLocalDaemon } from "@/hooks/use-is-local-daemon";
+import { hasDesktopOpenTargetsBridge } from "@/workspace/desktop-open-targets";
 import type { Theme } from "@/styles/theme";
+import { FileLinkMenu } from "./file-link-menu";
 import { MermaidFence } from "./fence/mermaid";
 import { markdownLinkSource } from "./source";
 
@@ -30,8 +46,67 @@ function WebCodeBlock({ code, language }: CodeBlockRendererProps) {
 // The library styles links inline, so a stylesheet :hover rule cannot underline them.
 const LINK_HOVER_STYLE = { textDecoration: "underline" } as const;
 
-function WebLink({ link, anchorProps, children }: LinkRendererProps) {
-  const { tooltipPath, onHoverIn } = useFileLink(markdownLinkSource(link.url, link.sourceType));
+function WebLink(props: LinkRendererProps) {
+  const fileLink = useFileLink(markdownLinkSource(props.link.url, props.link.sourceType));
+  const environment = useAssistantFileLinkEnvironment();
+  const isLocalDaemon = useIsLocalDaemon(environment.serverId ?? "");
+  if (!fileLink.isFileLink || !isLocalDaemon || !environment.serverId) {
+    return <WebLinkAnchor {...props} fileLink={fileLink} />;
+  }
+  return (
+    <ContextMenu>
+      <DesktopFileLinkAnchor {...props} fileLink={fileLink} />
+      <FileLinkMenu
+        serverId={environment.serverId}
+        workspaceRoot={environment.workspaceRoot}
+        resolve={fileLink.resolve}
+      />
+    </ContextMenu>
+  );
+}
+
+type WebLinkAnchorProps = LinkRendererProps & { fileLink: ReturnType<typeof useFileLink> };
+
+// Right click opens the file menu; Cmd/Ctrl+click opens the file in its default app.
+function DesktopFileLinkAnchor({ anchorProps, fileLink, ...props }: WebLinkAnchorProps) {
+  const menu = useContextMenu();
+  const openWithDefaultApp = useOpenFileLinkWithDefaultApp();
+  const { onClick } = anchorProps;
+  const { resolve } = fileLink;
+  const handleClick = useCallback(
+    (event: MouseEvent<HTMLAnchorElement>) => {
+      if (!(event.metaKey || event.ctrlKey) || !canOpenFileLinkWithDefaultApp()) {
+        onClick?.(event);
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      void (async () => {
+        const target = await resolve();
+        if (target) openWithDefaultApp(target);
+      })();
+    },
+    [onClick, openWithDefaultApp, resolve],
+  );
+  const handleContextMenu = useCallback(
+    (event: MouseEvent<HTMLAnchorElement>) => {
+      if (!hasDesktopOpenTargetsBridge()) return;
+      event.preventDefault();
+      event.stopPropagation();
+      menu.setAnchorRect({ x: event.pageX, y: event.pageY, width: 0, height: 0 });
+      menu.setOpen(true);
+    },
+    [menu],
+  );
+  const desktopAnchorProps = useMemo(
+    () => ({ ...anchorProps, onClick: handleClick, onContextMenu: handleContextMenu }),
+    [anchorProps, handleClick, handleContextMenu],
+  );
+  return <WebLinkAnchor {...props} anchorProps={desktopAnchorProps} fileLink={fileLink} />;
+}
+
+function WebLinkAnchor({ anchorProps, children, fileLink }: WebLinkAnchorProps) {
+  const { tooltipPath, onHoverIn } = fileLink;
   const [hovered, setHovered] = useState(false);
   const handleMouseEnter = useCallback(() => setHovered(true), []);
   const handleMouseLeave = useCallback(() => setHovered(false), []);

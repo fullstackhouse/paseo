@@ -76,6 +76,8 @@ export const ru: TranslationResources = {
       daemonClientUnavailable: "Daemon клиента недоступен",
       daemonClientDisconnected: "Daemon клиента отключен",
       noFileFound: "Файл для {{token}} не найден",
+      openWithDefaultAppUnsupported:
+        "Paseo открывает в приложении по умолчанию только документы, изображения, медиафайлы и папки. {{path}} к ним не относится",
       folderOutsideWorkspace: "{{path}} находится вне этого рабочего пространства",
       unexpectedDictationError: "При обработке диктовки произошла непредвиденная ошибка.",
     },
