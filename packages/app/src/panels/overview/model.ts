@@ -13,6 +13,7 @@ import type { GitActionId } from "@/git/policy";
 import type { WorkspaceSummaryItem } from "@/plugins/workspace-summary/store";
 import type { Agent } from "@/stores/session-store";
 import type { AttentionItem } from "@/workspace-attention/model";
+import type { ReportedWork } from "@/workspace-status/reported-work";
 
 const ARCHIVE_ACTION_ID: GitActionId = "archive-workspace";
 
@@ -62,7 +63,8 @@ export type YourMoveRow =
   | { kind: "entry"; key: string; item: WorkspaceSummaryItem; entry: PluginWorkspaceSummaryEntry }
   | { kind: "plugin"; key: string; item: WorkspaceSummaryItem }
   | { kind: "failed"; key: string; agentId: string }
-  | { kind: "archive"; key: string };
+  | { kind: "archive"; key: string }
+  | { kind: "archive-held"; key: string };
 
 /**
  * Everything that waits on the human, in the attention ladder's order, then Archive. Git steps and
@@ -71,17 +73,15 @@ export type YourMoveRow =
  * PRs live in other repos has no branch PR to merge), and never while an agent runs. Not over a commit
  * or PR step, which means work not in the PR yet. Only in a worktree, or after a merge: a regular
  * checkout doesn't offer Archive just because an agent finished, as in the header (git/policy.ts).
+ * Never while other work in the workspace is still open (`isWorkStillOpen`): a merged PR finishes one
+ * agent's job, and archiving would stop the rest. Nor while a permission prompt or a failed agent is
+ * listed (`masksRunningWork`). When live background work is what holds it, an `archive-held` row says
+ * so in its place: a dev server a finished agent left running would otherwise hide Archive with
+ * nothing on screen to say why, while the sidebar already shows the workspace as Done.
  */
-export function deriveYourMove(input: {
-  items: readonly AttentionItem[];
-  agentRunning: boolean;
-  gitPrimaryId: GitActionId | null;
-  /** The archive git action exists and is enabled (or running), whether or not it is the primary. */
-  canArchive: boolean;
-  isWorktree: boolean;
-  prMerged: boolean;
-  statusDone: boolean;
-}): YourMoveRow[] {
+export function deriveYourMove(
+  input: ArchiveInput & { items: readonly AttentionItem[] },
+): YourMoveRow[] {
   const rows: YourMoveRow[] = [];
   for (const item of input.items) {
     if (item.kind === "permission" || item.kind === "failed") {
@@ -97,18 +97,65 @@ export function deriveYourMove(input: {
       }
     }
   }
-  if (input.agentRunning) return rows;
+  if (input.agentRunning || rows.some(masksRunningWork) || !archiveFits(input)) return rows;
+  if (!input.workOpen) rows.push({ kind: "archive", key: `git:${ARCHIVE_ACTION_ID}` });
+  else if (input.liveWork) rows.push({ kind: "archive-held", key: `held:${ARCHIVE_ACTION_ID}` });
+  return rows;
+}
+
+interface ArchiveInput {
+  agentRunning: boolean;
+  gitPrimaryId: GitActionId | null;
+  /** The archive git action exists and is enabled (or running), whether or not it is the primary. */
+  canArchive: boolean;
+  isWorktree: boolean;
+  prMerged: boolean;
+  statusDone: boolean;
+  /** Work in the workspace is still under way although no agent runs a turn (`isWorkStillOpen`). */
+  workOpen: boolean;
+  /** The host still counts the workspace running: a background shell, monitor or subagent. */
+  liveWork: boolean;
+}
+
+/** Whether the work shipped and Archive fits the branch, before anything holds it back. */
+function archiveFits(input: ArchiveInput): boolean {
   const shipped = input.prMerged || input.statusDone;
-  if (
+  return (
     shipped &&
     input.canArchive &&
     (input.isWorktree || input.prMerged) &&
     input.gitPrimaryId !== null &&
     ARCHIVABLE_GIT_STEPS.has(input.gitPrimaryId)
-  ) {
-    rows.push({ kind: "archive", key: `git:${ARCHIVE_ACTION_ID}` });
-  }
-  return rows;
+  );
+}
+
+/**
+ * A permission prompt or a failed agent. The workspace status outranks `running` with `needs_input`
+ * and `failed`, so while one is listed another agent's live shell, monitor or subagent no longer
+ * shows as running, and `isWorkStillOpen` can't see it.
+ */
+function masksRunningWork(row: YourMoveRow): boolean {
+  return row.kind === "permission" || row.kind === "failed";
+}
+
+/**
+ * Whether the workspace still has work under way although no agent runs a turn: the host still
+ * counts it running (an idle agent's background shell, monitor or subagent), the newest status card
+ * says working or blocked, or the plugins' report, folded as in the sidebar, is working, blocked or
+ * needs you. Live work wins over a done report: paseo-status says done once every agent with a card
+ * is done, so an agent without a card that owns the shell doesn't count there. The card counts even
+ * when the plugin no longer believes it (a Working card with nothing live for 5 minutes): a card the
+ * agent forgot to update costs a click in the header, a wrong Archive can stop its work.
+ */
+export function isWorkStillOpen(input: {
+  reported: ReportedWork | null;
+  workspaceRunning: boolean;
+  /** The newest status card's state, if the workspace has one. */
+  cardState: PluginWorkspaceStatus["state"] | null;
+}): boolean {
+  if (input.workspaceRunning) return true;
+  if (input.cardState === "working" || input.cardState === "blocked") return true;
+  return input.reported !== null && input.reported !== "done";
 }
 
 /**

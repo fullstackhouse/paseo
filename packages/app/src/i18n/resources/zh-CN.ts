@@ -2307,6 +2307,8 @@ export const zhCN: TranslationResources = {
       prMergedTitle: "PR #{{number}} 已合并",
       outdated: "你在{{time}}回复过；智能体此后没有更新。",
       readyToArchive: "可以归档",
+      archiveHeldTitle: "归档在等待后台任务",
+      archiveHeldFacts: "仍有 shell、监视器或子代理在运行。从标题栏归档会将其停止。",
       pullRequests: "拉取请求",
       noPrYet: "尚无 PR",
       notRefreshed: "未刷新",

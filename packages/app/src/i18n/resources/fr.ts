@@ -2384,6 +2384,9 @@ export const fr: TranslationResources = {
       prMergedTitle: "PR #{{number}} fusionnée",
       outdated: "Vous avez répondu {{time}} ; l'agent ne l'a pas mis à jour depuis.",
       readyToArchive: "Prêt à archiver",
+      archiveHeldTitle: "L'archivage attend le travail en arrière-plan",
+      archiveHeldFacts:
+        "Un shell, un moniteur ou un sous-agent tourne encore. Archiver depuis l'en-tête l'arrête.",
       pullRequests: "Pull requests",
       noPrYet: "Pas encore de PR",
       notRefreshed: "non actualisé",

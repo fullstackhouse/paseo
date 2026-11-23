@@ -2369,6 +2369,9 @@ export const ptBR: TranslationResources = {
       prMergedTitle: "PR #{{number}} mesclado",
       outdated: "Você respondeu {{time}}; o agente não atualizou isto desde então.",
       readyToArchive: "Pronto para arquivar",
+      archiveHeldTitle: "Arquivar aguarda o trabalho em segundo plano",
+      archiveHeldFacts:
+        "Um shell, monitor ou subagente ainda está rodando. Arquivar pelo cabeçalho o interrompe.",
       pullRequests: "Pull requests",
       noPrYet: "Ainda sem PR",
       notRefreshed: "não atualizado",
