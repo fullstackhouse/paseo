@@ -13,6 +13,7 @@ import type { GitActionId } from "@/git/policy";
 import type { WorkspaceSummaryItem } from "@/plugins/workspace-summary/store";
 import type { Agent } from "@/stores/session-store";
 import type { AttentionItem } from "@/workspace-attention/model";
+import type { ReportedWork } from "@/workspace-status/reported-work";
 
 const ARCHIVE_ACTION_ID: GitActionId = "archive-workspace";
 
@@ -71,6 +72,8 @@ export type YourMoveRow =
  * PRs live in other repos has no branch PR to merge), and never while an agent runs. Not over a commit
  * or PR step, which means work not in the PR yet. Only in a worktree, or after a merge: a regular
  * checkout doesn't offer Archive just because an agent finished, as in the header (git/policy.ts).
+ * Never while other work in the workspace is still open (`isWorkStillOpen`): a merged PR finishes one
+ * agent's job, and archiving would stop the rest.
  */
 export function deriveYourMove(input: {
   items: readonly AttentionItem[];
@@ -81,6 +84,8 @@ export function deriveYourMove(input: {
   isWorktree: boolean;
   prMerged: boolean;
   statusDone: boolean;
+  /** Work in the workspace is still under way although no agent runs a turn (`isWorkStillOpen`). */
+  workOpen: boolean;
 }): YourMoveRow[] {
   const rows: YourMoveRow[] = [];
   for (const item of input.items) {
@@ -97,7 +102,7 @@ export function deriveYourMove(input: {
       }
     }
   }
-  if (input.agentRunning) return rows;
+  if (input.agentRunning || input.workOpen) return rows;
   const shipped = input.prMerged || input.statusDone;
   if (
     shipped &&
@@ -109,6 +114,21 @@ export function deriveYourMove(input: {
     rows.push({ kind: "archive", key: `git:${ARCHIVE_ACTION_ID}` });
   }
   return rows;
+}
+
+/**
+ * Whether the workspace still has work under way although no agent runs a turn: the host still
+ * counts it running (an idle agent's background shell, monitor or subagent), or the plugins' report,
+ * folded as in the sidebar, is working, blocked or needs you. Live work wins over a done report:
+ * paseo-status says done once every agent with a card is done, so an agent without a card that owns
+ * the shell doesn't count there.
+ */
+export function isWorkStillOpen(input: {
+  reported: ReportedWork | null;
+  workspaceRunning: boolean;
+}): boolean {
+  if (input.workspaceRunning) return true;
+  return input.reported !== null && input.reported !== "done";
 }
 
 /**

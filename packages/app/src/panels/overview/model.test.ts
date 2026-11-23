@@ -21,6 +21,7 @@ import {
   deriveYourMove,
   isStatusDone,
   isStatusOutdated,
+  isWorkStillOpen,
   noPullRequestFacts,
   openMoveKey,
   pinOpenMove,
@@ -99,6 +100,7 @@ describe("deriveYourMove", () => {
       isWorktree: true,
       prMerged: false,
       statusDone: false,
+      workOpen: false,
     });
     expect(rows.map((row) => row.kind)).toEqual([
       "permission",
@@ -116,6 +118,7 @@ describe("deriveYourMove", () => {
       isWorktree: true,
       prMerged: false,
       statusDone: false,
+      workOpen: false,
     });
     expect(rows).toEqual([{ kind: "plugin", key: "x", item: expect.anything() }]);
   });
@@ -129,6 +132,7 @@ describe("deriveYourMove", () => {
       isWorktree: true,
       prMerged: false,
       statusDone: true,
+      workOpen: false,
     };
     const archive = [{ kind: "archive", key: "git:archive-workspace" }];
 
@@ -161,6 +165,36 @@ describe("deriveYourMove", () => {
       expect(deriveYourMove(input)).toEqual([]);
       expect(deriveYourMove({ ...input, statusDone: false, prMerged: true })).toEqual(archive);
     });
+
+    it("waits while other work in the workspace is open", () => {
+      expect(deriveYourMove({ ...base, workOpen: true })).toEqual([]);
+      expect(
+        deriveYourMove({ ...base, statusDone: false, prMerged: true, workOpen: true }),
+      ).toEqual([]);
+    });
+  });
+});
+
+describe("isWorkStillOpen", () => {
+  it("is open while the report is working, blocked or needs you", () => {
+    for (const reported of ["working", "blocked", "needs_you"] as const) {
+      expect(isWorkStillOpen({ reported, workspaceRunning: false })).toBe(true);
+    }
+  });
+
+  it("is open while the host still counts the workspace running, with no report", () => {
+    // An idle agent waiting on a monitor or subagent, or a shell, with no status card.
+    expect(isWorkStillOpen({ reported: null, workspaceRunning: true })).toBe(true);
+  });
+
+  it("is open while live work runs, even when the report says done", () => {
+    // Agent A merged and said done; agent B, with no card, waits on a long test run.
+    expect(isWorkStillOpen({ reported: "done", workspaceRunning: true })).toBe(true);
+  });
+
+  it("is closed once the report is done or empty and nothing runs", () => {
+    expect(isWorkStillOpen({ reported: "done", workspaceRunning: false })).toBe(false);
+    expect(isWorkStillOpen({ reported: null, workspaceRunning: false })).toBe(false);
   });
 });
 

@@ -63,6 +63,7 @@ import { formatTimeAgo } from "@/utils/time";
 import { normalizeWorkspaceOpaqueId } from "@/utils/workspace-identity";
 import { useWorkspaceAttention } from "@/workspace-attention/attention";
 import { hasRunningAgent } from "@/workspace-attention/model";
+import { foldReportedWork } from "@/workspace-status/reported-work";
 import { showExplorerForAttention } from "@/workspace-attention/auto-show";
 import { openExplorerSidebarView } from "@/workspace-tabs/explorer-sidebar";
 import { buildWorkspaceTabPersistenceKey } from "@/workspace-tabs/model";
@@ -83,6 +84,7 @@ import {
   pinOpenMove,
   isStatusDone,
   isStatusOutdated,
+  isWorkStillOpen,
   noPullRequestFacts,
   overviewSubtitle,
   partitionSummaryItems,
@@ -137,6 +139,8 @@ function selectWorkspaceFacts(workspace: WorkspaceDescriptor) {
     // A plain folder has nothing to ship; checkouts and worktrees do, even before git status loads.
     isGitWorkspace: workspace.workspaceKind !== "directory",
     isWorktree: workspace.workspaceKind === "worktree",
+    // Monitors and subagents hold it running without runningFromBackgroundWork; any of them is live work.
+    isRunning: workspace.status === "running",
     branch: workspace.gitRuntime?.currentBranch ?? null,
     ahead: workspace.gitRuntime?.aheadOfOrigin ?? null,
     aheadOfBase: workspace.gitRuntime?.aheadBehind?.ahead ?? null,
@@ -179,6 +183,7 @@ function OverviewPanel(): ReactElement {
     facts,
     gitActions: git,
     status: status?.status ?? null,
+    summaryItems,
   });
   const statusCard = status?.status ?? null;
   const name = facts?.name ?? null;
@@ -234,6 +239,7 @@ function useYourMove(input: {
   facts: WorkspaceFacts | null;
   gitActions: GitActions | null;
   status: PluginWorkspaceStatus | null;
+  summaryItems: readonly WorkspaceSummaryItem[];
 }): YourMoveRow[] {
   const items = useWorkspaceAttention(input.serverId, input.workspaceId);
   const lastPromptAt = useSessionStore((state) =>
@@ -252,6 +258,10 @@ function useYourMove(input: {
       status: input.status,
       agentRunning: input.agentRunning,
       lastPromptAt,
+    }),
+    workOpen: isWorkStillOpen({
+      reported: foldReportedWork(input.summaryItems),
+      workspaceRunning: Boolean(input.facts?.isRunning),
     }),
   });
 }
