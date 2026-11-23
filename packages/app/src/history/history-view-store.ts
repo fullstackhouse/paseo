@@ -15,10 +15,3 @@ export const useHistoryViewStore = create<HistoryViewStoreState>((set) => ({
   view: "agents",
   setView: (view) => set({ view }),
 }));
-
-/** The History tab, kept across the remount History's content goes through on every focus. */
-export function useHistoryView(): { view: HistoryView; setView: (view: HistoryView) => void } {
-  const view = useHistoryViewStore((state) => state.view);
-  const setView = useHistoryViewStore((state) => state.setView);
-  return { view, setView };
-}
