@@ -2324,8 +2324,6 @@ export const en = {
       approved: "Approved",
       changesRequested: "Changes requested",
       reviewRequired: "Review required",
-      from: "From",
-      started: "Started",
       showAll: "Show all ({{count}})",
       prMerged: "PR merged",
       word: {
@@ -2351,8 +2349,6 @@ export const en = {
       prMergedTitle: "PR #{{number}} merged",
       outdated: "You replied {{time}}; the agent hasn't updated this since.",
       readyToArchive: "Ready to archive",
-      contextAgents: "Agents",
-      agentsHere: "{{count}} in this workspace",
       pullRequests: "Pull requests",
       noPrYet: "No PR yet",
       notRefreshed: "not refreshed",
@@ -2373,6 +2369,17 @@ export const en = {
         draft: "Draft",
         merged: "Merged",
         closed: "Closed",
+      },
+      tree: "Tree",
+      waitingOn: "Waiting on",
+      blocking: "Blocking",
+      agents: {
+        one: "{{count}} agent",
+        other: "{{count}} agents",
+      },
+      startedCount: {
+        one: "{{count}} started",
+        other: "{{count}} started",
       },
     },
     lineage: {

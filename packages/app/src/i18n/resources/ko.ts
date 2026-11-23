@@ -2307,8 +2307,6 @@ export const ko: TranslationResources = {
       approved: "승인됨",
       changesRequested: "변경 요청됨",
       reviewRequired: "리뷰 필요",
-      from: "출처",
-      started: "시작한 작업 공간",
       showAll: "모두 표시 ({{count}})",
       prMerged: "PR 병합됨",
       word: {
@@ -2334,8 +2332,6 @@ export const ko: TranslationResources = {
       prMergedTitle: "PR #{{number}} 병합됨",
       outdated: "{{time}}에 답장했지만 에이전트가 그 후로 업데이트하지 않았습니다.",
       readyToArchive: "보관 준비됨",
-      contextAgents: "에이전트",
-      agentsHere: "이 워크스페이스에 {{count}}개",
       pullRequests: "풀 리퀘스트",
       noPrYet: "아직 PR 없음",
       notRefreshed: "새로 고침 안 됨",
@@ -2356,6 +2352,17 @@ export const ko: TranslationResources = {
         draft: "초안",
         merged: "병합됨",
         closed: "닫힘",
+      },
+      tree: "트리",
+      waitingOn: "대기 중",
+      blocking: "차단 중",
+      agents: {
+        one: "에이전트 {{count}}개",
+        other: "에이전트 {{count}}개",
+      },
+      startedCount: {
+        one: "{{count}}개 시작",
+        other: "{{count}}개 시작",
       },
     },
     lineage: {

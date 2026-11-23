@@ -152,8 +152,8 @@ export interface WorkspaceRef {
 
 /** Lineage seen from a workspace: where its work came from and which workspaces it handed off to. */
 export interface WorkspaceLineage {
-  /** The nearest ancestor agent's workspace that isn't this one. */
-  parent: WorkspaceRef | null;
+  /** Every ancestor workspace other than this one, root first, each once; the last is the parent. */
+  ancestors: WorkspaceRef[];
   /** Workspaces other than this one that the focus agent started, oldest first, each once. */
   children: WorkspaceRef[];
   /** Children of the focus agent that run in this same workspace. */
@@ -165,18 +165,23 @@ function workspaceOf(node: LineageNode): WorkspaceRef | null {
   return { serverId: node.address.serverId, workspaceId: node.workspaceId };
 }
 
+function workspaceKey(ref: WorkspaceRef): string {
+  return `${ref.serverId}:${normalizeWorkspaceOpaqueId(ref.workspaceId)}`;
+}
+
 export function deriveWorkspaceLineage(
   lineage: Lineage,
   workspace: WorkspaceRef,
 ): WorkspaceLineage {
-  let parent: WorkspaceRef | null = null;
-  for (let index = lineage.ancestors.length - 1; index >= 0; index -= 1) {
-    const node = lineage.ancestors[index]!;
+  const ancestors: WorkspaceRef[] = [];
+  const seenAncestors = new Set<string>();
+  for (const node of lineage.ancestors) {
     const ref = workspaceOf(node);
-    if (ref && !isInWorkspace(node, workspace)) {
-      parent = ref;
-      break;
-    }
+    if (!ref || isInWorkspace(node, workspace)) continue;
+    const key = workspaceKey(ref);
+    if (seenAncestors.has(key)) continue;
+    seenAncestors.add(key);
+    ancestors.push(ref);
   }
   const children: WorkspaceRef[] = [];
   const seen = new Set<string>();
@@ -188,10 +193,10 @@ export function deriveWorkspaceLineage(
     }
     const ref = workspaceOf(node);
     if (!ref) continue;
-    const key = `${ref.serverId}:${normalizeWorkspaceOpaqueId(ref.workspaceId)}`;
+    const key = workspaceKey(ref);
     if (seen.has(key)) continue;
     seen.add(key);
     children.push(ref);
   }
-  return { parent, children, subagentsHere };
+  return { ancestors, children, subagentsHere };
 }

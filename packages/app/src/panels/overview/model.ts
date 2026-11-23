@@ -481,3 +481,59 @@ export function statusBlockers(status: PluginWorkspaceStatus | null): PluginWork
     return true;
   });
 }
+
+/** Workspace and agent blockers belong to the Tree; PRs, people and the rest stay under Waiting on. */
+export function isTreeBlocker(blocker: PluginWorkspaceBlocker): boolean {
+  return blocker.kind === "workspace" || blocker.kind === "agent";
+}
+
+const NEEDS_YOU_WORDS: ReadonlySet<WorkspaceStateWord> = new Set(["waiting", "blocked", "failed"]);
+
+/**
+ * Child workspaces in the Tree: the ones that need the human first, then newest first. `children`
+ * comes oldest first, as the lineage lists them.
+ */
+export function orderChildren<T>(
+  children: readonly T[],
+  wordOf: (child: T) => WorkspaceStateWord,
+): T[] {
+  const newestFirst = children.toReversed();
+  return [
+    ...newestFirst.filter((child) => NEEDS_YOU_WORDS.has(wordOf(child))),
+    ...newestFirst.filter((child) => !NEEDS_YOU_WORDS.has(wordOf(child))),
+  ];
+}
+
+/**
+ * The workspaces this one blocks: those whose current, unanswered blocked status names this
+ * workspace or one of its agents. Only status cards this client has loaded count.
+ */
+export function findBlocking(input: {
+  items: readonly WorkspaceSummaryItem[];
+  serverId: string;
+  workspaceId: string;
+  agentIdsHere: ReadonlySet<string>;
+  normalize: (workspaceId: string) => string | null;
+}): { serverId: string; workspaceId: string }[] {
+  const here = input.normalize(input.workspaceId);
+  const found = new Map<string, { serverId: string; workspaceId: string }>();
+  for (const item of input.items) {
+    if (item.serverId !== input.serverId || input.normalize(item.workspaceId) === here) continue;
+    const names = statusBlockers(item.status ?? null).some(
+      (blocker) =>
+        (blocker.kind === "workspace" &&
+          blocker.workspaceId !== undefined &&
+          input.normalize(blocker.workspaceId) === here) ||
+        (blocker.kind === "agent" &&
+          blocker.agentId !== undefined &&
+          input.agentIdsHere.has(blocker.agentId)),
+    );
+    if (names) {
+      found.set(input.normalize(item.workspaceId) ?? item.workspaceId, {
+        serverId: item.serverId,
+        workspaceId: item.workspaceId,
+      });
+    }
+  }
+  return [...found.values()];
+}

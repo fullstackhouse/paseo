@@ -2294,8 +2294,6 @@ export const ar: TranslationResources = {
       approved: "موافق عليه",
       changesRequested: "طُلبت تغييرات",
       reviewRequired: "المراجعة مطلوبة",
-      from: "من",
-      started: "المساحات التي بدأها",
       showAll: "عرض الكل ({{count}})",
       prMerged: "تم دمج PR",
       word: {
@@ -2321,8 +2319,6 @@ export const ar: TranslationResources = {
       prMergedTitle: "تم دمج PR #{{number}}",
       outdated: "رددت {{time}}؛ لم يحدّث الوكيل هذا منذ ذلك الحين.",
       readyToArchive: "جاهز للأرشفة",
-      contextAgents: "الوكلاء",
-      agentsHere: "{{count}} في مساحة العمل هذه",
       pullRequests: "طلبات السحب",
       noPrYet: "لا يوجد PR بعد",
       notRefreshed: "لم يُحدَّث",
@@ -2343,6 +2339,17 @@ export const ar: TranslationResources = {
         draft: "مسودة",
         merged: "مدموج",
         closed: "مغلق",
+      },
+      tree: "الشجرة",
+      waitingOn: "بانتظار",
+      blocking: "يحظر",
+      agents: {
+        one: "{{count}} وكيل",
+        other: "{{count}} وكلاء",
+      },
+      startedCount: {
+        one: "بدأ {{count}}",
+        other: "بدأ {{count}}",
       },
     },
     lineage: {

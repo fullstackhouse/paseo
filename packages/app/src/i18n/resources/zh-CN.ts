@@ -2270,8 +2270,6 @@ export const zhCN: TranslationResources = {
       approved: "已批准",
       changesRequested: "请求更改",
       reviewRequired: "需要审查",
-      from: "来自",
-      started: "已启动",
       showAll: "显示全部（{{count}}）",
       prMerged: "PR 已合并",
       word: {
@@ -2297,8 +2295,6 @@ export const zhCN: TranslationResources = {
       prMergedTitle: "PR #{{number}} 已合并",
       outdated: "你在{{time}}回复过；智能体此后没有更新。",
       readyToArchive: "可以归档",
-      contextAgents: "智能体",
-      agentsHere: "此工作区中有 {{count}} 个",
       pullRequests: "拉取请求",
       noPrYet: "尚无 PR",
       notRefreshed: "未刷新",
@@ -2319,6 +2315,17 @@ export const zhCN: TranslationResources = {
         draft: "草稿",
         merged: "已合并",
         closed: "已关闭",
+      },
+      tree: "树",
+      waitingOn: "等待",
+      blocking: "阻塞中",
+      agents: {
+        one: "{{count}} 个智能体",
+        other: "{{count}} 个智能体",
+      },
+      startedCount: {
+        one: "已启动 {{count}} 个",
+        other: "已启动 {{count}} 个",
       },
     },
     lineage: {

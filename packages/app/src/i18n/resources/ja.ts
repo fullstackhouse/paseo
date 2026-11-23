@@ -2319,8 +2319,6 @@ export const ja: TranslationResources = {
       approved: "承認済み",
       changesRequested: "変更リクエストあり",
       reviewRequired: "レビュー待ち",
-      from: "派生元",
-      started: "開始したワークスペース",
       showAll: "すべて表示 ({{count}})",
       prMerged: "PR マージ済み",
       word: {
@@ -2346,8 +2344,6 @@ export const ja: TranslationResources = {
       prMergedTitle: "PR #{{number}} マージ済み",
       outdated: "{{time}}に返信しました。エージェントはその後これを更新していません。",
       readyToArchive: "アーカイブできます",
-      contextAgents: "エージェント",
-      agentsHere: "このワークスペースに{{count}}件",
       pullRequests: "プルリクエスト",
       noPrYet: "PRはまだありません",
       notRefreshed: "未更新",
@@ -2368,6 +2364,17 @@ export const ja: TranslationResources = {
         draft: "ドラフト",
         merged: "マージ済み",
         closed: "クローズ",
+      },
+      tree: "ツリー",
+      waitingOn: "待機中",
+      blocking: "ブロック中",
+      agents: {
+        one: "エージェント{{count}}件",
+        other: "エージェント{{count}}件",
+      },
+      startedCount: {
+        one: "{{count}}件開始",
+        other: "{{count}}件開始",
       },
     },
     lineage: {
