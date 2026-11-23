@@ -41,8 +41,10 @@ Map: [spec-overview-tree-ui-map.md](./spec-overview-tree-ui-map.md). Spec: [spec
 - **Extended.** Up to four groups, each only when it has rows, in this order:
   - **Started by** — the ancestor chain, root first, down to the direct parent. Indented one step per
     level.
-  - **This workspace** — one highlighted row (name only, not pressable) anchoring the chain.
-  - **Started** — direct children, newest first; five shown, then "Show all (N)". A child that started
+  - **This workspace** — one highlighted row (name only, not pressable) anchoring the chain; only
+    when there are both ancestors and children.
+  - **Started** — direct children: needing you first (Waiting, Blocked, Failed), then newest first;
+    five shown, then "Show all (N)". A child that started
     others shows "· 3 started" after its state word.
   - **Blocked by** — workspaces and agents named in this workspace's status `blockedBy` (only while the
     status says blocked). An agent blocker shows the agent's title and its workspace.
@@ -65,7 +67,8 @@ Map: [spec-overview-tree-ui-map.md](./spec-overview-tree-ui-map.md). Spec: [spec
 
 - **Short.** The PRs this workspace's work lives in, for information.
 - **Extended.** Lists every PR paseo-prs relates to the workspace: the branch's PRs, their stack and
-  PRs linked from any repository. Open ones first, then merged/closed. Each row: `#123`, title,
+  PRs linked from any repository. Every open PR shows; merged and closed ones fold into one muted "3 merged" row that expands.
+  With no open PR, the merged ones show directly. Each row: `#123`, title,
   facts ("2 failing", "changes requested", "approved", "checks running", "merged", "draft"); the
   most urgent fact wins the tone. A PR from another repository prefixes `owner/repo`. Without
   paseo-prs installed, the branch's PR from the host's git status. With no PR, one row "No PR yet"
@@ -76,7 +79,7 @@ Map: [spec-overview-tree-ui-map.md](./spec-overview-tree-ui-map.md). Spec: [spec
 - **Scenarios.** A stacked 4-PR feature: all four, the failing one red. A multi-repo change: the paseo
   PR and the paseo-prs plugin PR, the second prefixed `fullstackhouse/paseo-prs`.
 - **Variants.** One open PR with checks passing; failing checks (red) and changes requested; a stack
-  of several PRs, more than five (Show all); merged PR; no PR with branch facts; linked PR from
+  of several PRs with two merged (folded); merged PR; no PR with branch facts; linked PR from
   another repo.
 - **Edge cases.** GitHub unreachable or `gh` signed out → rows keep their last facts and the section
   label adds "· not refreshed"; no error block. A branch with nothing to report and no PR → section
@@ -108,3 +111,11 @@ Map: [spec-overview-tree-ui-map.md](./spec-overview-tree-ui-map.md). Spec: [spec
 - **Shows.** Unlabelled rows: label, value, chevron.
 - **Variants.** Agents and two plugin facts; hidden when there is nothing to say.
 - **Edge cases.** None beyond today's.
+
+## Decisions (cards, 2026-11-23)
+
+1. Children needing you (Waiting, Blocked, Failed) come first, then newest first (A10).
+2. Open PRs all show; merged and closed fold into one "N merged" row; with none open, merged show
+   directly (A11).
+3. Tree group labels: Started by, This workspace, Started, Blocked by, Blocking (A12).
+4. The "This workspace" row shows only with both ancestors and children (A13).
