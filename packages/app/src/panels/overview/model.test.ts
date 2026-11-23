@@ -8,17 +8,16 @@ import {
   statusBlockers,
   branchFacts,
   canAnswerPermissionInPlace,
-  compactMoveWord,
   permissionActions,
   permissionFacts,
   permissionResponse,
   permissionSubject,
-  deriveCodeRow,
+  derivePullRequests,
   deriveWorkspaceStateWord,
   deriveYourMove,
-  gitMoveFacts,
   isStatusDone,
   isStatusOutdated,
+  noPullRequestFacts,
   openMoveKey,
   pinOpenMove,
   overviewSubtitle,
@@ -87,7 +86,7 @@ describe("deriveYourMove", () => {
     { kind: "pr-checks-failed", key: "checks" },
   ];
 
-  it("lists blocking items in ladder order, one row per entry, then checks and git", () => {
+  it("lists blocking items in ladder order, one row per entry, and no git or checks rows", () => {
     const rows = deriveYourMove({
       items,
       agentRunning: false,
@@ -101,22 +100,7 @@ describe("deriveYourMove", () => {
       "permission",
       ...Array(7).fill("entry"),
       "failed",
-      "checks",
-      "git",
     ]);
-  });
-
-  it("keeps only blocking items while an agent runs", () => {
-    const rows = deriveYourMove({
-      items,
-      agentRunning: true,
-      gitPrimaryId: "commit",
-      canArchive: true,
-      isWorktree: true,
-      prMerged: false,
-      statusDone: false,
-    });
-    expect(rows.some((row) => row.kind === "checks" || row.kind === "git")).toBe(false);
   });
 
   it("shows a plugin item without entries as one row", () => {
@@ -132,69 +116,45 @@ describe("deriveYourMove", () => {
     expect(rows).toEqual([{ kind: "plugin", key: "x", item: expect.anything() }]);
   });
 
-  it("offers archive only once the PR merged or the status card says done", () => {
-    const input = {
-      items: [],
-      agentRunning: false,
-      gitPrimaryId: "archive-workspace" as const,
-      canArchive: true,
-      isWorktree: true,
-    };
-    const archive = [{ kind: "git", key: "git:archive-workspace", actionId: "archive-workspace" }];
-    expect(deriveYourMove({ ...input, prMerged: false, statusDone: false })).toEqual([]);
-    expect(deriveYourMove({ ...input, prMerged: true, statusDone: false })).toEqual(archive);
-    expect(deriveYourMove({ ...input, prMerged: false, statusDone: true })).toEqual(archive);
-  });
-
-  describe("once the work shipped", () => {
+  describe("archive", () => {
     const base = {
       items: [],
       agentRunning: false,
+      gitPrimaryId: "archive-workspace" as GitActionId,
       canArchive: true,
       isWorktree: true,
       prMerged: false,
       statusDone: true,
     };
-    const archive = [{ kind: "git", key: "git:archive-workspace", actionId: "archive-workspace" }];
-    const step = (actionId: GitActionId) => [{ kind: "git", key: `git:${actionId}`, actionId }];
+    const archive = [{ kind: "archive", key: "git:archive-workspace" }];
 
-    it("replaces a leftover sync step with archive", () => {
+    it("is offered only once the PR merged or the status card says done", () => {
+      expect(deriveYourMove({ ...base, statusDone: false })).toEqual([]);
+      expect(deriveYourMove({ ...base, statusDone: false, prMerged: true })).toEqual(archive);
+      expect(deriveYourMove(base)).toEqual(archive);
+    });
+
+    it("is offered over a leftover sync step", () => {
       for (const id of ["pull", "push", "pull-and-push", "merge-from-base"] as const) {
         expect(deriveYourMove({ ...base, gitPrimaryId: id })).toEqual(archive);
       }
-      expect(
-        deriveYourMove({ ...base, gitPrimaryId: "pull", statusDone: false, prMerged: true }),
-      ).toEqual(archive);
     });
 
-    it("keeps commit and PR steps", () => {
-      for (const id of [
-        "commit",
-        "merge-pr-squash",
-        "enable-pr-auto-merge-squash",
-        "pr",
-      ] as const) {
-        expect(deriveYourMove({ ...base, gitPrimaryId: id })).toEqual(step(id));
+    it("waits while work isn't in the PR yet, or there is no git step", () => {
+      for (const id of ["commit", "merge-pr-squash", "pr"] as const) {
+        expect(deriveYourMove({ ...base, gitPrimaryId: id })).toEqual([]);
       }
-      expect(deriveYourMove({ ...base, gitPrimaryId: "commit", prMerged: true })).toEqual(
-        step("commit"),
-      );
-    });
-
-    it("adds no archive where the branch has no git step", () => {
       expect(deriveYourMove({ ...base, gitPrimaryId: null })).toEqual([]);
     });
 
-    it("keeps the step when it isn't shipped or archive can't run", () => {
-      const pull = step("pull-and-push");
-      const input = { ...base, gitPrimaryId: "pull-and-push" as const };
-      expect(deriveYourMove({ ...input, statusDone: false })).toEqual(pull);
-      expect(deriveYourMove({ ...input, canArchive: false })).toEqual(pull);
+    it("waits while an agent runs or archive can't run", () => {
+      expect(deriveYourMove({ ...base, agentRunning: true })).toEqual([]);
+      expect(deriveYourMove({ ...base, canArchive: false })).toEqual([]);
     });
 
-    it("offers archive in a regular checkout only after a merge", () => {
-      const input = { ...base, gitPrimaryId: "pull" as const, isWorktree: false };
-      expect(deriveYourMove(input)).toEqual(step("pull"));
+    it("is offered in a regular checkout only after a merge", () => {
+      const input = { ...base, isWorktree: false };
+      expect(deriveYourMove(input)).toEqual([]);
       expect(deriveYourMove({ ...input, statusDone: false, prMerged: true })).toEqual(archive);
     });
   });
@@ -226,8 +186,10 @@ describe("partitionSummaryItems", () => {
     const asks = summaryItem({ itemId: "asks", entries: [] });
     const waiting = summaryItem({ itemId: "w", needsYou: true });
     const limits = summaryItem({ itemId: "limits", label: "62%" });
-    expect(partitionSummaryItems([limits, status, asks, waiting])).toEqual({
+    const prs = summaryItem({ itemId: "prs", pullRequests: [] });
+    expect(partitionSummaryItems([limits, status, asks, waiting, prs])).toEqual({
       status,
+      pullRequests: prs,
       more: [limits],
     });
   });
@@ -267,64 +229,111 @@ describe("overviewSubtitle", () => {
   });
 });
 
-describe("branch and git move facts", () => {
+describe("branchFacts", () => {
   const t = (key: string) => key.replace("panels.overview.", "");
   const clean = { ahead: 0, behind: 0, isDirty: false, diffStat: null, pullRequest: null };
 
   it("says nothing for a clean branch in sync", () => {
     expect(branchFacts(clean, t)).toBe("");
-    expect(gitMoveFacts(clean, t)).toBe("");
   });
 
   it("lists sync, diff and uncommitted changes", () => {
-    const facts = {
-      ...clean,
-      ahead: 2,
-      isDirty: true,
-      diffStat: { additions: 10, deletions: 3 },
-    };
+    const facts = { ...clean, ahead: 2, isDirty: true, diffStat: { additions: 10, deletions: 3 } };
     expect(branchFacts(facts, t)).toBe("↑2 · +10 −3 · uncommitted");
   });
 
   it("says nothing once the PR merged", () => {
-    const facts = { ...clean, ahead: 1, pullRequest: { isMerged: true } };
-    expect(branchFacts(facts, t)).toBe("");
-    expect(gitMoveFacts(facts, t)).toBe("");
-  });
-
-  it("puts an open PR's checks and review before the branch facts on the git move", () => {
-    const facts = {
-      ...clean,
-      ahead: 2,
-      pullRequest: { isMerged: false, checksStatus: "failure", reviewDecision: "pending" } as const,
-    };
-    expect(gitMoveFacts(facts, t)).toBe("checksFailing · reviewRequired · ↑2");
+    expect(branchFacts({ ...clean, ahead: 1, pullRequest: { isMerged: true } }, t)).toBe("");
   });
 });
 
-describe("deriveCodeRow", () => {
-  it("shows nothing when the git move already names the PR or branch", () => {
-    expect(deriveCodeRow({ hasPullRequest: true, gitMoveShown: true, branchHasFacts: true })).toBe(
-      null,
-    );
-    expect(deriveCodeRow({ hasPullRequest: false, gitMoveShown: true, branchHasFacts: true })).toBe(
-      null,
-    );
+describe("derivePullRequests", () => {
+  const t = (key: string, options?: Record<string, unknown>) =>
+    options?.count === undefined ? key.replace("panels.overview.", "") : `${options.count}`;
+  const host = {
+    number: 231,
+    url: "https://github.test/o/paseo/pull/231",
+    title: "Tree and PRs",
+    state: "OPEN",
+    isMerged: false,
+    checksStatus: "failure" as const,
+    reviewDecision: "changes_requested" as const,
+  };
+  const pr = (patch: object) => ({
+    id: "u",
+    number: 1,
+    title: "T",
+    url: "https://github.test/o/paseo/pull/1",
+    state: "open" as const,
+    ...patch,
   });
 
-  it("shows only the PR, not its branch, when there is one", () => {
-    expect(deriveCodeRow({ hasPullRequest: true, gitMoveShown: false, branchHasFacts: true })).toBe(
-      "pr",
-    );
+  it("shows the host's branch PR with its checks and review, in red", () => {
+    expect(derivePullRequests({ plugin: null, host, t })).toEqual({
+      open: [
+        {
+          key: host.url,
+          ref: "#231",
+          title: "Tree and PRs",
+          facts: "checksFailing · changesRequested",
+          tone: "danger",
+          url: host.url,
+          isBranchPr: true,
+        },
+      ],
+      done: [],
+    });
   });
 
-  it("shows the branch only when it has something to report", () => {
+  it("files a merged or closed host PR as done", () => {
+    const merged = derivePullRequests({ plugin: null, host: { ...host, isMerged: true }, t });
+    expect(merged.done.map((row) => [row.facts, row.tone])).toEqual([["prState.merged", "merged"]]);
+    const closed = derivePullRequests({ plugin: null, host: { ...host, state: "CLOSED" }, t });
+    expect(closed.done.map((row) => row.tone)).toEqual(["muted"]);
+  });
+
+  it("prefers the plugin's list, splitting open from merged and closed", () => {
+    const list = derivePullRequests({
+      plugin: [
+        pr({ id: "a", number: 231, facts: "2 failing", tone: "danger" }),
+        pr({ id: "b", number: 58, repo: "paseo-prs", state: "draft" }),
+        pr({ id: "c", number: 229, state: "merged" }),
+        pr({ id: "d", number: 228, state: "closed" }),
+      ],
+      host,
+      t,
+    });
+    expect(list.open.map((row) => [row.ref, row.facts, row.tone, row.isBranchPr])).toEqual([
+      ["#231", "2 failing", "danger", true],
+      ["paseo-prs#58", "prState.draft", "muted", false],
+    ]);
+    expect(list.done.map((row) => [row.ref, row.tone])).toEqual([
+      ["#229", "merged"],
+      ["#228", "muted"],
+    ]);
+  });
+
+  it("takes an empty plugin list as no PRs", () => {
+    expect(derivePullRequests({ plugin: [], host, t })).toEqual({ open: [], done: [] });
+  });
+});
+
+describe("noPullRequestFacts", () => {
+  const t = (key: string, options?: Record<string, unknown>) =>
+    options?.count === undefined ? key.replace("panels.overview.", "") : `${options.count} commits`;
+
+  it("says what a PR would propose", () => {
     expect(
-      deriveCodeRow({ hasPullRequest: false, gitMoveShown: false, branchHasFacts: true }),
-    ).toBe("branch");
-    expect(
-      deriveCodeRow({ hasPullRequest: false, gitMoveShown: false, branchHasFacts: false }),
-    ).toBe(null);
+      noPullRequestFacts(
+        { aheadOfBase: 3, isDirty: true, diffStat: { additions: 120, deletions: 8 } },
+        t,
+      ),
+    ).toBe("3 commits · +120 −8 · uncommitted");
+  });
+
+  it("is null with nothing ahead of the base", () => {
+    expect(noPullRequestFacts({ aheadOfBase: 0, isDirty: true, diffStat: null }, t)).toBeNull();
+    expect(noPullRequestFacts({ aheadOfBase: null, isDirty: false, diffStat: null }, t)).toBeNull();
   });
 });
 
@@ -393,8 +402,8 @@ describe("permissions on Overview", () => {
 
 describe("openMoveKey", () => {
   const rows = [
-    { kind: "checks", key: "a" },
-    { kind: "git", key: "b", actionId: "commit" },
+    { kind: "failed", key: "a", agentId: "x" },
+    { kind: "archive", key: "b" },
   ] as const;
 
   it("opens the lead row until the human chooses", () => {
@@ -427,7 +436,7 @@ describe("pinOpenMove", () => {
       entry: { id, title: id },
     }) as const;
   const permission = { kind: "permission", key: "perm", agentId: "x" } as const;
-  const git = { kind: "git", key: "git:pr", actionId: "pr" } as const;
+  const archive = { kind: "archive", key: "git:archive-workspace" } as const;
 
   it("keeps the ask being answered open when a move arrives above it", () => {
     const pinned = pinOpenMove([ask("a")], undefined);
@@ -438,9 +447,11 @@ describe("pinOpenMove", () => {
   });
 
   it("never pins a row that can't expand, so a later ask above it still opens", () => {
-    const pinned = pinOpenMove([git], undefined);
+    const pinned = pinOpenMove([archive], undefined);
     expect(pinned).toBeUndefined();
-    expect(openMoveKey([ask("a"), git], pinOpenMove([ask("a"), git], pinned))).toBe("asks:a");
+    expect(openMoveKey([ask("a"), archive], pinOpenMove([ask("a"), archive], pinned))).toBe(
+      "asks:a",
+    );
   });
 
   it("keeps every row closed after the human closes the open one", () => {
@@ -449,17 +460,6 @@ describe("pinOpenMove", () => {
 
   it("pins the next lead ask once the pinned one is answered", () => {
     expect(pinOpenMove([ask("b")], "asks:a")).toBe("asks:b");
-  });
-});
-
-describe("compactMoveWord", () => {
-  it("names the action on a git row, whose title is only the branch or PR", () => {
-    expect(compactMoveWord("git", "Create PR")).toBe("Create PR");
-  });
-
-  it("adds nothing to rows whose title already says what to do", () => {
-    expect(compactMoveWord("checks", "Fix checks")).toBeNull();
-    expect(compactMoveWord("permission", "Review")).toBeNull();
   });
 });
 
