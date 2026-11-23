@@ -40,6 +40,7 @@ import type {
   WorkspaceDescriptorPayload,
   WorkspaceProjectDescriptorPayload,
   ProjectLastAgentSetup,
+  WorkspaceAppearance,
   WorkspaceManualGroup,
 } from "@getpaseo/protocol/messages";
 import {
@@ -129,6 +130,8 @@ export interface WorkspaceDescriptor {
   snoozedUntil?: string | null;
   /** The sidebar group the user moved this idle workspace to, until a turn or a newer agent status. */
   manualGroup?: WorkspaceManualGroup | null;
+  /** How a plugin marks the workspace's sidebar row: an avatar and a title icon. */
+  appearance?: WorkspaceAppearance | null;
   labels?: string[];
   status: WorkspaceDescriptorPayload["status"];
   /** Running only because an idle agent's background shells or monitors are live. */
@@ -188,6 +191,8 @@ export function normalizeWorkspaceDescriptor(
     title: payload.title ?? null,
     pinnedAt: payload.pinnedAt ?? null,
     ...normalizeWorkspaceAttentionFields(payload),
+    // COMPAT(workspaceAppearance): hosts without plugin appearances omit it.
+    appearance: payload.appearance ?? null,
     // COMPAT(workspaceLabels): old daemons omit assignments.
     labels: payload.labels ?? [],
     status: payload.status,

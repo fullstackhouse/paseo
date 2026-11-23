@@ -1,4 +1,5 @@
-import { ActivityIndicator, View, type ViewStyle } from "react-native";
+import { useMemo } from "react";
+import { ActivityIndicator, Image, View, type ViewStyle } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { useTranslation } from "react-i18next";
 import { ChevronDown, ChevronRight, CircleAlert } from "lucide-react-native";
@@ -112,6 +113,7 @@ export function ProjectLeadingVisual({
 // only its contents change.
 export function ProjectStatusIndicator({
   iconDataUri,
+  avatarDataUri = null,
   displayName,
   projectViewKey,
   statusBucket,
@@ -120,6 +122,8 @@ export function ProjectStatusIndicator({
   testID,
 }: {
   iconDataUri: string | null;
+  /** A person's image drawn round in place of the project icon, carrying the same badge. */
+  avatarDataUri?: string | null;
   displayName: string;
   projectViewKey: string;
   statusBucket: SidebarStateBucket | null;
@@ -148,11 +152,15 @@ export function ProjectStatusIndicator({
       }
     >
       <View style={styles.projectIconBox}>
-        <ProjectIcon
-          iconDataUri={iconDataUri}
-          placeholderInitial={placeholderInitial}
-          projectViewKey={projectViewKey}
-        />
+        {avatarDataUri === null ? (
+          <ProjectIcon
+            iconDataUri={iconDataUri}
+            placeholderInitial={placeholderInitial}
+            projectViewKey={projectViewKey}
+          />
+        ) : (
+          <Avatar dataUri={avatarDataUri} />
+        )}
         {badgeContent === null || badgeBucket === null ? null : (
           <ProjectStatusBadge
             content={badgeContent}
@@ -163,6 +171,11 @@ export function ProjectStatusIndicator({
       </View>
     </View>
   );
+}
+
+function Avatar({ dataUri }: { dataUri: string }) {
+  const source = useMemo(() => ({ uri: dataUri }), [dataUri]);
+  return <Image source={source} style={styles.avatar} accessibilityIgnoresInvertColors />;
 }
 
 function ProjectStatusBadge({
@@ -292,6 +305,11 @@ const styles = StyleSheet.create((theme) => {
     },
     projectIconFallbackText: {
       fontSize: 9,
+    },
+    avatar: {
+      width: densityIconBox("md"),
+      height: densityIconBox("md"),
+      borderRadius: theme.borderRadius.full,
     },
     // The shell the alert and dot statuses share. It straddles the icon's bottom-right corner
     // (half in, half out) so the lettered project box stays readable. The shell is a knockout:

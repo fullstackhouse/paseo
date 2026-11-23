@@ -6,6 +6,7 @@ import { selectPrHintFromStatus } from "@/git/pr-hint";
 import { type HostProjectListItem } from "@/projects/host-project-model";
 import type { PendingCreateAttempt } from "@/stores/create-flow-store";
 import type { WorkspaceDescriptor } from "@/stores/session-store";
+import type { WorkspaceAppearance } from "@getpaseo/protocol/messages";
 import type {
   WorkspaceStructureHostPlacement,
   WorkspaceStructureProject,
@@ -49,6 +50,8 @@ export interface SidebarWorkspaceEntry extends SidebarStatusWorkspacePlacement {
   snoozedAt?: string | null;
   snoozedUntil?: string | null;
   labels?: string[];
+  /** How a plugin marks this row: an avatar in place of the project icon, an icon before the title. */
+  appearance: WorkspaceAppearance | null;
   // Checkout branch (null when not a git checkout or detached HEAD).
   currentBranch: string | null;
   archivingAt: string | null;
@@ -173,6 +176,7 @@ export function createSidebarWorkspaceEntry(input: {
     snoozedAt: input.workspace.snoozedAt ?? null,
     snoozedUntil: input.workspace.snoozedUntil ?? null,
     labels: input.workspace.labels ?? EMPTY_WORKSPACE_LABELS,
+    appearance: input.workspace.appearance ?? null,
     currentBranch: normalizeCurrentBranch(input.workspace.gitRuntime?.currentBranch),
     statusBucket: effectiveStatus.status,
     statusEnteredAt: effectiveStatus.enteredAt,
