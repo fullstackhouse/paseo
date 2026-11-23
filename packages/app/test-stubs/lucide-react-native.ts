@@ -86,6 +86,7 @@ export const Plug = StubIcon;
 export const Plus = StubIcon;
 export const Puzzle = StubIcon;
 export const QrCode = StubIcon;
+export const Quote = StubIcon;
 export const RefreshCcw = StubIcon;
 export const RefreshCw = StubIcon;
 export const RotateCw = StubIcon;

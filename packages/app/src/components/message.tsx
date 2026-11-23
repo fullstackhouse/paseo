@@ -89,6 +89,7 @@ import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { capAssistantMessageForRender, getUtf8ByteLength } from "./assistant-message-render-limit";
 import { getTurnDurationLabel } from "./assistant-turn-footer-label";
 import { getCompactionMarkerLabel } from "./message-compaction-label";
+import { splitQuotedMessage } from "@/utils/message-quotes";
 import { PlanCard } from "./plan-card";
 import { ToolCallDetailsContent } from "./tool-call-details";
 import { useToolCallSheet } from "./tool-call-sheet";
@@ -337,6 +338,24 @@ const userMessageStylesheet = StyleSheet.create((theme) => ({
         }
       : {}),
   },
+  quote: {
+    borderLeftWidth: 3,
+    borderLeftColor: theme.colors.borderAccent,
+    paddingLeft: theme.spacing[3],
+  },
+  segments: {
+    gap: theme.spacing[2],
+  },
+  quoteText: {
+    color: theme.colors.foregroundMuted,
+    fontSize: theme.fontSize.content,
+    ...(isWeb
+      ? {
+          lineHeight: Math.round(theme.fontSize.content * 1.4),
+          overflowWrap: "anywhere" as const,
+        }
+      : {}),
+  },
   imagePreviewContainer: {
     flexDirection: "row",
     gap: theme.spacing[2],
@@ -424,6 +443,7 @@ export const UserMessage = memo(function UserMessage({
   );
   const resolvedDisableOuterSpacing = useDisableOuterSpacing(disableOuterSpacing);
   const hasText = message.trim().length > 0;
+  const segments = useMemo(() => splitQuotedMessage(message), [message]);
   const hasImages = images.length > 0;
   const hasAttachments = attachments.length > 0;
   const showTrailingRow = !isPending && hasText && (isCompact || isNative || isHovered);
@@ -519,9 +539,34 @@ export const UserMessage = memo(function UserMessage({
               </View>
             ) : null}
             {hasText ? (
-              <Text selectable style={userMessageStylesheet.text} dataSet={MESSAGE_TEXT_DATASET}>
-                {message}
-              </Text>
+              <View style={userMessageStylesheet.segments}>
+                {segments.map((segment) =>
+                  segment.kind === "quote" ? (
+                    <View
+                      key={segment.line}
+                      style={userMessageStylesheet.quote}
+                      testID="user-message-quote"
+                    >
+                      <Text
+                        selectable
+                        style={userMessageStylesheet.quoteText}
+                        dataSet={MESSAGE_TEXT_DATASET}
+                      >
+                        {segment.text}
+                      </Text>
+                    </View>
+                  ) : (
+                    <Text
+                      key={segment.line}
+                      selectable
+                      style={userMessageStylesheet.text}
+                      dataSet={MESSAGE_TEXT_DATASET}
+                    >
+                      {segment.text}
+                    </Text>
+                  ),
+                )}
+              </View>
             ) : null}
           </MessagePreview>
         </View>
