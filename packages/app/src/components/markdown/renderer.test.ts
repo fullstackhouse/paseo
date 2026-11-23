@@ -149,6 +149,26 @@ describe("shared Markdown source adaptation", () => {
       ["https://x/gh.png", true],
     ]);
   });
+  it("separates a table from the paragraph line above it", () => {
+    expect(prepareMarkdownSource("**Widgets**\n| A | B |\n|---|---|\n| 1 | 2 |").render()).toBe(
+      "**Widgets**\n\n| A | B |\n|---|---|\n| 1 | 2 |",
+    );
+    expect(prepareMarkdownSource("> Intro\n> | A |\n> | - |").render()).toBe(
+      "> Intro\n>\n> | A |\n> | - |",
+    );
+    expect(prepareMarkdownSource("- Item\n  | A |\n  | - |").render()).toBe(
+      "- Item\n\n  | A |\n  | - |",
+    );
+    const separated = "Intro\n\n| A |\n| - |";
+    expect(prepareMarkdownSource(separated).render()).toBe(separated);
+  });
+  it("renders a table directly under a paragraph line through the library parser", async () => {
+    const tree = await parseMarkdown(
+      prepareMarkdownSource("**Widgets**\n| A | B |\n|---|---|\n| 1 | 2 |").render(),
+      { hardSoftBreaks: true, latexMath: false },
+    );
+    expect(tree.children?.map((node) => node.type)).toEqual(["Paragraph", "Table"]);
+  });
   it("escapes spoiler delimiters only in prose", () => {
     expect(prepareMarkdownSource("Show ||words|| and `||code||`.").render()).toBe(
       "Show \\|\\|words\\|\\| and `||code||`.",
