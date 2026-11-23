@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { AgentList } from "@/components/agent-list";
 import { resolveArchivedViewState } from "@/history/archived-view-state";
-import { type HistoryView, useHistoryViewStore } from "@/history/history-view-store";
+import { type HistoryView, useHistoryView } from "@/history/history-view-store";
 import { ArchivedWorkspaceList } from "@/components/archived-workspace-list";
 import { SegmentedControl, type SegmentedControlOption } from "@/components/ui/segmented-control";
 import { SearchField } from "@/components/ui/search-field";
@@ -342,8 +342,7 @@ function SessionsScreenContent() {
   const hosts = useHosts();
   const autoFocusSearch = useShouldAutoFocusSearch();
   const [selectedHost, setSelectedHost] = useState(ALL_HOSTS_OPTION_ID);
-  const view = useHistoryViewStore((state) => state.view);
-  const setView = useHistoryViewStore((state) => state.setView);
+  const { view, setView } = useHistoryView();
   // Gate on any host that can list them; hosts that can't are named inside the view.
   const canShowArchived = useAnyHostSupportsArchivedWorkspaces();
   const activeView: HistoryView = canShowArchived ? view : "agents";

@@ -97,7 +97,10 @@ export async function archiveWorkspaceOptimistically(input: {
     // The daemon's live removal clears the pending marker, so the archive already happened.
     // Archive cleanup can outlast the RPC timeout; restoring the row then would leave one
     // that no later update removes.
-    if (!isWorkspaceArchivePending(input.workspace)) return;
+    if (!isWorkspaceArchivePending(input.workspace)) {
+      invalidateArchivedWorkspaces();
+      return;
+    }
     restoreOptimisticallyHiddenWorkspace({
       serverId: input.workspace.serverId,
       workspaceId: input.workspace.workspaceId,
