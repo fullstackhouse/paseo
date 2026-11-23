@@ -61,6 +61,41 @@ export type IconProps = Partial<PluginIconProps> &
 
 export declare const Icon: ComponentType<IconProps>;
 export declare const Modal: ModalComponent;
+
+/** A Lucide icon name, as `Icon` takes in `name`. */
+export type PluginIconName = string;
+
+export type MenuEntry =
+  | {
+      /** Unique within the menu. */
+      id: string;
+      label: string;
+      icon?: PluginIconName;
+      /** Draws the row in the destructive tone. */
+      destructive?: boolean;
+      disabled?: boolean;
+      /** Runs after the menu closes. On iOS it runs a beat after the press. */
+      onSelect(): void;
+    }
+  | { id: string; separator: true };
+
+export interface MenuProps {
+  /** Leading, trailing, and consecutive separators are dropped. */
+  items: readonly MenuEntry[];
+  /** The host draws the trigger: a quiet icon button, with `label` beside the icon when set. */
+  trigger: { icon: PluginIconName; accessibilityLabel: string; label?: string };
+  /** Compact layouts: a bottom sheet (default) or a popover. Wide layouts always use a popover. */
+  compactMode?: "sheet" | "popover";
+  disabled?: boolean;
+  /** On the trigger. Rows get `${testID}-${entry.id}`. */
+  testID?: string;
+}
+
+/**
+ * Paseo's menu, opened by a host-drawn trigger. Undefined on hosts older than the export;
+ * check `Menu !== undefined` before rendering it.
+ */
+export declare const Menu: ComponentType<MenuProps>;
 export declare function useToast(): ToastApi;
 export interface StreamedTextProps extends Omit<TextProps, "children"> {
   text: string;

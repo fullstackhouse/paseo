@@ -13,6 +13,7 @@ temporary by design: every patch is meant to go upstream and then drop out of `f
 - FSH-only (upstreamable): an archived workspace stays out of the sidebar when its archive takes longer than the app's 60 s request timeout. Before, the app put the row back after the daemon had already removed it, and the row stayed until a daemon restart. The daemon also sends the removal to apps that caught up from a cached directory (#94)
 
 - FSH-only (upstreamable): a file tab's right-click menu has **Reveal in Finder** (Explorer / Files on other OSes) on desktop with a local daemon, next to **Copy file path**.
+- FSH-only (upstreamable): plugins get the app's menu as `Menu` from `@getpaseo/plugin/client/ui`: rows as data (icon, destructive, disabled, separators), a host-drawn icon trigger, a popover on wide layouts and a bottom sheet on compact ones. Older hosts leave the export undefined
 - FSH-only (upstreamable): plugins can render the Explorer pull-request panel through `PullRequestPanel`, using their own checks and activity data without a workspace checkout. Inbox uses it for its read-only GitHub tab.
 
 - FSH-only (upstreamable): agent snapshots carry `capabilities.supportsSteering` (Claude, Codex, OpenCode, Pi, OMP, and provider plugins that negotiate `prompt.steer`), so plugins steer a running agent when it joins the turn and wait for the turn to end when a steer would interrupt it.
