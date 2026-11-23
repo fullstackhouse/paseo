@@ -40,8 +40,8 @@ Map: [spec-overview-tree-ui-map.md](./spec-overview-tree-ui-map.md). Spec: [spec
 - **Short.** Where this workspace sits among others: who started it, what it started, what blocks it,
   what it blocks, and how many agents work in it.
 - **Extended.** Up to five groups, each only when it has rows, in this order:
-  - **Started by** — the ancestor chain, root first, down to the direct parent. Indented one step per
-    level.
+  - **Started by** — the ancestor chain, root first, down to the direct parent. No indentation: every label and row
+    starts at the same left edge; the order and the group labels carry the hierarchy.
   - **This workspace** — one highlighted row anchoring the chain; only when there are both ancestors
     and children. With more than one top-level agent it reads "Impl — tree section · 3 agents" and
     opens the Lineage tab; otherwise it is not pressable.

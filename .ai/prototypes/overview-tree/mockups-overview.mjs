@@ -54,7 +54,7 @@ export function overviewStates({ ic, esc }) {
   const ASK2 = { icon: 'ask', tone: 'warn', title: 'Name the group "Blocking" or "Unblocks"?' }
   const ARCHIVE = { icon: 'archive', tone: 'merged', title: 'Ready to archive', sub: 'PR #231 merged · nothing uncommitted', actions: [{ label: 'Archive workspace', primary: true }] }
 
-  // Tree (O2). level indents the ancestor chain; off = muted and not pressable; here = the anchor row.
+  // Tree (O2). Flat: labels and rows share one left edge; ancestors listed root first. off = muted and not pressable; here = the anchor row.
   const trow = ({ name, word, tone = 'muted', started, level = 0, here, off, agent, link, dim }) =>
     `<div class="ot-row ${here ? 'is-here' : ''} ${off ? 'is-off' : ''}" style="--lv:${level}">${agent ? `<span class="ot-ricon">${ic('agent')}</span>` : ''}<span class="ot-name">${esc(name)}${dim ? `<span class="ot-dim"> · ${esc(dim)}</span>` : ''}</span>${word ? `<span class="ot-word"><span class="ot-t-${tone}">${esc(word)}</span>${started ? `<span class="ot-dim"> · ${started} started</span>` : ''}</span>` : ''}${(here && !link) || off ? '' : CH}</div>`
   const grp = (label, rows) => `<div class="ot-grp"><div class="ot-grp-label">${esc(label)}</div>${rows.join('')}</div>`

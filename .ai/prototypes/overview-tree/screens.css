@@ -541,8 +541,8 @@
 /* rows (tree, PRs): one line each */
 .ot-grp { display: flex; flex-direction: column; }
 .ot-grp + .ot-grp { margin-top: 8px; }
-.ot-grp-label { font-size: 11px; color: var(--app-fg-xmuted); padding: 2px 8px; }
-.ot-row { display: flex; align-items: center; gap: 8px; min-height: 32px; padding: 4px 8px 4px calc(8px + var(--lv, 0) * 14px); margin: 0 -8px; border-radius: 6px; font-size: 13px; }
+.ot-grp-label { font-size: 11px; color: var(--app-fg-xmuted); padding: 2px 0; }
+.ot-row { display: flex; align-items: center; gap: 8px; min-height: 32px; padding: 4px 8px; margin: 0 -8px; border-radius: 6px; font-size: 13px; }
 .ot-row:hover { background: var(--app-hl); }
 .ot-row.is-here { background: var(--app-surface1); box-shadow: inset 2px 0 0 var(--app-accent); font-weight: 500; }
 .ot-row.is-off { color: var(--app-fg-xmuted); }
