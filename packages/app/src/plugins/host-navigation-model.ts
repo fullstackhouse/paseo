@@ -7,7 +7,11 @@ import type { InstalledPlugin } from "./types";
 
 interface HostNavigationOwner {
   browserAvailable: boolean;
-  openAgent(input: { serverId: string; agentId: string }): void;
+  openAgent(input: {
+    serverId: string;
+    agentId: string;
+    timelinePosition?: { epoch: string; seq: number };
+  }): void;
   openWorkspace(input: NavigateToWorkspaceInput): void;
   resolveWorkspace(input: { serverId: string; workspaceId: string }): string | null;
   /** Shows the workspace's Explorer sidebar; the placement opens a tab in it. */
@@ -56,8 +60,14 @@ export function createPluginHostNavigation(
       owner.openScreen({ serverId: plugin.serverId, pluginId: plugin.id, screenId, params });
     },
     hasPluginScreen: (input) => findScreen(input) !== null,
-    openAgent: ({ agentId, serverId: targetServerId }) =>
-      owner.openAgent({ serverId: targetServerId ?? serverId, agentId }),
+    openAgent: ({ agentId, serverId: targetServerId, timelinePosition }) =>
+      owner.openAgent({
+        serverId: targetServerId ?? serverId,
+        agentId,
+        ...(timelinePosition
+          ? { timelinePosition: { epoch: timelinePosition.epoch, seq: timelinePosition.seq } }
+          : {}),
+      }),
     openWorkspace: ({ workspaceId, serverId: targetServerId }) =>
       owner.openWorkspace({ serverId: targetServerId ?? serverId, workspaceId }),
     openBrowser: owner.browserAvailable

@@ -76,6 +76,8 @@ import { resolveStreamRenderStrategy } from "./strategy-resolver";
 import { type StreamSegmentRenderers, type StreamViewportHandle } from "./strategy";
 import { ChatOutlineRail } from "@/agent-stream/chat-outline/rail";
 import { useChatOutline } from "@/agent-stream/chat-outline/use-chat-outline";
+import { useTimelineJump } from "@/agent-stream/timeline-jump/use-timeline-jump";
+import { useRequestedTimelineJump } from "@/agent-stream/timeline-jump/pending";
 import { getHostRuntimeStore } from "@/runtime/host-runtime";
 import { planTimelineTailFetch } from "@/timeline/timeline-sync-plan";
 import {
@@ -632,18 +634,6 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
           mountedHistoryMessageIds.has(messageId) || liveHeadMessageIds.has(messageId),
       };
     }, [baseRenderModel.segments.liveHead, mountedHistoryMessageIds]);
-    const chatOutline = useChatOutline({
-      agentId,
-      serverId: resolvedServerId,
-      timelineEpoch,
-      tail: effectiveStreamItems,
-      head: effectiveStreamHead,
-      enabled: supportsChatOutline && chatOutlineEnabled,
-      viewportRef,
-      onJumpError: handleTimelineHistoryLoadError,
-      mountedHistoryMessageIds,
-      revealLoadedMessage: revealLoadedHistory,
-    });
 
     useImperativeHandle(
       ref,
@@ -713,6 +703,33 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
         return true;
       }
       return revealLoadedHistory(messageId);
+    });
+    const { jumpToSeq } = useTimelineJump({
+      agentId,
+      serverId: resolvedServerId,
+      timelineEpoch,
+      tail: effectiveStreamItems,
+      head: effectiveStreamHead,
+      viewportRef,
+      onJumpError: handleTimelineHistoryLoadError,
+      mountedHistoryMessageIds,
+      revealLoadedMessage,
+    });
+    const chatOutline = useChatOutline({
+      agentId,
+      serverId: resolvedServerId,
+      timelineEpoch,
+      tail: effectiveStreamItems,
+      head: effectiveStreamHead,
+      enabled: supportsChatOutline && chatOutlineEnabled,
+      jumpToSeq,
+    });
+    useRequestedTimelineJump({
+      serverId: resolvedServerId,
+      agentId,
+      timelineEpoch,
+      ready: isAuthoritativeHistoryReady,
+      jumpToSeq,
     });
     // Read through stable events so a collapse rerun does not change the renderer identity;
     // rows whose turn state changed are revised through `historyRowRevision`.

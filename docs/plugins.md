@@ -451,6 +451,12 @@ existing agent-context instances, but it cannot create an agent panel without an
 Command Center callbacks use the selected host's existing `PaseoApi` for normal Paseo operations.
 They use typed plugin RPC only for plugin-specific backend work. Surface and panel navigation
 belongs to the app; plugins do not receive Expo Router or workspace-layout store access.
+`openAgent`'s `timelinePosition` is parked per agent in `agent-stream/timeline-jump/pending.ts`
+before navigating, so a chat that is already open (in the Explorer, say) jumps too; the chat view
+consumes it once its epoch is served. The jump shares the Chat outline's code
+(`useTimelineJump`). A stream item carries the seq its row ended at, so a multi-seq entry (a tool
+call's lifecycle) matches the first item at or after its `seqStart`, and only where the timeline
+around that seq is loaded.
 See the public [navigation fields](../public-docs/plugins/reference.md#screens-and-sidebar-items)
 and [external links and workspace browsers](../public-docs/plugins/reference.md#external-links-and-workspace-browsers)
 for the author-facing contract.

@@ -4,6 +4,7 @@ import { resolveWorkspaceMapKeyByIdentity } from "@/utils/workspace-identity";
 import { useMemo } from "react";
 import { navigateToWorkspace } from "@/stores/navigation-active-workspace-store";
 import { navigateToAgent } from "@/utils/navigate-to-agent";
+import { requestTimelineJump } from "@/agent-stream/timeline-jump/pending";
 
 import { getIsElectron } from "@/constants/platform";
 import { createWorkspaceBrowser } from "@/desktop/browser/store";
@@ -20,7 +21,11 @@ export function usePluginHostNavigation(
     () =>
       createPluginHostNavigation(serverId, {
         browserAvailable: getIsElectron(),
-        openAgent: navigateToAgent,
+        openAgent: ({ serverId: targetServerId, agentId, timelinePosition }) => {
+          // Set before navigating so a chat that is already open picks it up too.
+          if (timelinePosition) requestTimelineJump(targetServerId, agentId, timelinePosition);
+          navigateToAgent({ serverId: targetServerId, agentId });
+        },
         openWorkspace: navigateToWorkspace,
         createBrowser: createWorkspaceBrowser,
         findPlugin: ({ serverId: targetServerId, pluginId }) =>
