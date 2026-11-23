@@ -1337,6 +1337,45 @@ the modal. Dismissal calls `onOpenChange(false)`; the plugin must update `open` 
 Modal children keep the plugin runtime context. `usePaseo`, `useRpc`, `useWorkspace`, and
 `useAgent` work inside them.
 
+### Menu
+
+`Menu` is Paseo's own menu behind a trigger the host draws. Wide layouts open a popover anchored to
+the trigger; compact layouts open a bottom sheet, or the same popover with
+`compactMode="popover"`.
+
+```tsx
+import { Menu } from "@getpaseo/plugin/client/ui";
+
+<Menu
+  trigger={{ icon: "Ellipsis", accessibilityLabel: "Ask actions" }}
+  items={[
+    { id: "done", label: "Mark done", icon: "Check", onSelect: markDone },
+    { id: "chat", label: "Open chat", icon: "MessageSquare", onSelect: openChat },
+    { id: "drop-divider", separator: true },
+    { id: "drop", label: "Drop ask", icon: "Trash2", destructive: true, onSelect: dropAsk },
+  ]}
+/>;
+```
+
+| Prop          | Type                                                           | Default   | Behavior                                                                         |
+| ------------- | -------------------------------------------------------------- | --------- | -------------------------------------------------------------------------------- |
+| `items`       | `readonly MenuEntry[]`                                         | Required  | Rows and separators, in order.                                                   |
+| `trigger`     | `{ icon: string; accessibilityLabel: string; label?: string }` | Required  | A quiet icon button. With `label`, the label is drawn beside the icon.           |
+| `compactMode` | `"sheet" \| "popover"`                                         | `"sheet"` | Presentation on compact layouts. The sheet's title is `label` or the a11y label. |
+| `disabled`    | `boolean`                                                      | `false`   | The trigger does not open the menu.                                              |
+| `testID`      | `string`                                                       | —         | Set on the trigger. Each row gets `${testID}-${id}`.                             |
+
+A row is `{ id, label, icon?, destructive?, disabled?, onSelect }`; `icon` is a Lucide name and
+`destructive` draws the row in the destructive tone. A separator is `{ id, separator: true }`.
+Paseo drops leading, trailing and consecutive separators, so build the list from conditions without
+tidying it. IDs must be unique within the menu.
+
+Choosing a row closes the menu, then calls `onSelect`. On iOS the call comes a beat after the press,
+once the menu has gone; don't add a delay of your own.
+
+Hosts older than this export leave `Menu` undefined. Check `Menu !== undefined` and render your own
+fallback, such as separate buttons, when it is missing.
+
 ### Scrolling
 
 Import `ScrollView` and `FlatList` from `@getpaseo/plugin/client/ui` when content can appear in a

@@ -4,6 +4,8 @@ One engine, in `packages/app/src/components/ui/menu/`. `dropdown-menu.tsx` and `
 are wrappers over it and differ only in what opens them — a press, or a long press / right click.
 Import the `DropdownMenu*` or `ContextMenu*` names as before; reach for `@/components/ui/menu`
 directly only when you are building a third trigger shape.
+Plugins reach the engine through the kit's `Menu` (`packages/app/src/plugins/react-native/menu.tsx`),
+which takes rows as data and draws its own trigger.
 
 Do not add a third menu implementation. The two that existed were byte-identical from
 `computePosition` down, and the copies drifted: only one of them ever grew a sheet.

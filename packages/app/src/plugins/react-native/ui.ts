@@ -22,6 +22,7 @@ export { SettingsGroup } from "@/components/settings";
 
 export { Icon } from "../icons";
 export { Action, Combobox, Select, Toggle } from "./composer-controls";
+export { Menu } from "./menu";
 export { Modal } from "./modal";
 export { ScrollView, FlatList } from "./scroll-view";
 export { TextInput } from "./text-input";

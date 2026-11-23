@@ -1014,6 +1014,38 @@ import { Markdown } from "@getpaseo/plugin/client/ui";
 
 弹窗的子元素保留插件的运行时 context。`usePaseo`、`useRpc`、`useWorkspace` 和 `useAgent` 在其中都可以使用。
 
+### Menu {#menu}
+
+`Menu` 是 Paseo 自己的菜单，触发按钮由宿主绘制。宽布局中打开锚定在触发按钮上的弹出菜单；紧凑布局中打开底部面板，设置 `compactMode="popover"` 时则打开同样的弹出菜单。
+
+```tsx
+import { Menu } from "@getpaseo/plugin/client/ui";
+
+<Menu
+  trigger={{ icon: "Ellipsis", accessibilityLabel: "Ask actions" }}
+  items={[
+    { id: "done", label: "Mark done", icon: "Check", onSelect: markDone },
+    { id: "chat", label: "Open chat", icon: "MessageSquare", onSelect: openChat },
+    { id: "drop-divider", separator: true },
+    { id: "drop", label: "Drop ask", icon: "Trash2", destructive: true, onSelect: dropAsk },
+  ]}
+/>;
+```
+
+| 属性          | 类型                                                           | 默认值    | 行为                                                          |
+| ------------- | -------------------------------------------------------------- | --------- | ------------------------------------------------------------- |
+| `items`       | `readonly MenuEntry[]`                                         | 必填      | 按顺序排列的行和分隔线。                                      |
+| `trigger`     | `{ icon: string; accessibilityLabel: string; label?: string }` | 必填      | 低调的图标按钮。设置 `label` 时，标签显示在图标旁边。         |
+| `compactMode` | `"sheet" \| "popover"`                                         | `"sheet"` | 紧凑布局中的呈现方式。底部面板的标题为 `label` 或无障碍标签。 |
+| `disabled`    | `boolean`                                                      | `false`   | 触发按钮不会打开菜单。                                        |
+| `testID`      | `string`                                                       | —         | 设置在触发按钮上。每一行为 `${testID}-${id}`。                |
+
+一行为 `{ id, label, icon?, destructive?, disabled?, onSelect }`；`icon` 是 Lucide 名称，`destructive` 以危险色调绘制该行。分隔线为 `{ id, separator: true }`。Paseo 会去掉开头、结尾和连续的分隔线，因此可以直接按条件构建列表而无需整理。ID 在菜单内必须唯一。
+
+选择一行会先关闭菜单，再调用 `onSelect`。在 iOS 上，调用会在按下后稍晚一点、菜单消失后才发生；不要再自行添加延迟。
+
+早于此导出的主机上 `Menu` 为 undefined。请检查 `Menu !== undefined`，缺失时渲染你自己的替代方案，例如单独的按钮。
+
 ### 滚动 {#scrolling}
 
 当内容可能出现在 Paseo 弹窗中时，请从 `@getpaseo/plugin/client/ui` 导入 `ScrollView` 和 `FlatList`。它们接受 React Native 的属性和 ref，并与底部面板的手势集成。在底部面板之外，它们使用普通的 React Native 滚动。不要直接导入底部面板库。
