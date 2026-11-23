@@ -10588,3 +10588,85 @@ test("workspace.group.set.request moves a workspace to a group and clears the mo
     error: "Workspace not found",
   });
 });
+
+test("workspace.appearance.set.request marks a workspace, rejects a bad avatar and clears", async () => {
+  const emitted: SessionOutboundMessage[] = [];
+  const session = asTestSession(
+    createSessionForWorkspaceTests({ onMessage: (message) => emitted.push(message) }),
+  );
+  const workspace = createPersistedWorkspaceRecord({
+    workspaceId: "ws-1",
+    projectId: "proj-1",
+    cwd: REPO_CWD,
+    kind: "local_checkout",
+    displayName: "main",
+    createdAt: "2026-03-01T12:00:00.000Z",
+    updatedAt: "2026-03-01T12:00:00.000Z",
+  });
+  const workspaces = new Map([[workspace.workspaceId, workspace]]);
+  session.workspaceRegistry.list = async () => Array.from(workspaces.values());
+  session.workspaceRegistry.update = async (id, updater) => {
+    const existing = workspaces.get(id);
+    if (!existing) return null;
+    const updated = updater(existing);
+    workspaces.set(id, updated);
+    return updated;
+  };
+  await session.handleMessage({
+    type: "fetch_workspaces_request",
+    requestId: "sub-workspaces",
+    subscribe: { subscriptionId: "sub-workspaces" },
+  });
+  const onePixelPng =
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+
+  await session.handleMessage({
+    type: "workspace.appearance.set.request",
+    workspaceId: "ws-1",
+    avatar: onePixelPng,
+    titleIcon: "Inbox",
+    requestId: "req-mark",
+  });
+
+  const appearance = { avatar: { data: onePixelPng, mimeType: "image/png" }, titleIcon: "Inbox" };
+  expect(findByType(emitted, "workspace.appearance.set.response")?.payload).toEqual({
+    requestId: "req-mark",
+    workspaceId: "ws-1",
+    accepted: true,
+    appearance,
+    error: null,
+  });
+  expect(workspaces.get("ws-1")?.appearance).toEqual(appearance);
+  expect(findByType(emitted, "workspace_update")?.payload).toMatchObject({
+    kind: "upsert",
+    workspace: { id: "ws-1", appearance },
+  });
+
+  emitted.length = 0;
+  await session.handleMessage({
+    type: "workspace.appearance.set.request",
+    workspaceId: "ws-1",
+    avatar: Buffer.from("not an image").toString("base64"),
+    titleIcon: "Inbox",
+    requestId: "req-bad",
+  });
+  expect(findByType(emitted, "workspace.appearance.set.response")?.payload).toMatchObject({
+    accepted: false,
+    error: "Avatar must be a PNG, JPEG, GIF or WebP image",
+  });
+  expect(workspaces.get("ws-1")?.appearance).toEqual(appearance);
+
+  emitted.length = 0;
+  await session.handleMessage({
+    type: "workspace.appearance.set.request",
+    workspaceId: "ws-1",
+    avatar: null,
+    titleIcon: null,
+    requestId: "req-clear",
+  });
+  expect(findByType(emitted, "workspace.appearance.set.response")?.payload).toMatchObject({
+    accepted: true,
+    appearance: null,
+  });
+  expect(workspaces.get("ws-1")?.appearance).toBeNull();
+});
