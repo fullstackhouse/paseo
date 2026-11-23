@@ -5,7 +5,7 @@ afterEach(() => {
   useHistoryViewStore.setState({ view: "agents" });
 });
 
-it("keeps the chosen History tab outside the screen, so Back finds it again", () => {
+it("remembers the chosen History tab outside the screen component", () => {
   expect(useHistoryViewStore.getState().view).toBe("agents");
   useHistoryViewStore.getState().setView("archived");
   expect(useHistoryViewStore.getState().view).toBe("archived");
