@@ -346,8 +346,9 @@ function dotColorStyle(bucket: Exclude<SidebarStateBucket, "running">) {
     case "attention":
       return styles.dotAttention;
     case "done":
-    case "blocked":
       return styles.dotDone;
+    case "blocked":
+      return styles.dotBlocked;
   }
 }
 
@@ -424,5 +425,6 @@ const styles = StyleSheet.create((theme) => {
     dotFailed: statusDot("failed"),
     dotAttention: statusDot("attention"),
     dotDone: statusDot("done"),
+    dotBlocked: statusDot("blocked"),
   };
 });
