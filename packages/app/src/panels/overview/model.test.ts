@@ -13,6 +13,9 @@ import {
   permissionResponse,
   permissionSubject,
   derivePullRequests,
+  findBlocking,
+  isTreeBlocker,
+  orderChildren,
   deriveWorkspaceStateWord,
   deriveYourMove,
   isStatusDone,
@@ -500,5 +503,54 @@ describe("Blocked by", () => {
       url: "https://x.test/pull/1",
     });
     expect(blockerTarget({ kind: "person", label: "Mo" })).toBeNull();
+  });
+});
+
+describe("Tree", () => {
+  it("sends workspace and agent blockers to the Tree, the rest to Waiting on", () => {
+    expect(isTreeBlocker({ kind: "workspace", label: "w" })).toBe(true);
+    expect(isTreeBlocker({ kind: "agent", label: "a" })).toBe(true);
+    expect(isTreeBlocker({ kind: "pr", label: "#1" })).toBe(false);
+    expect(isTreeBlocker({ kind: "person", label: "Mo" })).toBe(false);
+  });
+
+  it("orders children needing you first, then newest first", () => {
+    const words = { a: "done", b: "waiting", c: "working", d: "failed" } as const;
+    expect(orderChildren(["a", "b", "c", "d"], (id) => words[id as keyof typeof words])).toEqual([
+      "d",
+      "b",
+      "c",
+      "a",
+    ]);
+  });
+
+  it("finds the workspaces whose blocked status names this workspace or its agents", () => {
+    const blocked = (workspaceId: string, blockedBy: object[], patch: object = {}) =>
+      summaryItem({
+        workspaceId,
+        status: { state: "blocked", summary: "s", updatedAt: 1, blockedBy, ...patch } as never,
+      });
+    const items = [
+      blocked("w-docs", [{ kind: "workspace", label: "Here", workspaceId: "W-HERE" }]),
+      blocked("w-fix", [{ kind: "agent", label: "Impl", agentId: "agent-here" }]),
+      blocked("w-other", [{ kind: "workspace", label: "Else", workspaceId: "w-else" }]),
+      blocked("w-answered", [{ kind: "workspace", label: "Here", workspaceId: "w-here" }], {
+        answered: true,
+      }),
+      blocked("w-here", [{ kind: "workspace", label: "Self", workspaceId: "w-here" }]),
+      summaryItem({ serverId: "other", workspaceId: "w-x", status: undefined }),
+    ];
+    expect(
+      findBlocking({
+        items,
+        serverId: "s",
+        workspaceId: "w-here",
+        agentIdsHere: new Set(["agent-here"]),
+        normalize: (id) => id.toLowerCase(),
+      }),
+    ).toEqual([
+      { serverId: "s", workspaceId: "w-docs" },
+      { serverId: "s", workspaceId: "w-fix" },
+    ]);
   });
 });
