@@ -1,7 +1,8 @@
-import { resolve } from "node:path";
+import { basename, resolve } from "node:path";
 import type pino from "pino";
 import type {
   AgentSnapshotPayload,
+  ArchivedWorkspaceEntry,
   SessionInboundMessage,
   SessionOutboundMessage,
   WorkspaceDescriptorPayload,
@@ -12,15 +13,19 @@ import {
   type WorkspaceStateBucket,
 } from "@getpaseo/protocol/agent-state-bucket";
 import { getParentAgentIdFromLabels } from "@getpaseo/protocol/agent-labels";
+import { RECALL_MATCH_OPTIONS, scoreTextFields } from "@getpaseo/protocol/search/text-match";
 import { SortablePager } from "./pagination/sortable-pager.js";
 import type { PersistedProjectRecord, PersistedWorkspaceRecord } from "./workspace-registry.js";
-import { resolveProjectDisplayName } from "./workspace-registry.js";
+import { resolveProjectDisplayName, resolveWorkspaceDisplayName } from "./workspace-registry.js";
 import {
   deriveTerminalActivityStatusBucket,
   type TerminalActivity,
 } from "@getpaseo/protocol/terminal-activity";
 import type { ProviderSubagentDescriptor } from "./agent/provider-subagents/store.js";
 import type { AgentBackgroundWorkActivity } from "./agent/background-work/store.js";
+
+const ARCHIVED_WORKSPACES_DEFAULT_LIMIT = 200;
+const ARCHIVED_WORKSPACES_MAX_LIMIT = 500;
 
 const FETCH_WORKSPACES_SORT_KEYS = [
   "status_priority",
@@ -621,6 +626,53 @@ export class WorkspaceDirectory {
         // The app replaces its project with this descriptor; omitting it would clear the setup.
         projectLastAgentSetup: project.lastAgentSetup ?? undefined,
       }));
+  }
+
+  // Archived workspaces the user can browse and recover, newest first. Background
+  // workspaces stay hidden here as they are everywhere else in discovery. Archives only
+  // grow, so the daemon searches the whole set and returns at most `limit` of the matches.
+  async listArchived(options: { search?: string; limit?: number } = {}): Promise<{
+    workspaces: ArchivedWorkspaceEntry[];
+    truncated: boolean;
+  }> {
+    const [workspaces, projects] = await Promise.all([
+      this.deps.workspaceRegistry.list(),
+      this.deps.projectRegistry.list(),
+    ]);
+    const projectsById = new Map(projects.map((project) => [project.projectId, project]));
+    const query = options.search?.trim() ?? "";
+    const limit = Math.min(
+      options.limit ?? ARCHIVED_WORKSPACES_DEFAULT_LIMIT,
+      ARCHIVED_WORKSPACES_MAX_LIMIT,
+    );
+    const matches: ArchivedWorkspaceEntry[] = [];
+    for (const workspace of workspaces) {
+      if (!workspace.archivedAt || workspace.background) continue;
+      const project = projectsById.get(workspace.projectId);
+      const entry: ArchivedWorkspaceEntry = {
+        workspaceId: workspace.workspaceId,
+        name: resolveWorkspaceDisplayName(workspace),
+        projectId: workspace.projectId,
+        projectDisplayName: project
+          ? resolveProjectDisplayName(project)
+          : basename(workspace.mainRepoRoot ?? workspace.cwd),
+        branch: workspace.branch,
+        archivedAt: workspace.archivedAt,
+      };
+      if (
+        query &&
+        scoreTextFields(
+          query,
+          [entry.name, entry.projectDisplayName, entry.branch ?? ""],
+          RECALL_MATCH_OPTIONS,
+        ) === null
+      ) {
+        continue;
+      }
+      matches.push(entry);
+    }
+    matches.sort((a, b) => b.archivedAt.localeCompare(a.archivedAt));
+    return { workspaces: matches.slice(0, limit), truncated: matches.length > limit };
   }
 
   async listObservationTargets(): Promise<

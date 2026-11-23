@@ -115,3 +115,20 @@ export function resolveArchivedPreviewAgentId(
   if (state.kind !== "archived" && state.kind !== "recoveryUnavailable") return null;
   return pendingOpenTarget.agentId;
 }
+
+/**
+ * Only an explicit open (a History agent row, an archived workspace row, or a paseo:// link) asks
+ * the host about recovery; any other route to a missing workspace stays "missing".
+ */
+export function shouldInspectWorkspaceRecovery(
+  hasHydratedWorkspaces: boolean,
+  workspace: WorkspaceDescriptor | null,
+  pendingOpenTarget: WorkspaceTabTarget | null,
+  requestedFromLink = false,
+): boolean {
+  const explicit =
+    pendingOpenTarget?.kind === "agent" ||
+    pendingOpenTarget?.kind === "overview" ||
+    requestedFromLink;
+  return explicit && hasHydratedWorkspaces && workspace === null;
+}

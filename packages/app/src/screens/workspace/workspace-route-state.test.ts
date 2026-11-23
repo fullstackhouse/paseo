@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { WorkspaceDescriptor } from "@/stores/session-store";
 import type { WorkspaceRecoveryModel } from "@/workspace-recovery/model";
-import { resolveArchivedPreviewAgentId, resolveWorkspaceRouteState } from "./workspace-route-state";
+import {
+  resolveArchivedPreviewAgentId,
+  resolveWorkspaceRouteState,
+  shouldInspectWorkspaceRecovery,
+} from "./workspace-route-state";
 
 function createWorkspaceDescriptor(): WorkspaceDescriptor {
   return {
@@ -226,5 +230,26 @@ describe("resolveArchivedPreviewAgentId", () => {
         agent,
       ),
     ).toBeNull();
+  });
+});
+
+describe("shouldInspectWorkspaceRecovery", () => {
+  it("inspects a missing workspace opened from an archived workspace row", () => {
+    expect(shouldInspectWorkspaceRecovery(true, null, { kind: "overview" })).toBe(true);
+    expect(shouldInspectWorkspaceRecovery(true, null, { kind: "agent", agentId: "a" })).toBe(true);
+    // A paseo:// link to an archived workspace asks too, with no tab to open.
+    expect(shouldInspectWorkspaceRecovery(true, null, null, true)).toBe(true);
+  });
+
+  it("leaves other opens, a live workspace and an unhydrated host alone", () => {
+    expect(shouldInspectWorkspaceRecovery(true, null, null)).toBe(false);
+    // A just-created workspace opening on a terminal or file has not arrived yet; it is not archived.
+    expect(shouldInspectWorkspaceRecovery(true, null, { kind: "terminal", terminalId: "t" })).toBe(
+      false,
+    );
+    expect(
+      shouldInspectWorkspaceRecovery(true, createWorkspaceDescriptor(), { kind: "overview" }),
+    ).toBe(false);
+    expect(shouldInspectWorkspaceRecovery(false, null, { kind: "overview" })).toBe(false);
   });
 });

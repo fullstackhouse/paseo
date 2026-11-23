@@ -274,9 +274,12 @@ Cascade is what keeps subagent fleets from outliving their orchestrator.
 Workspace archive is a separate lifecycle. Archiving or removing a worktree can close a surviving
 agent record without setting the agent's `archivedAt`, while its `workspaceId` still points at the
 archived workspace. History navigation must not infer workspace lifecycle from `agent.archivedAt`
-or mutate either lifecycle. The workspace route asks the daemon for authoritative recovery state;
-only the route's explicit Unarchive, Restore or Recreate empty folder action changes the archived
-workspace. Restore rebuilds a worktree from git: its saved branch, or a new branch of that name from
+or mutate either lifecycle. The workspace route asks the daemon for authoritative recovery state
+only when it was opened explicitly: a History agent row, a row in History's **Archived
+workspaces** view (which opens on Overview), or a `paseo://` workspace link. Any other route to a
+missing workspace shows it as missing. Only the route's explicit Unarchive, Restore or Recreate empty folder action changes
+the archived workspace. The Archived workspaces list comes from `workspace.archived.list`, gated on
+`server_info.features.archivedWorkspaces`; background workspaces stay out of it. Restore rebuilds a worktree from git: its saved branch, or a new branch of that name from
 the base when git proves the branch is gone (no local branch, and origin reports none; a leftover
 origin tracking ref doesn't count). A fetch that fails offline is not proof, so restore keeps the saved branch and shows
 the error. When a plain folder is missing, the daemon offers Recreate empty folder as a separate

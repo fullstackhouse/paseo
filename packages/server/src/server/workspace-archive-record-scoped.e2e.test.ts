@@ -257,6 +257,29 @@ test("archiving a workspace removes it from every subscribed client", async () =
   }
 });
 
+test("an archived workspace is listed for recovery until it is unarchived", async () => {
+  const keptId = await createLocalWorkspace(makeTempDir("workspace-archive-kept-"), "kept");
+  const archivedId = await createLocalWorkspace(
+    makeTempDir("workspace-archive-listed-"),
+    "listed workspace",
+  );
+
+  expect(await ctx.client.listArchivedWorkspaces()).toEqual({ workspaces: [], truncated: false });
+
+  const archive = await ctx.client.archiveWorkspace(archivedId);
+  expect(archive.error).toBe(null);
+
+  const { workspaces: archived } = await ctx.client.listArchivedWorkspaces();
+  expect(archived.map((entry) => [entry.workspaceId, entry.name])).toEqual([
+    [archivedId, "listed workspace"],
+  ]);
+  expect(archived[0]?.archivedAt).toEqual(expect.any(String));
+  expect(archived.some((entry) => entry.workspaceId === keptId)).toBe(false);
+
+  await ctx.client.restoreWorkspace(archivedId);
+  expect(await ctx.client.listArchivedWorkspaces()).toEqual({ workspaces: [], truncated: false });
+});
+
 test("renaming a workspace updates every subscribed client", async () => {
   const cwd = makeTempDir("workspace-rename-global-");
   const workspaceId = await createLocalWorkspace(cwd, "shared workspace");

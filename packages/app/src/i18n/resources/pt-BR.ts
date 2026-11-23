@@ -306,6 +306,21 @@ export const ptBR: TranslationResources = {
     tooManyMatches: "Muitos resultados — refine a busca",
     hostLoadFailed: "{{host}}: Não foi possível carregar o histórico",
     searchPlaceholder: "Buscar no histórico",
+    views: {
+      agents: "Agentes",
+      archivedWorkspaces: "Workspaces arquivados",
+    },
+    archived: {
+      empty: "Nenhum workspace arquivado",
+      noMatches: "Nenhum workspace arquivado corresponde",
+      searchPlaceholder: "Buscar workspaces arquivados",
+      loadFailed: "Não foi possível carregar os workspaces arquivados",
+      retry: "Tentar novamente",
+      hostLoadFailed: "{{host}}: Não foi possível carregar os workspaces arquivados",
+      needsUpdate: "{{host}}: Atualize este host para ver os workspaces arquivados",
+      truncated:
+        "Mostrando os {{count}} arquivados mais recentes de cada host. Pesquise para encontrar os mais antigos.",
+    },
     actions: {
       loadMore: "Carregar mais",
       clearSearch: "Limpar busca",

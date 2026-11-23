@@ -299,6 +299,21 @@ export const en = {
     tooManyMatches: "Too many matches — narrow your search",
     hostLoadFailed: "{{host}}: Could not load history",
     searchPlaceholder: "Search history",
+    views: {
+      agents: "Agents",
+      archivedWorkspaces: "Archived workspaces",
+    },
+    archived: {
+      empty: "No archived workspaces",
+      noMatches: "No archived workspaces match",
+      searchPlaceholder: "Search archived workspaces",
+      loadFailed: "Unable to load archived workspaces",
+      retry: "Try again",
+      hostLoadFailed: "{{host}}: Could not load archived workspaces",
+      needsUpdate: "{{host}}: Update this host to see its archived workspaces",
+      truncated:
+        "Showing the {{count}} most recently archived on each host. Search to find older ones.",
+    },
     actions: {
       loadMore: "Load more",
       clearSearch: "Clear search",
