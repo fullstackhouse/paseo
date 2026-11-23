@@ -15,6 +15,17 @@ export const ko: TranslationResources = {
     more: "외 {{count}}개",
     resumeAll: "모두 재개",
   },
+  failedAgents: {
+    title_one: "에이전트 {{count}}개가 실패했습니다",
+    title_other: "에이전트 {{count}}개가 실패했습니다",
+    description: "네트워크 또는 API 오류로 중단되었습니다: {{names}}",
+    pill: "실패",
+    panelTitle: "턴이 실패했습니다",
+    retryAll: "모두 다시 시도",
+    retryAllAction: "실패한 에이전트 다시 시도 ({{count}})",
+    retry: "다시 시도",
+    retryAccessibilityLabel: "실패한 턴 다시 시도",
+  },
   paneFind: {
     connectionFailure: "이 채팅을 검색할 수 없습니다. 호스트 연결을 확인하고 다시 시도하세요.",
     historyChangedFailure: "검색 중에 채팅이 변경되었습니다. 다시 검색하세요.",

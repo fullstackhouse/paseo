@@ -357,6 +357,29 @@ describe("MockLoadTestAgentClient", () => {
     });
   });
 
+  test("fails the turn with the error text given after the failure request", async () => {
+    vi.useFakeTimers();
+    const client = new MockLoadTestAgentClient();
+    const session = await client.createSession({
+      provider: "mock",
+      cwd: process.cwd(),
+      model: "ten-second-stream",
+    });
+    const events: AgentStreamEvent[] = [];
+    const unsubscribe = session.subscribe((event) => events.push(event));
+
+    await session.startTurn(
+      "Emit a synthetic turn failure: API Error: Can't reach the API server (ENOTFOUND)",
+    );
+    await vi.advanceTimersByTimeAsync(0);
+    unsubscribe();
+
+    expect(events.at(-1)).toMatchObject({
+      type: "turn_failed",
+      error: "API Error: Can't reach the API server (ENOTFOUND)",
+    });
+  });
+
   test("emits turn_started before the submitted user message", async () => {
     vi.useFakeTimers();
     const client = new MockLoadTestAgentClient();

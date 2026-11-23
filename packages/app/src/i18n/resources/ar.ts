@@ -15,6 +15,17 @@ export const ar: TranslationResources = {
     more: "+{{count}} آخرين",
     resumeAll: "استئناف الكل",
   },
+  failedAgents: {
+    title_one: "فشل {{count}} وكيل",
+    title_other: "فشل {{count}} وكلاء",
+    description: "توقف دورهم بسبب خطأ في الشبكة أو الواجهة البرمجية: {{names}}",
+    pill: "فشل",
+    panelTitle: "فشل الدور",
+    retryAll: "إعادة محاولة الكل",
+    retryAllAction: "إعادة محاولة الوكلاء الفاشلين ({{count}})",
+    retry: "إعادة المحاولة",
+    retryAccessibilityLabel: "إعادة محاولة الدور الفاشل",
+  },
   paneFind: {
     connectionFailure: "تعذر البحث في هذه المحادثة. تحقق من الاتصال بالمضيف وأعد المحاولة.",
     historyChangedFailure: "تغيّرت المحادثة أثناء البحث. أعد البحث.",

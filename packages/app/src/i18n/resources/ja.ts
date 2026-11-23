@@ -15,6 +15,17 @@ export const ja: TranslationResources = {
     more: "他 {{count}} 件",
     resumeAll: "すべて再開",
   },
+  failedAgents: {
+    title_one: "{{count}} 件のエージェントが失敗しました",
+    title_other: "{{count}} 件のエージェントが失敗しました",
+    description: "ネットワークまたは API のエラーで停止しました: {{names}}",
+    pill: "失敗",
+    panelTitle: "ターンが失敗しました",
+    retryAll: "すべて再試行",
+    retryAllAction: "失敗したエージェントを再試行 ({{count}})",
+    retry: "再試行",
+    retryAccessibilityLabel: "失敗したターンを再試行",
+  },
   paneFind: {
     connectionFailure:
       "このチャットを検索できませんでした。ホストへの接続を確認して再試行してください。",

@@ -262,8 +262,15 @@ function shouldEmitPlanApprovalPrompt(prompt: AgentPromptInput): boolean {
   return /emit\s+(?:a\s+)?synthetic\s+plan\s+approval/i.test(promptToText(prompt));
 }
 
-function shouldEmitTurnFailure(prompt: AgentPromptInput): boolean {
-  return /emit\s+(?:a\s+)?synthetic\s+turn\s+failure/i.test(promptToText(prompt));
+const DEFAULT_TURN_FAILURE_MESSAGE = "Requested mock provider failure";
+
+/** "Emit a synthetic turn failure[: <provider error text>]" fails the turn with that text. */
+function parseTurnFailureMessage(prompt: AgentPromptInput): string | null {
+  const match = /emit\s+(?:a\s+)?synthetic\s+turn\s+failure(?::\s*(.+))?/is.exec(
+    promptToText(prompt),
+  );
+  if (!match) return null;
+  return match[1]?.trim() || DEFAULT_TURN_FAILURE_MESSAGE;
 }
 
 function parseSteeringReplayShape(prompt: AgentPromptInput): SteeringReplayShape | null {
@@ -907,9 +914,10 @@ export class MockLoadTestAgentSession implements AgentSession {
     const structuredBranchName = parseStructuredBranchNamePrompt(prompt);
     const settledAssistantImageMarkdown = parseSettledAssistantImageMarkdown(prompt);
     const steeringReplayShape = parseSteeringReplayShape(prompt);
+    const turnFailureMessage = parseTurnFailureMessage(prompt);
     const scheduleTurn = () => {
-      if (shouldEmitTurnFailure(prompt)) {
-        this.scheduleFailedTurn(turn);
+      if (turnFailureMessage !== null) {
+        this.scheduleFailedTurn(turn, turnFailureMessage);
       } else if (steeringReplayShape) {
         this.scheduleSteeringReplayTurn(turn, steeringReplayShape);
       } else if (this.streamingAssistantResponse !== null) {
@@ -1199,7 +1207,7 @@ export class MockLoadTestAgentSession implements AgentSession {
     turn.timer.unref?.();
   }
 
-  private scheduleFailedTurn(turn: ActiveTurn): void {
+  private scheduleFailedTurn(turn: ActiveTurn, error: string): void {
     turn.timer = setTimeout(() => {
       if (this.activeTurn !== turn) {
         return;
@@ -1211,7 +1219,7 @@ export class MockLoadTestAgentSession implements AgentSession {
         type: "turn_failed",
         provider: this.provider,
         turnId: turn.turnId,
-        error: "Requested mock provider failure",
+        error,
       });
       turn.resolve({
         sessionId: this.id,
