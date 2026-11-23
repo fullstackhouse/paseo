@@ -651,7 +651,7 @@ it.each(["collapseToolCalls", "collapseTurns"] as const)(
       ],
     });
     // Both the original partial group and its replacement resolve directly to the turn.
-    expect(folded.readingRowReplacements.get(calls[1]!.id)).toBe("prompt");
+    expect(folded.readingRowReplacements.get(calls[1]!.id)).toEqual({ id: "prompt", folds: true });
     expect(anchor.getRowId(folded.readingRowReplacements)).toBe("prompt");
     const opened = present({ ...input, tail: calls, display: "full" });
     expect(opened.readingRowReplacements.get(calls[1]!.id)).toBeUndefined();
