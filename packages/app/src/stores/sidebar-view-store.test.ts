@@ -243,7 +243,7 @@ describe("sidebar view store", () => {
     expect(migrateSidebarViewState({ projectFilters: "project-a" })).toEqual({
       workspaceSort: "created",
       showBackground: false,
-      groupMode: "project",
+      groupMode: "status",
       hostFilters: [],
       projectFilters: [],
       labelFilter: { labels: [] },

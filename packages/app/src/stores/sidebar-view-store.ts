@@ -132,7 +132,7 @@ export function migrateSidebarViewState(persistedState: unknown): SidebarViewPer
   if (!result.success) {
     return {
       showBackground: false,
-      groupMode: "project",
+      groupMode: "status",
       workspaceSort: "created",
       hostFilters: [],
       projectFilters: [],
@@ -194,7 +194,7 @@ export const useSidebarViewStore = create<SidebarViewStoreState>()(
   persist(
     (set) => ({
       showBackground: false,
-      groupMode: "project",
+      groupMode: "status",
       workspaceSort: "created",
       hostFilters: [],
       projectFilters: [],
