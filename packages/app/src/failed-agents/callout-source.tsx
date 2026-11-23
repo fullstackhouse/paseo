@@ -78,8 +78,7 @@ export function FailedAgentsCalloutSource() {
         run: retryAll,
         presentation: {
           kind: "action",
-          title: t("failedAgents.title", { count: agents.length }),
-          subtitle: t("failedAgents.retryAll"),
+          title: t("failedAgents.retryAllAction", { count: agents.length }),
           sectionTitle: t("shell.commandCenter.actions"),
           icon: RetryIcon,
         },

@@ -17,6 +17,7 @@ export const ja: TranslationResources = {
     pill: "失敗",
     panelTitle: "ターンが失敗しました",
     retryAll: "すべて再試行",
+    retryAllAction: "失敗したエージェントを再試行 ({{count}})",
     retry: "再試行",
     retryAccessibilityLabel: "失敗したターンを再試行",
   },

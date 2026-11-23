@@ -17,6 +17,7 @@ export const ru: TranslationResources = {
     pill: "Сбой",
     panelTitle: "Ход не удался",
     retryAll: "Повторить все",
+    retryAllAction: "Повторить неудавшихся агентов ({{count}})",
     retry: "Повторить",
     retryAccessibilityLabel: "Повторить неудавшийся ход",
   },

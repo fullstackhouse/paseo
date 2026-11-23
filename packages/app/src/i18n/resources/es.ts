@@ -17,6 +17,7 @@ export const es: TranslationResources = {
     pill: "Falló",
     panelTitle: "El turno falló",
     retryAll: "Reintentar todos",
+    retryAllAction: "Reintentar agentes fallidos ({{count}})",
     retry: "Reintentar",
     retryAccessibilityLabel: "Reintentar el turno fallido",
   },

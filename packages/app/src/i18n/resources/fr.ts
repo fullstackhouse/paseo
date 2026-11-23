@@ -17,6 +17,7 @@ export const fr: TranslationResources = {
     pill: "Échec",
     panelTitle: "Le tour a échoué",
     retryAll: "Tout réessayer",
+    retryAllAction: "Réessayer les agents en échec ({{count}})",
     retry: "Réessayer",
     retryAccessibilityLabel: "Réessayer le tour échoué",
   },

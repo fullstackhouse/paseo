@@ -17,6 +17,7 @@ export const ar: TranslationResources = {
     pill: "فشل",
     panelTitle: "فشل الدور",
     retryAll: "إعادة محاولة الكل",
+    retryAllAction: "إعادة محاولة الوكلاء الفاشلين ({{count}})",
     retry: "إعادة المحاولة",
     retryAccessibilityLabel: "إعادة محاولة الدور الفاشل",
   },

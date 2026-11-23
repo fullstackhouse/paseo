@@ -14,6 +14,7 @@ export const en = {
     pill: "Failed",
     panelTitle: "Turn failed",
     retryAll: "Retry all",
+    retryAllAction: "Retry failed agents ({{count}})",
     retry: "Retry",
     retryAccessibilityLabel: "Retry the failed turn",
   },

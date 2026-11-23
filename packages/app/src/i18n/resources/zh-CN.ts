@@ -17,6 +17,7 @@ export const zhCN: TranslationResources = {
     pill: "失败",
     panelTitle: "回合失败",
     retryAll: "全部重试",
+    retryAllAction: "重试失败的代理 ({{count}})",
     retry: "重试",
     retryAccessibilityLabel: "重试失败的回合",
   },

@@ -17,6 +17,7 @@ export const ko: TranslationResources = {
     pill: "실패",
     panelTitle: "턴이 실패했습니다",
     retryAll: "모두 다시 시도",
+    retryAllAction: "실패한 에이전트 다시 시도 ({{count}})",
     retry: "다시 시도",
     retryAccessibilityLabel: "실패한 턴 다시 시도",
   },
