@@ -489,3 +489,98 @@
 .sb-frame-desktop { width: 1280px; max-width: 100%; }
 .sb-frame-mobile { width: 390px; max-width: 100%; }
 .frame-bar .sb-frame-label { margin-left: auto; font-size: 0.6875rem; color: var(--muted-foreground); }
+
+/* ── Overview tree and PRs (ot-) — anatomy from overview-v3 and packages/app/src/panels/overview-panel.tsx ── */
+.ot-frame { display: inline-block; vertical-align: top; }
+.ot-win { width: 420px; zoom: var(--ot-scale, 0.8); min-height: 320px; background: var(--app-surface0); color: var(--app-fg); font-family: var(--font-geist-sans); font-size: 14px; line-height: 1.4; }
+.ot-win svg { width: 14px; height: 14px; flex-shrink: 0; }
+.ot-win.ot-mobile { width: 390px; position: relative; min-height: 844px; padding-top: 60px; overflow: hidden; }
+.ot-tabs { display: flex; align-items: center; gap: 2px; padding: 6px; border-bottom: 1px solid var(--app-line); }
+.ot-tab { display: flex; align-items: center; gap: 5px; padding: 5px 7px; border-radius: 6px; font-size: 12px; color: var(--app-fg-muted); white-space: nowrap; }
+.ot-tab svg, .ot-tabs-end svg { width: 13px; height: 13px; }
+.ot-tab.is-on { color: var(--app-fg); background: var(--app-surface1); box-shadow: inset 0 0 0 1px var(--app-accent); }
+.ot-tabs-end { margin-left: auto; display: flex; gap: 8px; color: var(--app-fg-muted); padding-right: 4px; }
+.ot-behind { position: absolute; inset: 0; opacity: 0.35; padding: 16px 24px; display: flex; flex-direction: column; gap: 12px; }
+.ot-behind-head { font-size: 13px; color: var(--app-fg-muted); padding-bottom: 8px; border-bottom: 1px solid var(--app-line); }
+.ot-bub { display: block; height: 44px; border-radius: 8px; background: var(--app-surface1); width: 90%; }
+.ot-bub.w60 { width: 60%; } .ot-bub.w80 { width: 80%; }
+.ot-sheet { position: relative; min-height: 784px; background: var(--app-surface0); border-top: 1px solid var(--app-line); border-radius: 14px 14px 0 0; box-shadow: 0 -8px 24px rgb(0 0 0 / 0.4); }
+.ot-handle { width: 36px; height: 4px; border-radius: 99px; background: var(--app-surface3); margin: 8px auto 4px; }
+.ot-sheet-title { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 500; color: var(--app-fg-muted); padding: 4px 22px 0; }
+
+.ot-ov { display: flex; flex-direction: column; gap: 20px; padding: 18px 18px 24px; }
+.ot-mobile .ot-ov { padding: 14px 20px 24px; }
+.ot-cut { text-align: center; color: var(--app-fg-xmuted); font-size: 14px; letter-spacing: 0.3em; line-height: 1; margin: -6px 0; }
+
+/* tones */
+.ot-t-run { color: color-mix(in srgb, var(--app-accent) 55%, var(--app-fg)); } .ot-t-warn { color: var(--app-warn); } .ot-t-danger { color: var(--app-danger); }
+.ot-t-ok { color: var(--app-ok); } .ot-t-muted { color: var(--app-fg-muted); } .ot-t-merged { color: var(--app-merged); }
+.ot-dim { color: var(--app-fg-xmuted); }
+.ot-chev { color: var(--app-fg-xmuted); display: inline-flex; }
+.ot-push { margin-left: auto; font-weight: 400; }
+
+/* identity and status */
+.ot-id { display: flex; flex-direction: column; gap: 4px; }
+.ot-title { margin: 0; font-size: 17px; line-height: 1.3; font-weight: 600; letter-spacing: -0.01em; }
+.ot-goal { margin: 0; font-size: 13.5px; line-height: 1.45; color: var(--app-fg-muted); }
+.ot-story { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; margin: 0 -4px; border-radius: 10px; background: var(--app-surface1); }
+.ot-state { display: flex; align-items: center; gap: 7px; font-size: 12.5px; font-weight: 600; }
+.ot-dot { width: 8px; height: 8px; border-radius: 99px; background: currentColor; flex-shrink: 0; }
+.ot-dot.is-pulse { box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 25%, transparent); }
+.ot-summary { margin: 0; font-size: 13.5px; line-height: 1.5; }
+.ot-now { margin: 0; font-size: 12.5px; color: var(--app-fg-muted); display: flex; gap: 6px; align-items: baseline; }
+.ot-now b { color: var(--app-fg); font-weight: 500; }
+
+/* sections */
+.ot-sec { display: flex; flex-direction: column; gap: 6px; }
+.ot-sec-title { font-size: 12px; font-weight: 600; letter-spacing: 0.02em; text-transform: uppercase; color: var(--app-fg-muted); display: flex; align-items: center; gap: 6px; }
+.ot-n { min-width: 18px; height: 18px; padding: 0 5px; border-radius: 99px; background: var(--app-surface2); color: var(--app-fg-muted); font-size: 11px; display: inline-grid; place-items: center; text-transform: none; letter-spacing: 0; }
+.ot-n.is-warn { background: var(--app-warn-tint); color: var(--app-warn); }
+.ot-suffix { font-weight: 400; text-transform: none; letter-spacing: 0; color: var(--app-fg-xmuted); }
+
+/* rows (tree, PRs): one line each */
+.ot-grp { display: flex; flex-direction: column; }
+.ot-grp + .ot-grp { margin-top: 8px; }
+.ot-grp-label { font-size: 11px; color: var(--app-fg-xmuted); padding: 2px 8px; }
+.ot-row { display: flex; align-items: center; gap: 8px; min-height: 32px; padding: 4px 8px 4px calc(8px + var(--lv, 0) * 14px); margin: 0 -8px; border-radius: 6px; font-size: 13px; }
+.ot-row:hover { background: var(--app-hl); }
+.ot-row.is-here { background: var(--app-surface1); box-shadow: inset 2px 0 0 var(--app-accent); font-weight: 500; }
+.ot-row.is-off { color: var(--app-fg-xmuted); }
+.ot-row.is-off:hover { background: transparent; }
+.ot-row.is-indent { padding-left: 28px; }
+.ot-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ot-word { flex-shrink: 0; font-size: 12px; white-space: nowrap; }
+.ot-ricon { display: inline-flex; color: var(--app-fg-xmuted); }
+.ot-more { color: var(--app-fg-muted); }
+.ot-pr { flex-shrink: 0; font-family: var(--font-geist-mono); font-size: 12px; color: var(--app-fg-muted); }
+.ot-pr.ot-fix { font-family: inherit; font-size: 13px; color: var(--app-fg); }
+.ot-fold { color: var(--app-fg-muted); }
+.ot-facts { flex-shrink: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.ot-branch { flex: 1; min-width: 0; text-align: right; font-family: var(--font-geist-mono); font-size: 11px; color: var(--app-fg-xmuted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Your move */
+.ot-move { display: flex; flex-direction: column; gap: 8px; }
+.ot-item { border: 1px solid var(--app-line); border-radius: 10px; padding: 12px; display: flex; flex-direction: column; gap: 10px; background: var(--app-surface0); }
+.ot-item.is-lead { border-color: color-mix(in srgb, var(--lead) 55%, var(--app-line)); background: color-mix(in srgb, var(--lead) 7%, var(--app-surface0)); }
+.ot-item-head { display: flex; gap: 10px; align-items: flex-start; }
+.ot-item-icon { width: 26px; height: 26px; border-radius: 7px; display: grid; place-items: center; background: var(--app-surface2); flex-shrink: 0; }
+.ot-item-text { min-width: 0; flex: 1; }
+.ot-item-title { font-size: 13.5px; line-height: 1.4; font-weight: 500; }
+.ot-item-sub { font-size: 12.5px; line-height: 1.4; color: var(--app-fg-muted); margin-top: 2px; }
+.ot-item-err { display: flex; gap: 6px; align-items: flex-start; font-size: 12.5px; line-height: 1.4; color: var(--app-danger); margin-top: 4px; }
+.ot-item-err svg { margin-top: 2px; }
+.ot-actions { display: flex; flex-wrap: wrap; gap: 6px; padding-left: 36px; }
+.ot-mobile .ot-actions { padding-left: 0; }
+.ot-btn { font: inherit; font-size: 13px; padding: 6px 12px; border-radius: 7px; border: 1px solid var(--app-line); background: var(--app-surface1); color: var(--app-fg); }
+.ot-mobile .ot-btn { flex: 1 1 auto; padding: 9px 12px; }
+.ot-btn.is-primary { background: var(--app-accent); border-color: var(--app-accent); color: var(--app-accent-fg); font-weight: 500; }
+.ot-btn.is-ghost { border-color: transparent; background: transparent; color: var(--app-fg-muted); }
+.ot-btn small { opacity: 0.75; font-size: 11.5px; margin-left: 4px; }
+.ot-next { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--app-line); font-size: 13px; }
+.ot-next-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Context footer */
+.ot-ctx { display: flex; flex-direction: column; gap: 2px; padding-top: 14px; border-top: 1px solid var(--app-line); }
+.ot-ctx-row { display: flex; align-items: center; gap: 8px; min-height: 30px; padding: 0 6px; margin: 0 -6px; border-radius: 6px; font-size: 12.5px; color: var(--app-fg-muted); }
+.ot-k { color: var(--app-fg-xmuted); width: 52px; flex-shrink: 0; }
+.ot-v { color: var(--app-fg); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }

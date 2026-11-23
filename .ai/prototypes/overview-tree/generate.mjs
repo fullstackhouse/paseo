@@ -12,7 +12,7 @@
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { runAtlas } from './atlas.mjs'
-// import { EXAMPLE_ICONS, exampleStates } from './mockups-example.mjs'
+import { OT_ICONS, overviewStates } from './mockups-overview.mjs'
 
 const OUT = path.dirname(fileURLToPath(import.meta.url))
 
@@ -27,13 +27,13 @@ runAtlas({
   // renders the cards with "mockups pending"; `overview: true` (one file at most) puts that
   // file's area-wide rules and decisions on the overview page instead of an area page.
   areaFiles: [
-    { file: 'spec-overview-tree-ui-overview.md', areas: ['O', 'E'], title: 'Overview tab', mockups: false },
+    { file: 'spec-overview-tree-ui-overview.md', areas: ['O', 'E'], title: 'Overview tab', mockups: true },
   ],
   // Stage 3: areas whose every card needs states (and every state a card).
-  mockupAreas: [],
-  frameLabel: '1440 desktop',
+  mockupAreas: ['O', 'E'],
+  frameLabel: 'Explorer panel · 420 (mobile sheet · 390)',
   // CSS variable → frame width it must fit; the atlas sets it to scale frames to the column.
-  frameScales: { '--ka-scale': 1444 },
-  icons: {},
-  states: [],
+  frameScales: { '--ot-scale': 440 },
+  icons: OT_ICONS,
+  states: [overviewStates],
 })
