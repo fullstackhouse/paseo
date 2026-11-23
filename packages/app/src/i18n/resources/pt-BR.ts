@@ -1317,6 +1317,12 @@ export const ptBR: TranslationResources = {
     schedules: {
       needsYou: "Execuções agendadas precisam de você: {{count}}",
     },
+    drafts: {
+      title: "Rascunhos",
+      discard: "Descartar rascunho",
+      noProject: "Sem projeto",
+      attachmentsOnly: "Somente anexos",
+    },
     snoozed: {
       title: "Adiados",
       blocked: "Esperando você: {{count}}",

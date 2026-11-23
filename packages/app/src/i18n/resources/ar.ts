@@ -1291,6 +1291,12 @@ export const ar: TranslationResources = {
     schedules: {
       needsYou: "عمليات مجدولة تحتاجك: {{count}}",
     },
+    drafts: {
+      title: "المسودات",
+      discard: "تجاهل المسودة",
+      noProject: "بلا مشروع",
+      attachmentsOnly: "مرفقات فقط",
+    },
     snoozed: {
       title: "مؤجلة",
       blocked: "بانتظارك: {{count}}",
