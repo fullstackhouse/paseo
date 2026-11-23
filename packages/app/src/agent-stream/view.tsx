@@ -41,7 +41,7 @@ import {
   type InlinePathTarget,
 } from "@/components/message";
 import { PlanCard } from "@/components/plan-card";
-import { getStreamItemMessageId, type StreamItem } from "@/types/stream";
+import { generateMessageId, getStreamItemMessageId, type StreamItem } from "@/types/stream";
 import type { PendingMessageSubmission } from "@/composer/submission/model";
 import type { TurnPresentation } from "@/timeline/turn-liveness";
 import type { PendingPermission } from "@/types/shared";
@@ -106,6 +106,7 @@ import { navigateToWorkspace } from "@/stores/navigation-active-workspace-store"
 import { useStableEvent } from "@/hooks/use-stable-event";
 import { useDraftStore } from "@/stores/draft-store";
 import { buildDraftStoreKey } from "@/stores/draft-keys";
+import { requestQuoteCommentFocus } from "@/composer/quote-list";
 import { useForkAgent } from "@/hooks/use-fork-agent";
 import { isWeb } from "@/constants/platform";
 import type { Theme } from "@/styles/theme";
@@ -1958,8 +1959,11 @@ function useCiteIntoComposer(input: {
   readOnly: boolean;
 }): ((markdown: string) => void) | undefined {
   const cite = useStableEvent((markdown: string) => {
+    const id = generateMessageId();
+    requestQuoteCommentFocus(id);
     void useDraftStore.getState().attachQuote({
       draftKey: buildDraftStoreKey({ serverId: input.serverId, agentId: input.agentId }),
+      id,
       text: markdown,
     });
   });

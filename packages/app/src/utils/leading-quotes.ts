@@ -1,40 +1,53 @@
 const QUOTE_LINE = /^>(?: |$)/;
 
-export interface LeadingQuote {
-  /** Line the quote starts on; stable within one message, so it doubles as a React key. */
+export interface MessageSegment {
+  kind: "quote" | "text";
+  /** Line the segment starts on; stable within one message, so it doubles as a React key. */
   line: number;
   text: string;
 }
 
 /**
- * Splits the blockquotes a message opens with (what Cite adds above the user's text)
- * from the rest of it. Quotes separated by a blank line come back separately.
+ * Splits a message that opens with a blockquote (what Cite sends) into quote and text
+ * segments in order, so each quote shows with the comment written under it. A message
+ * that doesn't start with a quote comes back as one text segment.
  */
-export function splitLeadingQuotes(message: string): { quotes: LeadingQuote[]; body: string } {
+export function splitQuotedMessage(message: string): MessageSegment[] {
   const lines = message.split(/\r?\n/);
-  const quotes: LeadingQuote[] = [];
-  let start = -1;
-  let quoteLines: string[] = [];
-  const closeQuote = () => {
-    if (start >= 0) quotes.push({ line: start, text: quoteLines.join("\n") });
-    start = -1;
-    quoteLines = [];
-  };
-  let index = 0;
-  for (; index < lines.length; index += 1) {
-    const line = lines[index] ?? "";
-    if (QUOTE_LINE.test(line)) {
-      if (start < 0) start = index;
-      quoteLines.push(line.replace(/^> ?/, ""));
-      continue;
-    }
-    if (start >= 0 && line.trim() === "") {
-      closeQuote();
-      continue;
-    }
-    break;
+  if (!QUOTE_LINE.test(lines[0] ?? "")) {
+    return [{ kind: "text", line: 0, text: message }];
   }
-  closeQuote();
-  if (quotes.length === 0) return { quotes, body: message };
-  return { quotes, body: lines.slice(index).join("\n").trim() };
+  const segments: MessageSegment[] = [];
+  let kind: MessageSegment["kind"] | null = null;
+  let start = 0;
+  let buffer: string[] = [];
+  const flush = () => {
+    const text = buffer.join("\n");
+    if (kind && (kind === "quote" || text.trim())) {
+      segments.push({ kind, line: start, text: kind === "text" ? text.trim() : text });
+    }
+    kind = null;
+    buffer = [];
+  };
+  lines.forEach((line, index) => {
+    const isQuote = QUOTE_LINE.test(line);
+    if (kind === "quote" && !isQuote) flush();
+    if (isQuote && kind !== "quote") {
+      flush();
+      kind = "quote";
+      start = index;
+    }
+    if (isQuote) {
+      buffer.push(line.replace(/^> ?/, ""));
+      return;
+    }
+    if (kind === null) {
+      if (!line.trim()) return;
+      kind = "text";
+      start = index;
+    }
+    buffer.push(line);
+  });
+  flush();
+  return segments;
 }

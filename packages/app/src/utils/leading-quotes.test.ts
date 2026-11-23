@@ -1,35 +1,36 @@
 import { describe, expect, it } from "vitest";
 import { prependComposerQuotes } from "@/composer/attachments/submit";
-import { splitLeadingQuotes } from "./leading-quotes";
+import { splitQuotedMessage } from "./leading-quotes";
 
-describe("splitLeadingQuotes", () => {
-  it("leaves a message without quotes untouched", () => {
-    expect(splitLeadingQuotes("  plain text\n> later quote")).toEqual({
-      quotes: [],
-      body: "  plain text\n> later quote",
-    });
+describe("splitQuotedMessage", () => {
+  it("leaves a message that doesn't open with a quote as one text segment", () => {
+    expect(splitQuotedMessage("  plain text\n> later quote")).toEqual([
+      { kind: "text", line: 0, text: "  plain text\n> later quote" },
+    ]);
   });
 
-  it("reads back what Cite prepends, one quote per cited fragment", () => {
-    const text = prependComposerQuotes("why is that?", [
-      { kind: "quote", id: "a", text: "First line\n\nSecond paragraph" },
+  it("reads back each quote with the comment written under it, in order", () => {
+    const text = prependComposerQuotes("anything else?", [
+      { kind: "quote", id: "a", text: "First line\n\nSecond paragraph", comment: "why?" },
       { kind: "quote", id: "b", text: "- a list item" },
+      { kind: "quote", id: "c", text: "third", comment: "and this\non two lines" },
     ]);
 
-    expect(text).toBe("> First line\n>\n> Second paragraph\n\n> - a list item\n\nwhy is that?");
-    expect(splitLeadingQuotes(text)).toEqual({
-      quotes: [
-        { line: 0, text: "First line\n\nSecond paragraph" },
-        { line: 4, text: "- a list item" },
-      ],
-      body: "why is that?",
-    });
+    expect(text).toBe(
+      "> First line\n>\n> Second paragraph\n\nwhy?\n\n> - a list item\n\n> third\n\nand this\non two lines\n\nanything else?",
+    );
+    expect(splitQuotedMessage(text)).toEqual([
+      { kind: "quote", line: 0, text: "First line\n\nSecond paragraph" },
+      { kind: "text", line: 4, text: "why?" },
+      { kind: "quote", line: 6, text: "- a list item" },
+      { kind: "quote", line: 8, text: "third" },
+      { kind: "text", line: 10, text: "and this\non two lines\n\nanything else?" },
+    ]);
   });
 
   it("handles a message that is only a quote", () => {
-    expect(splitLeadingQuotes("> just this")).toEqual({
-      quotes: [{ line: 0, text: "just this" }],
-      body: "",
-    });
+    expect(splitQuotedMessage("> just this")).toEqual([
+      { kind: "quote", line: 0, text: "just this" },
+    ]);
   });
 });

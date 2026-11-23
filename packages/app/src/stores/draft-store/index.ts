@@ -6,7 +6,6 @@ import type {
   UserComposerAttachment,
   WorkspaceFileComposerAttachment,
 } from "@/attachments/types";
-import { generateMessageId } from "@/types/stream";
 import { appendWorkspaceFileAttachment } from "@/attachments/workspace-file";
 import {
   garbageCollectAttachments,
@@ -58,8 +57,8 @@ interface DraftStoreActions {
     draftKey: string;
     attachment: WorkspaceFileComposerAttachment;
   }) => Promise<void>;
-  /** Adds a cited fragment of an agent's reply to that chat's draft and focuses its composer. */
-  attachQuote: (input: { draftKey: string; text: string }) => Promise<void>;
+  /** Adds a cited fragment of an agent's reply to that chat's draft. */
+  attachQuote: (input: { draftKey: string; id: string; text: string }) => Promise<void>;
   getCreateModalDraft: () => DraftInput | null;
   saveCreateModalDraft: (draft: DraftInput | null) => void;
   collectActiveAttachmentIds: () => string[];
@@ -260,9 +259,13 @@ async function migrateAllLegacyDrafts(): Promise<void> {
 async function appendDraftAttachment(
   set: StoreApi<DraftStore>["setState"],
   get: StoreApi<DraftStore>["getState"],
-  draftKey: string,
-  append: (attachments: UserComposerAttachment[]) => UserComposerAttachment[],
+  input: {
+    draftKey: string;
+    focusComposer: boolean;
+    append: (attachments: UserComposerAttachment[]) => UserComposerAttachment[];
+  },
 ): Promise<void> {
+  const { draftKey } = input;
   await get().hydrateDraftInput({ draftKey });
   set((state) => {
     const existing = state.drafts[draftKey];
@@ -271,15 +274,19 @@ async function appendDraftAttachment(
       drafts: {
         ...state.drafts,
         [draftKey]: createDraftRecord({
-          draft: { ...draft, attachments: append(draft.attachments) },
+          draft: { ...draft, attachments: input.append(draft.attachments) },
           lifecycle: "active",
           previousVersion: existing?.version,
         }),
       },
-      attachmentFocusRequestByDraftKey: {
-        ...state.attachmentFocusRequestByDraftKey,
-        [draftKey]: (state.attachmentFocusRequestByDraftKey[draftKey] ?? 0) + 1,
-      },
+      ...(input.focusComposer
+        ? {
+            attachmentFocusRequestByDraftKey: {
+              ...state.attachmentFocusRequestByDraftKey,
+              [draftKey]: (state.attachmentFocusRequestByDraftKey[draftKey] ?? 0) + 1,
+            },
+          }
+        : {}),
     };
   });
   scheduleAttachmentGc();
@@ -410,15 +417,19 @@ export const useDraftStore = create<DraftStore>()(
       },
 
       attachWorkspaceFile: ({ draftKey, attachment }) =>
-        appendDraftAttachment(set, get, draftKey, (attachments) =>
-          appendWorkspaceFileAttachment(attachments, attachment),
-        ),
+        appendDraftAttachment(set, get, {
+          draftKey,
+          focusComposer: true,
+          append: (attachments) => appendWorkspaceFileAttachment(attachments, attachment),
+        }),
 
-      attachQuote: ({ draftKey, text }) =>
-        appendDraftAttachment(set, get, draftKey, (attachments) => [
-          ...attachments,
-          { kind: "quote", id: generateMessageId(), text },
-        ]),
+      // The quote's own comment field takes focus (see requestQuoteCommentFocus), not the message.
+      attachQuote: ({ draftKey, id, text }) =>
+        appendDraftAttachment(set, get, {
+          draftKey,
+          focusComposer: false,
+          append: (attachments) => [...attachments, { kind: "quote", id, text }],
+        }),
 
       getCreateModalDraft: () => {
         const record = get().createModalDraft;

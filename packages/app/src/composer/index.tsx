@@ -46,7 +46,6 @@ import {
   ClipboardPaste,
   Camera,
   Paperclip,
-  Quote,
 } from "lucide-react-native";
 import * as Clipboard from "expo-clipboard";
 import { FOOTER_HEIGHT } from "@/constants/layout";
@@ -135,11 +134,13 @@ import type { ForgeSearchItem } from "@getpaseo/protocol/messages";
 import type {
   AttachmentMetadata,
   ComposerAttachment,
+  QuoteComposerAttachment,
   UserComposerAttachment,
   WorkspaceFileComposerAttachment,
   WorkspaceComposerAttachment,
 } from "@/attachments/types";
 import type { SelectedFile } from "@/attachments/selected-file";
+import { ComposerQuoteList } from "@/composer/quote-list";
 import { resolveComposerAttachmentSubmitFormat } from "@/composer/attachments/submit";
 import { composerWorkspaceAttachment } from "@/composer/attachments/workspace";
 import { useWorkspaceAttachmentsForScopes } from "@/attachments/workspace-attachments-store";
@@ -332,8 +333,6 @@ interface RenderAttachmentTrayArgs {
     openImage: string;
     removeImage: string;
     removeFile: string;
-    quote: string;
-    removeQuote: string;
     openGithub: (kind: string, numberLabel: string) => string;
     removeGithub: (kind: string, numberLabel: string) => string;
   };
@@ -349,7 +348,8 @@ function renderAttachmentTray(args: RenderAttachmentTrayArgs): ReactElement | nu
     handleRemoveAttachment,
     labels,
   } = args;
-  if (selectedAttachments.length === 0 && pendingFiles.length === 0) return null;
+  const hasPills = selectedAttachments.some((attachment) => attachment.kind !== "quote");
+  if (!hasPills && pendingFiles.length === 0) return null;
   return (
     <View style={styles.attachmentTray} testID="composer-attachment-tray">
       {selectedAttachments.map((attachment, index) =>
@@ -414,7 +414,7 @@ interface RenderComposerAttachmentPillArgs {
   labels: RenderAttachmentTrayArgs["labels"];
 }
 
-function renderComposerAttachmentPill(args: RenderComposerAttachmentPillArgs): ReactElement {
+function renderComposerAttachmentPill(args: RenderComposerAttachmentPillArgs): ReactElement | null {
   const { attachment, index, disabled, onOpen, onRemove, labels } = args;
   if (attachment.kind === "image") {
     return (
@@ -442,19 +442,8 @@ function renderComposerAttachmentPill(args: RenderComposerAttachmentPillArgs): R
       />
     );
   }
-  if (attachment.kind === "quote") {
-    return (
-      <QuoteAttachmentPill
-        key={`quote:${attachment.id}`}
-        attachment={attachment}
-        index={index}
-        disabled={disabled}
-        onRemove={onRemove}
-        label={labels.quote}
-        removeLabel={labels.removeQuote}
-      />
-    );
-  }
+  // Quotes render in ComposerQuoteList, numbered and with their comments.
+  if (attachment.kind === "quote") return null;
   if (attachment.kind === "workspace_file") {
     return (
       <WorkspaceFileAttachmentPill
@@ -762,44 +751,6 @@ function ImageAttachmentPill({
       disabled={disabled}
     >
       <AttachmentThumbnail metadata={attachment.metadata} />
-    </AttachmentPill>
-  );
-}
-
-interface QuoteAttachmentPillProps {
-  attachment: Extract<ComposerAttachment, { kind: "quote" }>;
-  index: number;
-  disabled: boolean;
-  onRemove: (index: number) => void;
-  label: string;
-  removeLabel: string;
-}
-
-function QuoteAttachmentPill({
-  attachment,
-  index,
-  disabled,
-  onRemove,
-  label,
-  removeLabel,
-}: QuoteAttachmentPillProps) {
-  const handleRemove = useCallback(() => {
-    onRemove(index);
-  }, [onRemove, index]);
-  return (
-    <AttachmentPill
-      testID="composer-quote-attachment-pill"
-      onOpen={noop}
-      onRemove={handleRemove}
-      openAccessibilityLabel={label}
-      removeAccessibilityLabel={removeLabel}
-      disabled={disabled}
-    >
-      <AttachmentLabel
-        icon={quotePillIcon}
-        title={attachment.text.replace(/\s+/g, " ").trim()}
-        subtitle={label}
-      />
     </AttachmentPill>
   );
 }
@@ -2397,6 +2348,34 @@ function ComposerContentImpl({
     [isFullscreen],
   );
 
+  const quotes = useMemo(
+    () =>
+      selectedAttachments.filter(
+        (attachment): attachment is QuoteComposerAttachment => attachment.kind === "quote",
+      ),
+    [selectedAttachments],
+  );
+  const handleChangeQuoteComment = useCallback(
+    (id: string, comment: string) => {
+      setSelectedAttachments((prev) =>
+        prev.map((attachment) =>
+          attachment.kind === "quote" && attachment.id === id
+            ? { ...attachment, comment }
+            : attachment,
+        ),
+      );
+    },
+    [setSelectedAttachments],
+  );
+  const handleRemoveQuote = useCallback(
+    (id: string) => {
+      setSelectedAttachments((prev) =>
+        prev.filter((attachment) => attachment.kind !== "quote" || attachment.id !== id),
+      );
+    },
+    [setSelectedAttachments],
+  );
+
   const attachmentTray = useMemo(
     () =>
       renderAttachmentTray({
@@ -2410,8 +2389,6 @@ function ComposerContentImpl({
           openImage: t("composer.attachments.openImage"),
           removeImage: t("composer.attachments.removeImage"),
           removeFile: t("composer.attachments.removeFile"),
-          quote: t("composer.attachments.quote"),
-          removeQuote: t("composer.attachments.removeQuote"),
           openGithub: (kind: string, numberLabel: string) =>
             t("composer.attachments.openGithub", { kind, number: numberLabel }),
           removeGithub: (kind: string, numberLabel: string) =>
@@ -2426,6 +2403,32 @@ function ComposerContentImpl({
       selectedAttachments,
       pendingFiles,
       t,
+    ],
+  );
+
+  const attachmentSlot = useMemo(
+    () =>
+      quotes.length > 0 ? (
+        <View style={styles.attachmentSlot}>
+          <ComposerQuoteList
+            quotes={quotes}
+            disabled={isComposerLocked}
+            onChangeComment={handleChangeQuoteComment}
+            onRemove={handleRemoveQuote}
+            onSubmitComment={focusInput}
+          />
+          {attachmentTray}
+        </View>
+      ) : (
+        attachmentTray
+      ),
+    [
+      attachmentTray,
+      focusInput,
+      handleChangeQuoteComment,
+      handleRemoveQuote,
+      isComposerLocked,
+      quotes,
     ],
   );
 
@@ -2582,7 +2585,7 @@ function ComposerContentImpl({
                   onFocusChange={handleFocusChange}
                   onHeightChange={onComposerHeightChange}
                   inputWrapperStyle={inputWrapperStyle}
-                  attachmentSlot={attachmentTray}
+                  attachmentSlot={attachmentSlot}
                   inputMode={inputMode}
                   readOnly={readOnly}
                   textReplacement={textReplacement}
@@ -2714,6 +2717,9 @@ const styles = StyleSheet.create((theme: Theme) => ({
   iconButtonHovered: {
     backgroundColor: theme.colors.surface2,
   },
+  attachmentSlot: {
+    gap: theme.spacing[3],
+  },
   attachmentTray: {
     flexDirection: "row",
     gap: theme.spacing[2],
@@ -2785,7 +2791,6 @@ const ThemedCamera = withUnistyles(Camera);
 const ThemedImageIcon = withUnistyles(ImageIcon);
 const ThemedClipboardPaste = withUnistyles(ClipboardPaste);
 const ThemedFileText = withUnistyles(FileText);
-const ThemedQuote = withUnistyles(Quote);
 const iconForegroundMapping = (theme: Theme) => ({ color: theme.colors.foreground });
 const iconForegroundMutedMapping = (theme: Theme) => ({ color: theme.colors.foregroundMuted });
 const iconAccentForegroundMapping = (theme: Theme) => ({ color: theme.colors.accentForeground });
@@ -2802,7 +2807,6 @@ const githubPrPillIcon = (
 const githubIssuePillIcon = (
   <ThemedCircleDot size={ICON_SIZE.sm} uniProps={iconForegroundMutedMapping} />
 );
-const quotePillIcon = <ThemedQuote size={ICON_SIZE.sm} uniProps={iconForegroundMutedMapping} />;
 const filePillIcon = <ThemedFileText size={ICON_SIZE.sm} uniProps={iconForegroundMutedMapping} />;
 
 const pendingFilePillIcon = (

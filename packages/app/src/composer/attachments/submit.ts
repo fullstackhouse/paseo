@@ -94,22 +94,24 @@ export function splitComposerAttachmentsForSubmit(
 }
 
 /**
- * Puts each cited fragment above the message as a markdown blockquote, in the order they
- * were cited. The quote lives in the text rather than as an attachment so the agent reads
- * it first and the sent message keeps it after the daemon echoes it back.
+ * Puts each cited fragment above the message as a markdown blockquote, followed by the
+ * user's comment on it, in the order they were cited. Quotes live in the text rather than
+ * as attachments so the agent reads them first and the sent message keeps them after the
+ * daemon echoes it back.
  */
 export function prependComposerQuotes(text: string, attachments: ComposerAttachment[]): string {
-  const quotes = attachments.flatMap((attachment) =>
-    attachment.kind === "quote" && attachment.text.trim() ? [attachment.text.trim()] : [],
-  );
-  if (quotes.length === 0) {
-    return text;
-  }
-  const blockquotes = quotes.map((quote) =>
-    quote
+  const blocks = attachments.flatMap((attachment) => {
+    if (attachment.kind !== "quote" || !attachment.text.trim()) return [];
+    const quote = attachment.text
+      .trim()
       .split(/\r?\n/)
       .map((line) => (line.trim() ? `> ${line}` : ">"))
-      .join("\n"),
-  );
-  return [...blockquotes, text.trim()].filter(Boolean).join("\n\n");
+      .join("\n");
+    const comment = attachment.comment?.trim();
+    return comment ? [quote, comment] : [quote];
+  });
+  if (blocks.length === 0) {
+    return text;
+  }
+  return [...blocks, text.trim()].filter(Boolean).join("\n\n");
 }
