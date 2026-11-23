@@ -1,6 +1,6 @@
 import { router, useGlobalSearchParams, usePathname } from "expo-router";
 import { SquarePen, X } from "lucide-react-native";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Text, View, type PressableStateCallbackType } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
@@ -26,7 +26,7 @@ const foregroundMutedColorMapping = (theme: Theme) => ({ color: theme.colors.for
 
 /**
  * Unsent New workspace drafts (forks included), at the top of the sidebar, newest first.
- * The draft open on screen joins the list only once you leave it.
+ * The draft open on screen joins the list only once you leave it; after that it stays put.
  */
 export function SidebarDraftsSection() {
   const { t } = useTranslation();
@@ -34,10 +34,27 @@ export function SidebarDraftsSection() {
   const pathname = usePathname();
   const params = useGlobalSearchParams<{ draftId?: string }>();
   const openDraftId = pathname === "/new" ? (params.draftId ?? "") : null;
-  const drafts = useMemo(
-    () => listed.filter((draft) => openDraftId !== (draft.draftId ?? "")),
-    [listed, openDraftId],
+  const revealedDraftKeys = useNewWorkspaceDraftsStore((state) => state.revealedDraftKeys);
+  const isOpen = useCallback(
+    (draft: ListedNewWorkspaceDraft) => openDraftId === (draft.draftId ?? ""),
+    [openDraftId],
   );
+  // A draft you are typing in joins the list once you leave it, then stays put when you
+  // come back to it, so the list never shifts under the pointer.
+  const drafts = useMemo(
+    () =>
+      listed
+        .filter((draft) => !isOpen(draft) || revealedDraftKeys[draft.draftKey] !== undefined)
+        .sort(
+          (left, right) =>
+            (revealedDraftKeys[right.draftKey] ?? Infinity) -
+            (revealedDraftKeys[left.draftKey] ?? Infinity),
+        ),
+    [isOpen, listed, revealedDraftKeys],
+  );
+  useEffect(() => {
+    useNewWorkspaceDraftsStore.getState().revealDrafts(drafts.map((draft) => draft.draftKey));
+  }, [drafts]);
 
   if (drafts.length === 0) return null;
 
@@ -45,13 +62,13 @@ export function SidebarDraftsSection() {
     <View style={styles.section} testID="sidebar-drafts-section">
       <SidebarSectionHeader title={t("sidebar.drafts.title")} />
       {drafts.map((draft) => (
-        <DraftRow key={draft.draftKey} draft={draft} />
+        <DraftRow key={draft.draftKey} draft={draft} selected={isOpen(draft)} />
       ))}
     </View>
   );
 }
 
-function DraftRow({ draft }: { draft: ListedNewWorkspaceDraft }) {
+function DraftRow({ draft, selected }: { draft: ListedNewWorkspaceDraft; selected: boolean }) {
   const { t } = useTranslation();
   const isCompact = useIsCompactFormFactor();
   const alwaysShowDiscard = isNative || isCompact;
@@ -78,13 +95,15 @@ function DraftRow({ draft }: { draft: ListedNewWorkspaceDraft }) {
     useNewWorkspaceDraftsStore.getState().discardDraft(draft.draftKey);
   }, [draft.draftKey]);
 
+  const accessibilityState = useMemo(() => ({ selected }), [selected]);
   const rowStyle = useCallback(
     ({ pressed }: PressableStateCallbackType) => [
       styles.row,
       isHovered && styles.rowHovered,
+      selected && styles.rowSelected,
       pressed && styles.rowPressed,
     ],
-    [isHovered],
+    [isHovered, selected],
   );
 
   return (
@@ -95,6 +114,7 @@ function DraftRow({ draft }: { draft: ListedNewWorkspaceDraft }) {
     >
       <PressHighlight
         accessibilityRole="button"
+        accessibilityState={accessibilityState}
         onPress={handlePress}
         style={rowStyle}
         highlightStyle={styles.rowPressed}
@@ -160,6 +180,9 @@ const styles = StyleSheet.create((theme) => ({
   },
   rowHovered: {
     backgroundColor: theme.colors.surfaceSidebarHover,
+  },
+  rowSelected: {
+    backgroundColor: theme.colors.surfaceSidebarSelected,
   },
   rowPressed: {
     backgroundColor: theme.colors.surface2,

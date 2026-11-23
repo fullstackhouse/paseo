@@ -41,7 +41,7 @@ describe("selectListedNewWorkspaceDrafts", () => {
 describe("useNewWorkspaceDraftsStore", () => {
   beforeEach(() => {
     useDraftStore.setState({ drafts: {} });
-    useNewWorkspaceDraftsStore.setState({ entries: {} });
+    useNewWorkspaceDraftsStore.setState({ entries: {}, revealedDraftKeys: {} });
   });
 
   it("drops entries whose draft is gone when it records another", () => {
@@ -73,5 +73,16 @@ describe("useNewWorkspaceDraftsStore", () => {
       useDraftStore.getState().drafts,
     );
     expect(listed).toEqual([]);
+  });
+
+  it("numbers newly listed drafts so newer ones sort above and older numbers never change", () => {
+    const store = useNewWorkspaceDraftsStore.getState();
+    store.revealDrafts(["newer", "older"]);
+    store.revealDrafts(["newest", "newer", "older"]);
+    expect(useNewWorkspaceDraftsStore.getState().revealedDraftKeys).toEqual({
+      older: 1,
+      newer: 2,
+      newest: 3,
+    });
   });
 });

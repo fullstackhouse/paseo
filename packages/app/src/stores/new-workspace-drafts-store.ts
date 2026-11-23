@@ -57,7 +57,13 @@ const PersistedStateSchema = z.object({
 
 interface NewWorkspaceDraftsState {
   entries: Record<string, NewWorkspaceDraftEntry>;
+  /**
+   * Drafts the sidebar has listed this session, numbered in the order they appeared. Once
+   * listed, a draft stays listed and keeps its place, so typing in it does not move it.
+   */
+  revealedDraftKeys: Record<string, number>;
   recordDraft: (entry: NewWorkspaceDraftEntry) => void;
+  revealDrafts: (draftKeys: string[]) => void;
   discardDraft: (draftKey: string) => void;
 }
 
@@ -84,6 +90,17 @@ export const useNewWorkspaceDraftsStore = create<NewWorkspaceDraftsState>()(
   persist(
     (set) => ({
       entries: {},
+      revealedDraftKeys: {},
+      revealDrafts: (draftKeys) =>
+        set((state) => {
+          const missing = draftKeys.filter((key) => state.revealedDraftKeys[key] === undefined);
+          if (missing.length === 0) return state;
+          const revealedDraftKeys = { ...state.revealedDraftKeys };
+          let next = Math.max(0, ...Object.values(revealedDraftKeys));
+          // `draftKeys` is newest first; number the oldest first so newer drafts sort above.
+          for (const key of missing.toReversed()) revealedDraftKeys[key] = ++next;
+          return { revealedDraftKeys };
+        }),
       recordDraft: (entry) =>
         set((state) => {
           if (isSameEntry(state.entries[entry.draftKey], entry)) return state;
@@ -109,7 +126,9 @@ export const useNewWorkspaceDraftsStore = create<NewWorkspaceDraftsState>()(
           if (!state.entries[draftKey]) return state;
           const entries = { ...state.entries };
           delete entries[draftKey];
-          return { entries };
+          const revealedDraftKeys = { ...state.revealedDraftKeys };
+          delete revealedDraftKeys[draftKey];
+          return { entries, revealedDraftKeys };
         });
       },
     }),
