@@ -27,6 +27,7 @@ import {
   pinOpenMove,
   overviewSubtitle,
   partitionSummaryItems,
+  type YourMoveRow,
 } from "./model";
 
 function summaryItem(patch: Partial<WorkspaceSummaryItem>): WorkspaceSummaryItem {
@@ -78,6 +79,10 @@ describe("deriveWorkspaceStateWord", () => {
     ).toBe("idle");
   });
 });
+
+function rowKinds(rows: readonly YourMoveRow[]): YourMoveRow["kind"][] {
+  return rows.map((row) => row.kind);
+}
 
 describe("deriveYourMove", () => {
   const asks = summaryItem({
@@ -164,6 +169,20 @@ describe("deriveYourMove", () => {
       const input = { ...base, isWorktree: false };
       expect(deriveYourMove(input)).toEqual([]);
       expect(deriveYourMove({ ...input, statusDone: false, prMerged: true })).toEqual(archive);
+    });
+
+    it("waits while a permission prompt or a failed agent is listed", () => {
+      // Their workspace status outranks running, which hides another agent's live work.
+      const permission: AttentionItem = { kind: "permission", key: "perm", agentId: "a1" };
+      const failed: AttentionItem = { kind: "failed", key: "failed", agentId: "a2" };
+      expect(rowKinds(deriveYourMove({ ...base, items: [permission] }))).toEqual(["permission"]);
+      expect(rowKinds(deriveYourMove({ ...base, items: [failed] }))).toEqual(["failed"]);
+      const ask: AttentionItem = {
+        kind: "plugin",
+        key: "x",
+        item: summaryItem({ needsYou: true }),
+      };
+      expect(rowKinds(deriveYourMove({ ...base, items: [ask] }))).toEqual(["plugin", "archive"]);
     });
 
     it("waits while other work in the workspace is open", () => {

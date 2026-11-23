@@ -73,7 +73,8 @@ export type YourMoveRow =
  * or PR step, which means work not in the PR yet. Only in a worktree, or after a merge: a regular
  * checkout doesn't offer Archive just because an agent finished, as in the header (git/policy.ts).
  * Never while other work in the workspace is still open (`isWorkStillOpen`): a merged PR finishes one
- * agent's job, and archiving would stop the rest.
+ * agent's job, and archiving would stop the rest. Nor while a permission prompt or a failed agent is
+ * listed (`masksRunningWork`).
  */
 export function deriveYourMove(input: {
   items: readonly AttentionItem[];
@@ -102,7 +103,7 @@ export function deriveYourMove(input: {
       }
     }
   }
-  if (input.agentRunning || input.workOpen) return rows;
+  if (input.agentRunning || input.workOpen || rows.some(masksRunningWork)) return rows;
   const shipped = input.prMerged || input.statusDone;
   if (
     shipped &&
@@ -114,6 +115,15 @@ export function deriveYourMove(input: {
     rows.push({ kind: "archive", key: `git:${ARCHIVE_ACTION_ID}` });
   }
   return rows;
+}
+
+/**
+ * A permission prompt or a failed agent. The workspace status outranks `running` with `needs_input`
+ * and `failed`, so while one is listed another agent's live shell, monitor or subagent no longer
+ * shows as running, and `isWorkStillOpen` can't see it.
+ */
+function masksRunningWork(row: YourMoveRow): boolean {
+  return row.kind === "permission" || row.kind === "failed";
 }
 
 /**
