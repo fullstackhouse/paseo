@@ -2242,6 +2242,8 @@ export const ar: TranslationResources = {
       prMergedTitle: "تم دمج PR #{{number}}",
       outdated: "رددت {{time}}؛ لم يحدّث الوكيل هذا منذ ذلك الحين.",
       readyToArchive: "جاهز للأرشفة",
+      archiveHeldTitle: "الأرشفة بانتظار العمل في الخلفية",
+      archiveHeldFacts: "لا يزال shell أو مراقب أو وكيل فرعي قيد التشغيل. الأرشفة من الترويسة توقفه.",
       pullRequests: "طلبات السحب",
       noPrYet: "لا يوجد PR بعد",
       notRefreshed: "لم يُحدَّث",

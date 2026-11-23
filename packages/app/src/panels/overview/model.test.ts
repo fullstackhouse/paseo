@@ -21,11 +21,13 @@ import {
   deriveYourMove,
   isStatusDone,
   isStatusOutdated,
+  isWorkStillOpen,
   noPullRequestFacts,
   openMoveKey,
   pinOpenMove,
   overviewSubtitle,
   partitionSummaryItems,
+  type YourMoveRow,
 } from "./model";
 
 function summaryItem(patch: Partial<WorkspaceSummaryItem>): WorkspaceSummaryItem {
@@ -78,6 +80,10 @@ describe("deriveWorkspaceStateWord", () => {
   });
 });
 
+function rowKinds(rows: readonly YourMoveRow[]): YourMoveRow["kind"][] {
+  return rows.map((row) => row.kind);
+}
+
 describe("deriveYourMove", () => {
   const asks = summaryItem({
     needsYou: true,
@@ -99,6 +105,8 @@ describe("deriveYourMove", () => {
       isWorktree: true,
       prMerged: false,
       statusDone: false,
+      workOpen: false,
+      liveWork: false,
     });
     expect(rows.map((row) => row.kind)).toEqual([
       "permission",
@@ -116,6 +124,8 @@ describe("deriveYourMove", () => {
       isWorktree: true,
       prMerged: false,
       statusDone: false,
+      workOpen: false,
+      liveWork: false,
     });
     expect(rows).toEqual([{ kind: "plugin", key: "x", item: expect.anything() }]);
   });
@@ -129,6 +139,8 @@ describe("deriveYourMove", () => {
       isWorktree: true,
       prMerged: false,
       statusDone: true,
+      workOpen: false,
+      liveWork: false,
     };
     const archive = [{ kind: "archive", key: "git:archive-workspace" }];
 
@@ -161,6 +173,81 @@ describe("deriveYourMove", () => {
       expect(deriveYourMove(input)).toEqual([]);
       expect(deriveYourMove({ ...input, statusDone: false, prMerged: true })).toEqual(archive);
     });
+
+    it("waits while a permission prompt or a failed agent is listed", () => {
+      // Their workspace status outranks running, which hides another agent's live work.
+      const permission: AttentionItem = { kind: "permission", key: "perm", agentId: "a1" };
+      const failed: AttentionItem = { kind: "failed", key: "failed", agentId: "a2" };
+      expect(rowKinds(deriveYourMove({ ...base, items: [permission] }))).toEqual(["permission"]);
+      expect(rowKinds(deriveYourMove({ ...base, items: [failed] }))).toEqual(["failed"]);
+      const ask: AttentionItem = {
+        kind: "plugin",
+        key: "x",
+        item: summaryItem({ needsYou: true }),
+      };
+      expect(rowKinds(deriveYourMove({ ...base, items: [ask] }))).toEqual(["plugin", "archive"]);
+    });
+
+    it("says Archive waits when live background work holds it", () => {
+      // A dev server a finished agent left running: the card says done, the shell still runs.
+      const held = [{ kind: "archive-held", key: "held:archive-workspace" }];
+      expect(deriveYourMove({ ...base, workOpen: true, liveWork: true })).toEqual(held);
+      // Held by a card or the report only: the status card above already says why.
+      expect(deriveYourMove({ ...base, workOpen: true, liveWork: false })).toEqual([]);
+      // No hint where Archive wouldn't be offered anyway.
+      expect(
+        deriveYourMove({ ...base, workOpen: true, liveWork: true, statusDone: false }),
+      ).toEqual([]);
+      expect(
+        deriveYourMove({ ...base, workOpen: true, liveWork: true, agentRunning: true }),
+      ).toEqual([]);
+    });
+
+    it("waits while other work in the workspace is open", () => {
+      expect(deriveYourMove({ ...base, workOpen: true })).toEqual([]);
+      expect(
+        deriveYourMove({ ...base, statusDone: false, prMerged: true, workOpen: true }),
+      ).toEqual([]);
+    });
+  });
+});
+
+describe("isWorkStillOpen", () => {
+  it("is open while the report is working, blocked or needs you", () => {
+    for (const reported of ["working", "blocked", "needs_you"] as const) {
+      expect(isWorkStillOpen({ reported, workspaceRunning: false, cardState: null })).toBe(true);
+    }
+  });
+
+  it("is open while the host still counts the workspace running, with no report", () => {
+    // An idle agent waiting on a monitor or subagent, or a shell, with no status card.
+    expect(isWorkStillOpen({ reported: null, workspaceRunning: true, cardState: null })).toBe(true);
+  });
+
+  it("is open while live work runs, even when the report says done", () => {
+    // Agent A merged and said done; agent B, with no card, waits on a long test run.
+    expect(isWorkStillOpen({ reported: "done", workspaceRunning: true, cardState: null })).toBe(
+      true,
+    );
+  });
+
+  it("is open while the newest card says working or blocked, even when the report doesn't", () => {
+    // A Working card with nothing live for 5 minutes: paseo-status no longer reports it.
+    for (const cardState of ["working", "blocked"] as const) {
+      expect(isWorkStillOpen({ reported: null, workspaceRunning: false, cardState })).toBe(true);
+    }
+    expect(isWorkStillOpen({ reported: "done", workspaceRunning: false, cardState: "done" })).toBe(
+      false,
+    );
+  });
+
+  it("is closed once the report is done or empty and nothing runs", () => {
+    expect(isWorkStillOpen({ reported: "done", workspaceRunning: false, cardState: null })).toBe(
+      false,
+    );
+    expect(isWorkStillOpen({ reported: null, workspaceRunning: false, cardState: null })).toBe(
+      false,
+    );
   });
 });
 

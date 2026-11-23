@@ -2267,6 +2267,9 @@ export const ja: TranslationResources = {
       prMergedTitle: "PR #{{number}} マージ済み",
       outdated: "{{time}}に返信しました。エージェントはその後これを更新していません。",
       readyToArchive: "アーカイブできます",
+      archiveHeldTitle: "アーカイブはバックグラウンド処理を待っています",
+      archiveHeldFacts:
+        "シェル、モニター、またはサブエージェントがまだ実行中です。ヘッダーからアーカイブすると停止します。",
       pullRequests: "プルリクエスト",
       noPrYet: "PRはまだありません",
       notRefreshed: "未更新",
