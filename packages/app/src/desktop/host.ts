@@ -173,6 +173,25 @@ export interface DesktopBrowserBridge {
   ackLiveFrame?: (
     ack: Extract<SessionOutboundMessage, { type: "browser.host.live.frame_ack" }>,
   ) => Promise<void>;
+  /** Human control of a watched tab. An input can be a secret: never log one. */
+  takeLiveControl?: (
+    request: Extract<SessionOutboundMessage, { type: "browser.host.live.take_control.request" }>,
+  ) => Promise<
+    Extract<SessionInboundMessage, { type: "browser.host.live.take_control.response" }>["payload"]
+  >;
+  sendLiveInput?: (
+    request: Extract<SessionOutboundMessage, { type: "browser.host.live.send_input.request" }>,
+  ) => Promise<
+    Extract<SessionInboundMessage, { type: "browser.host.live.send_input.response" }>["payload"]
+  >;
+  releaseLiveControl?: (
+    request: Extract<SessionOutboundMessage, { type: "browser.host.live.release_control.request" }>,
+  ) => Promise<
+    Extract<
+      SessionInboundMessage,
+      { type: "browser.host.live.release_control.response" }
+    >["payload"]
+  >;
   /** Capture a PNG screenshot of the guest viewport cropped to `rect`. */
   captureElement?: (
     browserId: string,

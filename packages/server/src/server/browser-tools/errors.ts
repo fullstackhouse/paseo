@@ -6,6 +6,23 @@ import type {
 export type BrowserToolsResponsePayload = BrowserAutomationExecuteResponse["payload"];
 export type BrowserToolsErrorPayload = Extract<BrowserToolsResponsePayload, { ok: false }>["error"];
 
+/**
+ * What a tool caller gets. browser_human_control is made here and stops here: it isn't in the wire
+ * enum, because older peers reject codes they don't know.
+ */
+export type BrowserToolsCallPayload = (
+  | BrowserToolsResponsePayload
+  | {
+      requestId: string;
+      ok: false;
+      error: { code: "browser_human_control"; message: string; retryable: boolean };
+      dialogs?: Extract<BrowserToolsResponsePayload, { ok: false }>["dialogs"];
+    }
+) & {
+  /** What the user did with the tab since this agent's last browser call. */
+  userNotes?: string[];
+};
+
 export class BrowserToolsRequestError extends Error {
   public readonly code: BrowserAutomationErrorCode;
   public readonly retryable: boolean;
@@ -45,4 +62,16 @@ export function createBrowserToolsRequestError(params: {
     message: params.message,
     retryable: params.retryable ?? false,
   });
+}
+
+export function browserHumanControlFailure(requestId: string): BrowserToolsCallPayload {
+  return {
+    requestId,
+    ok: false,
+    error: {
+      code: "browser_human_control",
+      message: "The user is controlling this tab. Wait for hand-back, then call browser_snapshot.",
+      retryable: true,
+    },
+  };
 }

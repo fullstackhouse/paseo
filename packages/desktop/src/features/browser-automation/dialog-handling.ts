@@ -10,14 +10,13 @@ export interface JavaScriptDialogOpening {
 
 interface DialogPolicy {
   readonly action: BrowserAutomationDialogEvent["action"];
-  readonly accept: boolean;
 }
 
 const DIALOG_POLICIES: Record<BrowserAutomationDialogEvent["type"], DialogPolicy> = {
-  alert: { action: "accepted", accept: true },
-  confirm: { action: "dismissed", accept: false },
-  prompt: { action: "dismissed", accept: false },
-  beforeunload: { action: "dismissed", accept: false },
+  alert: { action: "accepted" },
+  confirm: { action: "dismissed" },
+  prompt: { action: "dismissed" },
+  beforeunload: { action: "dismissed" },
 };
 
 export function handledDialogEvent(opening: JavaScriptDialogOpening): BrowserAutomationDialogEvent {
@@ -30,10 +29,6 @@ export function handledDialogEvent(opening: JavaScriptDialogOpening): BrowserAut
     action: policy.action,
     timestamp: Date.now(),
   };
-}
-
-export function dialogAcceptValue(type: BrowserAutomationDialogEvent["type"]): boolean {
-  return DIALOG_POLICIES[type].accept;
 }
 
 export function promptShimInstallScript(): string {

@@ -4,6 +4,15 @@ import type { BrowserToolsBroker } from "./broker.js";
 
 type StartRequest = Extract<SessionInboundMessage, { type: "browser.live.start.request" }>;
 type StopRequest = Extract<SessionInboundMessage, { type: "browser.live.stop.request" }>;
+type TakeControlRequest = Extract<
+  SessionInboundMessage,
+  { type: "browser.live.take_control.request" }
+>;
+type SendInputRequest = Extract<SessionInboundMessage, { type: "browser.live.send_input.request" }>;
+type ReleaseControlRequest = Extract<
+  SessionInboundMessage,
+  { type: "browser.live.release_control.request" }
+>;
 type FrameAck = Extract<SessionInboundMessage, { type: "browser.live.frame_ack" }>;
 
 interface ViewerStream {
@@ -22,6 +31,8 @@ export class SessionLiveViews {
     private readonly deps: {
       broker: BrowserToolsBroker;
       viewerId: string;
+      /** Who the viewer is across sessions: the owner of any control it takes. */
+      ownerId: () => string;
       createStreamId: () => string;
       /** Opens an owned subscription for the current request; `stop` runs on release. */
       begin: (stop: () => Promise<void>) => OwnedSubscription;
@@ -45,6 +56,7 @@ export class SessionLiveViews {
       streamId,
       browserId: request.browserId,
       viewerId,
+      ownerId: this.deps.ownerId(),
       options: {
         ...(request.maxFps !== undefined ? { maxFps: request.maxFps } : {}),
         ...(request.jpegQuality !== undefined ? { jpegQuality: request.jpegQuality } : {}),
@@ -52,10 +64,13 @@ export class SessionLiveViews {
       },
       sink: {
         sendFrame: (frame) => subscription.emitBinary(frame),
-        ended: (failure) => {
+        ended: (failure, control) => {
           if (this.streams.get(streamId)?.subscription !== subscription) return;
           this.streams.delete(streamId);
-          subscription.emit({ type: "browser.live.ended", payload: { streamId, error: failure } });
+          subscription.emit({
+            type: "browser.live.ended",
+            payload: { streamId, error: failure, control },
+          });
           void subscription.release().catch(() => {});
         },
       },
@@ -72,8 +87,15 @@ export class SessionLiveViews {
                 streamId,
                 viewport: result.viewport,
                 error: null,
+                ...(result.control ? { control: result.control } : {}),
               }
-            : { requestId: request.requestId, streamId: null, viewport: null, error: result.error },
+            : {
+                requestId: request.requestId,
+                streamId: null,
+                viewport: null,
+                error: result.error,
+                control: result.control,
+              },
         });
       },
     });
@@ -106,6 +128,37 @@ export class SessionLiveViews {
       payload: { requestId: request.requestId, streamId: request.streamId, error },
     });
     await entry.subscription.release();
+  }
+
+  public async takeControl(request: TakeControlRequest): Promise<void> {
+    const { requestId, streamId } = request;
+    const result = await this.deps.broker.takeControl(this.viewerRef(streamId));
+    this.deps.emit({
+      type: "browser.live.take_control.response",
+      payload: { requestId, streamId, ...result },
+    });
+  }
+
+  public async sendInput(request: SendInputRequest): Promise<void> {
+    const { requestId, streamId, input } = request;
+    const result = await this.deps.broker.sendLiveInput({ ...this.viewerRef(streamId), input });
+    this.deps.emit({
+      type: "browser.live.send_input.response",
+      payload: { requestId, streamId, ...result },
+    });
+  }
+
+  public async releaseControl(request: ReleaseControlRequest): Promise<void> {
+    const { requestId, streamId } = request;
+    const { error } = await this.deps.broker.releaseControl(this.viewerRef(streamId));
+    this.deps.emit({
+      type: "browser.live.release_control.response",
+      payload: { requestId, streamId, error },
+    });
+  }
+
+  private viewerRef(streamId: string) {
+    return { streamId, viewerId: this.deps.viewerId, ownerId: this.deps.ownerId() };
   }
 
   public ack(message: FrameAck): void {

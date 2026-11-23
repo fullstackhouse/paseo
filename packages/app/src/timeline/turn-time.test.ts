@@ -22,6 +22,28 @@ function assistant(id: string, timestamp: Date, text = id): StreamItem {
 }
 
 describe("deriveStreamTurnTiming", () => {
+  it("doesn't count an info notification that arrives after the turn as work", () => {
+    const userAt = new Date("2026-05-15T00:00:00.000Z");
+    const assistantAt = new Date("2026-05-15T00:00:07.000Z");
+    const handBackNote: StreamItem = {
+      kind: "notification",
+      sourceType: "notification",
+      id: "note",
+      level: "info",
+      message: "The user handed the browser tab back.",
+      timestamp: new Date("2026-05-15T00:10:00.000Z"),
+    };
+
+    const timing = deriveStreamTurnTiming({
+      isTurnActive: false,
+      activeTurnStartedAt: null,
+      tail: [user("u1", userAt), assistant("a1", assistantAt), handBackNote],
+      head: [],
+    });
+
+    assert.deepEqual(timing.byItemId.get("a1"), { completedAt: assistantAt, durationMs: 7000 });
+  });
+
   it("starts elapsed time from the submitted prompt", () => {
     const submittedAt = new Date("2026-05-15T00:00:00.000Z");
 
@@ -246,4 +268,41 @@ it("times a heartbeat that ends with tools and no assistant text", () => {
     activeTurnStartedAt: null,
   });
   assert.equal(timing.byItemId.get("last")?.durationMs, 5000);
+});
+
+it("keeps the footer of a turn that ended with a tool when a note lands after it", () => {
+  const userAt = new Date("2026-05-15T00:00:00Z");
+  const tool: StreamItem = {
+    kind: "tool_call",
+    id: "last-tool",
+    timestamp: new Date("2026-05-15T00:00:05Z"),
+    payload: {
+      source: "agent",
+      data: {
+        provider: "claude",
+        callId: "last-tool",
+        name: "browser",
+        status: "completed",
+        error: null,
+        detail: { type: "plain_text", text: "Open the page" },
+      },
+    },
+  };
+  const note: StreamItem = {
+    kind: "notification",
+    sourceType: "notification",
+    id: "note",
+    level: "info",
+    message: "The user handed the browser tab back.",
+    timestamp: new Date("2026-05-15T00:10:00Z"),
+  };
+  for (const head of [[], [note]]) {
+    const timing = deriveStreamTurnTiming({
+      tail: [user("u1", userAt), tool, ...(head.length ? [] : [note])],
+      head,
+      isTurnActive: false,
+      activeTurnStartedAt: null,
+    });
+    assert.equal(timing.byItemId.get("last-tool")?.durationMs, 5000);
+  }
 });

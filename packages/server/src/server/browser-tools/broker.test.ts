@@ -955,14 +955,14 @@ describe("BrowserToolsBroker", () => {
 
 class FakeLiveHost extends FakeBrowserHostClient {
   public readonly liveMessages: BrowserHostLiveOutboundMessage[] = [];
-  public readonly liveView = {
+  public readonly liveView: NonNullable<BrowserHostClient["liveView"]> = {
     send: (message: BrowserHostLiveOutboundMessage) => {
       this.liveMessages.push(message);
     },
   };
 
   public lastLiveRequest(
-    type: "browser.host.live.start.request" | "browser.host.live.stop.request",
+    type: Extract<BrowserHostLiveOutboundMessage, { requestId: string }>["type"],
   ): Extract<BrowserHostLiveOutboundMessage, { requestId: string }> {
     const message = this.liveMessages.findLast((candidate) => candidate.type === type);
     if (!message || !("requestId" in message)) throw new Error(`No ${type} sent`);
@@ -979,6 +979,7 @@ class FakeLiveHost extends FakeBrowserHostClient {
 interface RecordingViewer {
   frames: Uint8Array[];
   ended: Array<{ code: string }>;
+  endedControl: Array<{ held: boolean } | undefined>;
   results: BrowserLiveViewStartResult[];
   sink: BrowserLiveViewSink;
   respond: (result: BrowserLiveViewStartResult) => void;
@@ -988,10 +989,14 @@ function createViewer(): RecordingViewer {
   const viewer: RecordingViewer = {
     frames: [],
     ended: [],
+    endedControl: [],
     results: [],
     sink: {
       sendFrame: (frame) => viewer.frames.push(frame),
-      ended: (error) => viewer.ended.push(error),
+      ended: (error, control) => {
+        viewer.ended.push(error);
+        viewer.endedControl.push(control);
+      },
     },
     respond: (result) => viewer.results.push(result),
   };
@@ -1035,12 +1040,14 @@ async function startStream(params: {
   viewer: RecordingViewer;
   streamId?: string;
   viewerId?: string;
+  ownerId?: string;
   browserId?: string;
 }): Promise<void> {
   const started = params.broker.startLiveView({
     streamId: params.streamId ?? "stream-1",
     browserId: params.browserId ?? BROWSER_ID,
     viewerId: params.viewerId ?? "viewer-1",
+    ownerId: params.ownerId ?? "phone",
     options: { maxFps: 5 },
     sink: params.viewer.sink,
     respond: params.viewer.respond,
@@ -1064,6 +1071,7 @@ describe("BrowserToolsBroker live view", () => {
       streamId: "stream-1",
       browserId: BROWSER_ID,
       viewerId: "viewer-1",
+      ownerId: "owner-viewer-1",
       options: {},
       sink: viewer.sink,
       respond: viewer.respond,
@@ -1077,6 +1085,7 @@ describe("BrowserToolsBroker live view", () => {
           message: "Browser live view is turned off in Host settings.",
           retryable: false,
         },
+        control: { held: false },
       },
     ]);
     expect(host.liveMessages).toEqual([]);
@@ -1169,13 +1178,18 @@ describe("BrowserToolsBroker live view", () => {
       streamId: "stream-1",
       browserId: BROWSER_ID,
       viewerId: "viewer-1",
+      ownerId: "owner-viewer-1",
       options: {},
       sink: viewer.sink,
       respond: viewer.respond,
     });
 
     expect(viewer.results).toEqual([
-      { ok: false, error: expect.objectContaining({ code: "browser_unsupported" }) },
+      {
+        ok: false,
+        error: expect.objectContaining({ code: "browser_unsupported" }),
+        control: { held: false },
+      },
     ]);
     expect(broker.getLiveViewCount()).toBe(0);
   });
@@ -1191,12 +1205,17 @@ describe("BrowserToolsBroker live view", () => {
       streamId: "stream-2",
       browserId: BROWSER_ID,
       viewerId: "viewer-2",
+      ownerId: "owner-viewer-2",
       options: {},
       sink: second.sink,
       respond: second.respond,
     });
     expect(second.results).toEqual([
-      { ok: false, error: expect.objectContaining({ code: "browser_denied" }) },
+      {
+        ok: false,
+        error: expect.objectContaining({ code: "browser_denied" }),
+        control: { held: false },
+      },
     ]);
     expect(
       host.liveMessages.filter((m) => m.type === "browser.host.live.start.request"),
@@ -1260,6 +1279,7 @@ describe("BrowserToolsBroker live view", () => {
       streamId: "stream-1",
       browserId: BROWSER_ID,
       viewerId: "viewer-1",
+      ownerId: "owner-viewer-1",
       options: {},
       sink: { sendFrame: () => order.push("frame"), ended: () => order.push("ended") },
       respond: () => order.push("response"),
@@ -1286,6 +1306,7 @@ describe("BrowserToolsBroker live view", () => {
       streamId: "stream-1",
       browserId: BROWSER_ID,
       viewerId: "viewer-1",
+      ownerId: "owner-viewer-1",
       options: {},
       sink: viewer.sink,
       respond: viewer.respond,
@@ -1300,7 +1321,11 @@ describe("BrowserToolsBroker live view", () => {
     });
     await started;
     expect(viewer.results).toEqual([
-      { ok: false, error: { code: "browser_tab_not_found", message: "gone", retryable: false } },
+      {
+        ok: false,
+        error: { code: "browser_tab_not_found", message: "gone", retryable: false },
+        control: { held: false },
+      },
     ]);
     expect(broker.getLiveViewCount()).toBe(0);
   });
@@ -1314,6 +1339,7 @@ describe("BrowserToolsBroker live view", () => {
       streamId: "stream-1",
       browserId: BROWSER_ID,
       viewerId: "viewer-1",
+      ownerId: "owner-viewer-1",
       options: {},
       sink: viewer.sink,
       respond: viewer.respond,
@@ -1330,7 +1356,9 @@ describe("BrowserToolsBroker live view", () => {
     });
     await started;
 
-    expect(viewer.results).toEqual([{ ok: false, error: expect.anything() }]);
+    expect(viewer.results).toEqual([
+      { ok: false, error: expect.anything(), control: { held: false } },
+    ]);
     expect(
       host.liveMessages.filter((m) => m.type === "browser.host.live.stop.request"),
     ).toHaveLength(2);
@@ -1347,6 +1375,7 @@ describe("BrowserToolsBroker live view", () => {
       streamId: "stream-1",
       browserId: BROWSER_ID,
       viewerId: "viewer-1",
+      ownerId: "owner-viewer-1",
       options: {},
       sink: viewer.sink,
       respond: viewer.respond,
@@ -1355,7 +1384,11 @@ describe("BrowserToolsBroker live view", () => {
     await started;
 
     expect(viewer.results).toEqual([
-      { ok: false, error: expect.objectContaining({ code: "browser_timeout" }) },
+      {
+        ok: false,
+        error: expect.objectContaining({ code: "browser_timeout" }),
+        control: { held: false },
+      },
     ]);
     expect(host.lastLiveRequest("browser.host.live.stop.request")).toMatchObject({
       streamId: "stream-1",
@@ -1430,6 +1463,7 @@ describe("BrowserToolsBroker live view", () => {
       streamId: "stream-1",
       browserId: BROWSER_ID,
       viewerId: "viewer-1",
+      ownerId: "owner-viewer-1",
       options: {},
       sink: viewer.sink,
       respond: viewer.respond,
@@ -1437,9 +1471,662 @@ describe("BrowserToolsBroker live view", () => {
     await vi.advanceTimersByTimeAsync(100);
     await started;
     expect(viewer.results).toEqual([
-      { ok: false, error: expect.objectContaining({ code: "browser_timeout" }) },
+      {
+        ok: false,
+        error: expect.objectContaining({ code: "browser_timeout" }),
+        control: { held: false },
+      },
     ]);
     expect(broker.getLiveViewCount()).toBe(0);
     vi.useRealTimers();
+  });
+});
+
+describe("BrowserToolsBroker human control", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  const GRACE_MS = 5 * 60_000;
+  const FOCUS = {
+    targetId: "target-1",
+    kind: "password",
+    origin: "https://idp.example",
+    topOrigin: "https://app.example",
+  };
+  const SENTINEL = "LV3-SENTINEL-broker";
+
+  class FakeControlHost extends FakeLiveHost {
+    public override readonly liveView: NonNullable<BrowserHostClient["liveView"]> = {
+      input: true,
+      send: (message) => {
+        this.liveMessages.push(message);
+      },
+    };
+  }
+
+  function controlledBroker(options: { enabled?: () => boolean } = {}) {
+    let sequence = 0;
+    const endings: Array<{ agentIds: string[]; note: string }> = [];
+    const broker = new BrowserToolsBroker({
+      defaultTimeoutMs: 100,
+      createRequestId: () => `req-${++sequence}`,
+      isLiveViewEnabled: options.enabled ?? (() => true),
+      onHumanControlEnded: (ending) => endings.push(ending),
+    });
+    const host = new FakeControlHost("host-1");
+    broker.registerClient(host);
+
+    const answer = (
+      payload: Record<string, unknown>,
+      type: Parameters<FakeLiveHost["lastLiveRequest"]>[0],
+    ) =>
+      broker.receiveLiveResponse({
+        payload: { requestId: host.lastLiveRequest(type).requestId, ...payload } as never,
+        clientIds: [host.id],
+      });
+    const viewer = (streamId = "stream-1", viewerId = "viewer-1", ownerId = "phone") => ({
+      streamId,
+      viewerId,
+      ownerId,
+    });
+    const watch = async (as = viewer()) => {
+      const recording = createViewer();
+      await startStream({ broker, host, viewer: recording, ...as });
+      return recording;
+    };
+    const take = async (as = viewer()) => {
+      const taking = broker.takeControl(as);
+      answer({ focus: FOCUS, error: null }, "browser.host.live.take_control.request");
+      return taking;
+    };
+    const released = async (error: { code: string; message: string } | null = null) => {
+      answer({ error }, "browser.host.live.release_control.request");
+      await vi.advanceTimersByTimeAsync(0);
+    };
+    const leave = async (as = viewer()) => {
+      const stopping = broker.stopLiveView(as);
+      answer({ error: null }, "browser.host.live.stop.request");
+      await stopping;
+    };
+    const releases = () =>
+      host.liveMessages.filter(
+        (message) => message.type === "browser.host.live.release_control.request",
+      );
+    const agentSnapshot = async (agentId = "agent-1") => {
+      const before = host.receivedRequests.length;
+      const result = broker.execute({ agentId, command: snapshotCommand() });
+      await Promise.resolve();
+      if (host.receivedRequests.length > before) {
+        host.resolveLatestWith(broker, {
+          requestId: "ignored",
+          ok: true,
+          result: {
+            command: "snapshot",
+            browserId: BROWSER_ID,
+            url: "https://app.example",
+            title: "App",
+            format: "aria-yaml",
+            snapshot: "",
+            refs: [],
+            truncated: false,
+            stats: { nodeCount: 0, refCount: 0, textLength: 0 },
+          } as never,
+        });
+      }
+      return result;
+    };
+    return {
+      broker,
+      host,
+      endings,
+      answer,
+      viewer,
+      watch,
+      take,
+      released,
+      leave,
+      releases,
+      agentSnapshot,
+    };
+  }
+
+  test("watching never locks the agent out", async () => {
+    const { watch, agentSnapshot } = controlledBroker();
+    const recording = await watch();
+    expect(recording.results).toEqual([expect.objectContaining({ control: { held: false } })]);
+    await expect(agentSnapshot()).resolves.toMatchObject({ ok: true });
+  });
+
+  test("a desktop without input support can be watched but not controlled", async () => {
+    const broker = createLiveBroker();
+    const host = new FakeLiveHost("host-old");
+    broker.registerClient(host);
+    const recording = createViewer();
+    await startStream({ broker, host, viewer: recording });
+
+    expect(recording.results[0]).not.toHaveProperty("control");
+    await expect(
+      broker.takeControl({ streamId: "stream-1", viewerId: "viewer-1", ownerId: "phone" }),
+    ).resolves.toMatchObject({ error: { code: "update_desktop" } });
+    expect(host.liveMessages.map((message) => message.type)).toEqual([
+      "browser.host.live.start.request",
+    ]);
+  });
+
+  test("locks as soon as take control is asked for, before the desktop answers", async () => {
+    const { broker, host, answer, viewer, watch } = controlledBroker();
+    await watch();
+    const taking = broker.takeControl(viewer());
+
+    await expect(
+      broker.execute({ agentId: "agent-1", command: snapshotCommand() }),
+    ).resolves.toMatchObject({
+      ok: false,
+      error: { code: "browser_human_control" },
+    });
+    await expect(
+      broker.sendLiveInput({ ...viewer(), input: { kind: "key", key: "Tab" } }),
+    ).resolves.toMatchObject({ error: { code: "not_controller" } });
+
+    answer({ focus: FOCUS, error: null }, "browser.host.live.take_control.request");
+    await expect(taking).resolves.toEqual({ focus: FOCUS, error: null });
+    expect(host.receivedRequests).toEqual([]);
+  });
+
+  test("a failed take releases the tab again", async () => {
+    const { broker, answer, viewer, watch, agentSnapshot, releases } = controlledBroker();
+    await watch();
+    const taking = broker.takeControl(viewer());
+    answer(
+      { focus: null, error: { code: "agent_busy", message: "Busy." } },
+      "browser.host.live.take_control.request",
+    );
+    await expect(taking).resolves.toMatchObject({ error: { code: "agent_busy" } });
+    expect(releases()).toEqual([expect.objectContaining({ discardInput: false })]);
+    await expect(agentSnapshot()).resolves.toMatchObject({ ok: true });
+  });
+
+  test("refuses every command that targets the held tab, reads included", async () => {
+    const { broker, host, watch, take } = controlledBroker();
+    await watch();
+    await take();
+    const browserId = BROWSER_ID;
+    const ref = "@e1";
+    const commands = [
+      { command: "snapshot", args: { browserId } },
+      {
+        command: "click",
+        args: { browserId, ref, button: "left", doubleClick: false, modifiers: [] },
+      },
+      { command: "fill", args: { browserId, ref, value: "x" } },
+      { command: "wait", args: { browserId, text: "x" } },
+      { command: "type", args: { browserId, text: "x" } },
+      { command: "keypress", args: { browserId, key: "Enter" } },
+      { command: "navigate", args: { browserId, url: "https://example.com" } },
+      { command: "back", args: { browserId } },
+      { command: "forward", args: { browserId } },
+      { command: "reload", args: { browserId } },
+      { command: "screenshot", args: { browserId, fullPage: false } },
+      { command: "upload", args: { browserId, ref, filePaths: ["file.txt"] } },
+      { command: "select", args: { browserId, ref, value: "x" } },
+      { command: "hover", args: { browserId, ref } },
+      { command: "drag", args: { browserId, sourceRef: ref, targetRef: "@e2" } },
+      { command: "logs", args: { browserId, maxEntries: 10 } },
+      { command: "evaluate", args: { browserId, function: "() => 1" } },
+      { command: "scroll", args: { browserId, deltaX: 0, deltaY: 1 } },
+      { command: "resize", args: { browserId, width: 800, height: 600 } },
+      { command: "close_tab", args: { browserId } },
+    ] as BrowserAutomationCommand[];
+    expect(new Set(commands.map((command) => command.command))).toEqual(
+      new Set(
+        BROWSER_AUTOMATION_COMMAND_NAMES.filter(
+          (name) => name !== "list_tabs" && name !== "new_tab",
+        ),
+      ),
+    );
+
+    for (const command of commands) {
+      await expect(broker.execute({ agentId: "agent-1", command })).resolves.toMatchObject({
+        ok: false,
+        error: {
+          code: "browser_human_control",
+          retryable: true,
+          message: expect.stringContaining("browser_snapshot"),
+        },
+      });
+    }
+    expect(host.receivedRequests).toEqual([]);
+  });
+
+  test("other tabs stay available to agents", async () => {
+    const { broker, host, watch, take } = controlledBroker();
+    await watch();
+    await take();
+    void broker.execute({ command: { command: "reload", args: { browserId: SECOND_BROWSER_ID } } });
+    await Promise.resolve();
+    expect(host.receivedRequests).toHaveLength(1);
+  });
+
+  test("list_tabs withholds the held tab's address and title", async () => {
+    const { broker, host, watch, take } = controlledBroker();
+    await watch();
+    await take();
+    const listing = broker.execute({ command: { command: "list_tabs", args: {} } });
+    await Promise.resolve();
+    const tab = { isActive: false, isLoading: false };
+    host.resolveLatestWith(broker, {
+      requestId: "ignored",
+      ok: true,
+      result: {
+        command: "list_tabs",
+        tabs: [
+          { ...tab, browserId: BROWSER_ID, url: "https://app.example/?code=1", title: "Secret" },
+          { ...tab, browserId: SECOND_BROWSER_ID, url: "https://docs.example/", title: "Docs" },
+        ],
+      },
+    });
+    await expect(listing).resolves.toMatchObject({
+      result: {
+        tabs: [
+          { browserId: BROWSER_ID, url: "", title: "", humanControl: true },
+          { browserId: SECOND_BROWSER_ID, url: "https://docs.example/", title: "Docs" },
+        ],
+      },
+    });
+  });
+
+  test("reports the desktop's own refusal as human control", async () => {
+    const { broker, host, answer, viewer, watch } = controlledBroker();
+    await watch();
+    const racing = broker.execute({ agentId: "agent-1", command: snapshotCommand() });
+    await Promise.resolve();
+    const taking = broker.takeControl(viewer());
+    host.resolveLatestWith(broker, {
+      requestId: "ignored",
+      ok: false,
+      error: { code: "browser_denied", message: "Held.", retryable: true },
+    });
+    await expect(racing).resolves.toMatchObject({ error: { code: "browser_human_control" } });
+    answer({ focus: null, error: null }, "browser.host.live.take_control.request");
+    await taking;
+  });
+
+  test("forwards the controller's input and refuses everyone else's", async () => {
+    const { broker, host, answer, viewer, watch, take } = controlledBroker();
+    await watch();
+    await take();
+    const input = { kind: "insert_text", targetId: "target-1", text: SENTINEL } as const;
+
+    for (const impostor of [
+      viewer("stream-1", "viewer-2"),
+      viewer("stream-1", "viewer-1", "tablet"),
+    ]) {
+      await expect(broker.sendLiveInput({ ...impostor, input })).resolves.toMatchObject({
+        error: { code: "stream_ended" },
+      });
+    }
+    expect(JSON.stringify(host.liveMessages)).not.toContain(SENTINEL);
+
+    const sending = broker.sendLiveInput({ ...viewer(), input });
+    expect(host.lastLiveRequest("browser.host.live.send_input.request")).toMatchObject({
+      streamId: "stream-1",
+      input,
+    });
+    answer({ focus: null, error: null }, "browser.host.live.send_input.request");
+    await expect(sending).resolves.toEqual({ focus: null, error: null });
+  });
+
+  test("an unanswered insert keeps the lock and isn't sent again", async () => {
+    vi.useFakeTimers();
+    const { broker, host, viewer, watch, take, agentSnapshot } = controlledBroker();
+    await watch();
+    await take();
+    const sending = broker.sendLiveInput({
+      ...viewer(),
+      input: { kind: "insert_text", targetId: "target-1", text: SENTINEL },
+    });
+    await vi.advanceTimersByTimeAsync(30_000);
+
+    const result = await sending;
+    expect(result).toMatchObject({ error: { code: "unconfirmed" } });
+    expect(JSON.stringify(result)).not.toContain(SENTINEL);
+    expect(
+      host.liveMessages.filter(
+        (message) => message.type === "browser.host.live.send_input.request",
+      ),
+    ).toHaveLength(1);
+    await expect(agentSnapshot()).resolves.toMatchObject({
+      error: { code: "browser_human_control" },
+    });
+  });
+
+  test("only the controller can watch a held tab again", async () => {
+    vi.useFakeTimers();
+    const { broker, viewer, watch, take, leave, host } = controlledBroker();
+    await watch();
+    await take();
+    await leave();
+
+    const stranger = createViewer();
+    await broker.startLiveView({
+      ...viewer("stream-2", "viewer-2", "tablet"),
+      browserId: BROWSER_ID,
+      options: {},
+      sink: stranger.sink,
+      respond: stranger.respond,
+    });
+    expect(stranger.results).toEqual([
+      {
+        ok: false,
+        error: expect.objectContaining({ code: "browser_denied" }),
+        control: { held: false },
+      },
+    ]);
+
+    // A new session of the same phone.
+    const returned = await watch(viewer("stream-3", "viewer-3"));
+    expect(returned.results).toEqual([expect.objectContaining({ control: { held: true } })]);
+    expect(host.lastLiveRequest("browser.host.live.start.request")).toMatchObject({
+      controlId: expect.any(String),
+    });
+  });
+
+  test("returning inside five minutes resumes control", async () => {
+    vi.useFakeTimers();
+    const { broker, answer, viewer, watch, take, leave, releases } = controlledBroker();
+    await watch();
+    await take();
+    await leave();
+    await vi.advanceTimersByTimeAsync(GRACE_MS - 1000);
+    await watch(viewer("stream-2"));
+    await vi.advanceTimersByTimeAsync(GRACE_MS * 2);
+
+    expect(releases()).toEqual([]);
+    const sending = broker.sendLiveInput({
+      ...viewer("stream-2"),
+      input: { kind: "key", key: "Tab" },
+    });
+    answer({ focus: null, error: null }, "browser.host.live.send_input.request");
+    await expect(sending).resolves.toMatchObject({ error: null });
+  });
+
+  test("releases five minutes after the phone left, discarding what it typed", async () => {
+    vi.useFakeTimers();
+    const { watch, take, leave, releases, released, agentSnapshot, endings } = controlledBroker();
+    await watch();
+    await take();
+    await agentSnapshot();
+    await leave();
+    await vi.advanceTimersByTimeAsync(GRACE_MS - 1);
+    expect(releases()).toEqual([]);
+
+    await vi.advanceTimersByTimeAsync(1);
+    expect(releases()).toEqual([expect.objectContaining({ discardInput: true })]);
+    // Still locked until the desktop discarded it.
+    await expect(agentSnapshot()).resolves.toMatchObject({
+      error: { code: "browser_human_control" },
+    });
+
+    await released();
+    expect(endings).toEqual([
+      { agentIds: ["agent-1"], note: expect.stringContaining("discarded") },
+    ]);
+    await expect(agentSnapshot()).resolves.toMatchObject({ ok: true });
+  });
+
+  test("retries an auto-release the desktop couldn't finish, still locked", async () => {
+    vi.useFakeTimers();
+    const { watch, take, leave, releases, released, agentSnapshot } = controlledBroker();
+    await watch();
+    await take();
+    await leave();
+    await vi.advanceTimersByTimeAsync(GRACE_MS);
+    await released({ code: "failed", message: "No." });
+    await expect(agentSnapshot()).resolves.toMatchObject({
+      error: { code: "browser_human_control" },
+    });
+
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(releases()).toHaveLength(2);
+    await released();
+    await expect(agentSnapshot()).resolves.toMatchObject({ ok: true });
+  });
+
+  test("hand-back discards nothing and leaves the agent one note, without secrets", async () => {
+    const { broker, answer, viewer, watch, take, releases, endings, agentSnapshot } =
+      controlledBroker();
+    await watch();
+    await agentSnapshot();
+    await take();
+
+    const handingBack = broker.releaseControl(viewer());
+    answer({ error: null }, "browser.host.live.release_control.request");
+    await expect(handingBack).resolves.toEqual({ error: null });
+
+    expect(releases()).toEqual([expect.objectContaining({ discardInput: false })]);
+    const note = expect.stringContaining("handed browser tab");
+    expect(endings).toEqual([{ agentIds: ["agent-1"], note }]);
+    await expect(agentSnapshot()).resolves.toMatchObject({ ok: true, userNotes: [note] });
+    expect(await agentSnapshot()).not.toHaveProperty("userNotes");
+  });
+
+  test("the note finds the next caller when the daemon saw no agent use the tab", async () => {
+    const { broker, answer, viewer, watch, take, agentSnapshot } = controlledBroker();
+    await watch();
+    await take();
+    const handingBack = broker.releaseControl(viewer());
+    answer({ error: null }, "browser.host.live.release_control.request");
+    await handingBack;
+    await expect(agentSnapshot("agent-2")).resolves.toMatchObject({
+      userNotes: [expect.stringContaining(BROWSER_ID)],
+    });
+  });
+
+  test("a hand-back the desktop couldn't finish keeps control", async () => {
+    const { broker, answer, viewer, watch, take, agentSnapshot } = controlledBroker();
+    await watch();
+    await take();
+    const handingBack = broker.releaseControl(viewer());
+    answer(
+      { error: { code: "failed", message: "No." } },
+      "browser.host.live.release_control.request",
+    );
+    await expect(handingBack).resolves.toMatchObject({ error: { code: "failed" } });
+    await expect(agentSnapshot()).resolves.toMatchObject({
+      error: { code: "browser_human_control" },
+    });
+  });
+
+  test("switching the setting off discards and releases, locked until done", async () => {
+    vi.useFakeTimers();
+    let enabled = true;
+    const { broker, answer, watch, take, releases, released, agentSnapshot } = controlledBroker({
+      enabled: () => enabled,
+    });
+    await watch();
+    await take();
+    enabled = false;
+    broker.stopAllLiveViews();
+    answer({ error: null }, "browser.host.live.stop.request");
+
+    expect(releases()).toEqual([expect.objectContaining({ discardInput: true })]);
+    await expect(agentSnapshot()).resolves.toMatchObject({
+      error: { code: "browser_human_control" },
+    });
+    await released();
+    await expect(agentSnapshot()).resolves.toMatchObject({ ok: true });
+  });
+
+  test("a desktop disconnect ends control here; that desktop discards and unlocks itself", async () => {
+    const { broker, host, watch, take, endings, releases, agentSnapshot } = controlledBroker();
+    await watch();
+    await take();
+    await agentSnapshot();
+    broker.unregisterClient(host.id);
+
+    expect(releases()).toEqual([]);
+    expect(endings).toEqual([{ agentIds: ["agent-1"], note: expect.any(String) }]);
+    await expect(agentSnapshot()).resolves.toMatchObject({ error: { code: "browser_no_host" } });
+  });
+
+  test("closing the tab ends control, and only its host can say so", async () => {
+    const { broker, host, watch, take, agentSnapshot } = controlledBroker();
+    await watch();
+    await take();
+    const taken = host.lastLiveRequest("browser.host.live.take_control.request") as Extract<
+      BrowserHostLiveOutboundMessage,
+      { controlId: string }
+    >;
+    const payload = { controlId: taken.controlId };
+
+    expect(broker.receiveControlEnded({ payload, clientIds: ["another-host"] })).toBe(false);
+    await expect(agentSnapshot()).resolves.toMatchObject({
+      error: { code: "browser_human_control" },
+    });
+    expect(broker.receiveControlEnded({ payload, clientIds: [host.id] })).toBe(true);
+    await expect(agentSnapshot()).resolves.toMatchObject({ ok: true });
+  });
+
+  test("a failed take leaves the last hand-back note waiting", async () => {
+    vi.useFakeTimers();
+    const { broker, answer, viewer, watch, take, released, agentSnapshot } = controlledBroker();
+    await agentSnapshot();
+    await watch();
+    await take();
+    const handingBack = broker.releaseControl(viewer());
+    await released();
+    await handingBack;
+
+    const taking = broker.takeControl(viewer());
+    const refused = await broker.execute({ agentId: "agent-1", command: snapshotCommand() });
+    expect(refused).not.toHaveProperty("userNotes");
+    answer(
+      { focus: null, error: { code: "agent_busy", message: "Busy." } },
+      "browser.host.live.take_control.request",
+    );
+    await taking;
+
+    await expect(agentSnapshot()).resolves.toMatchObject({
+      userNotes: [expect.stringContaining("handed browser tab")],
+    });
+  });
+
+  test("a granted take drops the note it made stale", async () => {
+    vi.useFakeTimers();
+    const { broker, viewer, watch, take, released, releases, agentSnapshot } = controlledBroker();
+    await agentSnapshot();
+    await watch();
+    await take();
+    const handingBack = broker.releaseControl(viewer());
+    await released();
+    await handingBack;
+
+    await take();
+    await expect(agentSnapshot()).resolves.not.toHaveProperty("userNotes");
+    expect(releases()).toHaveLength(1);
+  });
+
+  test("a stream that ends while control goes on says so", async () => {
+    const { broker, host, watch, take } = controlledBroker();
+    const recording = await watch();
+    await take();
+    const error = { code: "browser_tab_closed", message: "Detached.", retryable: false } as const;
+    broker.receiveLiveEnded({ payload: { streamId: "stream-1", error }, clientIds: [host.id] });
+    expect(recording.endedControl).toEqual([{ held: true }]);
+  });
+
+  test("a stream that ends with control says so", async () => {
+    const { broker, host, watch, take } = controlledBroker();
+    const recording = await watch();
+    await take();
+    broker.unregisterClient(host.id);
+    expect(recording.endedControl).toEqual([{ held: false }]);
+  });
+
+  test("switching the setting off tells the viewer control is over", async () => {
+    const { broker, watch, take } = controlledBroker();
+    const recording = await watch();
+    await take();
+    broker.stopAllLiveViews();
+    expect(recording.endedControl).toEqual([{ held: false }]);
+  });
+
+  test("a start that fails says whether the viewer still holds the tab", async () => {
+    const { broker, host, viewer, watch, take } = controlledBroker();
+    await watch();
+    await take();
+    const again = createViewer();
+    await broker.startLiveView({
+      ...viewer("stream-2"),
+      browserId: BROWSER_ID,
+      options: {},
+      sink: again.sink,
+      respond: again.respond,
+    });
+    expect(again.results).toEqual([
+      expect.objectContaining({ ok: false, control: { held: true } }),
+    ]);
+    expect(host.receivedRequests).toEqual([]);
+  });
+
+  test("an inactive stream is not a lost control", async () => {
+    vi.useFakeTimers();
+    const { broker, viewer, watch, take, leave } = controlledBroker();
+    await watch();
+    await take();
+    await leave();
+    const gone = { error: { code: "stream_ended" } };
+    const input = { kind: "key", key: "Tab" } as const;
+    await expect(broker.sendLiveInput({ ...viewer(), input })).resolves.toMatchObject(gone);
+    await expect(broker.releaseControl(viewer())).resolves.toMatchObject(gone);
+    await expect(broker.takeControl(viewer())).resolves.toMatchObject(gone);
+  });
+
+  test("the desktop can't declare control lost while the daemon holds the lock", async () => {
+    const { broker, answer, viewer, watch, take } = controlledBroker();
+    await watch();
+    await take();
+    const error = { code: "not_controller", message: "Unknown control." };
+    const input = { kind: "key", key: "Tab" } as const;
+    const sending = broker.sendLiveInput({ ...viewer(), input });
+    answer({ focus: null, error }, "browser.host.live.send_input.request");
+    await expect(sending).resolves.toMatchObject({ error: { code: "not_sent" } });
+
+    const handingBack = broker.releaseControl(viewer());
+    answer({ error }, "browser.host.live.release_control.request");
+    await expect(handingBack).resolves.toMatchObject({ error: { code: "failed" } });
+  });
+
+  test.each([
+    { kind: "key", key: "Enter" },
+    { kind: "tap", documentId: "stream-1:0", x: 1, y: 2 },
+    { kind: "scroll", documentId: "stream-1:0", x: 1, y: 2, deltaX: 0, deltaY: 9 },
+  ] as const)("a $kind without an answer may have been sent", async (input) => {
+    const { broker, viewer, watch, take } = controlledBroker();
+    await watch();
+    await take();
+    vi.useFakeTimers();
+    const sending = broker.sendLiveInput({ ...viewer(), input });
+    await vi.advanceTimersByTimeAsync(12_000);
+    await expect(sending).resolves.toMatchObject({ error: { code: "unconfirmed" } });
+  });
+
+  test("passes on that taking control reloaded the page", async () => {
+    const { broker, answer, viewer, watch } = controlledBroker();
+    await watch();
+    const taking = broker.takeControl(viewer());
+    answer({ focus: FOCUS, error: null, reloaded: true }, "browser.host.live.take_control.request");
+    await expect(taking).resolves.toEqual({ focus: FOCUS, error: null, reloaded: true });
+  });
+
+  test("a restarted daemon holds no lock", async () => {
+    const before = controlledBroker();
+    await before.watch();
+    await before.take();
+
+    // The desktop discards and unlocks itself when it loses the old daemon.
+    const after = controlledBroker();
+    await expect(after.agentSnapshot()).resolves.toMatchObject({ ok: true });
   });
 });

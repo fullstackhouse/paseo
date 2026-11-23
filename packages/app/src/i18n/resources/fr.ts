@@ -601,6 +601,92 @@ export const fr: TranslationResources = {
         subtitle: "Ouvrez cet espace de travail dans Electron pour utiliser le navigateur intégré.",
       },
       session: "Session de navigateur {{browserId}}",
+      liveView: {
+        connecting: "Connexion au navigateur de l’ordinateur...",
+        endedTitle: "La vue en direct est terminée",
+        retry: "Réessayer",
+        ended: {
+          connection: "La connexion à l’hôte a été perdue",
+          tabClosed: "L’onglet du navigateur a été fermé",
+          noDesktop: "L’ordinateur qui a cet onglet n’est pas connecté",
+          inUse: "Un autre appareil affiche ou contrôle cet onglet",
+          unsupported: "Mettez à jour Paseo sur l’ordinateur qui a cet onglet",
+          failed: "La vue en direct n’a pas pu continuer",
+        },
+        hints: {
+          turnOn:
+            "Activez la vue en direct du navigateur dans Réglages de l’hôte → Agents pour voir cet onglet ici",
+          updateHost: "Mettez à jour Paseo sur cet hôte pour voir cet onglet ici",
+        },
+        control: {
+          take: "Prendre le contrôle",
+          taking: "Prise de contrôle...",
+          takeHint:
+            "L’agent ne peut pas utiliser cet onglet pendant que vous le contrôlez. Après 5 minutes d’absence, le contrôle prend fin et la saisie non envoyée est supprimée.",
+          updateHost: "Mettez à jour Paseo sur cet hôte pour prendre le contrôle",
+          updateDesktop:
+            "Mettez à jour Paseo sur l’ordinateur qui a cet onglet pour prendre le contrôle",
+          heldHint:
+            "Touchez un champ pour saisir. Après 5 minutes d’absence, le contrôle prend fin et la saisie non envoyée est supprimée.",
+          handBack: "Rendre à l’agent",
+          handingBack: "Restitution...",
+          handBackHint:
+            "Ensuite, l’agent voit cette page et peut utiliser cette connexion. Les mots de passe et codes non envoyés sont effacés.",
+          pageOrigin: "Page : {{origin}}",
+          typingInto: "Saisie dans {{origin}}",
+          embeddedIn: "Intégré dans {{origin}}",
+          unknownOrigin: "un site inconnu",
+          send: "Envoyer",
+        },
+        fields: {
+          password: "Mot de passe",
+          newPassword: "Nouveau mot de passe",
+          oneTimeCode: "Code à usage unique",
+          username: "Nom d’utilisateur",
+          email: "E-mail",
+          secret: "Champ protégé",
+          text: "Texte",
+        },
+        keys: {
+          enter: "Entrée",
+          tab: "Tabulation",
+          backspace: "Effacer",
+          escape: "Échap",
+          arrowUp: "Flèche haut",
+          arrowDown: "Flèche bas",
+          arrowLeft: "Flèche gauche",
+          arrowRight: "Flèche droite",
+        },
+        notices: {
+          released: "Votre contrôle a pris fin. La saisie non envoyée a pu être supprimée.",
+          targetChanged:
+            "La page ou le champ a changé, le texte a donc été refusé. Touchez à nouveau le champ.",
+          pageChanged:
+            "La page a changé, votre appui ou défilement n'a donc pas été envoyé. Réessayez sur la nouvelle page.",
+          doesNotFit:
+            "Ce texte ne tient pas dans ce champ, il n'a donc pas été saisi. Touchez le champ et réessayez.",
+          streamEnded:
+            "La vue en direct s'est arrêtée, rien n'a donc été envoyé. Reconnectez-vous et réessayez.",
+          unconfirmed:
+            "L'ordinateur ne l'a pas confirmé. L'envoi a peut-être abouti : vérifiez la page avant de renvoyer.",
+          notSent: "Non envoyé. Réessayez.",
+          pageBlocked:
+            "La page ne répond pas. Si une boîte de dialogue y est ouverte, répondez-y sur l'ordinateur.",
+          watchBlocked:
+            "La page ne répond pas. Une boîte de dialogue y est peut-être ouverte. Prenez le contrôle pour l'ignorer ou répondez-y sur l'ordinateur.",
+          unloadBlocked:
+            "Prendre le contrôle exige de recharger la page pour arrêter l'action bloquée de l'agent, mais cette page empêche de la quitter. Terminez sur l'ordinateur.",
+          reloaded:
+            "L'action de l'agent était bloquée, la page a donc été rechargée pour l'arrêter. Ce qui n'était pas enregistré a été perdu.",
+          agentBusy: "L’action de l’agent dans le navigateur est encore en cours. Réessayez.",
+          busy: "Cet onglet est déjà contrôlé",
+          keyUnsupported:
+            "Les touches ne fonctionnent pas dans ce cadre intégré. Touchez plutôt son bouton.",
+          connection: "La connexion a été perdue. Réessayez.",
+          disabled: "La vue en direct du navigateur est désactivée sur cet hôte",
+          failed: "Le navigateur n’a pas répondu. Réessayez.",
+        },
+      },
       controls: {
         back: "Retour",
         forward: "Suivant",
@@ -3073,6 +3159,11 @@ export const fr: TranslationResources = {
       },
       agents: {
         unavailable: "Connectez-vous à cet hôte pour gérer les agents",
+        browserLiveView: {
+          title: "Vue en direct du navigateur (expérimental)",
+          hint: "Permet à votre téléphone de voir et de contrôler un onglet du navigateur d’un agent. Désactivée par défaut.",
+          updateFailed: "Impossible de modifier la vue en direct du navigateur",
+        },
         resumeOnStartup: {
           title: "Reprendre les agents après un redémarrage",
           info: "Rouvre les agents qui travaillaient lorsque l’hôte s’est arrêté et envoie le message de reprise. S’applique après un redémarrage normal ou un plantage.",

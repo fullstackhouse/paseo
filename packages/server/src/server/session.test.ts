@@ -909,6 +909,36 @@ describe("session authorization permissions", () => {
     ]);
   });
 
+  test("only workspace.write principals can control a live-viewed tab", async () => {
+    const messages: SessionOutboundMessage[] = [];
+    const session = createSessionForTest({
+      permissions: ["daemon.read", "workspace.read"],
+      messages,
+    });
+    const sentinel = "LV3-SENTINEL-session";
+    const streamId = "stream-1";
+    const requests = [
+      { type: "browser.live.take_control.request", requestId: "take", streamId },
+      {
+        type: "browser.live.send_input.request",
+        requestId: "input",
+        streamId,
+        input: { kind: "insert_text", targetId: "target-1", text: sentinel },
+      },
+      { type: "browser.live.release_control.request", requestId: "release", streamId },
+    ] as const;
+
+    for (const request of requests) await session.handleMessage(request);
+
+    expect(messages).toEqual(
+      requests.map(({ type, requestId }) => ({
+        type: "rpc_error",
+        payload: expect.objectContaining({ requestId, requestType: type, code: "access_denied" }),
+      })),
+    );
+    expect(JSON.stringify(messages)).not.toContain(sentinel);
+  });
+
   test("replaces a session's permissions without reconstructing the session", async () => {
     const messages: SessionOutboundMessage[] = [];
     const session = createSessionForTest({ permissions: ["hub.execute"], messages });

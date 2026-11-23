@@ -14,7 +14,11 @@ import {
 } from "@/desktop/browser/store";
 import { collectAllTabs, useWorkspaceLayoutStore } from "@/stores/workspace-layout-store";
 import { buildWorkspaceTabPersistenceKey } from "@/workspace-tabs/model";
-import { createBrowserLiveViewHost, isBrowserLiveViewSupported } from "./live-view";
+import {
+  createBrowserLiveViewHost,
+  isBrowserLiveInputSupported,
+  isBrowserLiveViewSupported,
+} from "./live-view";
 
 type BrowserAutomationExecuteRequest = Extract<
   SessionOutboundMessage,
@@ -81,6 +85,7 @@ export function mountBrowserAutomationDaemonClientHandler(
     hostKind: "desktop app",
     supportedCommands: [...BROWSER_AUTOMATION_COMMAND_NAMES],
     ...(liveView ? { liveView: true } : {}),
+    ...(liveView && isBrowserLiveInputSupported(getDesktopHost) ? { liveViewInput: true } : {}),
   });
   const unmount = mountBrowserAutomationHandler({
     client: {

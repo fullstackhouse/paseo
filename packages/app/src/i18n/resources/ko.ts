@@ -596,6 +596,88 @@ export const ko: TranslationResources = {
         subtitle: "내장 브라우저를 사용하려면 이 워크스페이스를 Electron에서 여세요.",
       },
       session: "브라우저 세션 {{browserId}}",
+      liveView: {
+        connecting: "데스크톱 브라우저에 연결 중...",
+        endedTitle: "라이브 뷰가 종료되었습니다",
+        retry: "다시 시도",
+        ended: {
+          connection: "호스트와의 연결이 끊겼습니다",
+          tabClosed: "브라우저 탭이 닫혔습니다",
+          noDesktop: "이 탭이 있는 데스크톱이 연결되어 있지 않습니다",
+          inUse: "다른 기기가 이 탭을 보거나 제어하고 있습니다",
+          unsupported: "이 탭이 있는 데스크톱의 Paseo를 업데이트하세요",
+          failed: "라이브 뷰를 계속할 수 없습니다",
+        },
+        hints: {
+          turnOn: "여기서 이 탭을 보려면 호스트 설정 → 에이전트에서 브라우저 라이브 뷰를 켜세요",
+          updateHost: "여기서 이 탭을 보려면 이 호스트의 Paseo를 업데이트하세요",
+        },
+        control: {
+          take: "제어권 가져오기",
+          taking: "제어권 가져오는 중...",
+          takeHint:
+            "제어하는 동안 에이전트는 이 탭을 사용할 수 없습니다. 5분간 자리를 비우면 제어가 끝나고 제출하지 않은 입력은 삭제됩니다.",
+          updateHost: "제어권을 가져오려면 이 호스트의 Paseo를 업데이트하세요",
+          updateDesktop: "제어권을 가져오려면 이 탭이 있는 데스크톱의 Paseo를 업데이트하세요",
+          heldHint:
+            "입력할 필드를 탭하세요. 5분간 자리를 비우면 제어가 끝나고 제출하지 않은 입력은 삭제됩니다.",
+          handBack: "에이전트에게 돌려주기",
+          handingBack: "돌려주는 중...",
+          handBackHint:
+            "돌려주면 에이전트가 이 페이지를 보고 이 로그인을 사용할 수 있습니다. 제출하지 않은 비밀번호와 코드는 지워집니다.",
+          pageOrigin: "페이지: {{origin}}",
+          typingInto: "입력 위치: {{origin}}",
+          embeddedIn: "포함된 위치: {{origin}}",
+          unknownOrigin: "알 수 없는 사이트",
+          send: "보내기",
+        },
+        fields: {
+          password: "비밀번호",
+          newPassword: "새 비밀번호",
+          oneTimeCode: "일회용 코드",
+          username: "사용자 이름",
+          email: "이메일",
+          secret: "보호된 필드",
+          text: "텍스트",
+        },
+        keys: {
+          enter: "입력",
+          tab: "탭 키",
+          backspace: "지우기",
+          escape: "이스케이프",
+          arrowUp: "위쪽 화살표",
+          arrowDown: "아래쪽 화살표",
+          arrowLeft: "왼쪽 화살표",
+          arrowRight: "오른쪽 화살표",
+        },
+        notices: {
+          released: "제어가 끝났습니다. 제출하지 않은 입력은 삭제되었을 수 있습니다.",
+          targetChanged: "페이지 또는 필드가 바뀌어 텍스트가 거부되었습니다. 필드를 다시 탭하세요.",
+          pageChanged:
+            "페이지가 바뀌어 탭이나 스크롤을 보내지 않았습니다. 새 페이지에서 다시 시도하세요.",
+          doesNotFit:
+            "텍스트가 이 필드에 맞지 않아 입력하지 않았습니다. 필드를 탭하고 다시 시도하세요.",
+          streamEnded:
+            "라이브 보기가 중지되어 아무것도 보내지 않았습니다. 다시 연결한 후 시도하세요.",
+          unconfirmed:
+            "데스크톱에서 확인되지 않았습니다. 전송되었을 수 있으니 다시 보내기 전에 페이지를 확인하세요.",
+          notSent: "전송되지 않았습니다. 다시 시도하세요.",
+          pageBlocked:
+            "페이지가 응답하지 않습니다. 대화 상자가 열려 있으면 데스크톱에서 응답하세요.",
+          watchBlocked:
+            "페이지가 응답하지 않습니다. 대화 상자가 열려 있을 수 있습니다. 제어를 가져와 닫거나 데스크톱에서 응답하세요.",
+          unloadBlocked:
+            "제어를 가져오려면 멈춘 에이전트 작업을 중지하기 위해 새로고침해야 하지만, 이 페이지가 나가기를 막고 있습니다. 데스크톱에서 마치세요.",
+          reloaded:
+            "에이전트 작업이 멈춰 있어 페이지를 새로고침하여 중지했습니다. 저장하지 않은 내용은 사라졌습니다.",
+          agentBusy: "에이전트의 브라우저 작업이 아직 실행 중입니다. 다시 시도하세요.",
+          busy: "이 탭은 이미 제어 중입니다",
+          keyUnsupported: "이 포함된 프레임에서는 키가 작동하지 않습니다. 대신 버튼을 탭하세요.",
+          connection: "연결이 끊겼습니다. 다시 시도하세요.",
+          disabled: "이 호스트에서 브라우저 라이브 뷰가 꺼져 있습니다",
+          failed: "브라우저가 응답하지 않았습니다. 다시 시도하세요.",
+        },
+      },
       controls: {
         back: "뒤로",
         forward: "앞으로",
@@ -3021,6 +3103,11 @@ export const ko: TranslationResources = {
       },
       agents: {
         unavailable: "에이전트를 관리하려면 이 호스트에 연결하세요",
+        browserLiveView: {
+          title: "브라우저 라이브 뷰(실험적)",
+          hint: "휴대폰에서 에이전트의 브라우저 탭을 보고 제어할 수 있습니다. 기본값은 꺼짐입니다.",
+          updateFailed: "브라우저 라이브 뷰를 업데이트할 수 없습니다",
+        },
         resumeOnStartup: {
           title: "재시작 후 에이전트 재개",
           info: "호스트가 중지될 때 작업 중이던 에이전트를 다시 열고 재개 메시지를 보냅니다. 정상 재시작과 비정상 종료 후 모두 적용됩니다.",

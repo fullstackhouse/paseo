@@ -696,6 +696,18 @@ export async function createPaseoDaemon(
   const browserToolsPolicy = new DaemonConfigBrowserToolsPolicy(daemonConfigStore);
   const browserToolsBroker = new BrowserToolsBroker({
     isLiveViewEnabled: () => daemonConfigStore.get().browserLiveView === true,
+    // Shown in the chat, and given to the agent on its next browser call. Never a prompt: ending
+    // control doesn't wake an agent.
+    onHumanControlEnded: ({ agentIds, note }) => {
+      for (const agentId of agentIds) {
+        if (!agentManager.getAgent(agentId)) continue;
+        agentManager
+          .appendTimelineItem(agentId, { type: "notification", level: "info", message: note })
+          .catch((error) =>
+            logger.warn({ err: error, agentId }, "Failed to show the end of browser control"),
+          );
+      }
+    },
   });
   const pluginRuntime: PluginService = new PluginService(logger, daemonConfigStore, daemonVersion, {
     usageAgents: {

@@ -2,22 +2,40 @@ import { ipcMain } from "electron";
 import { BrowserAutomationExecuteRequestSchema } from "@getpaseo/protocol/browser-automation/rpc-schemas";
 import {
   BrowserHostLiveFrameAckSchema,
+  BrowserHostLiveReleaseControlRequestSchema,
+  BrowserHostLiveSendInputRequestSchema,
   BrowserHostLiveStartRequestSchema,
   BrowserHostLiveStopRequestSchema,
+  BrowserHostLiveTakeControlRequestSchema,
+  type BrowserHostLiveReleaseControlResponse,
+  type BrowserHostLiveSendInputResponse,
   type BrowserHostLiveStartResponse,
   type BrowserHostLiveStopResponse,
+  type BrowserHostLiveTakeControlResponse,
 } from "@getpaseo/protocol/browser-automation/live-view";
+import { GUEST_CONTROL_REPLY_CHANNEL, type GuestFrame } from "./guest-frames.js";
+import {
+  BrowserHumanControls,
+  type HumanControlContents,
+  type HumanControlTab,
+} from "./human-control.js";
 import { BrowserLiveViewStream, type BrowserLiveViewEvents } from "./live-view.js";
+import { AgentCommandCancelledError } from "./agent-commands.js";
 import type {
   BrowserAutomationConsoleLogEntry,
   BrowserAutomationDialogEvent,
+  BrowserAutomationExecuteRequest,
 } from "@getpaseo/protocol/browser-automation/rpc-schemas";
-import type { TabContents, BrowserRegistry, TabImage } from "./service.js";
+import type {
+  AutomationCommandPayload,
+  TabContents,
+  BrowserRegistry,
+  TabImage,
+} from "./service.js";
 import type { IsolatedKeyboardInputEvent } from "./trusted-input.js";
 import { CdpSessionQueue } from "./cdp-session-queue.js";
 import { FrameProduction } from "./frame-production.js";
 import {
-  dialogAcceptValue,
   handledDialogEvent,
   MAX_DIALOGS_PER_COMMAND,
   promptShimDrainScript,
@@ -35,14 +53,29 @@ import {
 } from "../browser-webviews/index.js";
 
 const MAX_CONSOLE_MESSAGES_PER_TAB = 200;
+// Above Electron's own isolated world, 999.
+const PAINT_WORLD_ID = 1_100;
 const consoleMessagesByContentsId = new Map<number, BrowserAutomationConsoleLogEntry[]>();
 const cdpQueuesByContentsId = new Map<number, CdpSessionQueue>();
 const dialogMonitorsByContentsId = new Map<number, DialogMonitor>();
 const observedContentsIds = new Set<number>();
 const frameProductionByContentsId = new Map<number, FrameProduction>();
 
+const humanControls = new BrowserHumanControls();
+
+/** See BrowserHumanControls.hasTypedInto. */
+export function hasLiveViewTypedInto(contentsId: number): boolean {
+  return humanControls.hasTypedInto(contentsId);
+}
+
 interface IpcHandlerRegistry {
   handle(channel: string, listener: (event: unknown, ...args: unknown[]) => unknown): void;
+  on(channel: string, listener: (event: GuestReplyEvent, payload: unknown) => void): void;
+}
+
+interface GuestReplyEvent {
+  processId: number;
+  frameId: number;
 }
 
 interface HostWebContents {
@@ -59,6 +92,7 @@ interface LiveViewHostWebContents extends HostWebContents {
 
 export const BROWSER_LIVE_FRAME_EVENT = "paseo:event:browser-live-frame";
 export const BROWSER_LIVE_ENDED_EVENT = "paseo:event:browser-live-ended";
+export const BROWSER_LIVE_CONTROL_ENDED_EVENT = "paseo:event:browser-live-control-ended";
 
 export class HostSnapshotEngineRegistry {
   private readonly entries = new Map<
@@ -85,19 +119,24 @@ export class HostSnapshotEngineRegistry {
 
 const hostSnapshotEngines = new HostSnapshotEngineRegistry();
 
+type DebuggerMessageListener = (
+  event: unknown,
+  method: string,
+  params?: Record<string, unknown>,
+  sessionId?: string,
+) => void;
+
 interface WebContentsDebugger {
   isAttached(): boolean;
   attach(protocolVersion?: string): void;
-  sendCommand(command: string, params?: Record<string, unknown>): Promise<unknown>;
-  on?(
-    event: "message",
-    listener: (event: unknown, method: string, params?: Record<string, unknown>) => void,
-  ): void;
+  sendCommand(
+    command: string,
+    params?: Record<string, unknown>,
+    sessionId?: string,
+  ): Promise<unknown>;
+  on?(event: "message", listener: DebuggerMessageListener): void;
   on?(event: "detach", listener: () => void): void;
-  removeListener?(
-    event: "message",
-    listener: (event: unknown, method: string, params?: Record<string, unknown>) => void,
-  ): void;
+  removeListener?(event: "message", listener: DebuggerMessageListener): void;
   removeListener?(event: "detach", listener: () => void): void;
 }
 
@@ -116,7 +155,13 @@ interface ConsoleMessageEmitter {
 }
 
 interface BrowserAutomationWebContents extends ConsoleMessageEmitter {
+  once(event: "destroyed" | "did-stop-loading" | "did-navigate", listener: () => void): void;
   removeListener(event: "destroyed", listener: () => void): void;
+  readonly mainFrame: HumanControlContents["mainFrame"];
+  readonly focusedFrame: GuestFrame | null;
+  readonly navigationHistory: HumanControlContents["navigationHistory"];
+  getZoomFactor(): number;
+  isLoadingMainFrame(): boolean;
   readonly id: number;
   readonly debugger: WebContentsDebugger;
   getURL(): string;
@@ -126,7 +171,13 @@ interface BrowserAutomationWebContents extends ConsoleMessageEmitter {
   isLoading(): boolean;
   isDestroyed(): boolean;
   executeJavaScript(code: string): Promise<unknown>;
+  executeJavaScriptInIsolatedWorld(
+    worldId: number,
+    scripts: Array<{ code: string }>,
+  ): Promise<unknown>;
+  emit(event: "-cancel-dialogs"): boolean;
   loadURL(url: string): Promise<void>;
+  stop(): void;
   goBack(): void;
   goForward(): void;
   reload(): void;
@@ -156,6 +207,12 @@ export function adaptWebContents(
     isLoading: () => contents.isLoading(),
     isDestroyed: () => contents.isDestroyed(),
     executeJavaScript: (code: string) => contents.executeJavaScript(code),
+    // Electron's own condition in executeJavaScript.
+    waitUntilScriptable: async () => {
+      while (!contents.isDestroyed() && (!contents.getURL() || contents.isLoadingMainFrame())) {
+        await new Promise<void>((resolve) => contents.once("did-stop-loading", () => resolve()));
+      }
+    },
     loadURL: (url: string) => contents.loadURL(url),
     goBack: () => contents.goBack(),
     goForward: () => contents.goForward(),
@@ -251,6 +308,8 @@ function observeConsoleMessages(contents: BrowserAutomationWebContents, contents
   }
   observedContentsIds.add(contentsId);
   contents.on("console-message", (_event, level, message, line, sourceId) => {
+    // browser_logs would read it after hand-back.
+    if (humanControls.isHeld(contentsId)) return;
     const entry = normalizeConsoleMessage({ level, message, line, sourceId });
     const messages = consoleMessagesByContentsId.get(contentsId) ?? [];
     messages.push(entry);
@@ -358,7 +417,7 @@ class DialogMonitor {
       this.recordDialogs(collector, [event]);
     }
     await this.sendDialogResponseCommand("Page.handleJavaScriptDialog", {
-      accept: dialogAcceptValue(event.type),
+      accept: false,
     });
   }
 
@@ -492,11 +551,26 @@ function createRegistry(hostWebContentsId: number): BrowserRegistry {
   };
 }
 
+function liveViewTab(contents: BrowserAutomationWebContents) {
+  return {
+    ...adaptWebContents(contents),
+    sendDebugCommand: async (command: string, params?: Record<string, unknown>) => {
+      if (contents.isDestroyed()) throw new BrowserTabClosedError();
+      if (!contents.debugger.isAttached()) contents.debugger.attach("1.3");
+      return contents.debugger.sendCommand(command, params ?? {});
+    },
+    hasPainted: async () => {
+      const code = `performance.getEntriesByName("first-paint").length > 0`;
+      return (await contents.executeJavaScriptInIsolatedWorld(PAINT_WORLD_ID, [{ code }])) === true;
+    },
+  };
+}
+
 function liveViewEvents(contents: BrowserAutomationWebContents): BrowserLiveViewEvents {
   return {
     onMessage(listener) {
-      const handler = (_event: unknown, method: string, params?: Record<string, unknown>) =>
-        listener(method, params ?? {});
+      const handler: DebuggerMessageListener = (_event, method, params, sessionId) =>
+        listener(method, params ?? {}, sessionId);
       contents.debugger.on?.("message", handler);
       return () => contents.debugger.removeListener?.("message", handler);
     },
@@ -511,12 +585,118 @@ function liveViewEvents(contents: BrowserAutomationWebContents): BrowserLiveView
   };
 }
 
+function humanControlTab(contents: BrowserAutomationWebContents): HumanControlTab {
+  // Adapting registers the tab's observers; sends share its CDP queue.
+  const { id } = adaptWebContents(contents);
+  const cdpQueue = getCdpQueue(id);
+  // Read once: the getter throws once the tab is destroyed, when control still has to clean up,
+  // and an exception in that listener takes down Electron main.
+  const debuggerApi = contents.debugger;
+  return {
+    contents: contents as BrowserAutomationWebContents & HumanControlContents,
+    send: (command, params, sessionId, mayRun) =>
+      cdpQueue.run(async () => {
+        if (contents.isDestroyed()) throw new BrowserTabClosedError();
+        if (!debuggerApi.isAttached()) debuggerApi.attach("1.3");
+        if (mayRun && !mayRun()) throw new Error("The command is no longer current.");
+        return debuggerApi.sendCommand(command, params ?? {}, sessionId);
+      }),
+    dismissDialog: async (sessionId) => {
+      await debuggerApi.sendCommand("Page.handleJavaScriptDialog", { accept: false }, sessionId);
+      // CDP leaves Electron's message box up. This closes it and answers nothing.
+      contents.emit("-cancel-dialogs");
+    },
+    interrupt: async () => debuggerApi.sendCommand("Runtime.terminateExecution", {}),
+    onMessage: (listener) => {
+      // Electron gives the tab's own session an empty id, and rejects that id when sent back.
+      const handler: DebuggerMessageListener = (_event, method, params, sessionId) =>
+        listener(method, params ?? {}, sessionId || undefined);
+      debuggerApi.on?.("message", handler);
+      return () => debuggerApi.removeListener?.("message", handler);
+    },
+  };
+}
+
+function readCommittedOrigin(contents: BrowserAutomationWebContents): string | undefined {
+  if (contents.isDestroyed()) return undefined;
+  const { mainFrame } = contents;
+  return mainFrame.isDestroyed() ? undefined : mainFrame.origin;
+}
+
+/** Runs an agent's command unless a human controls its tab. */
+export async function runAgentCommand(input: {
+  request: BrowserAutomationExecuteRequest;
+  registry: BrowserRegistry;
+  snapshotEngine: BrowserSnapshotEngine;
+  controls: BrowserHumanControls;
+}): Promise<AutomationCommandPayload> {
+  const { request, registry, snapshotEngine, controls } = input;
+  const execute = () => executeAutomationCommand(request, registry, { snapshotEngine });
+  const { command } = request;
+  if (command.command === "list_tabs") {
+    return withholdHeldTabs(await execute(), registry, controls);
+  }
+  if (command.command === "new_tab") return execute();
+  const contents = registry.getTabContents(command.args.browserId);
+  if (!contents || contents.isDestroyed()) return execute();
+  if (controls.isHeld(contents.id)) return refuseHeldTab(request.requestId);
+  try {
+    return await controls.track(contents.id, (agentCommand) =>
+      executeAutomationCommand(
+        request,
+        {
+          ...registry,
+          getTabContents: (browserId) => {
+            const tab = registry.getTabContents(browserId);
+            return tab && agentCommand.guard(tab);
+          },
+        },
+        { snapshotEngine },
+      ),
+    );
+  } catch (error) {
+    if (error instanceof AgentCommandCancelledError) return refuseHeldTab(request.requestId);
+    throw error;
+  }
+}
+
+function refuseHeldTab(requestId: string): AutomationCommandPayload {
+  return {
+    requestId,
+    ok: false,
+    error: {
+      // Not browser_human_control: daemons that predate it reject responses with unknown codes.
+      code: "browser_denied",
+      message: "The user is controlling this tab. Wait for hand-back, then call browser_snapshot.",
+      retryable: true,
+    },
+  };
+}
+
+function withholdHeldTabs(
+  payload: AutomationCommandPayload,
+  registry: BrowserRegistry,
+  controls: BrowserHumanControls,
+): AutomationCommandPayload {
+  if (!payload.ok || payload.result.command !== "list_tabs") return payload;
+  const tabs = payload.result.tabs.map((tab) => {
+    const contents = registry.getTabContents(tab.browserId);
+    const held = contents && !contents.isDestroyed() && controls.isHeld(contents.id);
+    return held ? { ...tab, url: "", title: "" } : tab;
+  });
+  return { ...payload, result: { ...payload.result, tabs } };
+}
+
 /** Live view screencasts by streamId, across host windows. */
 export class BrowserLiveViewStreams {
   private readonly streams = new Map<string, BrowserLiveViewStream>();
   private readonly streamIdsByHost = new Map<number, Set<string>>();
   // CDP allows one screencast per debugger session, so one stream per tab.
   private readonly streamIdByContentsId = new Map<number, string>();
+  private readonly tabByStreamId = new Map<
+    string,
+    { contents: BrowserAutomationWebContents; hostId: number }
+  >();
   private readonly hostThrottlingBefore = new Map<number, boolean>();
 
   public constructor(
@@ -524,6 +704,7 @@ export class BrowserLiveViewStreams {
       browserId: string,
       hostWebContentsId: number,
     ) => BrowserAutomationWebContents | null,
+    private readonly controls: BrowserHumanControls = humanControls,
   ) {}
 
   public get size(): number {
@@ -555,6 +736,13 @@ export class BrowserLiveViewStreams {
       );
     }
     const contentsId = contents.id;
+    if (this.controls.isHeldByOther(contentsId, request.controlId)) {
+      return liveFailure(
+        request.requestId,
+        "browser_denied",
+        `Browser tab ${request.browserId} is being controlled.`,
+      );
+    }
     if (this.streamIdByContentsId.has(contentsId)) {
       return liveFailure(
         request.requestId,
@@ -565,10 +753,12 @@ export class BrowserLiveViewStreams {
     const hostStreamIds = this.streamIdsOfHost(hostContents);
     const stream = new BrowserLiveViewStream({
       streamId: request.streamId,
-      tab: adaptWebContents(contents),
+      tab: liveViewTab(contents),
       events: liveViewEvents(contents),
+      readOrigin: () => readCommittedOrigin(contents),
       onFrame: (frame) => {
-        if (!hostContents.isDestroyed()) hostContents.send(BROWSER_LIVE_FRAME_EVENT, frame);
+        if (hostContents.isDestroyed()) return;
+        hostContents.send(BROWSER_LIVE_FRAME_EVENT, frame);
       },
       onEnded: (reason) => {
         if (this.streams.get(request.streamId) !== stream) return;
@@ -576,16 +766,22 @@ export class BrowserLiveViewStreams {
         hostStreamIds.delete(request.streamId);
         if (hostStreamIds.size === 0) this.releaseHostWindow(hostContents);
         this.streamIdByContentsId.delete(contentsId);
+        this.tabByStreamId.delete(request.streamId);
         // Nobody asked for this end; the daemon still thinks the viewer is watching.
-        if (reason === "gone" && !hostContents.isDestroyed()) {
-          hostContents.send(BROWSER_LIVE_ENDED_EVENT, {
-            streamId: request.streamId,
-            error: {
-              code: "browser_tab_closed",
-              message: `Browser tab ${request.browserId} closed.`,
-              retryable: false,
-            },
-          });
+        if (reason === "gone") {
+          // Closing a tab detaches the debugger before it ends control. The daemon has to hear
+          // that control ended first, so the viewer learns both from the stream's end.
+          setTimeout(() => {
+            if (hostContents.isDestroyed()) return;
+            hostContents.send(BROWSER_LIVE_ENDED_EVENT, {
+              streamId: request.streamId,
+              error: {
+                code: "browser_tab_closed",
+                message: `Browser tab ${request.browserId} closed.`,
+                retryable: false,
+              },
+            });
+          }, 0);
         }
       },
     });
@@ -593,6 +789,7 @@ export class BrowserLiveViewStreams {
     if (hostStreamIds.size === 0) this.holdHostWindow(hostContents);
     hostStreamIds.add(request.streamId);
     this.streamIdByContentsId.set(contentsId, request.streamId);
+    this.tabByStreamId.set(request.streamId, { contents, hostId: hostContents.id });
     try {
       const viewport = await stream.start({
         ...(request.maxFps !== undefined ? { maxFps: request.maxFps } : {}),
@@ -624,6 +821,74 @@ export class BrowserLiveViewStreams {
     // Stopping an unknown stream is a no-op: the daemon may stop a stream that already ended.
     await this.streams.get(parsed.data.streamId)?.stop();
     return { requestId: parsed.data.requestId, error: null };
+  }
+
+  public async takeControl(
+    hostContents: LiveViewHostWebContents,
+    rawRequest: unknown,
+  ): Promise<BrowserHostLiveTakeControlResponse["payload"]> {
+    const parsed = BrowserHostLiveTakeControlRequestSchema.safeParse(rawRequest);
+    if (!parsed.success) return invalidControlRequest(rawRequest);
+    const { requestId, streamId, controlId } = parsed.data;
+    const contents = this.tabOfStream(hostContents, streamId);
+    if (!contents) return streamGone(requestId);
+    const result = await this.controls.take({
+      controlId,
+      hostId: hostContents.id,
+      tab: humanControlTab(contents),
+      onEnded: () => {
+        if (hostContents.isDestroyed()) return;
+        hostContents.send(BROWSER_LIVE_CONTROL_ENDED_EVENT, { controlId });
+      },
+    });
+    return { requestId, ...result };
+  }
+
+  public async sendInput(
+    hostContents: LiveViewHostWebContents,
+    rawRequest: unknown,
+  ): Promise<BrowserHostLiveSendInputResponse["payload"]> {
+    const parsed = BrowserHostLiveSendInputRequestSchema.safeParse(rawRequest);
+    // The parse error is dropped on purpose: the request can hold a secret.
+    if (!parsed.success) return invalidControlRequest(rawRequest);
+    const { requestId, streamId, controlId, input } = parsed.data;
+    const contents = this.tabOfStream(hostContents, streamId);
+    if (!contents) return streamGone(requestId);
+    const stream = this.streams.get(streamId);
+    const result = await this.controls.input({
+      controlId,
+      hostId: hostContents.id,
+      contentsId: contents.id,
+      input,
+      showsDocument: (documentId) => stream?.showsDocument(documentId) === true,
+    });
+    return { requestId, ...result };
+  }
+
+  public async releaseControl(
+    hostContents: LiveViewHostWebContents,
+    rawRequest: unknown,
+  ): Promise<BrowserHostLiveReleaseControlResponse["payload"]> {
+    const parsed = BrowserHostLiveReleaseControlRequestSchema.safeParse(rawRequest);
+    if (!parsed.success) {
+      const { requestId, error } = invalidControlRequest(rawRequest);
+      return { requestId, error };
+    }
+    const { requestId, controlId, discardInput } = parsed.data;
+    const error = await this.controls.release({
+      controlId,
+      hostId: hostContents.id,
+      discardInput,
+    });
+    return { requestId, error };
+  }
+
+  private tabOfStream(
+    hostContents: LiveViewHostWebContents,
+    streamId: string,
+  ): BrowserAutomationWebContents | null {
+    const tab = this.tabByStreamId.get(streamId);
+    return tab?.hostId === hostContents.id && !tab.contents.isDestroyed() ? tab.contents : null;
   }
 
   public ack(rawAck: unknown): void {
@@ -672,6 +937,22 @@ function liveFailure(
   return { requestId, viewport: null, error: { code, message, retryable: false } };
 }
 
+function invalidControlRequest(rawRequest: unknown) {
+  return {
+    requestId: readRequestId(rawRequest),
+    focus: null,
+    error: { code: "not_sent", message: "Invalid live view request." },
+  };
+}
+
+function streamGone(requestId: string) {
+  return {
+    requestId,
+    focus: null,
+    error: { code: "stream_ended", message: "The live view ended." },
+  };
+}
+
 export function registerBrowserAutomationIpc(options?: { ipc?: IpcHandlerRegistry }): void {
   const ipc = options?.ipc ?? ipcMain;
   const liveViews = new BrowserLiveViewStreams(getPaseoBrowserWebContentsForHostWindow);
@@ -692,6 +973,19 @@ export function registerBrowserAutomationIpc(options?: { ipc?: IpcHandlerRegistr
   );
   ipc.handle("paseo:browser:live-frame-ack", (_event, rawAck: unknown) => {
     liveViews.ack(rawAck);
+  });
+
+  ipc.handle("paseo:browser:live-take-control", (event, rawRequest: unknown) =>
+    liveViews.takeControl((event as { sender: LiveViewHostWebContents }).sender, rawRequest),
+  );
+  ipc.handle("paseo:browser:live-send-input", (event, rawRequest: unknown) =>
+    liveViews.sendInput((event as { sender: LiveViewHostWebContents }).sender, rawRequest),
+  );
+  ipc.handle("paseo:browser:live-release-control", (event, rawRequest: unknown) =>
+    liveViews.releaseControl((event as { sender: LiveViewHostWebContents }).sender, rawRequest),
+  );
+  ipc.on(GUEST_CONTROL_REPLY_CHANNEL, (event, reply) => {
+    humanControls.frames.receive(event, reply);
   });
 
   ipc.handle("paseo:browser:execute-automation-command", async (event, rawRequest: unknown) => {
@@ -720,8 +1014,11 @@ export function registerBrowserAutomationIpc(options?: { ipc?: IpcHandlerRegistr
         },
       };
     }
-    return executeAutomationCommand(parsed.data, registry, {
+    return runAgentCommand({
+      request: parsed.data,
+      registry,
       snapshotEngine: hostSnapshotEngines.get(hostContents),
+      controls: humanControls,
     });
   });
 }

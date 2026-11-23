@@ -1183,6 +1183,7 @@ describe("relay external socket reconnect behavior", () => {
       clientId: "cid-browser-live-view-flag",
     });
     expect(serverInfo.features?.browserLiveView).toBeUndefined();
+    expect(serverInfo.features?.browserLiveViewInput).toBeUndefined();
 
     daemonConfig.current = { browserLiveView: true };
     for (const listener of configListeners) listener(daemonConfig.current as MutableDaemonConfig);
@@ -1191,6 +1192,7 @@ describe("relay external socket reconnect behavior", () => {
     );
     expect(sentServerInfoEnvelopes(socket)).toHaveLength(2);
     expect(enabled?.features?.browserLiveView).toBe(true);
+    expect(enabled?.features?.browserLiveViewInput).toBe(true);
 
     // An unrelated config change does not re-advertise.
     for (const listener of configListeners) listener(daemonConfig.current as MutableDaemonConfig);
@@ -1202,6 +1204,7 @@ describe("relay external socket reconnect behavior", () => {
       sentServerInfoEnvelopes(socket).at(-1)?.message?.payload,
     );
     expect(disabled?.features?.browserLiveView).toBeUndefined();
+    expect(disabled?.features?.browserLiveViewInput).toBeUndefined();
 
     await server.close();
   });

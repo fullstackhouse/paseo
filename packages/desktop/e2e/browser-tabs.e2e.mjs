@@ -17,6 +17,7 @@ import { runAppearanceFontSizeRegression } from "./appearance-font-size.electron
 import { runAdaptiveThemeRegression } from "./appearance-theme.electron.mjs";
 import { runSettingsScrollRegression } from "./settings-scroll.electron.mjs";
 import { runSettingsMemoryRegression } from "./settings-memory.electron.mjs";
+import { runLiveInputRegression } from "./browser-live-input.electron.mjs";
 
 import { seedPluginLinks, runPluginLinksRegression } from "./plugin-links.electron.mjs";
 
@@ -1272,9 +1273,11 @@ async function main() {
       typingAgent,
       artifactDir,
     });
+    const liveInput = await runLiveInputRegression({ daemonPort, client });
     const pluginLinks = await checkPluginLinks();
     writeJson(path.join(artifactDir, "result.json"), {
       ...report,
+      liveInput,
       settingsMemory,
       pluginLinks,
       adaptiveTheme,

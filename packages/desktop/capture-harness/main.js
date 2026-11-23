@@ -1628,7 +1628,7 @@ async function automationEvaluate(guest, functionSource, refEntry) {
 }
 
 const AUTOMATION_DIALOG_POLICY = {
-  alert: { action: "accepted", accept: true },
+  alert: { action: "accepted", accept: false },
   confirm: { action: "dismissed", accept: false },
   prompt: { action: "dismissed", accept: false },
   beforeunload: { action: "dismissed", accept: false },

@@ -265,6 +265,8 @@ export const BrowserAutomationTabInfoSchema = z.object({
   isLoading: z.boolean().default(false),
   canGoBack: z.boolean().optional(),
   canGoForward: z.boolean().optional(),
+  // The user is controlling the tab; its url and title are withheld.
+  humanControl: z.boolean().optional(),
 });
 
 export const BrowserAutomationListTabsResultSchema = z.object({

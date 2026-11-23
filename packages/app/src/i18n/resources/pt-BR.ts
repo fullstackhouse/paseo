@@ -600,6 +600,90 @@ export const ptBR: TranslationResources = {
         subtitle: "Abra este workspace no Electron para usar o navegador integrado.",
       },
       session: "Sessão do navegador {{browserId}}",
+      liveView: {
+        connecting: "Conectando ao navegador do computador...",
+        endedTitle: "A visualização ao vivo terminou",
+        retry: "Tentar novamente",
+        ended: {
+          connection: "A conexão com o host caiu",
+          tabClosed: "A aba do navegador foi fechada",
+          noDesktop: "O computador que tem esta aba não está conectado",
+          inUse: "Outro dispositivo está vendo ou controlando esta aba",
+          unsupported: "Atualize o Paseo no computador que tem esta aba",
+          failed: "Não foi possível continuar a visualização ao vivo",
+        },
+        hints: {
+          turnOn:
+            "Ative a visualização ao vivo do navegador em Configurações do host → Agentes para ver esta aba aqui",
+          updateHost: "Atualize o Paseo neste host para ver esta aba aqui",
+        },
+        control: {
+          take: "Assumir o controle",
+          taking: "Assumindo o controle...",
+          takeHint:
+            "O agente não pode usar esta aba enquanto você a controla. Se você se ausentar por 5 minutos, o controle termina e o que não foi enviado é descartado.",
+          updateHost: "Atualize o Paseo neste host para assumir o controle",
+          updateDesktop: "Atualize o Paseo no computador que tem esta aba para assumir o controle",
+          heldHint:
+            "Toque em um campo para digitar. Se você se ausentar por 5 minutos, o controle termina e o que não foi enviado é descartado.",
+          handBack: "Devolver ao agente",
+          handingBack: "Devolvendo...",
+          handBackHint:
+            "Ao devolver, o agente vê esta página e pode usar este login. Senhas e códigos não enviados são apagados.",
+          pageOrigin: "Página: {{origin}}",
+          typingInto: "Digitando em {{origin}}",
+          embeddedIn: "Incorporado em {{origin}}",
+          unknownOrigin: "um site desconhecido",
+          send: "Enviar",
+        },
+        fields: {
+          password: "Senha",
+          newPassword: "Nova senha",
+          oneTimeCode: "Código de uso único",
+          username: "Nome de usuário",
+          email: "E-mail",
+          secret: "Campo protegido",
+          text: "Texto",
+        },
+        keys: {
+          enter: "Confirmar",
+          tab: "Tabulação",
+          backspace: "Apagar",
+          escape: "Esc",
+          arrowUp: "Seta para cima",
+          arrowDown: "Seta para baixo",
+          arrowLeft: "Seta para a esquerda",
+          arrowRight: "Seta para a direita",
+        },
+        notices: {
+          released: "Seu controle terminou. O que você não enviou pode ter sido descartado.",
+          targetChanged:
+            "A página ou o campo mudou e o texto foi recusado. Toque no campo novamente.",
+          pageChanged:
+            "A página mudou, por isso seu toque ou rolagem não foi enviado. Tente novamente na nova página.",
+          doesNotFit:
+            "Esse texto não cabe neste campo, por isso não foi inserido. Toque no campo e tente novamente.",
+          streamEnded:
+            "A visualização ao vivo parou, por isso nada foi enviado. Reconecte e tente novamente.",
+          unconfirmed:
+            "O computador não confirmou. Pode ter sido enviado, então confira a página antes de enviar de novo.",
+          notSent: "Não enviado. Tente novamente.",
+          pageBlocked:
+            "A página não responde. Se houver uma caixa de diálogo aberta, responda no computador.",
+          watchBlocked:
+            "A página não responde. Pode haver uma caixa de diálogo aberta. Assuma o controle para dispensá-la ou responda no computador.",
+          unloadBlocked:
+            "Assumir o controle exige recarregar para parar a ação travada do agente, mas esta página impede a saída. Conclua no computador.",
+          reloaded:
+            "A ação do agente travou, então a página foi recarregada para interrompê-la. O que não estava salvo foi perdido.",
+          agentBusy: "A ação do agente no navegador ainda está em andamento. Tente novamente.",
+          busy: "Esta aba já está sendo controlada",
+          keyUnsupported: "As teclas não funcionam neste quadro incorporado. Toque no botão dele.",
+          connection: "A conexão caiu. Tente novamente.",
+          disabled: "A visualização ao vivo do navegador está desativada neste host",
+          failed: "O navegador não respondeu. Tente novamente.",
+        },
+      },
       controls: {
         back: "Voltar",
         forward: "Avançar",
@@ -3051,6 +3135,11 @@ export const ptBR: TranslationResources = {
       },
       agents: {
         unavailable: "Conecte-se a este host para gerenciar agentes",
+        browserLiveView: {
+          title: "Visualização ao vivo do navegador (experimental)",
+          hint: "Permite ver e controlar pelo celular uma aba do navegador do agente. Desativada por padrão.",
+          updateFailed: "Não foi possível atualizar a visualização ao vivo do navegador",
+        },
         resumeOnStartup: {
           title: "Retomar agentes após reiniciar",
           info: "Reabre os agentes que estavam trabalhando quando o host parou e envia a mensagem de retomada. Aplica-se após reinicializações normais e falhas.",

@@ -29,6 +29,7 @@ export function BrowserPane({ browserId, serverId, isInteractive = false }: Brow
 
 function LiveBrowserPane(props: { browserId: string; serverId: string; isInteractive: boolean }) {
   const client = useHostRuntimeClient(props.serverId);
+  const supportsControl = useHostFeature(props.serverId, "browserLiveViewInput");
   const isConnected = useHostRuntimeIsConnected(props.serverId);
   const isPanelActive = useRetainedPanelActive();
   const isAppVisible = useAppActivelyVisible();
@@ -38,6 +39,7 @@ function LiveBrowserPane(props: { browserId: string; serverId: string; isInterac
       client={client}
       browserId={props.browserId}
       active={isOnScreen && isConnected}
+      hostSupportsControl={supportsControl}
     />
   );
 }
@@ -45,7 +47,7 @@ function LiveBrowserPane(props: { browserId: string; serverId: string; isInterac
 function UnavailableBrowserPane(props: { browserId: string; serverId: string }) {
   const { t } = useTranslation();
   const { config } = useDaemonConfig(props.serverId);
-  const hint = config ? getLiveViewHint(config.browserLiveView) : null;
+  const hint = config ? t(getLiveViewHintKey(config.browserLiveView)) : null;
 
   return (
     <View style={styles.container}>
@@ -63,11 +65,9 @@ function UnavailableBrowserPane(props: { browserId: string; serverId: string }) 
 }
 
 // COMPAT(browserLiveViewFlag): hosts that know the setting report false while it is off; older hosts omit it.
-function getLiveViewHint(browserLiveView: boolean | undefined): string {
-  if (browserLiveView === false) {
-    return "Turn on Browser live view in Host settings → Agents to watch this tab here";
-  }
-  return "Update Paseo on this host to watch this tab here";
+function getLiveViewHintKey(browserLiveView: boolean | undefined): string {
+  if (browserLiveView === false) return "workspace.browser.liveView.hints.turnOn";
+  return "workspace.browser.liveView.hints.updateHost";
 }
 
 const styles = StyleSheet.create((theme) => ({

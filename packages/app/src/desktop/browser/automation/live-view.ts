@@ -2,11 +2,17 @@ import {
   encodeBrowserLiveFrame,
   type BrowserLiveFrameMetadata,
 } from "@getpaseo/protocol/binary-frames/browser-live";
+import type {
+  BrowserLiveControlError,
+  BrowserLiveControlErrorCode,
+  BrowserLiveFocusResult,
+} from "@getpaseo/protocol/browser-automation/live-view";
 import type { SessionInboundMessage, SessionOutboundMessage } from "@getpaseo/protocol/messages";
 import type { DesktopHostBridge } from "@/desktop/host";
 
 export const BROWSER_LIVE_FRAME_EVENT = "browser-live-frame";
 export const BROWSER_LIVE_ENDED_EVENT = "browser-live-ended";
+export const BROWSER_LIVE_CONTROL_ENDED_EVENT = "browser-live-control-ended";
 
 type BrowserHostLiveMessage = Extract<
   SessionOutboundMessage,
@@ -14,6 +20,9 @@ type BrowserHostLiveMessage = Extract<
     type:
       | "browser.host.live.start.request"
       | "browser.host.live.stop.request"
+      | "browser.host.live.take_control.request"
+      | "browser.host.live.send_input.request"
+      | "browser.host.live.release_control.request"
       | "browser.host.live.frame_ack";
   }
 >;
@@ -23,6 +32,10 @@ type BrowserHostLiveResponse = Extract<
     type:
       | "browser.host.live.start.response"
       | "browser.host.live.stop.response"
+      | "browser.host.live.take_control.response"
+      | "browser.host.live.send_input.response"
+      | "browser.host.live.release_control.response"
+      | "browser.host.live.control_ended"
       | "browser.host.live.ended";
   }
 >;
@@ -43,7 +56,7 @@ export interface BrowserLiveViewHost {
   /** Returns true when the message was a browser.host.live.* message. */
   handle(message: { type: string }): boolean;
   /**
-   * Stops every stream. Call when the daemon registration is lost or replaced: the daemon
+   * Stops every stream and discards and releases all control. Call when the daemon registration is lost or replaced: the daemon
    * forgot those streams, so nothing would ack or stop them.
    */
   reset(): void;
@@ -53,6 +66,11 @@ export interface BrowserLiveViewHost {
 export function isBrowserLiveViewSupported(getHost: () => DesktopHostBridge | null): boolean {
   const browser = getHost()?.browser;
   return Boolean(browser?.startLiveView && browser.stopLiveView && browser.ackLiveFrame);
+}
+
+export function isBrowserLiveInputSupported(getHost: () => DesktopHostBridge | null): boolean {
+  const browser = getHost()?.browser;
+  return Boolean(browser?.takeLiveControl && browser.sendLiveInput && browser.releaseLiveControl);
 }
 
 /**
@@ -66,6 +84,7 @@ export function createBrowserLiveViewHost(options: {
 }): BrowserLiveViewHost {
   const { client, getHost } = options;
   const streamIds = new Set<string>();
+  const controlIds = new Set<string>();
   let disposed = false;
   const unsubscribers: Array<() => void> = [];
 
@@ -95,8 +114,24 @@ export function createBrowserLiveViewHost(options: {
     client.sendBrowserHostLiveMessage({ type: "browser.host.live.ended", payload: ended });
   });
 
+  listen(BROWSER_LIVE_CONTROL_ENDED_EVENT, (payload) => {
+    const ended = payload as { controlId: string };
+    if (!controlIds.delete(ended.controlId)) return;
+    client.sendBrowserHostLiveMessage({ type: "browser.host.live.control_ended", payload: ended });
+  });
+
   function stopAll(): void {
     const browser = getHost()?.browser;
+    for (const controlId of controlIds) {
+      // Discarded, not just unlocked: the agent could read what the user typed.
+      void browser?.releaseLiveControl?.({
+        type: "browser.host.live.release_control.request",
+        requestId: `reset:${controlId}`,
+        controlId,
+        discardInput: true,
+      });
+    }
+    controlIds.clear();
     for (const streamId of streamIds) {
       void browser?.stopLiveView?.({
         type: "browser.host.live.stop.request",
@@ -167,6 +202,57 @@ export function createBrowserLiveViewHost(options: {
     });
   }
 
+  // Failures are answered with fixed text: an error thrown here could quote an input.
+  async function takeControl(
+    message: Extract<BrowserHostLiveMessage, { type: "browser.host.live.take_control.request" }>,
+  ): Promise<void> {
+    const { requestId, streamId, controlId } = message;
+    const takeLiveControl = getHost()?.browser?.takeLiveControl;
+    let payload = {
+      requestId,
+      ...controlFailure(takeLiveControl ? "stream_ended" : "update_desktop"),
+    };
+    if (takeLiveControl && streamIds.has(streamId)) {
+      // Known before it is granted, so a reset meanwhile releases it too.
+      controlIds.add(controlId);
+      const result = await takeLiveControl(message).catch(() => controlFailure("failed"));
+      if (result.error) controlIds.delete(controlId);
+      payload = { ...result, requestId };
+    }
+    client.sendBrowserHostLiveMessage({ type: "browser.host.live.take_control.response", payload });
+  }
+
+  async function sendInput(
+    message: Extract<BrowserHostLiveMessage, { type: "browser.host.live.send_input.request" }>,
+  ): Promise<void> {
+    const { requestId, streamId, controlId } = message;
+    const sendLiveInput = getHost()?.browser?.sendLiveInput;
+    const refusal = streamIds.has(streamId) ? "not_controller" : "stream_ended";
+    let payload = { requestId, ...controlFailure(refusal) };
+    if (sendLiveInput && streamIds.has(streamId) && controlIds.has(controlId)) {
+      const result = await sendLiveInput(message).catch(() => controlFailure("unconfirmed"));
+      payload = { ...result, requestId };
+    }
+    client.sendBrowserHostLiveMessage({ type: "browser.host.live.send_input.response", payload });
+  }
+
+  async function releaseControl(
+    message: Extract<BrowserHostLiveMessage, { type: "browser.host.live.release_control.request" }>,
+  ): Promise<void> {
+    const { requestId, controlId } = message;
+    const releaseLiveControl = getHost()?.browser?.releaseLiveControl;
+    let error: BrowserLiveControlError | null = null;
+    if (releaseLiveControl && controlIds.has(controlId)) {
+      const result = await releaseLiveControl(message).catch(() => controlFailure("failed"));
+      error = result.error;
+      if (!error) controlIds.delete(controlId);
+    }
+    client.sendBrowserHostLiveMessage({
+      type: "browser.host.live.release_control.response",
+      payload: { requestId, error },
+    });
+  }
+
   return {
     handle(message) {
       const live = message as BrowserHostLiveMessage;
@@ -176,6 +262,15 @@ export function createBrowserLiveViewHost(options: {
           return true;
         case "browser.host.live.stop.request":
           void stop(live);
+          return true;
+        case "browser.host.live.take_control.request":
+          void takeControl(live);
+          return true;
+        case "browser.host.live.send_input.request":
+          void sendInput(live);
+          return true;
+        case "browser.host.live.release_control.request":
+          void releaseControl(live);
           return true;
         case "browser.host.live.frame_ack":
           if (streamIds.has(live.streamId)) void getHost()?.browser?.ackLiveFrame?.(live);
@@ -191,4 +286,8 @@ export function createBrowserLiveViewHost(options: {
       stopAll();
     },
   };
+}
+
+function controlFailure(code: BrowserLiveControlErrorCode): BrowserLiveFocusResult {
+  return { focus: null, error: { code, message: "The desktop couldn't complete the request." } };
 }

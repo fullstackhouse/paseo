@@ -1,3 +1,8 @@
+import {
+  BrowserLiveEndedSchema,
+  BrowserLiveInputSchema,
+  BrowserLiveTakeControlResponseSchema,
+} from "./browser-automation/live-view.js";
 import { describe, expect, test } from "vitest";
 
 import { BROWSER_AUTOMATION_COMMAND_NAMES } from "./browser-automation/rpc-schemas.js";
@@ -9,6 +14,7 @@ import {
   SessionOutboundMessageSchema,
   WSHelloMessageSchema,
 } from "./messages.js";
+import { validateWSOutboundMessage } from "./validation/ws-outbound.js";
 
 describe("browser automation protocol integration", () => {
   const browserId = "11111111-1111-4111-8111-111111111111";
@@ -264,6 +270,116 @@ describe("browser automation protocol integration", () => {
     ).toBe("browser.host.live.ended");
   });
 
+  test("parses human control requests from the app and their forwarded host form", () => {
+    const focus = {
+      targetId: "target-1",
+      kind: "password",
+      origin: "https://idp.example",
+      topOrigin: "https://app.example",
+    };
+    const inputs = [
+      { kind: "tap", documentId: "stream-1:0", x: 12.5, y: 40 },
+      { kind: "scroll", documentId: "stream-1:0", x: 1, y: 2, deltaX: 0, deltaY: 300 },
+      { kind: "key", key: "Enter" },
+      { kind: "insert_text", targetId: "target-1", text: "dummy" },
+    ];
+    for (const input of inputs) {
+      expect(
+        SessionInboundMessageSchema.parse({
+          type: "browser.live.send_input.request",
+          requestId: "req-1",
+          streamId: "stream-1",
+          input,
+        }),
+      ).toMatchObject({ input });
+      expect(
+        SessionOutboundMessageSchema.parse({
+          type: "browser.host.live.send_input.request",
+          requestId: "req-1",
+          streamId: "stream-1",
+          controlId: "control-1",
+          input,
+        }),
+      ).toMatchObject({ input });
+    }
+    expect(
+      SessionOutboundMessageSchema.parse({
+        type: "browser.live.take_control.response",
+        payload: { requestId: "req-2", streamId: "stream-1", focus, error: null },
+      }),
+    ).toMatchObject({ payload: { focus } });
+    expect(
+      SessionInboundMessageSchema.parse({
+        type: "browser.host.live.release_control.response",
+        payload: { requestId: "req-3", error: { code: "a_future_code", message: "Busy." } },
+      }),
+    ).toMatchObject({ payload: { error: { code: "a_future_code" } } });
+  });
+
+  test("live start answers from phase 1 daemons and hosts still parse", () => {
+    const payload = {
+      requestId: "req-1",
+      streamId: "stream-1",
+      viewport: { width: 800, height: 600 },
+      error: null,
+    };
+    expect(
+      SessionOutboundMessageSchema.parse({ type: "browser.live.start.response", payload }),
+    ).not.toHaveProperty("payload.control");
+    expect(
+      SessionOutboundMessageSchema.parse({
+        type: "browser.live.start.response",
+        payload: { ...payload, control: { held: true } },
+      }),
+    ).toHaveProperty("payload.control.held", true);
+  });
+
+  test("a rejected input never repeats its text in the validation error", () => {
+    const sentinel = "LV3-SENTINEL-protocol";
+    const invalidInputs = [
+      { kind: "insert_text", text: sentinel },
+      { kind: "insert_text", targetId: "target-1", text: [sentinel] },
+      { kind: "future_kind", text: sentinel },
+      sentinel,
+    ];
+    for (const input of invalidInputs) {
+      const inbound = SessionInboundMessageSchema.safeParse({
+        type: "browser.live.send_input.request",
+        requestId: "req-1",
+        streamId: "stream-1",
+        input,
+      });
+      const outbound = validateWSOutboundMessage({
+        type: "session",
+        message: {
+          type: "browser.host.live.send_input.request",
+          requestId: "req-1",
+          streamId: "stream-1",
+          controlId: "control-1",
+          input,
+        },
+      });
+      expect(inbound.success).toBe(false);
+      expect(outbound.success).toBe(false);
+      expect(JSON.stringify([inbound.error, inbound.error?.message])).not.toContain(sentinel);
+      if (outbound.success) continue;
+      expect(JSON.stringify([outbound.error, outbound.error.message])).not.toContain(sentinel);
+    }
+  });
+
+  test("browser host registration accepts an optional liveViewInput flag", () => {
+    expect(
+      SessionInboundMessageSchema.parse({
+        type: "browser.host.register.request",
+        requestId: "req-1",
+        hostKind: "desktop app",
+        supportedCommands: ["list_tabs"],
+        liveView: true,
+        liveViewInput: true,
+      }),
+    ).toMatchObject({ liveViewInput: true });
+  });
+
   test("browser host registration accepts an optional liveView flag", () => {
     const registration = {
       type: "browser.host.register.request",
@@ -299,4 +415,33 @@ describe("browser automation protocol integration", () => {
       }).browserTools,
     ).toEqual({ enabled: true });
   });
+});
+
+describe("browser live control state", () => {
+  test("pointer input names the document of the frame it was aimed at", () => {
+    expect(BrowserLiveInputSchema.safeParse({ kind: "tap", x: 1, y: 2 }).success).toBe(false);
+    expect(
+      BrowserLiveInputSchema.parse({ kind: "tap", documentId: "stream-1:0", x: 1, y: 2 }),
+    ).toMatchObject({ documentId: "stream-1:0" });
+  });
+
+  test("an ended stream can say whether the viewer still holds the tab", () => {
+    const ended = { type: "browser.live.ended", payload: { streamId: "s", error: null } };
+    expect(BrowserLiveEndedSchema.safeParse(ended).success).toBe(true);
+    expect(
+      BrowserLiveEndedSchema.parse({
+        ...ended,
+        payload: { ...ended.payload, control: { held: true } },
+      }).payload,
+    ).toMatchObject({ control: { held: true } });
+  });
+});
+
+test("a granted take can say that it reloaded the page", () => {
+  const payload = { requestId: "r", streamId: "s", focus: null, error: null, reloaded: true };
+  const parsed = BrowserLiveTakeControlResponseSchema.parse({
+    type: "browser.live.take_control.response",
+    payload,
+  });
+  expect(parsed.payload).toEqual(payload);
 });

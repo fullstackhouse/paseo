@@ -9,7 +9,7 @@ import type {
 } from "@getpaseo/protocol/browser-automation/rpc-schemas";
 import { BROWSER_AUTOMATION_COMMAND_NAMES } from "@getpaseo/protocol/browser-automation/rpc-schemas";
 import { CLIENT_CAPS } from "@getpaseo/protocol/client-capabilities";
-import type pino from "pino";
+import pino from "pino";
 import { afterEach, describe, expect, it } from "vitest";
 
 import type { AgentManager } from "./agent/agent-manager.js";
@@ -197,6 +197,131 @@ describe("WebSocketServer browser tools wiring", () => {
     expect(harness.broker.getRegisteredClientCount()).toBe(1);
     expect(harness.broker.getPendingRequestCount()).toBe(0);
   });
+
+  it("carries human input from phone to desktop without logging, tracing, or echoing it", async () => {
+    const sentinel = "LV3-SENTINEL-websocket";
+    const recorded: string[] = [];
+    const logger = pino({ level: "trace" }, { write: (line: string) => void recorded.push(line) });
+    const record = (...args: unknown[]) => void recorded.push(JSON.stringify(args));
+    const broker = new BrowserToolsBroker({
+      createRequestId: createRequestIdSequence(),
+      isLiveViewEnabled: () => true,
+    });
+    const httpServer = createServer();
+    const wsServer = createVoiceAssistantWebSocketServer({ httpServer, broker, logger });
+    await listen(httpServer);
+    const connect = async (clientId: string) => {
+      const client = new DaemonClient({
+        url: `ws://127.0.0.1:${getPort(httpServer)}/ws`,
+        clientId,
+        clientType: "browser",
+        connectTimeoutMs: 500,
+        reconnect: { enabled: false },
+        logger: { debug: record, info: record, warn: record, error: record },
+        trace: { isEnabled: () => true, beginSection: record, endSection: () => {} },
+      });
+      await client.connect();
+      return client;
+    };
+    const [phone, desktop, stranger] = await Promise.all(
+      ["phone", "desktop", "stranger"].map(connect),
+    );
+
+    const focus = {
+      targetId: "target-1",
+      kind: "password",
+      origin: "https://idp.example",
+      topOrigin: "https://app.example",
+    };
+    const received: unknown[] = [];
+    const host = desktop.registerBrowserHost({
+      hostKind: "desktop app",
+      supportedCommands: [...BROWSER_AUTOMATION_COMMAND_NAMES],
+      liveView: true,
+      liveViewInput: true,
+    });
+    host.subscribe({
+      snapshot: () => {},
+      update: (message) => {
+        if (message.type === "browser.host.live.start.request") {
+          desktop.sendBrowserHostLiveMessage({
+            type: "browser.host.live.start.response",
+            payload: {
+              requestId: message.requestId,
+              viewport: { width: 8, height: 6 },
+              error: null,
+            },
+          });
+        } else if (message.type === "browser.host.live.take_control.request") {
+          desktop.sendBrowserHostLiveMessage({
+            type: "browser.host.live.take_control.response",
+            payload: { requestId: message.requestId, focus, error: null },
+          });
+        } else if (message.type === "browser.host.live.send_input.request") {
+          received.push(message.input);
+          desktop.sendBrowserHostLiveMessage({
+            type: "browser.host.live.send_input.response",
+            payload: {
+              requestId: message.requestId,
+              focus: null,
+              error: { code: "target_changed", message: "Refused." },
+            },
+          });
+        } else if (message.type === "browser.host.live.release_control.request") {
+          desktop.sendBrowserHostLiveMessage({
+            type: "browser.host.live.release_control.response",
+            payload: { requestId: message.requestId, error: null },
+          });
+        } else if (message.type === "browser.host.live.stop.request") {
+          desktop.sendBrowserHostLiveMessage({
+            type: "browser.host.live.stop.response",
+            payload: { requestId: message.requestId, error: null },
+          });
+        }
+      },
+    });
+
+    try {
+      await host.ready;
+      const started = await phone.startBrowserLiveView({ browserId: BROWSER_ID });
+      expect(started.control).toEqual({ held: false });
+      const streamId = started.streamId!;
+      await expect(phone.takeBrowserLiveControl(streamId)).resolves.toMatchObject({ focus });
+
+      const input = { kind: "insert_text", targetId: "target-1", text: sentinel } as const;
+      await expect(stranger.sendBrowserLiveInput(streamId, input)).resolves.toMatchObject({
+        error: { code: "stream_ended" },
+      });
+      expect(received).toEqual([]);
+
+      const answer = await phone.sendBrowserLiveInput(streamId, input);
+      expect(received).toEqual([input]);
+      expect(answer).toMatchObject({ streamId, error: { code: "target_changed" } });
+      expect(JSON.stringify(answer)).not.toContain(sentinel);
+
+      // Text that fails validation must not reach the rejection's log line or reply either.
+      expect(() =>
+        phone.sendBrowserLiveInput(streamId, { ...input, text: sentinel.repeat(1000) }),
+      ).toThrow(expect.objectContaining({ message: expect.not.stringContaining(sentinel) }));
+
+      await expect(phone.releaseBrowserLiveControl(streamId)).resolves.toMatchObject({
+        error: null,
+      });
+    } finally {
+      await Promise.all([phone.close(), desktop.close(), stranger.close()]);
+      await wsServer.close();
+      await closeHttpServer(httpServer);
+    }
+
+    // Guards against passing because nothing was recorded.
+    expect(recorded.join("\n")).toContain("browser.live.send_input.request");
+    expect(recorded.join("\n")).not.toContain(sentinel);
+    // Not even the length of what was typed.
+    const inputTraces = recorded.filter(
+      (line) => line.includes("payloadBytes") && line.includes("send_input.request"),
+    );
+    expect(inputTraces).toEqual([]);
+  });
 });
 
 async function startBrowserToolsDaemonHarness(): Promise<BrowserToolsDaemonHarness> {
@@ -278,8 +403,9 @@ function createRequestIdSequence(): () => string {
 function createVoiceAssistantWebSocketServer(params: {
   httpServer: HTTPServer;
   broker: BrowserToolsBroker;
+  logger?: pino.Logger;
 }): VoiceAssistantWebSocketServer {
-  const { httpServer, broker } = params;
+  const { httpServer, broker, logger = createStub<pino.Logger>(createLogger()) } = params;
   const agentManager = {
     setAgentAttentionCallback() {},
     subscribe: () => () => {},
@@ -298,7 +424,7 @@ function createVoiceAssistantWebSocketServer(params: {
 
   return new VoiceAssistantWebSocketServer(
     httpServer,
-    createStub<pino.Logger>(createLogger()),
+    logger,
     "srv-test",
     createStub<AgentManager>(agentManager),
     createStub<AgentStorage>({}),

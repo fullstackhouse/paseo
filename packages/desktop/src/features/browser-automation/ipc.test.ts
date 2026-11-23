@@ -1,11 +1,15 @@
 import { describe, expect, test, vi } from "vitest";
 import { executeAutomationCommand, type BrowserRegistry, type TabImage } from "./service.js";
+import type { GuestControlReply, GuestControlRequest } from "./guest-frames.js";
+import { BrowserHumanControls } from "./human-control.js";
 import {
   adaptWebContents,
+  BROWSER_LIVE_CONTROL_ENDED_EVENT,
   BROWSER_LIVE_ENDED_EVENT,
   BROWSER_LIVE_FRAME_EVENT,
   BrowserLiveViewStreams,
   HostSnapshotEngineRegistry,
+  runAgentCommand,
 } from "./ipc.js";
 import type { IsolatedKeyboardInputEvent } from "./trusted-input.js";
 
@@ -21,16 +25,22 @@ class FakeImage implements TabImage {
 
 class FakeDebugger {
   public attachedProtocolVersions: string[] = [];
-  public commands: Array<{ command: string; params: Record<string, unknown> }> = [];
+  public commands: Array<{ command: string; params: Record<string, unknown>; sessionId?: string }> =
+    [];
+  public readonly responses = new Map<
+    string,
+    (params: Record<string, unknown>, sessionId?: string) => unknown
+  >();
   public blockCommands = false;
   public readonly blockedCommandNames = new Set<string>();
+  public blockPressed = false;
   public readonly failedCommandNames = new Set<string>();
   public readonly failedCommandErrors = new Map<string, Error>();
   public readonly promptDialogs: unknown[] = [];
   public failPromptDrain = false;
   public beforeCommand: ((command: string) => void) | null = null;
   private readonly messageListeners = new Set<
-    (event: unknown, method: string, params?: Record<string, unknown>) => void
+    (event: unknown, method: string, params?: Record<string, unknown>, sessionId?: string) => void
   >();
   private readonly detachListeners = new Set<() => void>();
   private readonly blockedCommands: Array<() => void> = [];
@@ -43,8 +53,14 @@ class FakeDebugger {
     this.attachedProtocolVersions.push(protocolVersion ?? "");
   }
 
-  public async sendCommand(command: string, params?: Record<string, unknown>): Promise<unknown> {
-    this.commands.push({ command, params: params ?? {} });
+  public async sendCommand(
+    command: string,
+    params?: Record<string, unknown>,
+    sessionId?: string,
+  ): Promise<unknown> {
+    // As Electron does.
+    if (sessionId === "") throw new Error("Empty session id is not allowed");
+    this.commands.push({ command, params: params ?? {}, ...(sessionId ? { sessionId } : {}) });
     this.beforeCommand?.(command);
     const commandError = this.failedCommandErrors.get(command);
     if (commandError) {
@@ -53,7 +69,11 @@ class FakeDebugger {
     if (this.failedCommandNames.has(command)) {
       throw new Error(`${command} failed`);
     }
-    if (this.blockCommands || this.blockedCommandNames.has(command)) {
+    if (
+      this.blockCommands ||
+      this.blockedCommandNames.has(command) ||
+      (this.blockPressed && params?.type === "mousePressed")
+    ) {
       await new Promise<void>((resolve) => {
         this.blockedCommands.push(resolve);
       });
@@ -67,6 +87,8 @@ class FakeDebugger {
       }
       return { result: { value: true } };
     }
+    const response = this.responses.get(command);
+    if (response) return response(params ?? {}, sessionId);
     if (command === "Page.getLayoutMetrics") {
       return { cssLayoutViewport: { clientWidth: 1024, clientHeight: 768 } };
     }
@@ -107,16 +129,23 @@ class FakeDebugger {
     return this.messageListeners.size;
   }
 
-  public emitMessage(method: string, params?: Record<string, unknown>): void {
+  /** Electron reports the tab's own session as an empty id. */
+  public emitMessage(method: string, params?: Record<string, unknown>, sessionId = ""): void {
     if (this.messageListeners.size === 0) {
       throw new Error("Debugger message listener was not registered");
     }
-    for (const listener of this.messageListeners) listener({}, method, params);
+    for (const listener of this.messageListeners) listener({}, method, params, sessionId);
   }
 
   public emitDetach(): void {
     this.attachedProtocolVersions.length = 0;
     for (const listener of this.detachListeners) listener();
+  }
+
+  public finishCommands(): void {
+    this.blockedCommandNames.clear();
+    this.blockPressed = false;
+    for (const resolve of this.blockedCommands.splice(0)) resolve();
   }
 
   public finishNextCommand(): void {
@@ -136,7 +165,65 @@ type ConsoleMessageListener = (
   sourceId: unknown,
 ) => void;
 
+type WithoutId<T> = T extends unknown ? Omit<T, "id"> : never;
+
+class FakeFrame {
+  public url: string;
+  public detached = false;
+  public destroyed = false;
+  public readonly children: FakeFrame[] = [];
+  public readonly requests: GuestControlRequest[] = [];
+  /** Null leaves the request unanswered, as a hung or crashed renderer does. */
+  public answer: (request: WithoutId<GuestControlRequest>) => Omit<GuestControlReply, "id"> | null =
+    (request) => {
+      if (request.op === "describe") return { target: { targetId: "target-1", kind: "password" } };
+      if (request.op === "insert") return { inserted: true };
+      return { typed: true };
+    };
+  public reply: ((sender: FakeFrame, reply: GuestControlReply) => void) | null = null;
+
+  public constructor(
+    public origin: string,
+    public processId: number,
+    public routingId: number,
+  ) {
+    this.url = `${origin}/login`;
+  }
+
+  public get framesInSubtree(): FakeFrame[] {
+    return [this, ...this.children.flatMap((child) => child.framesInSubtree)];
+  }
+
+  public isDestroyed(): boolean {
+    return this.destroyed;
+  }
+
+  public send(_channel: string, request: GuestControlRequest): void {
+    if (this.destroyed) throw new Error("Render frame was disposed");
+    this.requests.push(request);
+    const answer = this.answer(request);
+    if (answer) queueMicrotask(() => this.reply?.(this, { id: request.id, ...answer }));
+  }
+}
+
 class FakeWebContents {
+  public readonly mainFrame = new FakeFrame("https://app.example", 10, 1);
+  public focusedFrame: FakeFrame | null = this.mainFrame;
+  public zoomFactor = 1;
+  public loadingMainFrame = false;
+  public historyClears = 0;
+  public readonly insertedTexts: string[] = [];
+  public readonly navigationHistory = {
+    clear: () => {
+      this.historyClears += 1;
+    },
+  };
+  public getZoomFactor(): number {
+    return this.zoomFactor;
+  }
+  public isLoadingMainFrame(): boolean {
+    return this.loadingMainFrame;
+  }
   public backgroundThrottling = true;
   public getBackgroundThrottling(): boolean {
     return this.backgroundThrottling;
@@ -145,7 +232,13 @@ class FakeWebContents {
     if (this.destroyed) throw new Error("Object has been destroyed");
     this.backgroundThrottling = allowed;
   }
-  public readonly debugger = new FakeDebugger();
+  private readonly debuggerApi = new FakeDebugger();
+  /** Electron's getter: usable during detach, throwing from "destroyed" on. */
+  public get debugger(): FakeDebugger {
+    if (this.debuggerDisposed) throw new TypeError("Object has been destroyed");
+    return this.debuggerApi;
+  }
+  private debuggerDisposed = false;
   public readonly inputEvents: IsolatedKeyboardInputEvent[] = [];
   public readonly loadedUrls: string[] = [];
   public frameListener: ((image: TabImage) => void) | null = null;
@@ -188,12 +281,57 @@ class FakeWebContents {
     return this.destroyed;
   }
 
-  public async executeJavaScript(): Promise<unknown> {
-    return null;
+  public script: (code: string) => Promise<unknown> = async () => null;
+  public async executeJavaScript(code: string): Promise<unknown> {
+    return this.script(code);
+  }
+  public stops = 0;
+  public stop(): void {
+    this.stops += 1;
+  }
+  private readonly internalListeners = new Map<string, Array<(...args: never[]) => void>>();
+  public emit(event: string, ...args: unknown[]): boolean {
+    for (const listener of this.internalListeners.get(event) ?? []) listener(...(args as never[]));
+    return true;
+  }
+  public finishLoading(): void {
+    this.loadingMainFrame = false;
+    const waiting = this.internalListeners.get("did-stop-loading") ?? [];
+    this.internalListeners.delete("did-stop-loading");
+    for (const listener of waiting) (listener as () => void)();
   }
 
   public async loadURL(url: string): Promise<void> {
     this.loadedUrls.push(url);
+    if (this.failedUrls.has(url)) throw new Error("ERR_ABORTED");
+    if (this.guardsUnload) {
+      // Chromium announces a navigation before that navigation's beforeunload.
+      this.debuggerApi.emitMessage("Page.frameStartedNavigating", {
+        frameId: "main",
+        url,
+        navigationType: "differentDocument",
+      });
+      this.beforeUnload?.();
+      if (!this.preventUnload()) throw new Error("ERR_ABORTED");
+      this.guardsUnload = false;
+    }
+    this.mainFrame.url = url;
+    this.mainFrame.children.length = 0;
+  }
+  public readonly failedUrls = new Set<string>();
+  public guardsUnload = false;
+  public beforeUnload: (() => void) | null = null;
+  /** Electron's will-prevent-unload: true when a listener lets the document go. */
+  public preventUnload(): boolean {
+    let prevented = false;
+    for (const listener of this.unloadListeners) {
+      listener({ preventDefault: () => (prevented = true) });
+    }
+    return prevented;
+  }
+  public hasPainted = true;
+  public async executeJavaScriptInIsolatedWorld(): Promise<unknown> {
+    return this.hasPainted;
   }
 
   public goBack(): void {}
@@ -220,21 +358,37 @@ class FakeWebContents {
     this.inputEvents.push(event);
   }
 
-  public async insertText(_text: string): Promise<void> {}
-
-  public on(event: "console-message", listener: ConsoleMessageListener): void {
-    expect(event).toBe("console-message");
-    this.consoleMessageListener = listener;
+  public async insertText(text: string): Promise<void> {
+    this.insertedTexts.push(text);
   }
 
-  public once(event: "destroyed", listener: () => void): void {
-    expect(event).toBe("destroyed");
-    this.destroyedListeners.add(listener);
+  public readonly unloadListeners = new Set<(event: { preventDefault(): void }) => void>();
+
+  public on(event: string, listener: ConsoleMessageListener | ((...args: never[]) => void)): void {
+    if (event === "console-message")
+      this.consoleMessageListener = listener as ConsoleMessageListener;
+    else if (event !== "will-prevent-unload") this.listen(event, listener as () => void);
+    else this.unloadListeners.add(listener as (event: { preventDefault(): void }) => void);
   }
 
-  public removeListener(event: "destroyed", listener: () => void): void {
-    expect(event).toBe("destroyed");
-    this.destroyedListeners.delete(listener);
+  private listen(event: string, listener: (...args: never[]) => void): void {
+    this.internalListeners.set(event, [...(this.internalListeners.get(event) ?? []), listener]);
+  }
+
+  public once(
+    event: "destroyed" | "did-stop-loading" | "did-navigate",
+    listener: () => void,
+  ): void {
+    if (event === "destroyed") this.destroyedListeners.add(listener);
+    else this.listen(event, listener);
+  }
+
+  public removeListener(
+    event: "destroyed" | "will-prevent-unload",
+    listener: (event: { preventDefault(): void }) => void,
+  ): void {
+    if (event === "will-prevent-unload") this.unloadListeners.delete(listener);
+    else this.destroyedListeners.delete(listener as () => void);
   }
 
   public emitConsoleMessage(input: {
@@ -251,7 +405,8 @@ class FakeWebContents {
 
   public destroy(): void {
     this.destroyed = true;
-    this.debugger.emitDetach();
+    this.debuggerApi.emitDetach();
+    this.debuggerDisposed = true;
     this.frameListener = null;
     for (const listener of this.destroyedListeners) {
       this.destroyedListeners.delete(listener);
@@ -518,7 +673,7 @@ describe("browser automation IPC adapter", () => {
           params: { expression: expect.any(String), returnByValue: true },
         },
         { command: "Input.dispatchMouseEvent", params: { type: "mousePressed" } },
-        { command: "Page.handleJavaScriptDialog", params: { accept: true } },
+        { command: "Page.handleJavaScriptDialog", params: { accept: false } },
       ]);
 
       contents.debugger.blockedCommandNames.clear();
@@ -887,7 +1042,11 @@ function createLiveViews() {
   return { contents, host, streams };
 }
 
-function screencastFrame(contents: FakeWebContents, sessionId: number): void {
+function screencastFrame(
+  contents: FakeWebContents,
+  sessionId: number,
+  capturedAtMs?: number,
+): void {
   contents.debugger.emitMessage("Page.screencastFrame", {
     sessionId,
     data: Buffer.from([0xff, 0xd8, sessionId, 0xff, 0xd9]).toString("base64"),
@@ -898,8 +1057,25 @@ function screencastFrame(contents: FakeWebContents, sessionId: number): void {
       pageScaleFactor: 1,
       scrollOffsetX: 0,
       scrollOffsetY: 12,
+      ...(capturedAtMs === undefined ? {} : { timestamp: capturedAtMs / 1000 }),
     },
   });
+}
+
+function isPageEnable({ command }: { command: string }, index: number): boolean {
+  // The first is the stream's own.
+  return index > 0 && command === "Page.enable";
+}
+
+function commitDocument(contents: FakeWebContents, origin: string): void {
+  contents.mainFrame.origin = origin;
+  contents.debugger.emitMessage("Page.frameNavigated", {
+    frame: { id: "main", url: origin, loaderId: "next-loader" },
+  });
+}
+
+function firstPaint(contents: FakeWebContents, loaderId = "next-loader"): void {
+  contents.debugger.emitMessage("Page.lifecycleEvent", { name: "firstPaint", loaderId });
 }
 
 function screencastAcks(contents: FakeWebContents): unknown[] {
@@ -997,15 +1173,50 @@ describe("browser live view screencast", () => {
       expect(forwarded()).toBe(1);
 
       streams.ack({ type: "browser.host.live.frame_ack", streamId: "stream-1", frameSeq: 0 });
-      // A frame arriving during the frame-rate delay is dropped too.
+      // A newer frame replaces the waiting one, also during the frame-rate delay.
       screencastFrame(contents, 3);
       expect(forwarded()).toBe(1);
       await vi.advanceTimersByTimeAsync(250);
-      expect(screencastAcks(contents)).toEqual([1, 2, 3]);
+      expect(screencastAcks(contents)).toEqual([1, 2]);
 
-      screencastFrame(contents, 4);
+      // The newest frame still goes out. A page that stops painting, as one does once a sign-in
+      // lands on a static page, never sends another.
       expect(forwarded()).toBe(2);
-      expect(host.sent.at(-1)?.payload).toMatchObject({ frameSeq: 1 });
+      expect(host.sent.at(-1)?.payload).toMatchObject({
+        frameSeq: 1,
+        jpeg: new Uint8Array([0xff, 0xd8, 3, 0xff, 0xd9]),
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  test("restarts the screencast once after Chromium's buffer was full", async () => {
+    vi.useFakeTimers();
+    try {
+      const { contents, host, streams } = createLiveViews();
+      await streams.start(host, liveStartRequest());
+      const starts = () =>
+        contents.debugger.commands.filter(({ command }) => command === "Page.startScreencast");
+      const ack = async (frameSeq: number) => {
+        streams.ack({ type: "browser.host.live.frame_ack", streamId: "stream-1", frameSeq });
+        await vi.advanceTimersByTimeAsync(250);
+      };
+
+      // With two frames unacked Chromium drops what it paints next, the final paint included, and
+      // invalidate() doesn't bring it back. Only a new screencast starts with the current paint.
+      screencastFrame(contents, 1);
+      screencastFrame(contents, 2);
+      await ack(0);
+      expect(starts()).toHaveLength(1);
+      await ack(1);
+      expect(starts()).toHaveLength(2);
+      expect(starts()[1]).toEqual(starts()[0]);
+
+      // Its first frame arrives alone, so it asks for no other.
+      screencastFrame(contents, 3);
+      await ack(2);
+      expect(starts()).toHaveLength(2);
     } finally {
       vi.useRealTimers();
     }
@@ -1050,12 +1261,14 @@ describe("browser live view screencast", () => {
   test("ends the stream when the tab is destroyed and reports it to the host window", async () => {
     const { contents, host, streams } = createLiveViews();
     await streams.start(host, liveStartRequest());
-    expect(contents.debugger.messageListenerCount).toBeGreaterThan(0);
+    const tabDebugger = contents.debugger;
+    expect(tabDebugger.messageListenerCount).toBeGreaterThan(0);
 
     contents.destroy();
 
     expect(streams.size).toBe(0);
-    expect(contents.debugger.messageListenerCount).toBe(0);
+    expect(tabDebugger.messageListenerCount).toBe(0);
+    await flushMicrotasks();
     expect(host.sent.filter((event) => event.channel === BROWSER_LIVE_ENDED_EVENT)).toEqual([
       {
         channel: BROWSER_LIVE_ENDED_EVENT,
@@ -1079,6 +1292,7 @@ describe("browser live view screencast", () => {
 
     await streams.start(host, liveStartRequest("stream-2"));
     contents.debugger.emitDetach();
+    await flushMicrotasks();
     expect(host.sent.filter((event) => event.channel === BROWSER_LIVE_ENDED_EVENT)).toEqual([
       expect.objectContaining({ payload: expect.objectContaining({ streamId: "stream-2" }) }),
     ]);
@@ -1152,5 +1366,1186 @@ describe("browser live view screencast", () => {
       error: { code: "browser_denied" },
     });
     expect(streams.size).toBe(1);
+  });
+});
+
+describe("browser live view human control", () => {
+  const SENTINEL = "LV3-SENTINEL-desktop";
+  /** The document of stream-1's frames until a navigation commits. */
+  const DOCUMENT = "stream-1:0";
+
+  async function watchedTab() {
+    const contents = new FakeWebContents(nextLiveContentsId++);
+    const host = new FakeLiveHostWindow(1);
+    const controls = new BrowserHumanControls({
+      settleMs: 0,
+      replyTimeoutMs: 20,
+      drainTimeoutMs: 20,
+      cdpTimeoutMs: 60,
+    });
+    const streams = new BrowserLiveViewStreams(
+      (browserId, hostId) =>
+        browserId === LIVE_BROWSER_ID && hostId === host.id ? contents : null,
+      controls,
+    );
+    const connect = (frame: FakeFrame) => {
+      frame.reply = (sender, reply) =>
+        controls.frames.receive({ processId: sender.processId, frameId: sender.routingId }, reply);
+    };
+    connect(contents.mainFrame);
+    const addFrame = (origin: string, processId: number, parent = contents.mainFrame) => {
+      const frame = new FakeFrame(
+        origin,
+        processId,
+        20 + contents.mainFrame.framesInSubtree.length,
+      );
+      parent.children.push(frame);
+      connect(frame);
+      return frame;
+    };
+    await streams.start(host, liveStartRequest());
+
+    const take = (controlId = "control-1") =>
+      streams.takeControl(host, {
+        type: "browser.host.live.take_control.request",
+        requestId: "take",
+        streamId: "stream-1",
+        controlId,
+      });
+    const send = (input: object, controlId = "control-1") =>
+      streams.sendInput(host, {
+        type: "browser.host.live.send_input.request",
+        requestId: "input",
+        streamId: "stream-1",
+        controlId,
+        input,
+      });
+    const type = () => send({ kind: "insert_text", targetId: "target-1", text: SENTINEL });
+    const release = (discardInput: boolean, controlId = "control-1") =>
+      streams.releaseControl(host, {
+        type: "browser.host.live.release_control.request",
+        requestId: "release",
+        controlId,
+        discardInput,
+      });
+    const run = (command: object) =>
+      runAgentCommand({
+        request: {
+          type: "browser.automation.execute.request",
+          requestId: "agent",
+          command,
+        } as never,
+        registry: {
+          listRegisteredBrowserIds: () => [LIVE_BROWSER_ID],
+          listRegisteredBrowserIdsForWorkspace: () => [LIVE_BROWSER_ID],
+          getTabContents: () => adaptWebContents(contents),
+          getBrowserWorkspaceId: () => null,
+          getWorkspaceActiveBrowserId: () => null,
+        },
+        snapshotEngine: new HostSnapshotEngineRegistry().get(new FakeHostWebContents(host.id)),
+        controls,
+      });
+    return { contents, host, controls, streams, addFrame, take, send, type, release, run };
+  }
+
+  const silence = () => {};
+  const inserts = (frame: FakeFrame) => frame.requests.filter((request) => request.op === "insert");
+
+  test("watching leaves the tab to agents; taking control locks it", async () => {
+    const { contents, controls, take } = await watchedTab();
+    expect(controls.isHeld(contents.id)).toBe(false);
+
+    await expect(take()).resolves.toEqual({
+      requestId: "take",
+      focus: {
+        targetId: "target-1",
+        kind: "password",
+        origin: "https://app.example",
+        topOrigin: "https://app.example",
+      },
+      error: null,
+    });
+    expect(controls.isHeld(contents.id)).toBe(true);
+  });
+
+  test("accepts input only after the agent's running command finished", async () => {
+    const { contents, controls, take } = await watchedTab();
+    let finish!: () => void;
+    const command = controls.track(contents.id, () => new Promise<void>((done) => (finish = done)));
+    let taken = false;
+    const taking = take().then((result) => {
+      taken = true;
+      return result;
+    });
+    await flushMicrotasks();
+    expect(controls.isHeld(contents.id)).toBe(true);
+    expect(taken).toBe(false);
+
+    finish();
+    await command;
+    await expect(taking).resolves.toMatchObject({ error: null });
+  });
+
+  const evaluateCommand = {
+    command: "evaluate",
+    args: { browserId: LIVE_BROWSER_ID, function: "() => new Promise(() => {})" },
+  };
+
+  test("a script that never settles is ended with its document before control is granted", async () => {
+    const { contents, controls, take, run } = await watchedTab();
+    let finishScript!: (value: unknown) => void;
+    contents.script = () => new Promise((resolve) => (finishScript = resolve));
+    const command = run(evaluateCommand);
+    await flushMicrotasks();
+
+    await expect(take()).resolves.toMatchObject({ error: null });
+
+    expect(controls.isHeld(contents.id)).toBe(true);
+    expect(contents.loadedUrls).toEqual(["about:blank", "https://app.example/login"]);
+    expect(contents.debugger.commands).toContainEqual({
+      command: "Runtime.terminateExecution",
+      params: {},
+    });
+    // Back would bring the document, and its script, back.
+    expect(contents.historyClears).toBe(2);
+    finishScript({ ok: true, resultJson: '"what the script read"', truncated: false });
+    const result = await command;
+    expect(result).toMatchObject({ ok: false, error: { code: "browser_denied" } });
+    expect(JSON.stringify(result)).not.toContain("what the script read");
+  });
+
+  test("an abandoned command takes no further step after the grant", async () => {
+    const { contents, take, run } = await watchedTab();
+    let finishScript!: (value: unknown) => void;
+    contents.script = () => new Promise((resolve) => (finishScript = resolve));
+    const command = run({
+      command: "scroll",
+      args: { browserId: LIVE_BROWSER_ID, deltaX: 0, deltaY: 100 },
+    });
+    await flushMicrotasks();
+
+    await expect(take()).resolves.toMatchObject({ error: null });
+    finishScript({ x: 5, y: 5 });
+    await expect(command).resolves.toMatchObject({ error: { code: "browser_denied" } });
+    await flushMicrotasks();
+
+    expect(contents.debugger.commands.filter(({ params }) => params.type === "mouseWheel")).toEqual(
+      [],
+    );
+  });
+
+  test("a script still waiting for the page to load never runs after the grant", async () => {
+    const { contents, take, run } = await watchedTab();
+    const ran: string[] = [];
+    contents.script = async (code) => void ran.push(code);
+    contents.loadingMainFrame = true;
+    const command = run(evaluateCommand);
+    await flushMicrotasks();
+
+    await expect(take()).resolves.toMatchObject({ error: null });
+    // Electron runs waiting scripts at did-stop-loading, in whatever document is there by then.
+    contents.finishLoading();
+    await expect(command).resolves.toMatchObject({ error: { code: "browser_denied" } });
+    await flushMicrotasks();
+
+    expect(ran).toEqual([]);
+    expect(contents.loadedUrls).toEqual([]);
+  });
+
+  test("cancels a long wait without losing the page", async () => {
+    const { contents, take, run } = await watchedTab();
+    const command = run({
+      command: "wait",
+      args: { browserId: LIVE_BROWSER_ID, text: "Signed in", timeoutMs: 60_000 },
+    });
+    await flushMicrotasks();
+
+    await expect(take()).resolves.toMatchObject({ error: null });
+    await expect(command).resolves.toMatchObject({ error: { code: "browser_denied" } });
+    expect(contents.loadedUrls).toEqual([]);
+  });
+
+  test("stays read-only while an abandoned script can't be ended, on every attempt", async () => {
+    const { contents, controls, take, run } = await watchedTab();
+    contents.script = () => new Promise(() => {});
+    void run(evaluateCommand);
+    await flushMicrotasks();
+    contents.failedUrls.add("about:blank");
+
+    await expect(take()).resolves.toMatchObject({ error: { code: "agent_busy" } });
+    await expect(take("control-2")).resolves.toMatchObject({ error: { code: "agent_busy" } });
+    expect(controls.isHeld(contents.id)).toBe(false);
+
+    contents.failedUrls.clear();
+    await expect(take("control-3")).resolves.toMatchObject({ error: null });
+  });
+
+  test("one controller per tab", async () => {
+    const { take, send } = await watchedTab();
+    await take();
+    await expect(take("control-2")).resolves.toMatchObject({ error: { code: "busy" } });
+    await expect(send({ kind: "key", key: "Tab" }, "control-2")).resolves.toMatchObject({
+      error: { code: "not_controller" },
+    });
+  });
+
+  test("maps a tap from screen space to CSS pixels under page zoom", async () => {
+    const { contents, take, send } = await watchedTab();
+    await take();
+    contents.zoomFactor = 2;
+    await send({ kind: "tap", documentId: DOCUMENT, x: 100, y: 60 });
+    expect(
+      contents.debugger.commands.filter(({ params }) => params.type === "mousePressed"),
+    ).toEqual([
+      {
+        command: "Input.dispatchMouseEvent",
+        params: expect.objectContaining({ x: 50, y: 30 }),
+      },
+    ]);
+  });
+
+  test("delivers a tap over a cross-origin iframe to that frame's own session", async () => {
+    const { contents, take, send } = await watchedTab();
+    const cdp = contents.debugger;
+    cdp.responses.set("Target.setAutoAttach", (params, sessionId) => {
+      if (params.autoAttach && !sessionId) {
+        cdp.emitMessage("Target.attachedToTarget", {
+          sessionId: "iframe-session",
+          targetInfo: { targetId: "iframe-frame" },
+        });
+      }
+      return {};
+    });
+    cdp.responses.set("Page.getLayoutMetrics", (_params, sessionId) => ({
+      cssLayoutViewport: { pageX: 0, pageY: sessionId ? 0 : 400 },
+    }));
+    cdp.responses.set("DOM.getNodeForLocation", (_params, sessionId) =>
+      sessionId ? { backendNodeId: 9 } : { backendNodeId: 5 },
+    );
+    cdp.responses.set("DOM.describeNode", (_params, sessionId) =>
+      sessionId ? { node: { nodeName: "INPUT" } } : { node: { frameId: "iframe-frame" } },
+    );
+    cdp.responses.set("DOM.getBoxModel", () => ({
+      model: {
+        content: [42, 368, 542, 368, 542, 468, 42, 468],
+        border: [40, 366, 544, 366, 544, 470, 40, 470],
+        width: 504,
+        height: 104,
+      },
+    }));
+
+    await take();
+    await send({ kind: "tap", documentId: DOCUMENT, x: 92, y: 398 });
+
+    // getNodeForLocation counts from the document, quads and input from the viewport.
+    expect(cdp.commands).toContainEqual({
+      command: "DOM.getNodeForLocation",
+      params: { x: 92, y: 798 },
+    });
+    expect(cdp.commands.filter(({ params }) => params.type === "mousePressed")).toEqual([
+      {
+        command: "Input.dispatchMouseEvent",
+        params: expect.objectContaining({ x: 50, y: 30 }),
+        // The root session can't hit-test into a parked tab's out-of-process iframe.
+        sessionId: "iframe-session",
+      },
+    ]);
+  });
+
+  test.each([
+    ["scaled", [100, 100, 350, 100, 350, 150, 100, 150], [102.5, 102.5], [225, 125], [245, 45]],
+    ["rotated", [300, 100, 300, 600, 200, 600, 200, 100], [295, 105], [255, 200], [95, 40]],
+    ["mirrored", [600, 100, 100, 100, 100, 200, 600, 200], [595, 105], [500, 150], [95, 45]],
+    ["in perspective", [0, 0, 400, 50, 400, 150, 0, 200], [0, 0], [800 / 3, 100], [250, 50]],
+  ] as const)(
+    "maps a tap into a %s cross-origin iframe",
+    async (_name, border, [left, top], [x, y], [childX, childY]) => {
+      const { contents, take, send } = await watchedTab();
+      const cdp = contents.debugger;
+      cdp.responses.set("Target.setAutoAttach", (params, sessionId) => {
+        if (params.autoAttach && !sessionId) {
+          cdp.emitMessage("Target.attachedToTarget", {
+            sessionId: "iframe-session",
+            targetInfo: { targetId: "iframe-frame" },
+          });
+        }
+        return {};
+      });
+      cdp.responses.set("DOM.getNodeForLocation", () => ({ backendNodeId: 5 }));
+      cdp.responses.set("DOM.describeNode", (_params, sessionId) => ({
+        node: sessionId ? { nodeName: "INPUT" } : { frameId: "iframe-frame" },
+      }));
+      // The box is 500x100 before transforms, and content starts where its quad starts.
+      cdp.responses.set("DOM.getBoxModel", () => ({
+        model: { border, content: [left, top, 0, 0, 0, 0, 0, 0], width: 500, height: 100 },
+      }));
+
+      await take();
+      await send({ kind: "tap", documentId: DOCUMENT, x, y });
+
+      const pressed = cdp.commands.find(({ params }) => params.type === "mousePressed");
+      expect(pressed?.sessionId).toBe("iframe-session");
+      expect(pressed?.params.x).toBeCloseTo(childX);
+      expect(pressed?.params.y).toBeCloseTo(childY);
+    },
+  );
+
+  test("the page counts as focused while controlled, and only then", async () => {
+    const { contents, take, release } = await watchedTab();
+    const emulated = () =>
+      contents.debugger.commands
+        .filter(({ command }) => command === "Emulation.setFocusEmulationEnabled")
+        .map(({ params }) => params.enabled);
+    // Without it, the first press in a tab without focus blurs the iframe field it focused.
+    await take();
+    expect(emulated()).toEqual([true]);
+    await release(false);
+    await flushMicrotasks();
+    expect(emulated()).toEqual([true, false]);
+  });
+
+  test("releasing detaches from iframe targets", async () => {
+    const { contents, take, release } = await watchedTab();
+    await take();
+    await release(false);
+    await flushMicrotasks();
+    expect(contents.debugger.commands.at(-1)).toMatchObject({
+      command: "Target.setAutoAttach",
+      params: { autoAttach: false },
+    });
+  });
+
+  test("scrolls at the point the finger started", async () => {
+    const { contents, take, send } = await watchedTab();
+    await take();
+    await send({ kind: "scroll", documentId: DOCUMENT, x: 10, y: 20, deltaX: 0, deltaY: 300 });
+    expect(contents.debugger.commands).toContainEqual({
+      command: "Input.dispatchMouseEvent",
+      params: { type: "mouseWheel", x: 10, y: 20, deltaX: 0, deltaY: 300 },
+    });
+  });
+
+  test("Enter carries the character that submits a form", async () => {
+    const { contents, take, send } = await watchedTab();
+    await take();
+    await send({ kind: "key", key: "Enter" });
+    expect(contents.inputEvents.map(({ type, keyCode }) => [type, keyCode])).toEqual([
+      ["keyDown", "Enter"],
+      ["char", "\r"],
+      ["keyUp", "Enter"],
+    ]);
+  });
+
+  test("types into a cross-origin iframe through that frame, never webContents.insertText", async () => {
+    const { contents, addFrame, take, type } = await watchedTab();
+    const outer = addFrame("https://idp.example", 30);
+    const nested = addFrame("https://idp.example", 30, outer);
+    const bystander = addFrame("https://ads.example", 40);
+    contents.focusedFrame = nested;
+
+    await expect(take()).resolves.toMatchObject({
+      focus: { origin: "https://idp.example", topOrigin: "https://app.example" },
+    });
+    await expect(type()).resolves.toMatchObject({ error: null });
+
+    expect(inserts(nested)).toEqual([expect.objectContaining({ text: SENTINEL })]);
+    // webContents.insertText crashes the renderer with focus in an out-of-process iframe.
+    expect(contents.insertedTexts).toEqual([]);
+    expect(inserts(contents.mainFrame)).toEqual([]);
+    expect(outer.requests).toEqual([]);
+    expect(bystander.requests).toEqual([]);
+  });
+
+  test("keys don't reach another process's frame, so say so", async () => {
+    const { contents, addFrame, take, send } = await watchedTab();
+    contents.focusedFrame = addFrame("https://idp.example", 30);
+    await take();
+    await expect(send({ kind: "key", key: "Enter" })).resolves.toMatchObject({
+      error: { code: "key_unsupported" },
+    });
+    expect(contents.inputEvents).toEqual([]);
+  });
+
+  test.each([
+    "the frame navigated",
+    "the tab navigated",
+    "focus moved to another frame",
+    "the frame is gone",
+  ])("refuses text without sending it when %s", async (change) => {
+    const { contents, addFrame, take, type } = await watchedTab();
+    const shown = addFrame("https://idp.example", 30);
+    const other = addFrame("https://idp.example", 30);
+    contents.focusedFrame = shown;
+    await take();
+
+    if (change === "the frame navigated") shown.origin = "https://evil.example";
+    if (change === "the tab navigated") contents.mainFrame.origin = "https://evil.example";
+    if (change === "focus moved to another frame") contents.focusedFrame = other;
+    if (change === "the frame is gone") shown.destroyed = true;
+
+    await expect(type()).resolves.toMatchObject({ focus: null, error: { code: "target_changed" } });
+    for (const frame of [shown, other, contents.mainFrame]) expect(inserts(frame)).toEqual([]);
+  });
+
+  test("refuses text for a field the user wasn't shown last", async () => {
+    const { contents, take, send } = await watchedTab();
+    await take();
+    await expect(
+      send({ kind: "insert_text", targetId: "an-older-target", text: SENTINEL }),
+    ).resolves.toMatchObject({ error: { code: "target_changed" } });
+    expect(inserts(contents.mainFrame)).toEqual([]);
+  });
+
+  test("reports a field the page switched while typing", async () => {
+    const { contents, take, type } = await watchedTab();
+    await take();
+    contents.mainFrame.answer = () => ({ inserted: false });
+    await expect(type()).resolves.toMatchObject({ error: { code: "target_changed" } });
+  });
+
+  test("an unanswered insert fails closed: lock kept, value not resent or logged", async () => {
+    const logged = (["log", "info", "warn", "error", "debug"] as const).map((level) =>
+      vi.spyOn(console, level).mockImplementation(silence),
+    );
+    try {
+      const { contents, controls, take, type } = await watchedTab();
+      await take();
+      contents.mainFrame.answer = () => null;
+
+      const result = await type();
+
+      expect(result).toMatchObject({ error: { code: "unconfirmed" } });
+      expect(controls.isHeld(contents.id)).toBe(true);
+      expect(inserts(contents.mainFrame)).toHaveLength(1);
+      expect(inserts(contents.mainFrame)[0]).toMatchObject({ deadline: expect.any(Number) });
+      expect(JSON.stringify(result)).not.toContain(SENTINEL);
+      expect(JSON.stringify(logged.map((spy) => spy.mock.calls))).not.toContain(SENTINEL);
+      expect(JSON.stringify(contents.debugger.commands)).not.toContain(SENTINEL);
+    } finally {
+      for (const spy of logged) spy.mockRestore();
+    }
+  });
+
+  test("says when text doesn't fit the field", async () => {
+    const { contents, take, type } = await watchedTab();
+    await take();
+    contents.mainFrame.answer = () => ({ inserted: false, reason: "does_not_fit" });
+    await expect(type()).resolves.toMatchObject({ error: { code: "does_not_fit" } });
+  });
+
+  test("tells the frame which control typed and which clears", async () => {
+    const { contents, take, type, release } = await watchedTab();
+    await take();
+    await type();
+    await release(false);
+    const scoped = contents.mainFrame.requests.filter((request) => request.op !== "describe");
+    expect(scoped).toEqual([
+      expect.objectContaining({ op: "insert", controlId: "control-1" }),
+      expect.objectContaining({ op: "clear", controlId: "control-1" }),
+    ]);
+  });
+
+  test("only the frame that was asked can answer", async () => {
+    const { contents, controls, take, type } = await watchedTab();
+    await take();
+    contents.mainFrame.answer = () => null;
+    const typing = type();
+    await flushMicrotasks();
+    const [sent] = inserts(contents.mainFrame);
+    controls.frames.receive({ processId: 99, frameId: 1 }, { id: sent!.id, inserted: true });
+    await expect(typing).resolves.toMatchObject({ error: { code: "unconfirmed" } });
+  });
+
+  test("hand-back clears secrets in place and doesn't reload the page", async () => {
+    const { contents, controls, take, type, release } = await watchedTab();
+    await take();
+    await type();
+
+    await expect(release(false)).resolves.toEqual({ requestId: "release", error: null });
+
+    expect(contents.mainFrame.requests).toContainEqual(
+      expect.objectContaining({ op: "clear", scope: "secrets" }),
+    );
+    expect(contents.loadedUrls).toEqual([]);
+    expect(contents.historyClears).toBe(1);
+    expect(controls.isHeld(contents.id)).toBe(false);
+  });
+
+  test("a release the user didn't ask for discards the document before unlocking", async () => {
+    const { contents, controls, take, type, release } = await watchedTab();
+    await take();
+    await type();
+    const loadURL = contents.loadURL.bind(contents);
+    const heldDuringLoad: boolean[] = [];
+    contents.loadURL = (url) => {
+      heldDuringLoad.push(controls.isHeld(contents.id));
+      return loadURL(url);
+    };
+
+    await expect(release(true)).resolves.toEqual({ requestId: "release", error: null });
+
+    expect(contents.mainFrame.requests).toContainEqual(
+      expect.objectContaining({ op: "clear", scope: "all" }),
+    );
+    // A GET of the URL: a reload would submit the page's POST again.
+    expect(contents.loadedUrls).toEqual(["about:blank", "https://app.example/login"]);
+    expect(heldDuringLoad).toEqual([true, true]);
+    // Back, forward and their saved form state go too.
+    expect(contents.historyClears).toBe(2);
+    expect(contents.unloadListeners.size).toBe(0);
+    expect(controls.isHeld(contents.id)).toBe(false);
+  });
+
+  test("an auto-release leaves a page the user submitted or never typed into", async () => {
+    const untouched = await watchedTab();
+    await untouched.take();
+    await untouched.release(true);
+    expect(untouched.contents.loadedUrls).toEqual([]);
+
+    const submitted = await watchedTab();
+    await submitted.take();
+    await submitted.type();
+    submitted.contents.mainFrame.answer = () => ({ typed: false });
+    await submitted.release(true);
+    expect(submitted.contents.loadedUrls).toEqual([]);
+    expect(submitted.contents.historyClears).toBe(1);
+  });
+
+  test("a frame that can't answer is discarded", async () => {
+    const { contents, take, type, release } = await watchedTab();
+    await take();
+    await type();
+    contents.mainFrame.answer = () => null;
+    await expect(release(true)).resolves.toMatchObject({ error: null });
+    expect(contents.loadedUrls[0]).toBe("about:blank");
+  });
+
+  test("keeps the lock when the document can't be discarded, and can retry", async () => {
+    const { contents, controls, take, type, release } = await watchedTab();
+    await take();
+    await type();
+    contents.failedUrls.add("about:blank");
+
+    await expect(release(true)).resolves.toMatchObject({ error: { code: "failed" } });
+    expect(controls.isHeld(contents.id)).toBe(true);
+
+    contents.failedUrls.clear();
+    await expect(release(true)).resolves.toMatchObject({ error: null });
+    expect(controls.isHeld(contents.id)).toBe(false);
+  });
+
+  test("retries a failed discard by itself, as after losing the daemon", async () => {
+    const { contents, controls, take, type, release } = await watchedTab();
+    await take();
+    await type();
+    contents.failedUrls.add("about:blank");
+    vi.useFakeTimers();
+    try {
+      await expect(release(true)).resolves.toMatchObject({ error: { code: "failed" } });
+      contents.failedUrls.clear();
+      await vi.advanceTimersByTimeAsync(30_000);
+      expect(controls.isHeld(contents.id)).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  test("won't hand back while a secret can't be cleared", async () => {
+    const { contents, controls, take, type, release } = await watchedTab();
+    await take();
+    await type();
+    contents.mainFrame.answer = () => null;
+    await expect(release(false)).resolves.toMatchObject({ error: { code: "failed" } });
+    expect(controls.isHeld(contents.id)).toBe(true);
+  });
+
+  test("closing the tab ends control and tells the host", async () => {
+    const { contents, host, controls, take } = await watchedTab();
+    await take();
+    const contentsId = contents.id;
+    contents.destroy();
+    expect(controls.isHeld(contentsId)).toBe(false);
+    expect(host.sent).toContainEqual({
+      channel: BROWSER_LIVE_CONTROL_ENDED_EVENT,
+      payload: { controlId: "control-1" },
+    });
+  });
+
+  test("the lock outlives the stream and only its controller can watch again", async () => {
+    const { contents, host, controls, streams, take } = await watchedTab();
+    await take();
+    await streams.stop({
+      type: "browser.host.live.stop.request",
+      requestId: "stop",
+      streamId: "stream-1",
+    });
+    expect(controls.isHeld(contents.id)).toBe(true);
+
+    await expect(streams.start(host, liveStartRequest("stream-2"))).resolves.toMatchObject({
+      error: { code: "browser_denied" },
+    });
+    await expect(
+      streams.start(host, { ...liveStartRequest("stream-3"), controlId: "control-1" }),
+    ).resolves.toMatchObject({ error: null });
+  });
+
+  const handled = (contents: FakeWebContents) =>
+    contents.debugger.commands.filter(({ command }) => command === "Page.handleJavaScriptDialog");
+
+  test.each(["alert", "confirm", "prompt"])("only ever dismisses a %s", async (type) => {
+    const { contents, take } = await watchedTab();
+    await take();
+    const before = handled(contents).length;
+    contents.debugger.emitMessage("Page.javascriptDialogOpening", { type }, "iframe-session");
+    await flushMicrotasks();
+
+    expect(handled(contents).slice(before)).toEqual([
+      expect.objectContaining({ sessionId: "iframe-session" }),
+    ]);
+    expect(handled(contents).map(({ params }) => params.accept)).not.toContain(true);
+  });
+
+  test("leaves beforeunload to Electron, which keeps the page", async () => {
+    const { contents, take } = await watchedTab();
+    await take();
+    const before = handled(contents).length;
+    contents.debugger.emitMessage("Page.javascriptDialogOpening", { type: "beforeunload" });
+    await flushMicrotasks();
+    expect(handled(contents)).toHaveLength(before);
+    expect(contents.preventUnload()).toBe(false);
+  });
+
+  test("closes Electron's box of the dialog it dismissed", async () => {
+    const { contents, take } = await watchedTab();
+    let closed = 0;
+    contents.on("-cancel-dialogs", () => (closed += 1));
+    await expect(take()).resolves.toMatchObject({ error: null });
+    expect(closed).toBe(1);
+  });
+
+  test("closes the box of a dialog that opens under control, which follows CDP's event", async () => {
+    const { contents, take } = await watchedTab();
+    await take();
+    let boxOpen = false;
+    contents.on("-cancel-dialogs", () => (boxOpen = false));
+    contents.debugger.emitMessage("Page.javascriptDialogOpening", { type: "confirm" });
+    // Microtasks run when the event's listeners return, and only then does Electron open its box.
+    for (let turn = 0; turn < 10; turn++) await Promise.resolve();
+    boxOpen = true;
+    await flushMicrotasks();
+    await flushMicrotasks();
+    expect(boxOpen).toBe(false);
+  });
+
+  test("closes no box when there was no dialog to dismiss", async () => {
+    const { contents, take } = await watchedTab();
+    contents.debugger.failedCommandNames.add("Page.handleJavaScriptDialog");
+    let closed = 0;
+    contents.on("-cancel-dialogs", () => (closed += 1));
+    await expect(take()).resolves.toMatchObject({ error: null });
+    expect(closed).toBe(0);
+  });
+
+  test("frames carry the committed origin", async () => {
+    const { contents, host } = await watchedTab();
+    screencastFrame(contents, 3);
+    expect(host.sent.at(-1)?.payload).toMatchObject({
+      metadata: { origin: "https://app.example" },
+    });
+  });
+
+  const framesSent = (host: FakeLiveHostWindow) =>
+    host.sent
+      .filter(({ channel }) => channel === BROWSER_LIVE_FRAME_EVENT)
+      .map(({ payload }) => (payload as { metadata: object }).metadata);
+
+  test("a waiting frame of the previous document is dropped, never relabelled", async () => {
+    const { contents, host, streams } = await watchedTab();
+    screencastFrame(contents, 1);
+    screencastFrame(contents, 2);
+    commitDocument(contents, "https://next.example");
+
+    streams.ack({ type: "browser.host.live.frame_ack", streamId: "stream-1", frameSeq: 0 });
+    await new Promise((resolve) => setTimeout(resolve, 250));
+
+    expect(framesSent(host)).toEqual([
+      expect.objectContaining({ origin: "https://app.example", documentId: DOCUMENT }),
+    ]);
+    expect(screencastAcks(contents)).toEqual([1, 2]);
+  });
+
+  test("a waiting frame keeps the origin it arrived with", async () => {
+    const { contents, host, streams } = await watchedTab();
+    screencastFrame(contents, 1);
+    screencastFrame(contents, 2);
+    contents.mainFrame.origin = "https://next.example";
+
+    streams.ack({ type: "browser.host.live.frame_ack", streamId: "stream-1", frameSeq: 0 });
+    await new Promise((resolve) => setTimeout(resolve, 250));
+
+    expect(framesSent(host)).toHaveLength(2);
+    expect(framesSent(host)[1]).toMatchObject({ origin: "https://app.example" });
+  });
+
+  test("a frame captured before a commit that arrives after it is dropped", async () => {
+    const { contents, host } = await watchedTab();
+    const capturedAt = Date.now() - 50;
+    commitDocument(contents, "https://next.example");
+    firstPaint(contents);
+
+    screencastFrame(contents, 7, capturedAt);
+    await flushMicrotasks();
+    expect(framesSent(host)).toEqual([]);
+    expect(screencastAcks(contents)).toEqual([7]);
+
+    screencastFrame(contents, 8, Date.now() + 50);
+    expect(framesSent(host)).toEqual([
+      expect.objectContaining({ origin: "https://next.example", documentId: "stream-1:1" }),
+    ]);
+  });
+
+  test.each(["tap", "scroll"])("refuses a %s aimed at the previous document", async (kind) => {
+    const { contents, take, send } = await watchedTab();
+    await take();
+    commitDocument(contents, "https://app.example");
+
+    await expect(
+      send({ kind, documentId: DOCUMENT, x: 5, y: 5, deltaX: 0, deltaY: 50 }),
+    ).resolves.toMatchObject({ error: { code: "page_changed" } });
+    expect(
+      contents.debugger.commands.filter(({ command }) => command === "Input.dispatchMouseEvent"),
+    ).toEqual([]);
+  });
+
+  test("refuses a tap when the document changed while it was being routed", async () => {
+    const { contents, take, send } = await watchedTab();
+    await take();
+    contents.debugger.beforeCommand = () => {
+      contents.debugger.beforeCommand = null;
+      commitDocument(contents, "https://next.example");
+    };
+
+    await expect(send({ kind: "tap", documentId: DOCUMENT, x: 5, y: 5 })).resolves.toMatchObject({
+      error: { code: "page_changed" },
+    });
+    expect(contents.debugger.commands.map(({ params }) => params.type)).not.toContain(
+      "mousePressed",
+    );
+  });
+
+  test("an iframe navigating doesn't change the document", async () => {
+    const { contents, take, send } = await watchedTab();
+    await take();
+    contents.debugger.emitMessage("Page.frameNavigated", {
+      frame: { id: "ad", parentId: "main" },
+    });
+    await expect(send({ kind: "tap", documentId: DOCUMENT, x: 5, y: 5 })).resolves.toMatchObject({
+      error: null,
+    });
+  });
+
+  test.each(["before take", "during take"])("answers a dialog that opened %s", async (when) => {
+    const { contents, take } = await watchedTab();
+    const cdp = contents.debugger;
+    const open = () => {
+      cdp.blockedCommandNames.add("Page.enable");
+    };
+    cdp.responses.set("Page.handleJavaScriptDialog", () => {
+      if (!cdp.blockedCommandNames.delete("Page.enable")) return {};
+      // Commands the dialog held up resume.
+      if (cdp.commands.some(isPageEnable)) {
+        cdp.finishNextCommand();
+      }
+      return {};
+    });
+    if (when === "before take") open();
+    else {
+      cdp.beforeCommand = (command) => {
+        if (command !== "Page.enable") return;
+        cdp.beforeCommand = null;
+        open();
+        setTimeout(() => cdp.emitMessage("Page.javascriptDialogOpening", { type: "confirm" }));
+      };
+    }
+
+    await expect(take()).resolves.toMatchObject({ error: null });
+  });
+
+  test("watching answers no dialog and says the page is blocked", async () => {
+    const { contents, host, streams } = createLiveViews();
+    const cdp = contents.debugger;
+    cdp.blockedCommandNames.add("Page.enable");
+    cdp.blockedCommandNames.add("Page.getLayoutMetrics");
+
+    await expect(streams.start(host, liveStartRequest())).resolves.toMatchObject({ error: null });
+
+    expect(handled(contents)).toEqual([]);
+    expect(contents.loadedUrls).toEqual([]);
+    // The screencast doesn't wait for the page: this is what it shows behind the dialog.
+    expect(cdp.commands).toContainEqual(
+      expect.objectContaining({ command: "Page.startScreencast" }),
+    );
+    screencastFrame(contents, 1);
+    expect(host.sent.at(-1)?.payload).toMatchObject({ metadata: { blocked: true } });
+
+    cdp.finishCommands();
+    await flushMicrotasks();
+    streams.ack({ type: "browser.host.live.frame_ack", streamId: "stream-1", frameSeq: 0 });
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    screencastFrame(contents, 2);
+    expect(host.sent.at(-1)?.payload).not.toMatchObject({ metadata: { blocked: true } });
+  });
+
+  test("resuming a controlled stream answers no dialog either", async () => {
+    const { contents, host, streams, take } = await watchedTab();
+    await take();
+    await streams.stop({
+      type: "browser.host.live.stop.request",
+      requestId: "stop",
+      streamId: "stream-1",
+    });
+    const before = handled(contents).length;
+    await streams.start(host, { ...liveStartRequest("stream-2"), controlId: "control-1" });
+    expect(handled(contents)).toHaveLength(before);
+  });
+
+  test("a dialog that opens while watching shows as blocked", async () => {
+    const { contents, host } = await watchedTab();
+    contents.debugger.emitMessage("Page.javascriptDialogOpening", { type: "confirm" });
+    screencastFrame(contents, 1);
+    expect(host.sent.at(-1)?.payload).toMatchObject({ metadata: { blocked: true } });
+    expect(handled(contents)).toEqual([]);
+  });
+
+  test("says to answer on the desktop when take can't get through to the page", async () => {
+    const { contents, controls, take } = await watchedTab();
+    contents.debugger.blockedCommandNames.add("Page.enable");
+    contents.debugger.failedCommandNames.add("Page.handleJavaScriptDialog");
+    await expect(take()).resolves.toMatchObject({ error: { code: "page_blocked" } });
+    expect(controls.isHeld(contents.id)).toBe(false);
+  });
+
+  test("an attach that timed out turns nothing on afterwards", async () => {
+    const { contents, take } = await watchedTab();
+    const cdp = contents.debugger;
+    cdp.blockedCommandNames.add("Page.enable");
+    await take();
+
+    cdp.finishCommands();
+    await flushMicrotasks();
+
+    const enabled = cdp.commands.filter(
+      ({ command, params }) =>
+        params.autoAttach === true ||
+        (command === "Emulation.setFocusEmulationEnabled" && params.enabled === true),
+    );
+    expect(enabled).toEqual([]);
+  });
+
+  test("holds frames of a new document until its first paint", async () => {
+    const { contents, host } = await watchedTab();
+    commitDocument(contents, "https://app.example");
+    // A restarted screencast can still copy the old surface, stamped after the commit.
+    screencastFrame(contents, 1, Date.now() + 5);
+    firstPaint(contents, "an-iframes-loader");
+    screencastFrame(contents, 2, Date.now() + 5);
+    await flushMicrotasks();
+    expect(framesSent(host)).toEqual([]);
+    expect(screencastAcks(contents)).toEqual([1, 2]);
+
+    firstPaint(contents);
+    await flushMicrotasks();
+    // What was painted is only shown if asked again.
+    expect(contents.debugger.commands.at(-1)).toMatchObject({ command: "Page.startScreencast" });
+    screencastFrame(contents, 3, Date.now() + 5);
+    expect(framesSent(host)).toEqual([expect.objectContaining({ documentId: "stream-1:1" })]);
+  });
+
+  test("stops holding a page that never paints when Chromium clears the old one", async () => {
+    const { contents, host } = await watchedTab();
+    vi.useFakeTimers();
+    try {
+      commitDocument(contents, "https://app.example");
+      await vi.advanceTimersByTimeAsync(4_000);
+      screencastFrame(contents, 1, Date.now() + 5);
+      expect(framesSent(host)).toEqual([]);
+      await vi.advanceTimersByTimeAsync(1_100);
+      screencastFrame(contents, 2, Date.now() + 5);
+      expect(framesSent(host)).toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  test("a stream that starts before the document's first paint holds its frames", async () => {
+    const { contents, host, streams } = createLiveViews();
+    contents.hasPainted = false;
+    await streams.start(host, liveStartRequest());
+    screencastFrame(contents, 1, Date.now() + 5);
+    expect(host.sent.filter(({ channel }) => channel === BROWSER_LIVE_FRAME_EVENT)).toEqual([]);
+    await streams.stop({
+      type: "browser.host.live.stop.request",
+      requestId: "stop",
+      streamId: "stream-1",
+    });
+  });
+
+  const dispatched = (contents: FakeWebContents) =>
+    contents.debugger.commands
+      .filter(({ command }) => command === "Input.dispatchMouseEvent")
+      .map(({ params }) => params.type);
+  const tapInput = { kind: "tap", documentId: DOCUMENT, x: 5, y: 5 };
+  const scrollInput = { ...tapInput, kind: "scroll", deltaX: 0, deltaY: 50 };
+
+  test.each([tapInput, scrollInput])("sends no $kind after it timed out", async (input) => {
+    const { contents, take, send } = await watchedTab();
+    await take();
+    const cdp = contents.debugger;
+    // The tab's CDP queue is held up, so the action waits in it.
+    cdp.blockedCommandNames.add("DOM.getDocument");
+    void adaptWebContents(contents).sendDebugCommand("DOM.getDocument");
+    await flushMicrotasks();
+
+    await expect(send(input)).resolves.toMatchObject({ error: { code: "not_sent" } });
+    cdp.finishCommands();
+    await flushMicrotasks();
+
+    expect(dispatched(contents)).toEqual([]);
+  });
+
+  test.each([tapInput, scrollInput])("sends no $kind after hand-back", async (input) => {
+    const { contents, take, send, release } = await watchedTab();
+    await take();
+    const cdp = contents.debugger;
+    cdp.blockedCommandNames.add("DOM.getDocument");
+    void adaptWebContents(contents).sendDebugCommand("DOM.getDocument");
+    await flushMicrotasks();
+
+    const sending = send(input);
+    await flushMicrotasks();
+    const releasing = release(false);
+    cdp.finishCommands();
+
+    await expect(sending).resolves.toMatchObject({ error: { code: "not_sent" } });
+    await releasing;
+    await flushMicrotasks();
+    expect(dispatched(contents)).toEqual([]);
+  });
+
+  test("a press that was delivered is never reported as not sent", async () => {
+    const { contents, take, send } = await watchedTab();
+    await take();
+    contents.debugger.beforeCommand = () => {
+      if (dispatched(contents).includes("mousePressed")) {
+        contents.debugger.beforeCommand = null;
+        commitDocument(contents, "https://next.example");
+      }
+    };
+    await expect(send(tapInput)).resolves.toMatchObject({ error: { code: "unconfirmed" } });
+  });
+
+  test("a press without an answer may have been sent, and is followed by nothing", async () => {
+    const { contents, take, send } = await watchedTab();
+    await take();
+    contents.debugger.blockPressed = true;
+    await expect(send(tapInput)).resolves.toMatchObject({ error: { code: "unconfirmed" } });
+    contents.debugger.finishCommands();
+    await flushMicrotasks();
+    expect(dispatched(contents)).toEqual(["mouseMoved", "mousePressed"]);
+  });
+
+  test("says that stopping a stuck script reloaded the page", async () => {
+    const { contents, take, run } = await watchedTab();
+    contents.script = () => new Promise(() => {});
+    void run(evaluateCommand);
+    await flushMicrotasks();
+    await expect(take()).resolves.toMatchObject({ error: null, reloaded: true });
+  });
+
+  test("won't throw away a page that guards unload to stop a stuck script", async () => {
+    const { contents, controls, take, run } = await watchedTab();
+    contents.script = () => new Promise(() => {});
+    void run(evaluateCommand);
+    await flushMicrotasks();
+    contents.guardsUnload = true;
+
+    await expect(take()).resolves.toMatchObject({ error: { code: "unload_blocked" } });
+    expect(contents.loadedUrls).toEqual(["about:blank"]);
+    expect(controls.isHeld(contents.id)).toBe(false);
+  });
+
+  test("a page the user left since doesn't get reloaded for its old stuck script", async () => {
+    const { contents, take, run } = await watchedTab();
+    contents.script = () => new Promise(() => {});
+    void run(evaluateCommand);
+    await flushMicrotasks();
+    contents.guardsUnload = true;
+    await expect(take()).resolves.toMatchObject({ error: { code: "unload_blocked" } });
+
+    contents.guardsUnload = false;
+    contents.loadedUrls.length = 0;
+    contents.emit("did-navigate");
+
+    await expect(take("control-2")).resolves.toEqual(
+      expect.not.objectContaining({ reloaded: true }),
+    );
+    expect(contents.loadedUrls).toEqual([]);
+  });
+
+  async function typedOnGuardedPage() {
+    const tab = await watchedTab();
+    await tab.take();
+    await tab.type();
+    tab.contents.guardsUnload = true;
+    return tab;
+  }
+
+  test("an auto-release's own discard gets past beforeunload, and only that", async () => {
+    const { contents, controls, release } = await typedOnGuardedPage();
+    await expect(release(true)).resolves.toMatchObject({ error: null });
+    expect(controls.isHeld(contents.id)).toBe(false);
+    expect(contents.unloadListeners.size).toBe(0);
+    expect(contents.preventUnload()).toBe(false);
+  });
+
+  test("a hand-back overrides no beforeunload", async () => {
+    const { contents, release } = await typedOnGuardedPage();
+    await release(false);
+    expect(contents.preventUnload()).toBe(false);
+  });
+
+  test("a navigation the page started during the discard isn't let through", async () => {
+    const { contents, release } = await typedOnGuardedPage();
+    const cdp = contents.debugger;
+    const pageStarted: boolean[] = [];
+    contents.beforeUnload = () => {
+      contents.beforeUnload = null;
+      cdp.emitMessage("Page.frameRequestedNavigation", { frameId: "child" }, "iframe-session");
+      pageStarted.push(contents.preventUnload());
+      cdp.emitMessage(
+        "Page.frameClearedScheduledNavigation",
+        { frameId: "child" },
+        "iframe-session",
+      );
+    };
+    await expect(release(true)).resolves.toMatchObject({ error: null });
+    expect(pageStarted).toEqual([false]);
+  });
+
+  test("a page navigation requested just before main's own isn't let through", async () => {
+    const { contents, release } = await typedOnGuardedPage();
+    const cdp = contents.debugger;
+    const answer = contents.mainFrame.answer;
+    contents.mainFrame.answer = (request) => {
+      if (request.op === "clear") {
+        cdp.emitMessage("Page.frameRequestedNavigation", { frameId: "main" });
+      }
+      return answer(request);
+    };
+    const pageStarted: boolean[] = [];
+    contents.beforeUnload = () => {
+      contents.beforeUnload = null;
+      pageStarted.push(contents.preventUnload());
+      cdp.emitMessage("Page.frameClearedScheduledNavigation", { frameId: "main" });
+    };
+    await expect(release(true)).resolves.toMatchObject({ error: null });
+    expect(pageStarted).toEqual([false]);
+  });
+
+  test("history navigation during the discard isn't let through either", async () => {
+    const { contents, release } = await typedOnGuardedPage();
+    const pageStarted: boolean[] = [];
+    contents.beforeUnload = () => {
+      if (pageStarted.length > 0) return;
+      contents.debugger.emitMessage("Page.frameStartedNavigating", {
+        url: "about:blank",
+        navigationType: "historyDifferentDocument",
+      });
+      pageStarted.push(contents.preventUnload());
+    };
+    await expect(release(true)).resolves.toMatchObject({ error: null });
+    expect(pageStarted).toEqual([false]);
+  });
+
+  test.each(["beforeunload", "pagehide", "timer"])(
+    "a confirm raised from %s during the discard is never accepted",
+    async (from) => {
+      const { contents, release } = await typedOnGuardedPage();
+      const confirm = () =>
+        contents.debugger.emitMessage("Page.javascriptDialogOpening", { type: "confirm" });
+      contents.beforeUnload = () => {
+        contents.beforeUnload = null;
+        if (from === "beforeunload") confirm();
+        else queueMicrotask(confirm);
+      };
+      const load = contents.loadURL.bind(contents);
+      contents.loadURL = async (url) => {
+        await load(url);
+        // A real navigation takes turns of the event loop.
+        await new Promise((resolve) => setTimeout(resolve, 5));
+      };
+      const before = handled(contents).length;
+      await release(true);
+      expect(handled(contents).length).toBeGreaterThan(before);
+      expect(handled(contents).map(({ params }) => params.accept)).not.toContain(true);
+    },
+  );
+
+  test("a closed tab's control ends before its stream", async () => {
+    const { contents, host, take } = await watchedTab();
+    await take();
+    contents.destroy();
+    await flushMicrotasks();
+    expect(host.sent.map(({ channel }) => channel)).toEqual([
+      BROWSER_LIVE_CONTROL_ENDED_EVENT,
+      BROWSER_LIVE_ENDED_EVENT,
+    ]);
+  });
+
+  test("input on an ended stream says the stream is gone, not control", async () => {
+    const { contents, streams, take, send } = await watchedTab();
+    await take();
+    contents.debugger.emitDetach();
+    await flushMicrotasks();
+    expect(streams.size).toBe(0);
+    await expect(send({ kind: "key", key: "Tab" })).resolves.toMatchObject({
+      error: { code: "stream_ended" },
+    });
+  });
+
+  test("only tabs live view typed into drop out of the desktop log", async () => {
+    const { contents, controls, take, send, type } = await watchedTab();
+    await take();
+    await send({ kind: "tap", documentId: DOCUMENT, x: 1, y: 1 });
+    expect(controls.hasTypedInto(contents.id)).toBe(false);
+    await type();
+    expect(controls.hasTypedInto(contents.id)).toBe(true);
+  });
+
+  test("every agent command on a held tab is refused, list_tabs withholds its address", async () => {
+    const { take, release, run } = await watchedTab();
+    await take();
+
+    const browserId = LIVE_BROWSER_ID;
+    for (const command of [
+      { command: "snapshot", args: { browserId } },
+      { command: "screenshot", args: { browserId, fullPage: false } },
+      { command: "evaluate", args: { browserId, function: "() => 1" } },
+      { command: "logs", args: { browserId, maxEntries: 5 } },
+      { command: "navigate", args: { browserId, url: "https://example.com" } },
+    ]) {
+      await expect(run(command)).resolves.toMatchObject({
+        ok: false,
+        error: { code: "browser_denied", retryable: true },
+      });
+    }
+    await expect(run({ command: "list_tabs", args: {} })).resolves.toMatchObject({
+      result: { tabs: [{ browserId, url: "", title: "" }] },
+    });
+
+    await release(false);
+    await expect(run({ command: "list_tabs", args: {} })).resolves.toMatchObject({
+      result: { tabs: [{ url: "https://example.com" }] },
+    });
   });
 });

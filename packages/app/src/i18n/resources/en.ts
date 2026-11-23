@@ -592,6 +592,88 @@ export const en = {
         subtitle: "Open this workspace in Electron to use the built-in browser.",
       },
       session: "Browser session {{browserId}}",
+      liveView: {
+        connecting: "Connecting to the desktop browser...",
+        endedTitle: "Live view ended",
+        retry: "Retry",
+        ended: {
+          connection: "The connection to the host dropped",
+          tabClosed: "The browser tab closed",
+          noDesktop: "The desktop with this tab isn't connected",
+          inUse: "Another device is viewing or controlling this tab",
+          unsupported: "Update Paseo on the desktop that has this tab",
+          failed: "The live view couldn't continue",
+        },
+        hints: {
+          turnOn: "Turn on Browser live view in Host settings → Agents to watch this tab here",
+          updateHost: "Update Paseo on this host to watch this tab here",
+        },
+        control: {
+          take: "Take control",
+          taking: "Taking control...",
+          takeHint:
+            "The agent can't use this tab while you control it. If you're away for 5 minutes, control ends and input you didn't submit is discarded.",
+          updateHost: "Update Paseo on this host to take control",
+          updateDesktop: "Update Paseo on the desktop that has this tab to take control",
+          heldHint:
+            "Tap a field to type. If you're away for 5 minutes, control ends and input you didn't submit is discarded.",
+          handBack: "Hand back to agent",
+          handingBack: "Handing back...",
+          handBackHint:
+            "After hand-back the agent sees this page and can use this login. Passwords and codes you didn't submit are cleared.",
+          pageOrigin: "Page: {{origin}}",
+          typingInto: "Typing into {{origin}}",
+          embeddedIn: "Embedded in {{origin}}",
+          unknownOrigin: "an unknown site",
+          send: "Send",
+        },
+        fields: {
+          password: "Password",
+          newPassword: "New password",
+          oneTimeCode: "One-time code",
+          username: "Username",
+          email: "Email",
+          secret: "Protected field",
+          text: "Text",
+        },
+        keys: {
+          enter: "Enter",
+          tab: "Tab",
+          backspace: "Delete",
+          escape: "Esc",
+          arrowUp: "Arrow up",
+          arrowDown: "Arrow down",
+          arrowLeft: "Arrow left",
+          arrowRight: "Arrow right",
+        },
+        notices: {
+          released: "Your control ended. Input you didn't submit may have been discarded.",
+          targetChanged:
+            "The page or field changed, so your text was refused. Tap the field again.",
+          pageChanged:
+            "The page changed, so your tap or scroll wasn't sent. Try again on the new page.",
+          doesNotFit:
+            "That text doesn't fit this field, so it wasn't entered. Tap the field and try again.",
+          streamEnded: "The live view stopped, so nothing was sent. Reconnect and try again.",
+          unconfirmed:
+            "The desktop didn't confirm that. It may have gone through, so check the page before sending it again.",
+          notSent: "Not sent. Try again.",
+          pageBlocked:
+            "The page isn't responding. If a dialog is open on it, answer it on the desktop.",
+          watchBlocked:
+            "The page isn't responding. A dialog may be open on it. Take control to dismiss it, or answer it on the desktop.",
+          unloadBlocked:
+            "Taking control needs a reload to stop the agent's stuck action, and this page blocks leaving it. Finish on the desktop.",
+          reloaded:
+            "The agent's action was stuck, so the page was reloaded to stop it. Anything unsaved on it was lost.",
+          agentBusy: "The agent's browser action is still running. Try again.",
+          busy: "This tab is already controlled",
+          keyUnsupported: "Keys don't work in this embedded frame. Tap its button instead.",
+          connection: "The connection dropped. Try again.",
+          disabled: "Browser live view is turned off on this host",
+          failed: "The browser didn't respond. Try again.",
+        },
+      },
       controls: {
         back: "Back",
         forward: "Forward",
@@ -3155,6 +3237,11 @@ export const en = {
       },
       agents: {
         unavailable: "Connect to this host to manage agents",
+        browserLiveView: {
+          title: "Browser live view (experimental)",
+          hint: "Lets your phone view and control an agent's browser tab. Off by default.",
+          updateFailed: "Unable to update browser live view",
+        },
         resumeOnStartup: {
           title: "Resume agents after restart",
           info: "Reopen agents that were working when the host stopped and send the resume prompt. Applies after graceful restarts and crashes.",

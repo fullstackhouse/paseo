@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { z } from "zod";
 import type { BrowserToolsBroker, BrowserToolsExecuteInput } from "./broker.js";
-import type { BrowserToolsResponsePayload } from "./errors.js";
+import type { BrowserToolsCallPayload, BrowserToolsResponsePayload } from "./errors.js";
 import { registerBrowserTools, type RegisterBrowserToolsOptions } from "./tools.js";
 import type {
   PaseoToolConfig,
@@ -25,13 +25,13 @@ interface RegisteredTool {
 class FakeBrowserBroker {
   public readonly calls: BrowserToolsExecuteInput[] = [];
 
-  public constructor(private response: BrowserToolsResponsePayload = listTabsPayload()) {}
+  public constructor(private response: BrowserToolsCallPayload = listTabsPayload()) {}
 
-  public setResponse(response: BrowserToolsResponsePayload): void {
+  public setResponse(response: BrowserToolsCallPayload): void {
     this.response = response;
   }
 
-  public async execute(input: BrowserToolsExecuteInput): Promise<BrowserToolsResponsePayload> {
+  public async execute(input: BrowserToolsExecuteInput): Promise<BrowserToolsCallPayload> {
     this.calls.push(input);
     return this.response;
   }
@@ -993,5 +993,39 @@ describe("registerBrowserTools", () => {
       result: snapshotPayload().result,
       context: { browserId: BROWSER_ID },
     });
+  });
+});
+
+describe("browser tools under human control", () => {
+  test("tells the agent the user controls the tab", async () => {
+    const harness = new BrowserToolHarness();
+    harness.broker.setResponse({
+      requestId: "req-1",
+      ok: false,
+      error: {
+        code: "browser_human_control",
+        message:
+          "The user is controlling this tab. Wait for hand-back, then call browser_snapshot.",
+        retryable: true,
+      },
+    });
+    const result = await harness.execute("browser_snapshot", { browserId: BROWSER_ID });
+    expect(result.content[0]).toMatchObject({
+      text: expect.stringContaining("Wait for hand-back"),
+    });
+    expect(result.structuredContent).toMatchObject({
+      ok: false,
+      error: { code: "browser_human_control", retryable: true },
+    });
+  });
+
+  test("adds the hand-back note after the result's own text", async () => {
+    const harness = new BrowserToolHarness();
+    harness.broker.setResponse({ ...listTabsPayload(), userNotes: ["The user handed it back."] });
+    const result = await harness.execute("browser_list_tabs", {});
+    // Clients read content[0] as the command's own summary.
+    expect(result.content[0]).not.toMatchObject({ text: "The user handed it back." });
+    expect(result.content.at(-1)).toEqual({ type: "text", text: "The user handed it back." });
+    expect(result.structuredContent).toMatchObject({ userNotes: ["The user handed it back."] });
   });
 });

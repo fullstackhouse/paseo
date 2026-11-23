@@ -113,18 +113,31 @@ import {
 } from "./browser-automation/rpc-schemas.js";
 import { BrowserAutomationHostCapabilitySchema } from "./browser-automation/capabilities.js";
 import {
+  BrowserHostLiveControlEndedSchema,
   BrowserHostLiveEndedSchema,
   BrowserHostLiveFrameAckSchema,
+  BrowserHostLiveReleaseControlRequestSchema,
+  BrowserHostLiveReleaseControlResponseSchema,
+  BrowserHostLiveSendInputRequestSchema,
+  BrowserHostLiveSendInputResponseSchema,
   BrowserHostLiveStartRequestSchema,
   BrowserHostLiveStartResponseSchema,
   BrowserHostLiveStopRequestSchema,
   BrowserHostLiveStopResponseSchema,
+  BrowserHostLiveTakeControlRequestSchema,
+  BrowserHostLiveTakeControlResponseSchema,
   BrowserLiveEndedSchema,
   BrowserLiveFrameAckSchema,
+  BrowserLiveReleaseControlRequestSchema,
+  BrowserLiveReleaseControlResponseSchema,
+  BrowserLiveSendInputRequestSchema,
+  BrowserLiveSendInputResponseSchema,
   BrowserLiveStartRequestSchema,
   BrowserLiveStartResponseSchema,
   BrowserLiveStopRequestSchema,
   BrowserLiveStopResponseSchema,
+  BrowserLiveTakeControlRequestSchema,
+  BrowserLiveTakeControlResponseSchema,
 } from "./browser-automation/live-view.js";
 import {
   PaseoConfigRawSchema,
@@ -3482,6 +3495,8 @@ export const BrowserHostRegisterRequestSchema = z.object({
   supportedCommands: z.array(z.enum(BROWSER_AUTOMATION_COMMAND_NAMES)).min(1),
   // COMPAT(browserLiveView): added after v0.15.4, remove after 2027-05-22. Hosts without it get browser_unsupported on live view.
   liveView: z.boolean().optional(),
+  // COMPAT(browserLiveViewInput): added after v0.15.4, remove after 2027-05-22. Hosts without it can only be watched.
+  liveViewInput: z.boolean().optional(),
 });
 export const BrowserHostRegisterResponseSchema = z.object({
   type: z.literal("browser.host.register.response"),
@@ -3521,6 +3536,13 @@ export const SessionInboundMessageSchema = z.discriminatedUnion("type", [
   BrowserHostLiveStartResponseSchema,
   BrowserHostLiveStopResponseSchema,
   BrowserHostLiveEndedSchema,
+  BrowserLiveTakeControlRequestSchema,
+  BrowserLiveSendInputRequestSchema,
+  BrowserLiveReleaseControlRequestSchema,
+  BrowserHostLiveTakeControlResponseSchema,
+  BrowserHostLiveSendInputResponseSchema,
+  BrowserHostLiveReleaseControlResponseSchema,
+  BrowserHostLiveControlEndedSchema,
   VoiceAudioChunkMessageSchema,
   AbortRequestMessageSchema,
   AudioPlayedMessageSchema,
@@ -4000,6 +4022,8 @@ export const ServerInfoStatusPayloadSchema = z
         scheduleRunAttention: z.boolean().optional(),
         // COMPAT(browserLiveView): FSH-only, added after v0.15.4, remove gate after 2027-05-22.
         browserLiveView: z.boolean().optional(),
+        // COMPAT(browserLiveViewInput): FSH-only, added after v0.15.4, remove gate after 2027-05-22.
+        browserLiveViewInput: z.boolean().optional(),
         // COMPAT(skillManagement): added in v0.4.0, remove gate after 2027-08-16.
         skillManagement: z.boolean().optional(),
         // COMPAT(idleRuntimeCleanupSetting): added in v0.13.0, remove gate after 2027-04-26.
@@ -7444,6 +7468,12 @@ export const SessionOutboundMessageSchema = z.discriminatedUnion("type", [
   BrowserHostLiveStartRequestSchema,
   BrowserHostLiveStopRequestSchema,
   BrowserHostLiveFrameAckSchema,
+  BrowserLiveTakeControlResponseSchema,
+  BrowserLiveSendInputResponseSchema,
+  BrowserLiveReleaseControlResponseSchema,
+  BrowserHostLiveTakeControlRequestSchema,
+  BrowserHostLiveSendInputRequestSchema,
+  BrowserHostLiveReleaseControlRequestSchema,
   PluginCatalogGetResponseSchema,
   PluginListResponseSchema,
   PluginLogsGetResponseSchema,

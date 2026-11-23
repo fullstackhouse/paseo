@@ -221,7 +221,8 @@ export const FormTextInput = forwardRef<EditingTextInputHandle, FormTextInputPro
     );
 
     return (
-      <Pressable disabled={isDisabled} style={chromeStyle}>
+      // accessible would fold the input into the chrome: VoiceOver would find no text field.
+      <Pressable accessible={false} disabled={isDisabled} style={chromeStyle}>
         <AdaptiveTextInput
           ref={setInputRef}
           editable={editable}

@@ -8,18 +8,35 @@ import {
   type BrowserAutomationExecuteResponse,
 } from "@getpaseo/protocol/browser-automation/rpc-schemas";
 import type {
+  BrowserHostLiveControlEnded,
   BrowserHostLiveEnded,
   BrowserHostLiveOutboundMessage,
+  BrowserHostLiveReleaseControlResponse,
+  BrowserHostLiveSendInputResponse,
   BrowserHostLiveStartResponse,
   BrowserHostLiveStopResponse,
+  BrowserHostLiveTakeControlResponse,
+  BrowserLiveControlError,
+  BrowserLiveControlErrorCode,
+  BrowserLiveFocusResult,
+  BrowserLiveInput,
+  BrowserLiveTakeResult,
   BrowserLiveViewport,
 } from "@getpaseo/protocol/browser-automation/live-view";
 import type { BrowserLiveFrameHeader } from "@getpaseo/protocol/binary-frames/browser-live";
 import {
+  browserHumanControlFailure,
   browserToolsFailure,
+  type BrowserToolsCallPayload,
   type BrowserToolsErrorPayload,
   type BrowserToolsResponsePayload,
 } from "./errors.js";
+import {
+  BrowserHumanControl,
+  type BrowserHostControlAnswer,
+  type BrowserHostControlRequest,
+} from "./human-control.js";
+import { BrowserTabNotes } from "./tab-notes.js";
 
 export interface BrowserHostClient {
   id: string;
@@ -28,6 +45,8 @@ export interface BrowserHostClient {
   sendBrowserAutomationRequest(request: BrowserAutomationExecuteRequest): void | Promise<void>;
   /** Present when the host registered with liveView support. */
   liveView?: {
+    /** Present when the host also registered with liveViewInput support. */
+    input?: boolean;
     send(message: BrowserHostLiveOutboundMessage): void | Promise<void>;
   };
 }
@@ -37,7 +56,7 @@ export interface BrowserLiveViewSink {
   /** Receives the host's binary browser_live frame unchanged. */
   sendFrame(frame: Uint8Array): void;
   /** The stream ended without a stop from the viewer. */
-  ended(error: BrowserToolsErrorPayload): void;
+  ended(error: BrowserToolsErrorPayload, control: { held: boolean }): void;
 }
 
 export interface BrowserLiveViewOptions {
@@ -47,13 +66,26 @@ export interface BrowserLiveViewOptions {
 }
 
 export type BrowserLiveViewStartResult =
-  | { ok: true; streamId: string; viewport: BrowserLiveViewport }
-  | { ok: false; error: BrowserToolsErrorPayload };
+  | {
+      ok: true;
+      streamId: string;
+      viewport: BrowserLiveViewport;
+      /** Present when the host can hand over control. */
+      control?: { held: boolean };
+    }
+  | {
+      ok: false;
+      error: BrowserToolsErrorPayload;
+      /** Whether the viewer still holds the tab. */
+      control: { held: boolean };
+    };
 
 interface BrowserLiveViewStream {
   streamId: string;
   browserId: string;
   viewerId: string;
+  /** Stable across the viewer's sessions: who may hold control. */
+  ownerId: string;
   hostClientId: string;
   startedAt: number;
   sink: BrowserLiveViewSink;
@@ -73,6 +105,24 @@ interface PendingLiveRequest {
   clientId: string;
   timeout: ReturnType<typeof setTimeout>;
   resolve: (payload: BrowserHostLiveResponsePayload) => void;
+}
+
+type BrowserHostControlResponsePayload =
+  | BrowserHostLiveTakeControlResponse["payload"]
+  | BrowserHostLiveSendInputResponse["payload"]
+  | BrowserHostLiveReleaseControlResponse["payload"];
+
+interface PendingControlRequest {
+  clientId: string;
+  timeout: ReturnType<typeof setTimeout>;
+  resolve: (answer: BrowserHostControlAnswer | null) => void;
+}
+
+/** Names the viewer's stream and, in ownerId, who they are. */
+export interface BrowserLiveViewerRef {
+  streamId: string;
+  viewerId: string;
+  ownerId: string;
 }
 
 export interface BrowserToolsExecuteInput {
@@ -103,6 +153,8 @@ export interface BrowserToolsBrokerOptions {
   // COMPAT(browserLiveViewFlag): experimental opt-in added after v0.15.4, remove once live view ships on by default.
   /** Whether viewers may start live views (the host's browserLiveView setting). Off when absent. */
   isLiveViewEnabled?: () => boolean;
+  /** Human control of a tab ended; `note` is safe to show and to persist. */
+  onHumanControlEnded?: (ending: { agentIds: string[]; note: string }) => void;
 }
 
 const DEFAULT_BROWSER_TOOLS_TIMEOUT_MS = 15_000;
@@ -116,13 +168,29 @@ export class BrowserToolsBroker {
   private readonly browserHostByBrowserId = new Map<string, string>();
   private readonly strandedBrowserHostByBrowserId = new Map<string, string>();
   private registrationSequence = 0;
-  private readonly liveViews = new LiveViewRegistry();
+  private readonly notes = new BrowserTabNotes();
+  private readonly control: BrowserHumanControl;
+  private readonly liveViews = new LiveViewRegistry((stream) =>
+    this.control.viewerLeft(stream.browserId),
+  );
   private readonly pendingLive = new Map<string, PendingLiveRequest>();
+  private readonly pendingControl = new Map<string, PendingControlRequest>();
 
   public constructor(options: BrowserToolsBrokerOptions) {
     this.defaultTimeoutMs = options.defaultTimeoutMs ?? DEFAULT_BROWSER_TOOLS_TIMEOUT_MS;
     this.createRequestId = options.createRequestId ?? (() => `browser_${randomUUID()}`);
     this.isLiveViewEnabled = options.isLiveViewEnabled ?? (() => false);
+    this.control = new BrowserHumanControl({
+      createId: this.createRequestId,
+      send: (hostClientId, request, timeoutMs) =>
+        this.sendControlRequest(hostClientId, request, timeoutMs),
+      hasViewer: (browserId) => this.liveViews.getByBrowserId(browserId) !== undefined,
+      onTaken: (browserId) => this.notes.discard(browserId),
+      onEnded: (browserId, note) => {
+        const agentIds = this.notes.add(browserId, note);
+        options.onHumanControlEnded?.({ agentIds, note });
+      },
+    });
   }
 
   public registerClient(client: BrowserHostClient): () => void {
@@ -184,8 +252,15 @@ export class BrowserToolsBroker {
       });
     }
 
+    // Before the streams go, so no grace timer starts. That desktop unlocks by itself.
+    this.control.hostGone(clientId);
+    for (const [requestId, pending] of this.pendingControl) {
+      if (pending.clientId !== clientId) continue;
+      settleControlRequest(this.pendingControl, requestId, null);
+    }
+
     for (const stream of this.liveViews.removeForHost(clientId)) {
-      stream.sink.ended({
+      this.endStream(stream, {
         code: "browser_no_host",
         message: `The app hosting browser tab ${stream.browserId} disconnected.`,
         retryable: true,
@@ -201,7 +276,7 @@ export class BrowserToolsBroker {
     return this.clients.size;
   }
 
-  public async execute(input: BrowserToolsExecuteInput): Promise<BrowserToolsResponsePayload> {
+  public async execute(input: BrowserToolsExecuteInput): Promise<BrowserToolsCallPayload> {
     const requestId = input.requestId ?? this.createRequestId();
 
     const request = BrowserAutomationExecuteRequestSchema.safeParse({
@@ -221,32 +296,67 @@ export class BrowserToolsBroker {
       });
     }
 
-    if (request.data.command.command === "list_tabs") {
-      return this.executeListTabs({
-        request: request.data,
-        timeoutMs: input.timeoutMs ?? this.defaultTimeoutMs,
-      });
+    const payload = await this.executeUnlessHeld(
+      request.data,
+      input.timeoutMs ?? this.defaultTimeoutMs,
+    );
+    const { agentId } = input;
+    if (!agentId) return payload;
+
+    const browserId = getBrowserIdForCommand(request.data.command);
+    if (browserId && (payload.ok || this.control.isHeld(browserId))) {
+      this.notes.recordUse(browserId, agentId);
+    } else if (payload.ok && payload.result.command === "new_tab") {
+      this.notes.recordUse(payload.result.browserId, agentId);
+    }
+    const userNotes = this.notes.deliver(agentId, browserId, (id) => this.control.isHeld(id));
+    return userNotes.length > 0 ? { ...payload, userNotes } : payload;
+  }
+
+  private async executeUnlessHeld(
+    request: BrowserAutomationExecuteRequest,
+    timeoutMs: number,
+  ): Promise<BrowserToolsCallPayload> {
+    const { command, requestId } = request;
+    if (command.command === "list_tabs") {
+      return this.withholdHeldTabs(await this.executeListTabs({ request, timeoutMs }));
     }
 
-    const host = this.selectHostForCommand(request.data.command, requestId);
+    // Before host selection, so nothing about a held tab leaks through routing errors either.
+    const browserId = getBrowserIdForCommand(command);
+    if (browserId && this.control.isHeld(browserId)) {
+      return browserHumanControlFailure(requestId);
+    }
+
+    const host = this.selectHostForCommand(command, requestId);
     if (!host.ok) {
       return host.payload;
     }
 
     const unsupported = this.unsupportedCommandFailure({
       host: host.value,
-      commandName: request.data.command.command,
+      commandName: command.command,
       requestId,
     });
     if (unsupported) {
       return unsupported;
     }
 
-    return this.sendRequest({
-      host: host.value,
-      request: request.data,
-      timeoutMs: input.timeoutMs ?? this.defaultTimeoutMs,
-    });
+    const payload = await this.sendRequest({ host: host.value, request, timeoutMs });
+    // Sent just before the take, and refused by the desktop's lock.
+    const refusedByLock = !payload.ok && payload.error.code === "browser_denied";
+    return refusedByLock && browserId && this.control.isHeld(browserId)
+      ? browserHumanControlFailure(requestId)
+      : payload;
+  }
+
+  private withholdHeldTabs(payload: BrowserToolsResponsePayload): BrowserToolsResponsePayload {
+    if (!payload.ok || payload.result.command !== "list_tabs") return payload;
+    if (!payload.result.tabs.some((tab) => this.control.isHeld(tab.browserId))) return payload;
+    const tabs = payload.result.tabs.map((tab) =>
+      this.control.isHeld(tab.browserId) ? { ...tab, url: "", title: "", humanControl: true } : tab,
+    );
+    return { ...payload, result: { ...payload.result, tabs } };
   }
 
   public receiveResponse(
@@ -300,30 +410,40 @@ export class BrowserToolsBroker {
     streamId: string;
     browserId: string;
     viewerId: string;
+    ownerId: string;
     options: BrowserLiveViewOptions;
     sink: BrowserLiveViewSink;
     respond: (result: BrowserLiveViewStartResult) => void;
     timeoutMs?: number;
   }): Promise<void> {
-    if (!this.isLiveViewEnabled()) {
+    const refuse = (error: BrowserToolsErrorPayload) =>
       input.respond({
         ok: false,
-        error: {
-          code: "browser_unsupported",
-          message: "Browser live view is turned off in Host settings.",
-          retryable: false,
-        },
+        error,
+        control: this.controlStateOf(input.browserId, input.ownerId),
+      });
+    if (!this.isLiveViewEnabled()) {
+      refuse({
+        code: "browser_unsupported",
+        message: "Browser live view is turned off in Host settings.",
+        retryable: false,
+      });
+      return;
+    }
+    if (this.control.isHeldByOther(input.browserId, input.ownerId)) {
+      refuse({
+        // Not browser_human_control, which phones that predate it can't parse.
+        code: "browser_denied",
+        message: `Browser tab ${input.browserId} is controlled from another device.`,
+        retryable: true,
       });
       return;
     }
     if (this.liveViews.getByBrowserId(input.browserId)) {
-      input.respond({
-        ok: false,
-        error: {
-          code: "browser_denied",
-          message: `Browser tab ${input.browserId} is already being viewed.`,
-          retryable: true,
-        },
+      refuse({
+        code: "browser_denied",
+        message: `Browser tab ${input.browserId} is already being viewed.`,
+        retryable: true,
       });
       return;
     }
@@ -331,18 +451,15 @@ export class BrowserToolsBroker {
     const requestId = this.createRequestId();
     const host = this.selectHostForBrowserId(input.browserId, requestId);
     if (!host.ok) {
-      input.respond({ ok: false, error: failureError(host.payload) });
+      refuse(failureError(host.payload));
       return;
     }
     const liveView = host.value.client.liveView;
     if (!liveView) {
-      input.respond({
-        ok: false,
-        error: {
-          code: "browser_unsupported",
-          message: `Live view is not supported by the ${describeBrowserHost(host.value)}. Update Paseo desktop.`,
-          retryable: false,
-        },
+      refuse({
+        code: "browser_unsupported",
+        message: `Live view is not supported by the ${describeBrowserHost(host.value)}. Update Paseo desktop.`,
+        retryable: false,
       });
       return;
     }
@@ -351,6 +468,7 @@ export class BrowserToolsBroker {
       streamId: input.streamId,
       browserId: input.browserId,
       viewerId: input.viewerId,
+      ownerId: input.ownerId,
       hostClientId: host.value.client.id,
       startedAt: Date.now(),
       sink: input.sink,
@@ -367,6 +485,7 @@ export class BrowserToolsBroker {
         requestId,
         streamId: stream.streamId,
         browserId: input.browserId,
+        ...controlIdField(this.control.controllerOf(input.browserId, input.ownerId)),
         ...input.options,
       },
       timeoutMs: input.timeoutMs ?? this.defaultTimeoutMs,
@@ -375,13 +494,10 @@ export class BrowserToolsBroker {
     if (this.liveViews.get(stream.streamId) !== stream) {
       // Stopped while starting (viewer left or host gone). The host may have started anyway.
       this.stopOrphanedHostStream(stream);
-      input.respond({
-        ok: false,
-        error: {
-          code: "browser_tab_closed",
-          message: "The live view stopped before it started.",
-          retryable: true,
-        },
+      refuse({
+        code: "browser_tab_closed",
+        message: "The live view stopped before it started.",
+        retryable: true,
       });
       return;
     }
@@ -390,19 +506,25 @@ export class BrowserToolsBroker {
       this.liveViews.remove(stream.streamId);
       // A timeout or lost answer does not mean the host never started; stopping is idempotent.
       this.stopOrphanedHostStream(stream);
-      input.respond({
-        ok: false,
-        error: response.error ?? {
+      refuse(
+        response.error ?? {
           code: "browser_unknown_error",
           message: "The browser host started the live view without a viewport.",
           retryable: false,
         },
-      });
+      );
       return;
     }
 
     stream.active = true;
-    input.respond({ ok: true, streamId: stream.streamId, viewport: response.viewport });
+    this.control.viewerArrived(stream.browserId);
+    const held = this.control.controllerOf(stream.browserId, stream.ownerId)?.held === true;
+    input.respond({
+      ok: true,
+      streamId: stream.streamId,
+      viewport: response.viewport,
+      ...(liveView.input ? { control: { held } } : {}),
+    });
     const early = stream.earlyFrame;
     stream.earlyFrame = null;
     if (early) {
@@ -431,6 +553,52 @@ export class BrowserToolsBroker {
     }
     const response = await this.sendStopToHost(stream, this.createRequestId());
     return { error: response.error };
+  }
+
+  /** Locks the watched tab for this viewer. Watching alone never locks it. */
+  public async takeControl(viewer: BrowserLiveViewerRef): Promise<BrowserLiveTakeResult> {
+    if (!this.isLiveViewEnabled()) {
+      return controlRefusal("disabled", "Browser live view is turned off in Host settings.");
+    }
+    const stream = this.streamOfViewer(viewer);
+    if (!stream) return controlRefusal("stream_ended", "The live view isn't active.");
+    if (!this.clients.get(stream.hostClientId)?.client.liveView?.input) {
+      return controlRefusal("update_desktop", "Update Paseo desktop to take control.");
+    }
+    return this.control.take(stream, viewer.ownerId);
+  }
+
+  /** The input can be a secret: it goes to the host and nowhere else. */
+  public async sendLiveInput(
+    input: BrowserLiveViewerRef & { input: BrowserLiveInput },
+  ): Promise<BrowserLiveFocusResult> {
+    const stream = this.streamOfViewer(input);
+    if (!stream) return controlRefusal("stream_ended", "The live view isn't active.");
+    return this.control.input(stream, input.ownerId, input.input);
+  }
+
+  /** The user's hand-back. */
+  public async releaseControl(
+    viewer: BrowserLiveViewerRef,
+  ): Promise<{ error: BrowserLiveControlError | null }> {
+    const stream = this.streamOfViewer(viewer);
+    if (!stream) {
+      return { error: controlRefusal("stream_ended", "The live view isn't active.").error };
+    }
+    return { error: await this.control.handBack(stream, viewer.ownerId) };
+  }
+
+  public receiveControlEnded(input: {
+    payload: BrowserHostLiveControlEnded["payload"];
+    clientIds: readonly string[];
+  }): boolean {
+    return this.control.tabGone(input.payload.controlId, input.clientIds);
+  }
+
+  private streamOfViewer(viewer: BrowserLiveViewerRef): BrowserLiveViewStream | null {
+    const stream = this.liveViews.get(viewer.streamId);
+    if (!stream?.active) return null;
+    return stream.viewerId === viewer.viewerId && stream.ownerId === viewer.ownerId ? stream : null;
   }
 
   /** Forwards the viewer's ack for the frame in flight; stale or foreign acks are dropped. */
@@ -471,15 +639,20 @@ export class BrowserToolsBroker {
   }
 
   public receiveLiveResponse(input: {
-    payload: BrowserHostLiveResponsePayload;
+    payload: BrowserHostLiveResponsePayload | BrowserHostControlResponsePayload;
     clientIds: readonly string[];
   }): boolean {
     const { payload, clientIds } = input;
+    const control = this.pendingControl.get(payload.requestId);
+    if (control && clientIds.includes(control.clientId)) {
+      const { requestId, ...answer } = payload as BrowserHostControlResponsePayload;
+      return settleControlRequest(this.pendingControl, requestId, answer);
+    }
     const pending = this.pendingLive.get(payload.requestId);
     if (!pending || !clientIds.includes(pending.clientId)) {
       return false;
     }
-    return settleLiveRequest(this.pendingLive, payload);
+    return settleLiveRequest(this.pendingLive, payload as BrowserHostLiveResponsePayload);
   }
 
   /** The host's screencast ended on its own (tab closed or gone); tell the viewer. */
@@ -492,7 +665,8 @@ export class BrowserToolsBroker {
       return false;
     }
     this.liveViews.remove(stream.streamId);
-    stream.sink.ended(
+    this.endStream(
+      stream,
       input.payload.error ?? {
         code: "browser_tab_closed",
         message: `The live view of browser tab ${stream.browserId} ended on the desktop.`,
@@ -504,9 +678,11 @@ export class BrowserToolsBroker {
 
   /** Ends every stream, e.g. when live view is switched off. Viewers get browser.live.ended. */
   public stopAllLiveViews(): void {
+    // First, so each viewer's ended message says control is over.
+    this.control.releaseAll();
     for (const stream of this.liveViews.removeAll()) {
       this.stopOrphanedHostStream(stream);
-      stream.sink.ended({
+      this.endStream(stream, {
         code: "browser_unsupported",
         message: "Browser live view was turned off in Host settings.",
         retryable: false,
@@ -522,11 +698,19 @@ export class BrowserToolsBroker {
     const stream = this.liveViews.getByBrowserId(browserId);
     if (!stream) return;
     this.liveViews.remove(stream.streamId);
-    stream.sink.ended({
+    this.endStream(stream, {
       code: "browser_tab_closed",
       message: `Browser tab ${browserId} was closed.`,
       retryable: false,
     });
+  }
+
+  private endStream(stream: BrowserLiveViewStream, error: BrowserToolsErrorPayload): void {
+    stream.sink.ended(error, this.controlStateOf(stream.browserId, stream.ownerId));
+  }
+
+  private controlStateOf(browserId: string, ownerId: string): { held: boolean } {
+    return { held: this.control.controllerOf(browserId, ownerId)?.held === true };
   }
 
   private stopOrphanedHostStream(stream: BrowserLiveViewStream): void {
@@ -594,6 +778,27 @@ export class BrowserToolsBroker {
           message: formatBrowserAutomationSendError(error),
           retryable: false,
         });
+      }
+    });
+  }
+
+  private sendControlRequest(
+    hostClientId: string,
+    request: BrowserHostControlRequest,
+    timeoutMs: number,
+  ): Promise<BrowserHostControlAnswer | null> {
+    const liveView = this.clients.get(hostClientId)?.client.liveView;
+    if (!liveView) return Promise.resolve(null);
+    const { requestId } = request;
+    return new Promise((resolve) => {
+      const giveUp = () => settleControlRequest(this.pendingControl, requestId, null);
+      const timeout = setTimeout(giveUp, timeoutMs);
+      this.pendingControl.set(requestId, { clientId: hostClientId, timeout, resolve });
+      try {
+        // A send error is dropped on purpose: the request can hold a secret.
+        Promise.resolve(liveView.send(request)).catch(giveUp);
+      } catch {
+        giveUp();
       }
     });
   }
@@ -878,9 +1083,32 @@ function settleLiveRequest(
   return true;
 }
 
+function settleControlRequest(
+  pendingControl: Map<string, PendingControlRequest>,
+  requestId: string,
+  answer: BrowserHostControlAnswer | null,
+): boolean {
+  const pending = pendingControl.get(requestId);
+  if (!pending) return false;
+  pendingControl.delete(requestId);
+  clearTimeout(pending.timeout);
+  pending.resolve(answer);
+  return true;
+}
+
+function controlRefusal(code: BrowserLiveControlErrorCode, message: string) {
+  return { focus: null, error: { code, message } };
+}
+
+function controlIdField(control: { controlId: string } | null): { controlId?: string } {
+  return control ? { controlId: control.controlId } : {};
+}
+
 class LiveViewRegistry {
   private readonly byStreamId = new Map<string, BrowserLiveViewStream>();
   private readonly streamIdByBrowserId = new Map<string, string>();
+
+  public constructor(private readonly onRemoved: (stream: BrowserLiveViewStream) => void) {}
 
   public get size(): number {
     return this.byStreamId.size;
@@ -907,6 +1135,7 @@ class LiveViewRegistry {
     if (this.streamIdByBrowserId.get(stream.browserId) === streamId) {
       this.streamIdByBrowserId.delete(stream.browserId);
     }
+    this.onRemoved(stream);
     return stream;
   }
 
@@ -914,6 +1143,7 @@ class LiveViewRegistry {
     const removed = [...this.byStreamId.values()];
     this.byStreamId.clear();
     this.streamIdByBrowserId.clear();
+    for (const stream of removed) this.onRemoved(stream);
     return removed;
   }
 

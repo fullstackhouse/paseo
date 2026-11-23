@@ -601,6 +601,91 @@ export const es: TranslationResources = {
         subtitle: "Abra este espacio de trabajo en Electron para usar el navegador integrado.",
       },
       session: "Sesión de navegador{{browserId}}",
+      liveView: {
+        connecting: "Conectando con el navegador del escritorio...",
+        endedTitle: "La vista en directo ha terminado",
+        retry: "Reintentar",
+        ended: {
+          connection: "Se perdió la conexión con el host",
+          tabClosed: "La pestaña del navegador se cerró",
+          noDesktop: "El escritorio que tiene esta pestaña no está conectado",
+          inUse: "Otro dispositivo está viendo o controlando esta pestaña",
+          unsupported: "Actualiza Paseo en el escritorio que tiene esta pestaña",
+          failed: "No se pudo continuar la vista en directo",
+        },
+        hints: {
+          turnOn:
+            "Activa la vista en directo del navegador en Ajustes del host → Agentes para ver esta pestaña aquí",
+          updateHost: "Actualiza Paseo en este host para ver esta pestaña aquí",
+        },
+        control: {
+          take: "Tomar el control",
+          taking: "Tomando el control...",
+          takeHint:
+            "El agente no puede usar esta pestaña mientras la controlas. Si te ausentas 5 minutos, el control termina y se descarta lo que no hayas enviado.",
+          updateHost: "Actualiza Paseo en este host para tomar el control",
+          updateDesktop:
+            "Actualiza Paseo en el escritorio que tiene esta pestaña para tomar el control",
+          heldHint:
+            "Toca un campo para escribir. Si te ausentas 5 minutos, el control termina y se descarta lo que no hayas enviado.",
+          handBack: "Devolver al agente",
+          handingBack: "Devolviendo...",
+          handBackHint:
+            "Al devolverla, el agente ve esta página y puede usar esta sesión. Se borran las contraseñas y los códigos que no hayas enviado.",
+          pageOrigin: "Página: {{origin}}",
+          typingInto: "Escribiendo en {{origin}}",
+          embeddedIn: "Integrado en {{origin}}",
+          unknownOrigin: "un sitio desconocido",
+          send: "Enviar",
+        },
+        fields: {
+          password: "Contraseña",
+          newPassword: "Contraseña nueva",
+          oneTimeCode: "Código de un solo uso",
+          username: "Nombre de usuario",
+          email: "Correo electrónico",
+          secret: "Campo protegido",
+          text: "Texto",
+        },
+        keys: {
+          enter: "Intro",
+          tab: "Tabulador",
+          backspace: "Borrar",
+          escape: "Esc",
+          arrowUp: "Flecha arriba",
+          arrowDown: "Flecha abajo",
+          arrowLeft: "Flecha izquierda",
+          arrowRight: "Flecha derecha",
+        },
+        notices: {
+          released: "Tu control terminó. Puede que se haya descartado lo que no enviaste.",
+          targetChanged:
+            "La página o el campo cambió y se rechazó el texto. Vuelve a tocar el campo.",
+          pageChanged:
+            "La página cambió, así que no se envió tu toque ni desplazamiento. Inténtalo de nuevo en la página nueva.",
+          doesNotFit:
+            "Ese texto no cabe en este campo, así que no se introdujo. Toca el campo e inténtalo de nuevo.",
+          streamEnded:
+            "La vista en vivo se detuvo, así que no se envió nada. Vuelve a conectarte e inténtalo de nuevo.",
+          unconfirmed:
+            "El escritorio no lo confirmó. Puede que se haya enviado, así que revisa la página antes de volver a enviarlo.",
+          notSent: "No se envió. Inténtalo de nuevo.",
+          pageBlocked:
+            "La página no responde. Si tiene un diálogo abierto, respóndelo en el escritorio.",
+          watchBlocked:
+            "La página no responde. Puede que tenga un diálogo abierto. Toma el control para descartarlo o respóndelo en el escritorio.",
+          unloadBlocked:
+            "Para tomar el control hay que recargar y detener la acción bloqueada del agente, pero esta página impide salir de ella. Termina en el escritorio.",
+          reloaded:
+            "La acción del agente estaba bloqueada, así que se recargó la página para detenerla. Se perdió lo que no estaba guardado.",
+          agentBusy: "La acción del agente en el navegador sigue en curso. Inténtalo de nuevo.",
+          busy: "Esta pestaña ya está controlada",
+          keyUnsupported: "Las teclas no funcionan en este marco integrado. Toca su botón.",
+          connection: "Se perdió la conexión. Inténtalo de nuevo.",
+          disabled: "La vista en directo del navegador está desactivada en este host",
+          failed: "El navegador no respondió. Inténtalo de nuevo.",
+        },
+      },
       controls: {
         back: "Atrás",
         forward: "Adelante",
@@ -3069,6 +3154,11 @@ export const es: TranslationResources = {
       },
       agents: {
         unavailable: "Connect to this host to manage agents",
+        browserLiveView: {
+          title: "Vista en directo del navegador (experimental)",
+          hint: "Permite ver y controlar desde el teléfono una pestaña del navegador del agente. Desactivada por defecto.",
+          updateFailed: "No se pudo actualizar la vista en directo del navegador",
+        },
         resumeOnStartup: {
           title: "Reanudar agentes tras reiniciar",
           info: "Vuelve a abrir los agentes que estaban trabajando cuando se detuvo el host y envía el mensaje de reanudación. Se aplica tras reinicios normales y fallos.",

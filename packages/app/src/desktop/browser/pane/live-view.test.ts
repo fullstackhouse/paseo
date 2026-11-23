@@ -5,6 +5,7 @@ import {
   createBrowserLiveView,
   type BrowserLiveViewClient,
   type BrowserLiveViewState,
+  type BrowserLiveViewStreamInfo,
 } from "./live-view";
 
 type StartResult = Awaited<ReturnType<BrowserLiveViewClient["startBrowserLiveView"]>>;
@@ -42,6 +43,7 @@ function createHarness() {
   const frameHandlers = new Set<(frame: BrowserLiveFrame) => void>();
   const endedHandlers = new Set<(ended: EndedPayload) => void>();
   const states: BrowserLiveViewState[] = [];
+  const streams: Array<BrowserLiveViewStreamInfo | null> = [];
 
   const client: BrowserLiveViewClient = {
     startBrowserLiveView(input) {
@@ -72,11 +74,25 @@ function createHarness() {
     browserId: "tab-1",
     options: OPTIONS,
     onChange: (state) => states.push(state),
+    onStreamChange: (stream) => streams.push(stream),
   });
 
-  function sendFrame(streamId: string, frameSeq: number, jpeg = [0xff, 0xd8, frameSeq]) {
+  function sendFrame(
+    streamId: string,
+    frameSeq: number,
+    jpeg = [0xff, 0xd8, frameSeq],
+    origin?: string,
+    documentId?: string,
+    blocked?: boolean,
+  ) {
+    const metadata = {
+      ...METADATA,
+      ...(origin ? { origin } : {}),
+      ...(documentId ? { documentId } : {}),
+      ...(blocked ? { blocked } : {}),
+    };
     for (const handler of frameHandlers) {
-      handler({ streamId, frameSeq, metadata: METADATA, jpeg: Uint8Array.from(jpeg) });
+      handler({ streamId, frameSeq, metadata, jpeg: Uint8Array.from(jpeg) });
     }
   }
 
@@ -97,6 +113,7 @@ function createHarness() {
     stops,
     acks,
     states,
+    streams,
     frameHandlers,
     endedHandlers,
     sendFrame,
@@ -109,6 +126,8 @@ function createHarness() {
 function flush(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 0));
 }
+
+const SCREEN = { width: 1280, height: 800, offsetTop: 0 };
 
 function frameUri(bytes: number[]): string {
   return `data:image/jpeg;base64,${btoa(String.fromCharCode(...bytes))}`;
@@ -130,7 +149,15 @@ describe("createBrowserLiveView", () => {
     harness.sendFrame("s1", 0, [1, 2, 3]);
     expect(harness.lastState()).toEqual({
       status: "live",
-      frame: { seq: 0, uri: frameUri([1, 2, 3]) },
+      frame: {
+        seq: 0,
+        uri: frameUri([1, 2, 3]),
+        screen: SCREEN,
+        origin: null,
+        documentId: null,
+        blocked: false,
+      },
+      shown: null,
     });
   });
 
@@ -158,10 +185,15 @@ describe("createBrowserLiveView", () => {
       ["s1", 1],
       ["s1", 2],
     ]);
-    expect(harness.lastState()).toEqual({
-      status: "live",
-      frame: { seq: 1, uri: frameUri([9, 9]) },
-    });
+    const frame = {
+      seq: 1,
+      uri: frameUri([9, 9]),
+      screen: SCREEN,
+      origin: null,
+      documentId: null,
+      blocked: false,
+    };
+    expect(harness.lastState()).toEqual({ status: "live", frame, shown: frame });
   });
 
   it("ignores frames from other streams", async () => {
@@ -219,7 +251,8 @@ describe("createBrowserLiveView", () => {
     });
     expect(harness.lastState()).toEqual({
       status: "ended",
-      message: "Browser tab tab-1 was closed.",
+      code: "browser_tab_closed",
+      held: null,
     });
 
     harness.view.frameRendered(0);
@@ -228,6 +261,77 @@ describe("createBrowserLiveView", () => {
     harness.view.retry();
     expect(harness.startInputs).toHaveLength(2);
     expect(harness.lastState()).toEqual({ status: "connecting" });
+  });
+
+  it("reports each stream and whether this device controls the tab", async () => {
+    const harness = createHarness();
+    harness.view.setActive(true);
+    harness.starts[0].resolve({ ...startedResult("s1"), control: { held: true } });
+    await flush();
+    expect(harness.streams.at(-1)).toEqual({ streamId: "s1", control: { held: true } });
+
+    harness.view.setActive(false);
+    expect(harness.streams.at(-1)).toBeNull();
+
+    await harness.activate("s2");
+    expect(harness.streams.at(-1)).toEqual({ streamId: "s2", control: null });
+  });
+
+  it("updates the origin of an identical image without stalling the stream", async () => {
+    const harness = createHarness();
+    await harness.activate("s1");
+    harness.sendFrame("s1", 1, [9, 9], "https://first.example");
+    harness.view.frameRendered(1);
+    harness.sendFrame("s1", 2, [9, 9], "https://second.example");
+
+    expect(harness.acks).toEqual([
+      ["s1", 1],
+      ["s1", 2],
+    ]);
+    expect(harness.lastState()).toMatchObject({ frame: { origin: "https://second.example" } });
+  });
+
+  it("keeps the origin and document of the image on screen until the next one renders", async () => {
+    const harness = createHarness();
+    await harness.activate("s1");
+    harness.sendFrame("s1", 1, [1], "https://first.example", "s1:0");
+    harness.view.frameRendered(1);
+    harness.sendFrame("s1", 2, [2], "https://second.example", "s1:1");
+
+    expect(harness.lastState()).toMatchObject({
+      frame: { seq: 2 },
+      shown: { origin: "https://first.example", documentId: "s1:0" },
+    });
+
+    harness.view.frameRendered(2);
+    expect(harness.lastState()).toMatchObject({
+      shown: { origin: "https://second.example", documentId: "s1:1" },
+    });
+  });
+
+  it("moves an identical image on screen to the document it now stands for", async () => {
+    const harness = createHarness();
+    await harness.activate("s1");
+    harness.sendFrame("s1", 1, [9], "https://first.example", "s1:0");
+    harness.view.frameRendered(1);
+    harness.sendFrame("s1", 2, [9], "https://first.example", "s1:1");
+    expect(harness.lastState()).toMatchObject({ shown: { documentId: "s1:1" } });
+  });
+
+  it("shows that the page is blocked, though its image is the same", async () => {
+    const harness = createHarness();
+    await harness.activate("s1");
+    harness.sendFrame("s1", 1, [9], "https://first.example", "s1:0");
+    harness.view.frameRendered(1);
+    harness.sendFrame("s1", 2, [9], "https://first.example", "s1:0", true);
+    expect(harness.lastState()).toMatchObject({ shown: { blocked: true } });
+  });
+
+  it("passes on whether control outlived the stream", async () => {
+    const harness = createHarness();
+    await harness.activate("s1");
+    harness.sendEnded({ streamId: "s1", error: null, control: { held: true } });
+    expect(harness.lastState()).toEqual({ status: "ended", code: null, held: true });
   });
 
   it("ignores ended messages for other streams", async () => {
@@ -257,7 +361,8 @@ describe("createBrowserLiveView", () => {
 
     expect(harness.lastState()).toEqual({
       status: "ended",
-      message: "Live view is not supported by the desktop app. Update Paseo desktop.",
+      code: "browser_unsupported",
+      held: null,
     });
   });
 
@@ -268,7 +373,7 @@ describe("createBrowserLiveView", () => {
     harness.starts[0].reject(new Error("Request timed out"));
     await flush();
 
-    expect(harness.lastState()).toEqual({ status: "ended", message: "Request timed out" });
+    expect(harness.lastState()).toEqual({ status: "ended", code: "connection", held: null });
   });
 
   it("does not retry while inactive", () => {
