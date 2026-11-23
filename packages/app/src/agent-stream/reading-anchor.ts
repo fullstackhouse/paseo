@@ -11,8 +11,13 @@ const edgeOf = (row: RowGeometry, edge: DisclosureTriggerEdge) =>
 
 // A row must clear the reading line before the next row takes ownership.
 const READING_POSITION_OFFSET_PX = 8;
+export interface ReadingRowReplacement {
+  id: string;
+  /** The replacement hides the row behind a folded turn's summary instead of showing it. */
+  folds: boolean;
+}
 export interface ReadingRowReplacements {
-  get(id: string): string | undefined;
+  get(id: string): ReadingRowReplacement | undefined;
 }
 const NO_REPLACEMENTS: ReadingRowReplacements = new Map();
 
@@ -33,15 +38,19 @@ export function createReadingAnchor() {
   const readingRow = (scrollTop: number) =>
     geometry.find((row) => row.top + row.height > scrollTop + READING_POSITION_OFFSET_PX);
   const getRowId = (replacements = NO_REPLACEMENTS) =>
-    anchor ? (replacements.get(anchor.id) ?? anchor.id) : null;
+    anchor ? (replacements.get(anchor.id)?.id ?? anchor.id) : null;
   const project = (
     scrollTop: number,
     row: RowGeometry | undefined,
     replacements = NO_REPLACEMENTS,
-  ) =>
-    anchor && row && row.id === getRowId(replacements)
-      ? (anchor.pinnedScrollTop ?? scrollTop) + edgeOf(row, anchor.edge) - anchor.position
-      : scrollTop;
+  ) => {
+    if (!anchor || !row || row.id !== getRowId(replacements)) return scrollTop;
+    const projected =
+      (anchor.pinnedScrollTop ?? scrollTop) + edgeOf(row, anchor.edge) - anchor.position;
+    // A fold hides the row being read, so how far the reader had scrolled into it means
+    // nothing in the folded turn. Start the turn at the viewport top, never above it.
+    return replacements.get(anchor.id)?.folds ? Math.min(projected, row.top) : projected;
+  };
   return {
     getRowId,
     getReadingRowId: (scrollTop: number) =>
