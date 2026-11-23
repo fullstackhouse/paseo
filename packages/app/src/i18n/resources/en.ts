@@ -1351,6 +1351,12 @@ export const en = {
     schedules: {
       needsYou: "Scheduled runs need you: {{count}}",
     },
+    drafts: {
+      title: "Drafts",
+      discard: "Discard draft",
+      noProject: "No project",
+      attachmentsOnly: "Attachments only",
+    },
     snoozed: {
       title: "Snoozed",
       blocked: "Waiting on you: {{count}}",

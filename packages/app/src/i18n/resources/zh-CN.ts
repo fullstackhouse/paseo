@@ -1333,6 +1333,12 @@ export const zhCN: TranslationResources = {
     schedules: {
       needsYou: "需要你处理的计划运行：{{count}}",
     },
+    drafts: {
+      title: "草稿",
+      discard: "丢弃草稿",
+      noProject: "无项目",
+      attachmentsOnly: "仅附件",
+    },
     snoozed: {
       title: "已暂缓",
       blocked: "等待你处理：{{count}}",

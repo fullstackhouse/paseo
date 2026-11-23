@@ -1360,6 +1360,12 @@ export const ru: TranslationResources = {
     schedules: {
       needsYou: "Запланированные запуски ждут вас: {{count}}",
     },
+    drafts: {
+      title: "Черновики",
+      discard: "Удалить черновик",
+      noProject: "Без проекта",
+      attachmentsOnly: "Только вложения",
+    },
     snoozed: {
       title: "Отложенные",
       blocked: "Ждут вас: {{count}}",

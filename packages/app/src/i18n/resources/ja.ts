@@ -1355,6 +1355,12 @@ export const ja: TranslationResources = {
     schedules: {
       needsYou: "対応が必要なスケジュール実行: {{count}}",
     },
+    drafts: {
+      title: "下書き",
+      discard: "下書きを破棄",
+      noProject: "プロジェクトなし",
+      attachmentsOnly: "添付ファイルのみ",
+    },
     snoozed: {
       title: "スヌーズ中",
       blocked: "あなたを待機中: {{count}}",
