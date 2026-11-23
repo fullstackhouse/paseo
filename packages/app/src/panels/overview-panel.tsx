@@ -262,6 +262,7 @@ function useYourMove(input: {
     workOpen: isWorkStillOpen({
       reported: foldReportedWork(input.summaryItems),
       workspaceRunning: Boolean(input.facts?.isRunning),
+      cardState: input.status?.state ?? null,
     }),
   });
 }

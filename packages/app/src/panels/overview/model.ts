@@ -118,16 +118,21 @@ export function deriveYourMove(input: {
 
 /**
  * Whether the workspace still has work under way although no agent runs a turn: the host still
- * counts it running (an idle agent's background shell, monitor or subagent), or the plugins' report,
- * folded as in the sidebar, is working, blocked or needs you. Live work wins over a done report:
- * paseo-status says done once every agent with a card is done, so an agent without a card that owns
- * the shell doesn't count there.
+ * counts it running (an idle agent's background shell, monitor or subagent), the newest status card
+ * says working or blocked, or the plugins' report, folded as in the sidebar, is working, blocked or
+ * needs you. Live work wins over a done report: paseo-status says done once every agent with a card
+ * is done, so an agent without a card that owns the shell doesn't count there. The card counts even
+ * when the plugin no longer believes it (a Working card with nothing live for 5 minutes): a card the
+ * agent forgot to update costs a click in the header, a wrong Archive can stop its work.
  */
 export function isWorkStillOpen(input: {
   reported: ReportedWork | null;
   workspaceRunning: boolean;
+  /** The newest status card's state, if the workspace has one. */
+  cardState: PluginWorkspaceStatus["state"] | null;
 }): boolean {
   if (input.workspaceRunning) return true;
+  if (input.cardState === "working" || input.cardState === "blocked") return true;
   return input.reported !== null && input.reported !== "done";
 }
 

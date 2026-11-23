@@ -178,23 +178,39 @@ describe("deriveYourMove", () => {
 describe("isWorkStillOpen", () => {
   it("is open while the report is working, blocked or needs you", () => {
     for (const reported of ["working", "blocked", "needs_you"] as const) {
-      expect(isWorkStillOpen({ reported, workspaceRunning: false })).toBe(true);
+      expect(isWorkStillOpen({ reported, workspaceRunning: false, cardState: null })).toBe(true);
     }
   });
 
   it("is open while the host still counts the workspace running, with no report", () => {
     // An idle agent waiting on a monitor or subagent, or a shell, with no status card.
-    expect(isWorkStillOpen({ reported: null, workspaceRunning: true })).toBe(true);
+    expect(isWorkStillOpen({ reported: null, workspaceRunning: true, cardState: null })).toBe(true);
   });
 
   it("is open while live work runs, even when the report says done", () => {
     // Agent A merged and said done; agent B, with no card, waits on a long test run.
-    expect(isWorkStillOpen({ reported: "done", workspaceRunning: true })).toBe(true);
+    expect(isWorkStillOpen({ reported: "done", workspaceRunning: true, cardState: null })).toBe(
+      true,
+    );
+  });
+
+  it("is open while the newest card says working or blocked, even when the report doesn't", () => {
+    // A Working card with nothing live for 5 minutes: paseo-status no longer reports it.
+    for (const cardState of ["working", "blocked"] as const) {
+      expect(isWorkStillOpen({ reported: null, workspaceRunning: false, cardState })).toBe(true);
+    }
+    expect(isWorkStillOpen({ reported: "done", workspaceRunning: false, cardState: "done" })).toBe(
+      false,
+    );
   });
 
   it("is closed once the report is done or empty and nothing runs", () => {
-    expect(isWorkStillOpen({ reported: "done", workspaceRunning: false })).toBe(false);
-    expect(isWorkStillOpen({ reported: null, workspaceRunning: false })).toBe(false);
+    expect(isWorkStillOpen({ reported: "done", workspaceRunning: false, cardState: null })).toBe(
+      false,
+    );
+    expect(isWorkStillOpen({ reported: null, workspaceRunning: false, cardState: null })).toBe(
+      false,
+    );
   });
 });
 
