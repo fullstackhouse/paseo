@@ -8,7 +8,8 @@ Map: [spec-overview-tree-ui-map.md](./spec-overview-tree-ui-map.md). Spec: [spec
 - **Device.** Desktop: Overview tab in the Explorer sidebar, ~360–480 px wide. Mobile: the workspace
   sheet, full width. Same content, same order.
 - **Rows.** Every relation and PR row is one line: a label or name, a muted facts word, a chevron when
-  it opens something. Tones: running blue, waiting amber, blocked/failed red, done green, else muted.
+  it opens something. Tones as the app's state words: running accent, waiting warning, blocked/failed danger, done
+  success; idle, archived and not-loaded muted.
 - **Sections** render nothing when empty: no heading, no "none" placeholder.
 - **Live.** Rows update in place as other workspaces' status cards and PR facts change; no refresh
   control.
@@ -58,8 +59,8 @@ Map: [spec-overview-tree-ui-map.md](./spec-overview-tree-ui-map.md). Spec: [spec
   0.16 · Working".
 - **Variants.** Parent chain + this + children; deep chain (3 ancestors); many children (Show all);
   blocked by a workspace and an agent; blocking two workspaces; only children (a root).
-- **Edge cases.** An ancestor or child on a host that isn't connected → its row reads "Not loaded",
-  muted, not pressable. An archived parent → the row shows "Archived" and still opens it. A blocker
+- **Edge cases.** An ancestor or child on a host that isn't connected → its last known name, muted, with the
+  word "Not loaded"; not pressable. An archived parent → the row shows "Archived" and still opens it. A blocker
   workspace that no longer exists → "Removed workspace", muted, not pressable. A workspace that both
   blocks and is blocked by the same one shows in both groups.
 
@@ -69,13 +70,14 @@ Map: [spec-overview-tree-ui-map.md](./spec-overview-tree-ui-map.md). Spec: [spec
 - **Extended.** Lists every PR paseo-prs relates to the workspace: the branch's PRs, their stack and
   PRs linked from any repository. Every open PR shows; merged and closed ones fold into one muted "3 merged" row that expands.
   With no open PR, the merged ones show directly. Each row: `#123`, title,
-  facts ("2 failing", "changes requested", "approved", "checks running", "merged", "draft"); the
+  facts ("2 failing", "changes requested", "approved", "checks running", "checks passing",
+  "merged", "draft"); the
   most urgent fact wins the tone. A PR from another repository prefixes `owner/repo`. Without
   paseo-prs installed, the branch's PR from the host's git status. With no PR, one row "No PR yet"
   with the branch facts ("3 commits · +120 −8 · uncommitted") and the branch name small and muted at
   the end. No buttons: fixing and merging is the agent's or the asks' job.
 - **Get here.** Last section of O1.
-- **Shows.** Section label "Pull requests" with a count when more than one; the rows above.
+- **Shows.** Section label "Pull requests" with a count of all related PRs (merged included) when more than one; the rows above.
 - **Scenarios.** A stacked 4-PR feature: all four, the failing one red. A multi-repo change: the paseo
   PR and the paseo-prs plugin PR, the second prefixed `fullstackhouse/paseo-prs`.
 - **Variants.** One open PR with checks passing; failing checks (red) and changes requested; a stack
