@@ -216,6 +216,31 @@ export interface PluginWorkspaceSummaryItemState {
    * list says this plugin has nothing waiting here.
    */
   entries?: PluginWorkspaceSummaryEntry[];
+  /**
+   * The pull requests the workspace's work lives in, listed at the end of the Overview for
+   * information. Replaces the host's own branch PR there; an empty list says there are none.
+   * FSH-only. Publish it on its own item, without `status`, and set `entries: []` beside it:
+   * hosts that don't know this field otherwise list the item as a one-line fact.
+   */
+  pullRequests?: PluginWorkspacePullRequest[];
+  /** True while `pullRequests` couldn't be refreshed (the forge is unreachable); the rows keep their last facts. */
+  pullRequestsStale?: boolean;
+}
+
+/** One pull request on the Overview. Pressing it opens `url`, or the PR tab for the branch's own PR. */
+export interface PluginWorkspacePullRequest {
+  /** Stable id, such as the PR's URL. */
+  id: string;
+  number: number;
+  title: string;
+  url: string;
+  /** The repository's name, only for a PR outside the workspace's repository: shown as `repo#58`. */
+  repo?: string;
+  state: "open" | "draft" | "merged" | "closed";
+  /** The most urgent fact, such as "2 failing" or "changes requested"; the state is shown when omitted. */
+  facts?: string;
+  /** Colors the row's facts. */
+  tone?: "success" | "warning" | "danger" | "muted";
 }
 
 /**
