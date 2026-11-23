@@ -486,6 +486,29 @@ describe("useAgentInputDraft live contract", () => {
     });
   });
 
+  it("appends a cited quote to the draft without moving focus to the message", async () => {
+    useDraftStore.getState().saveDraftInput({
+      draftKey: "draft:quote",
+      draft: { text: "my question", attachments: [] },
+    });
+    const focusBefore =
+      useDraftStore.getState().attachmentFocusRequestByDraftKey["draft:quote"] ?? 0;
+
+    await useDraftStore.getState().attachQuote({
+      draftKey: "draft:quote",
+      id: "quote-1",
+      text: "> cited **bit**",
+    });
+
+    const draft = useDraftStore.getState().getDraftInput("draft:quote");
+    expect(draft?.text).toBe("my question");
+    expect(draft?.attachments).toEqual([{ kind: "quote", id: "quote-1", text: "> cited **bit**" }]);
+    // The quote's comment field takes focus, so the message input must not grab it.
+    expect(useDraftStore.getState().attachmentFocusRequestByDraftKey["draft:quote"] ?? 0).toBe(
+      focusBefore,
+    );
+  });
+
   it("clear resets text and attachments", async () => {
     let latest: ReturnType<typeof useAgentInputDraft> | null = null;
     const image: AttachmentMetadata = {

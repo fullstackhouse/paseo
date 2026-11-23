@@ -179,6 +179,9 @@ export const ko: TranslationResources = {
       openImage: "이미지 첨부 열기",
       removeImage: "이미지 첨부 제거",
       removeFile: "파일 첨부 제거",
+      quoteText: "인용 {{number}}",
+      quoteComment: "인용 {{number}}에 댓글",
+      removeQuote: "인용 {{number}} 삭제",
       openGithub: "{{kind}} {{number}} 열기",
       removeGithub: "{{kind}} {{number}} 제거",
       element: "요소",
@@ -246,6 +249,7 @@ export const ko: TranslationResources = {
   agentStream: {
     empty: "이 에이전트와 대화를 시작하세요...",
     scrollToBottom: "맨 아래로 스크롤",
+    cite: "인용",
     historyLoadFailed: "에이전트 기록을 로드할 수 없습니다.",
     messageCapped: "이 메시지는 길이 제한으로 잘렸습니다({{bytes}}바이트).",
     permission: {

@@ -175,6 +175,9 @@ export const en = {
       openImage: "Open image attachment",
       removeImage: "Remove image attachment",
       removeFile: "Remove file attachment",
+      quoteText: "Quote {{number}}",
+      quoteComment: "Comment on quote {{number}}",
+      removeQuote: "Remove quote {{number}}",
       openGithub: "Open {{kind}} {{number}}",
       removeGithub: "Remove {{kind}} {{number}}",
       element: "Element",
@@ -242,6 +245,7 @@ export const en = {
   agentStream: {
     empty: "Start chatting with this agent...",
     scrollToBottom: "Scroll to bottom",
+    cite: "Cite",
     historyLoadFailed: "Couldn't load agent history",
     messageCapped: "This message was capped ({{bytes}} bytes).",
     permission: {
