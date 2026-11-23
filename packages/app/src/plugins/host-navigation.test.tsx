@@ -5,6 +5,7 @@ import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { navigateToWorkspace } from "@/stores/navigation-active-workspace-store";
 import { navigateToAgent } from "@/utils/navigate-to-agent";
+import { usePendingTimelineJump } from "@/agent-stream/timeline-jump/pending";
 import { usePluginHostNavigation } from "./host-navigation";
 
 vi.mock("@/utils/navigate-to-agent", () => ({
@@ -34,6 +35,19 @@ describe("usePluginHostNavigation", () => {
       serverId: "host-1",
       workspaceId: "workspace-1",
     });
+  });
+
+  it("asks the agent's chat to jump to the requested timeline position", () => {
+    const { result } = renderHook(() => usePluginHostNavigation("host-1"));
+    const pending = renderHook(() => usePendingTimelineJump("host-1", "agent-9"));
+    expect(pending.result.current).toBeNull();
+
+    act(() =>
+      result.current.openAgent({ agentId: "agent-9", timelinePosition: { epoch: "e1", seq: 4 } }),
+    );
+
+    expect(pending.result.current).toEqual({ epoch: "e1", seq: 4 });
+    expect(navigateToAgentMock).toHaveBeenCalledWith({ serverId: "host-1", agentId: "agent-9" });
   });
 
   it("keeps the capability stable until the rendering host changes", () => {
