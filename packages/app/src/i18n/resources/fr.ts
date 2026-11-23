@@ -2308,6 +2308,7 @@ export const fr: TranslationResources = {
         one: "{{count}} fusionnée ou fermée",
         other: "{{count}} fusionnées ou fermées",
       },
+      prsShowLess: "Afficher moins",
       prState: {
         open: "Ouverte",
         draft: "Brouillon",

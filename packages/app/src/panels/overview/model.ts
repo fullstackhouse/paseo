@@ -266,8 +266,17 @@ export interface PullRequestRow {
 
 export interface PullRequestList {
   open: PullRequestRow[];
-  /** Merged and closed PRs: folded behind one row while any PR is open. */
+  /** Merged and closed PRs: see `foldsDonePullRequests`. */
   done: PullRequestRow[];
+}
+
+/**
+ * Merged and closed PRs fold behind one row while any PR is open, or when there are several of
+ * them: a long-running workspace piles up finished PRs that bury the rest of the panel. A lone
+ * finished PR stays inline.
+ */
+export function foldsDonePullRequests(list: PullRequestList): boolean {
+  return list.done.length > 1 || (list.done.length > 0 && list.open.length > 0);
 }
 
 export interface HostPullRequest extends PullRequestFacts {

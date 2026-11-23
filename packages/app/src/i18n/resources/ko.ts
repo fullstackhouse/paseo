@@ -2268,6 +2268,7 @@ export const ko: TranslationResources = {
         one: "{{count}}개 병합 또는 닫힘",
         other: "{{count}}개 병합 또는 닫힘",
       },
+      prsShowLess: "간략히 보기",
       prState: {
         open: "열림",
         draft: "초안",

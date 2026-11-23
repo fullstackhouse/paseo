@@ -13,6 +13,7 @@ import {
   permissionResponse,
   permissionSubject,
   derivePullRequests,
+  foldsDonePullRequests,
   findBlocking,
   isTreeBlocker,
   orderChildren,
@@ -318,6 +319,29 @@ describe("derivePullRequests", () => {
 
   it("takes an empty plugin list as no PRs", () => {
     expect(derivePullRequests({ plugin: [], host, t })).toEqual({ open: [], done: [] });
+  });
+});
+
+describe("foldsDonePullRequests", () => {
+  const row = (key: string) =>
+    ({
+      key,
+      ref: key,
+      title: key,
+      facts: "",
+      tone: "merged",
+      url: key,
+      isBranchPr: false,
+    }) as const;
+
+  it("folds finished PRs while one is open or when there are several", () => {
+    expect(foldsDonePullRequests({ open: [row("a")], done: [row("b")] })).toBe(true);
+    expect(foldsDonePullRequests({ open: [], done: [row("b"), row("c")] })).toBe(true);
+  });
+
+  it("keeps a lone finished PR, and open PRs alone, inline", () => {
+    expect(foldsDonePullRequests({ open: [], done: [row("b")] })).toBe(false);
+    expect(foldsDonePullRequests({ open: [row("a")], done: [] })).toBe(false);
   });
 });
 

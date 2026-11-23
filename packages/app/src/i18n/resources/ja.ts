@@ -2280,6 +2280,7 @@ export const ja: TranslationResources = {
         one: "{{count}}件マージ済みまたはクローズ",
         other: "{{count}}件マージ済みまたはクローズ",
       },
+      prsShowLess: "表示を減らす",
       prState: {
         open: "オープン",
         draft: "ドラフト",
