@@ -1,7 +1,8 @@
-import { resolve } from "node:path";
+import { basename, resolve } from "node:path";
 import type pino from "pino";
 import type {
   AgentSnapshotPayload,
+  ArchivedWorkspaceEntry,
   SessionInboundMessage,
   SessionOutboundMessage,
   WorkspaceDescriptorPayload,
@@ -14,7 +15,7 @@ import {
 import { getParentAgentIdFromLabels } from "@getpaseo/protocol/agent-labels";
 import { SortablePager } from "./pagination/sortable-pager.js";
 import type { PersistedProjectRecord, PersistedWorkspaceRecord } from "./workspace-registry.js";
-import { resolveProjectDisplayName } from "./workspace-registry.js";
+import { resolveProjectDisplayName, resolveWorkspaceDisplayName } from "./workspace-registry.js";
 import {
   deriveTerminalActivityStatusBucket,
   type TerminalActivity,
@@ -621,6 +622,34 @@ export class WorkspaceDirectory {
         // The app replaces its project with this descriptor; omitting it would clear the setup.
         projectLastAgentSetup: project.lastAgentSetup ?? undefined,
       }));
+  }
+
+  // Archived workspaces the user can browse and recover, newest first. Background
+  // workspaces stay hidden here as they are everywhere else in discovery.
+  async listArchived(): Promise<ArchivedWorkspaceEntry[]> {
+    const [workspaces, projects] = await Promise.all([
+      this.deps.workspaceRegistry.list(),
+      this.deps.projectRegistry.list(),
+    ]);
+    const projectsById = new Map(projects.map((project) => [project.projectId, project]));
+    const entries: ArchivedWorkspaceEntry[] = [];
+    for (const workspace of workspaces) {
+      if (!workspace.archivedAt || workspace.background) continue;
+      const project = projectsById.get(workspace.projectId);
+      entries.push({
+        workspaceId: workspace.workspaceId,
+        name: resolveWorkspaceDisplayName(workspace),
+        projectId: workspace.projectId,
+        projectDisplayName: project
+          ? resolveProjectDisplayName(project)
+          : basename(workspace.mainRepoRoot ?? workspace.cwd),
+        cwd: workspace.cwd,
+        workspaceKind: workspace.kind,
+        branch: workspace.branch,
+        archivedAt: workspace.archivedAt,
+      });
+    }
+    return entries.sort((a, b) => b.archivedAt.localeCompare(a.archivedAt));
   }
 
   async listObservationTargets(): Promise<

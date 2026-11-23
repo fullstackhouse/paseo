@@ -141,6 +141,7 @@ import type {
   PaseoConfigRevision,
   WorkspaceCreateRequest,
   WorkspaceRecoveryState,
+  ArchivedWorkspaceEntry,
   PluginListItem,
   PluginLogEntry,
   PluginSourceStatusItem,
@@ -3694,6 +3695,16 @@ export class DaemonClient {
         },
       });
     return payload.state;
+  }
+
+  /** Archived workspaces, newest first. Gate on `server_info.features.archivedWorkspaces`. */
+  async listArchivedWorkspaces(requestId?: string): Promise<ArchivedWorkspaceEntry[]> {
+    const payload =
+      await this.sendNamespacedCorrelatedSessionRequest<"workspace.archived.list.response">({
+        requestId,
+        message: { type: "workspace.archived.list.request" },
+      });
+    return payload.workspaces;
   }
 
   async restoreWorkspace(workspaceId: string, requestId?: string): Promise<void> {

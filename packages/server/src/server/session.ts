@@ -3251,6 +3251,8 @@ export class Session {
         return this.handleWorkspaceRecoveryInspectRequest(msg);
       case "workspace.recovery.restore.request":
         return this.handleWorkspaceRecoveryRestoreRequest(msg);
+      case "workspace.archived.list.request":
+        return this.handleWorkspaceArchivedListRequest(msg);
       case "workspace.clear_attention.request":
         return this.handleWorkspaceClearAttentionRequest(msg);
       case "workspace.mark_unread.request":
@@ -4277,6 +4279,18 @@ export class Session {
       payload: {
         requestId: request.requestId,
         state,
+      },
+    });
+  }
+
+  private async handleWorkspaceArchivedListRequest(
+    request: Extract<SessionInboundMessage, { type: "workspace.archived.list.request" }>,
+  ): Promise<void> {
+    this.emit({
+      type: "workspace.archived.list.response",
+      payload: {
+        requestId: request.requestId,
+        workspaces: await this.workspaceDirectory.listArchived(),
       },
     });
   }
