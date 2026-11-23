@@ -18,6 +18,8 @@ temporary by design: every patch is meant to go upstream and then drop out of `f
 - FSH-only (upstreamable): right-clicking a file link in an agent's reply opens a menu with **Open in <editor>**, **Reveal in Finder** and **Copy path**. Cmd/Ctrl+click opens the file in its default app, so an `.html` file goes to the system browser. Both work on desktop with a local daemon. The new `paseo:opener:openPath` IPC only opens documents, images, media and folders (an allow-list, checked on the symlink-resolved path), because `shell.openPath` runs anything the OS treats as a program; everything else shows a toast.
 - FSH-only (upstreamable): plugins can render the Explorer pull-request panel through `PullRequestPanel`, using their own checks and activity data without a workspace checkout. Inbox uses it for its read-only GitHub tab.
 
+- FSH-only (upstreamable): plugins mark the workspaces they create in the sidebar. `workspaces.ref(id).setAppearance({ avatar, titleIcon })` puts an avatar in place of the project icon (status badge kept) and a Lucide icon before the title. Gated on `features.workspaceAppearance`. Inbox uses it for reviews: the PR author's avatar and an `Inbox` icon
+
 - FSH-only (upstreamable): agent snapshots carry `capabilities.supportsSteering` (Claude, Codex, OpenCode, Pi, OMP, and provider plugins that negotiate `prompt.steer`), so plugins steer a running agent when it joins the turn and wait for the turn to end when a steer would interrupt it.
 
 - FSH-only: don't automatically show the worktree scripts setup callout; configure scripts in project settings.
