@@ -2715,6 +2715,37 @@ describe("create_agent MCP tool", () => {
     ]);
   });
 
+  it("returns a link that opens each workspace in Paseo", async () => {
+    const { agentManager, agentStorage } = createTestDeps();
+    const workspace = createPersistedWorkspaceRecord({
+      workspaceId: "wks_feature",
+      projectId: "project-1",
+      cwd: "/tmp/paseo/worktrees/repo/feature",
+      kind: "worktree",
+      displayName: "feature",
+      createdAt: "2026-07-17T00:00:00.000Z",
+      updatedAt: "2026-07-17T00:00:00.000Z",
+    });
+    const server = await createAgentMcpServer({
+      agentManager,
+      agentStorage,
+      serverId: "srv_1",
+      providerSnapshotManager: createOpenCodeManager().manager,
+      workspaceRegistry: {
+        get: vi.fn(async () => workspace),
+        list: vi.fn(async () => [workspace]),
+        upsert: vi.fn(async () => undefined),
+      },
+      logger,
+    });
+
+    const response = await registeredTool(server, "list_workspaces").handler({});
+
+    expect(response.structuredContent.workspaces).toEqual([
+      expect.objectContaining({ url: "paseo://h/srv_1/workspace/wks_feature" }),
+    ]);
+  });
+
   it("creates an background local workspace and leaves it out of list_workspaces", async () => {
     const { agentManager, agentStorage } = createTestDeps();
     const createCalls: Array<{ cwd: string; context: { background?: boolean } | undefined }> = [];

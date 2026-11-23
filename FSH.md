@@ -20,6 +20,8 @@ temporary by design: every patch is meant to go upstream and then drop out of `f
 
 - FSH-only: don't automatically show the worktree scripts setup callout; configure scripts in project settings.
 
+- FSH-only (upstreamable): `paseo://h/<server>/workspace/<id>` and `…/agent/<id>` links in chat open inside the app on every platform; before, the app dropped them. An archived workspace's link shows **Workspace archived · Unarchive**. MCP `create_workspace`, `list_workspaces` and `create_agent` return the link as `url`, and the Paseo skill tells agents to link the workspaces they point you at.
+
 - FSH-only (not upstream yet): plugin Markdown supports inline review annotations with source line ranges and advertises `supportsBlockAnnotations`. Inbox and Asks use the shared renderer, including Mermaid diagrams; older hosts show update guidance for annotated documents.
 
 - getpaseo/paseo#7692: Cmd+Shift+[ / ] for previous/next tab on macOS desktop

@@ -690,6 +690,12 @@ sending a message. Use `paseo://h/<server-id>/agent/<agent-id>`, or run
 `paseo agent open <agent-id>`. The CLI reads the local daemon's server ID by
 default; pass `--server <server-id>` when targeting another server.
 
+In chat, `paseo://h/<server-id>/workspace/<workspace-id>` and
+`paseo://h/<server-id>/agent/<agent-id>` links open in the app on every platform
+(`packages/app/src/utils/paseo-app-link.ts`); the OS never sees them. The Paseo
+MCP workspace tools and `create_agent` return these as `url` so agents can link
+the workspaces they mention.
+
 ## Agent state
 
 Agent data lives at:
