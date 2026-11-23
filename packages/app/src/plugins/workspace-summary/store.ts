@@ -165,20 +165,30 @@ const PR_STATES = new Set<PluginWorkspacePullRequest["state"]>([
   "closed",
 ]);
 
+/** A list longer than this is a plugin bug; the section isn't virtualized. */
+const MAX_PULL_REQUESTS = 50;
+
 /** Drops malformed PRs one by one, and links that aren't http(s). Ids key the Overview rows. */
 function cleanPullRequests(prs: unknown): PluginWorkspacePullRequest[] {
   if (!Array.isArray(prs)) return [];
   const clean: PluginWorkspacePullRequest[] = [];
   const seen = new Set<string>();
   for (const pr of prs as Partial<PluginWorkspacePullRequest>[]) {
+    if (clean.length >= MAX_PULL_REQUESTS) break;
     const id = optionalText(pr?.id);
     const title = optionalText(pr?.title);
     const url = optionalText(pr?.url);
     if (!id || !title || !url || !isHttpUrl(url) || seen.has(id)) continue;
-    if (typeof pr.number !== "number" || !Number.isFinite(pr.number)) continue;
+    if (!Number.isInteger(pr.number) || (pr.number as number) <= 0) continue;
     if (!pr.state || !PR_STATES.has(pr.state)) continue;
     seen.add(id);
-    const item: PluginWorkspacePullRequest = { id, number: pr.number, title, url, state: pr.state };
+    const item: PluginWorkspacePullRequest = {
+      id,
+      number: pr.number as number,
+      title,
+      url,
+      state: pr.state,
+    };
     const repo = optionalText(pr.repo);
     if (repo) item.repo = repo;
     const facts = optionalText(pr.facts);

@@ -179,7 +179,8 @@ export interface PluginWorkspaceSummaryItemState {
   /**
    * The pull requests the workspace's work lives in, listed at the end of the Overview for
    * information. Replaces the host's own branch PR there; an empty list says there are none.
-   * FSH-only; older hosts drop it.
+   * FSH-only. Publish it on its own item, without `status`, and set `entries: []` beside it:
+   * hosts that don't know this field otherwise list the item as a one-line fact.
    */
   pullRequests?: PluginWorkspacePullRequest[];
   /** True while `pullRequests` couldn't be refreshed (the forge is unreachable); the rows keep their last facts. */
