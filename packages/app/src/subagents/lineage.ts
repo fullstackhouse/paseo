@@ -152,9 +152,7 @@ export interface WorkspaceRef {
 
 /** Lineage seen from a workspace: where its work came from and which workspaces it handed off to. */
 export interface WorkspaceLineage {
-  /** The nearest ancestor agent's workspace that isn't this one. */
-  parent: WorkspaceRef | null;
-  /** Every ancestor workspace other than this one, root first, each once; ends with `parent`. */
+  /** Every ancestor workspace other than this one, root first, each once; the last is the parent. */
   ancestors: WorkspaceRef[];
   /** Workspaces other than this one that the focus agent started, oldest first, each once. */
   children: WorkspaceRef[];
@@ -185,7 +183,6 @@ export function deriveWorkspaceLineage(
     seenAncestors.add(key);
     ancestors.push(ref);
   }
-  const parent = ancestors.at(-1) ?? null;
   const children: WorkspaceRef[] = [];
   const seen = new Set<string>();
   let subagentsHere = 0;
@@ -201,5 +198,5 @@ export function deriveWorkspaceLineage(
     seen.add(key);
     children.push(ref);
   }
-  return { parent, ancestors, children, subagentsHere };
+  return { ancestors, children, subagentsHere };
 }

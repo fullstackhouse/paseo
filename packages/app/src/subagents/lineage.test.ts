@@ -303,7 +303,7 @@ describe("deriveWorkspaceLineage", () => {
       },
       here,
     );
-    expect(result.parent).toEqual({ serverId: SERVER_ID, workspaceId: "ws-a" });
+    expect(result.ancestors.at(-1)).toEqual({ serverId: SERVER_ID, workspaceId: "ws-a" });
   });
 
   it("lists ancestor workspaces root first, each once, without this one", () => {
@@ -330,7 +330,7 @@ describe("deriveWorkspaceLineage", () => {
       { ancestors: [node("root", "ws-a"), node("gone", null, { missing: true })], children: [] },
       here,
     );
-    expect(result.parent).toEqual({ serverId: SERVER_ID, workspaceId: "ws-a" });
+    expect(result.ancestors.at(-1)).toEqual({ serverId: SERVER_ID, workspaceId: "ws-a" });
   });
 
   it("groups children by workspace and counts the ones here as subagents", () => {
@@ -348,7 +348,6 @@ describe("deriveWorkspaceLineage", () => {
       here,
     );
     expect(result).toEqual({
-      parent: null,
       ancestors: [],
       children: [
         { serverId: SERVER_ID, workspaceId: "ws-c" },

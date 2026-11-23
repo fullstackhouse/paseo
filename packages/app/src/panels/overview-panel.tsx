@@ -901,16 +901,40 @@ function archiveMoveView(
 
 // ── 4. Context ───────────────────────────────────────────────────────────
 
+const NO_AGENTS: readonly Agent[] = [];
+const agentsByWorkspace = new WeakMap<ReadonlyMap<string, Agent>, Map<string, Agent[]>>();
+
+/**
+ * A host's agents in one workspace. Session selectors run on every store write (stream chunks
+ * included), so the per-workspace index is built once per agents map, not per call.
+ */
+function agentsInWorkspace(
+  agents: ReadonlyMap<string, Agent> | undefined,
+  workspaceId: string,
+): readonly Agent[] {
+  if (!agents) return NO_AGENTS;
+  let index = agentsByWorkspace.get(agents);
+  if (!index) {
+    index = new Map();
+    for (const agent of agents.values()) {
+      const key = normalizeWorkspaceOpaqueId(agent.workspaceId) ?? "";
+      const list = index.get(key);
+      if (list) list.push(agent);
+      else index.set(key, [agent]);
+    }
+    agentsByWorkspace.set(agents, index);
+  }
+  return index.get(normalizeWorkspaceOpaqueId(workspaceId) ?? "") ?? NO_AGENTS;
+}
+
 function countWorkspaceRootAgents(
   agents: ReadonlyMap<string, Agent> | undefined,
   workspaceId: string,
 ): number {
-  if (!agents) return 0;
-  const target = normalizeWorkspaceOpaqueId(workspaceId);
   let count = 0;
-  for (const agent of agents.values()) {
-    if (agent.archivedAt || normalizeWorkspaceOpaqueId(agent.workspaceId) !== target) continue;
-    const parent = agent.parentAgentId ? agents.get(agent.parentAgentId) : undefined;
+  for (const agent of agentsInWorkspace(agents, workspaceId)) {
+    if (agent.archivedAt) continue;
+    const parent = agent.parentAgentId ? agents?.get(agent.parentAgentId) : undefined;
     if (isWorkspaceRootAgent(agent, parent)) count += 1;
   }
   return count;
@@ -920,13 +944,10 @@ function selectAgentIdsHere(
   agents: ReadonlyMap<string, Agent> | undefined,
   workspaceId: string,
 ): string {
-  if (!agents) return "";
-  const target = normalizeWorkspaceOpaqueId(workspaceId);
-  const ids: string[] = [];
-  for (const agent of agents.values()) {
-    if (normalizeWorkspaceOpaqueId(agent.workspaceId) === target) ids.push(agent.id);
-  }
-  return ids.sort().join("\n");
+  return agentsInWorkspace(agents, workspaceId)
+    .map((agent) => agent.id)
+    .sort()
+    .join("\n");
 }
 
 function useAllSummaryItems(): readonly WorkspaceSummaryItem[] {
@@ -1033,9 +1054,18 @@ function Tree({
       {blockers.length > 0 ? (
         <View style={styles.context} testID="overview-tree-blocked-by">
           <Text style={styles.groupLabel}>{t("panels.overview.blockedBy")}</Text>
-          {blockers.map((blocker) => (
-            <BlockerRow key={blockerKey(blocker)} blocker={blocker} serverId={serverId} />
-          ))}
+          {blockers.map((blocker) =>
+            // A workspace shows its live state word; an agent keeps the plugin's label and detail.
+            blocker.kind === "workspace" && blocker.workspaceId ? (
+              <BlockerWorkspaceRow
+                key={blockerKey(blocker)}
+                serverId={serverId}
+                workspaceId={blocker.workspaceId}
+              />
+            ) : (
+              <BlockerRow key={blockerKey(blocker)} blocker={blocker} serverId={serverId} />
+            ),
+          )}
         </View>
       ) : null}
       {blocking.length > 0 ? (
@@ -1058,6 +1088,19 @@ function Tree({
 function Spacer({ width }: { width: number }): ReactElement {
   const style = useMemo(() => ({ width }), [width]);
   return <View style={style} />;
+}
+
+function BlockerWorkspaceRow({
+  serverId,
+  workspaceId,
+}: {
+  serverId: string;
+  workspaceId: string;
+}): ReactElement {
+  const workspace = useMemo(() => ({ serverId, workspaceId }), [serverId, workspaceId]);
+  return (
+    <LineageRow workspace={workspace} level={0} testID={`overview-blocked-by-${workspaceId}`} />
+  );
 }
 
 /** Steps a Tree row in one level per generation; levels past the root sit behind a ↳. */
@@ -1281,13 +1324,10 @@ function workspaceStateWord(
   summaryItems: (workspace: WorkspaceRef) => readonly WorkspaceSummaryItem[],
 ): WorkspaceStateWord {
   const status = partitionSummaryItems(summaryItems(workspace)).status?.status ?? null;
-  const target = normalizeWorkspaceOpaqueId(workspace.workspaceId);
-  const inWorkspace = agents
-    ? [...agents.values()].filter(
-        (agent) => normalizeWorkspaceOpaqueId(agent.workspaceId) === target,
-      )
-    : [];
-  return deriveWorkspaceStateWord({ status, agents: inWorkspace });
+  return deriveWorkspaceStateWord({
+    status,
+    agents: agentsInWorkspace(agents, workspace.workspaceId),
+  });
 }
 
 function useWorkspaceStateWord(workspace: WorkspaceRef): WorkspaceStateWord {
