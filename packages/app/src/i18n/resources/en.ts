@@ -320,6 +320,9 @@ export const en = {
       searchPlaceholder: "Search archived workspaces",
       loadFailed: "Unable to load archived workspaces",
       retry: "Try again",
+      truncatedSearch:
+        "Showing the {{count}} most recent matches on each host. Refine the search to see older ones.",
+      refreshFailed: "Could not refresh archived workspaces. Showing the last list.",
       hostLoadFailed: "{{host}}: Could not load archived workspaces",
       needsUpdate: "{{host}}: Update this host to see its archived workspaces",
       truncated:

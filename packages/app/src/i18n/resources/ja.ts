@@ -328,6 +328,10 @@ export const ja: TranslationResources = {
       searchPlaceholder: "アーカイブ済みワークスペースを検索",
       loadFailed: "アーカイブ済みワークスペースを読み込めませんでした",
       retry: "再試行",
+      truncatedSearch:
+        "各ホストで最近一致した {{count}} 件を表示しています。古いものを見るには検索を絞り込んでください。",
+      refreshFailed:
+        "アーカイブ済みワークスペースを更新できませんでした。前回の一覧を表示しています。",
       truncated:
         "各ホストで最近アーカイブされた {{count}} 件を表示しています。古いものは検索してください。",
       hostLoadFailed: "{{host}}: アーカイブ済みワークスペースを読み込めませんでした",

@@ -328,6 +328,10 @@ export const es: TranslationResources = {
       searchPlaceholder: "Buscar espacios de trabajo archivados",
       loadFailed: "No se pudieron cargar los espacios de trabajo archivados",
       retry: "Reintentar",
+      truncatedSearch:
+        "Se muestran las {{count}} coincidencias más recientes de cada host. Afina la búsqueda para ver las anteriores.",
+      refreshFailed:
+        "No se pudieron actualizar los espacios de trabajo archivados. Se muestra la última lista.",
       hostLoadFailed: "{{host}}: No se pudieron cargar los espacios de trabajo archivados",
       needsUpdate: "{{host}}: Actualiza este host para ver sus espacios de trabajo archivados",
       truncated:
