@@ -11,9 +11,15 @@ import { AssistantFileLinkResolverProvider } from "./provider";
 import type { DirectorySuggestionResult } from "./resolver";
 import { useFileLink } from "./use-file-link";
 import type { OpenFileDisposition } from "@/workspace/file-open";
+import { openExternalUrl } from "@/utils/open-external-url";
+import { openPaseoAppLink } from "@/utils/open-paseo-app-link";
 
 vi.mock("@/utils/open-external-url", () => ({
   openExternalUrl: vi.fn(async () => {}),
+}));
+
+vi.mock("@/utils/open-paseo-app-link", () => ({
+  openPaseoAppLink: vi.fn(),
 }));
 
 const SOURCE = {
@@ -331,6 +337,32 @@ describe("useFileLink", () => {
 
     expect(result.current.isFileLink).toBe(false);
     await expect(result.current.resolve()).resolves.toBeNull();
+    expect(getDirectorySuggestions).not.toHaveBeenCalled();
+  });
+
+  it("opens a paseo:// workspace link inside the app", async () => {
+    const getDirectorySuggestions = vi.fn(async () => resolvedSuggestions([]));
+    const { result } = renderHook(
+      () =>
+        useFileLink({
+          href: "paseo://h/srv_1/workspace/wks_abc",
+          text: "the workspace",
+          markup: "markdown",
+        }),
+      { wrapper: createWrapper({ client: { getDirectorySuggestions }, openedFiles: [] }) },
+    );
+
+    act(() => {
+      result.current.onPress();
+    });
+    await waitFor(() => {
+      expect(openPaseoAppLink).toHaveBeenCalledWith({
+        kind: "workspace",
+        serverId: "srv_1",
+        workspaceId: "wks_abc",
+      });
+    });
+    expect(openExternalUrl).not.toHaveBeenCalled();
     expect(getDirectorySuggestions).not.toHaveBeenCalled();
   });
 

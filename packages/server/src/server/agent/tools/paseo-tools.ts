@@ -49,6 +49,7 @@ import { inheritWorkspaceBackground } from "../create-agent/intent.js";
 import type { VoiceCallerContext, VoiceSpeakHandler } from "../../voice-types.js";
 import type { FirstAgentContext } from "../../messages.js";
 import { everyMsToFiveFieldCron } from "@getpaseo/protocol/schedule/cadence";
+import { buildAgentDeepLink } from "@getpaseo/protocol/agent-deep-link";
 import { expandUserPath, isSameOrDescendantPath, resolvePathFromBase } from "../../path-utils.js";
 import type { TerminalManager } from "../../../terminal/terminal-manager.js";
 import { encodeTerminalKeyInput } from "@getpaseo/protocol/terminal-key-input";
@@ -203,9 +204,16 @@ const WorkspaceAutomationSummarySchema = z.object({
   kind: z.enum(["directory", "local_checkout", "worktree"]),
   title: z.string().nullable(),
   background: z.boolean().optional(),
+  url: z
+    .string()
+    .optional()
+    .describe("Opens the workspace in Paseo. Link it when you point the user at this workspace."),
 });
 
-function toWorkspaceAutomationSummary(workspace: PersistedWorkspaceRecord) {
+function toWorkspaceAutomationSummary(
+  workspace: PersistedWorkspaceRecord,
+  serverId: string | undefined,
+) {
   return {
     workspaceId: workspace.workspaceId,
     projectId: workspace.projectId,
@@ -215,7 +223,18 @@ function toWorkspaceAutomationSummary(workspace: PersistedWorkspaceRecord) {
     title: workspace.title,
     background: workspace.background,
     parentWorkspaceId: workspace.parentWorkspaceId,
+    ...(serverId
+      ? { url: buildWorkspaceDeepLink({ serverId, workspaceId: workspace.workspaceId }) }
+      : {}),
   };
+}
+
+// Mirrors the app's workspace route segment: URL-safe ids as-is, others as base64url.
+function buildWorkspaceDeepLink(input: { serverId: string; workspaceId: string }): string {
+  const segment = /^[A-Za-z0-9._~-]+$/.test(input.workspaceId)
+    ? input.workspaceId
+    : `b64_${Buffer.from(input.workspaceId, "utf8").toString("base64url")}`;
+  return `paseo://h/${encodeURIComponent(input.serverId)}/workspace/${encodeURIComponent(segment)}`;
 }
 
 type WorkspaceWorktreeMode = "branch-off" | "checkout-branch" | "checkout-pr";
@@ -1550,7 +1569,9 @@ function createToolCatalog(
 
       return {
         content: [],
-        structuredContent: ensureValidJson(toWorkspaceAutomationSummary(workspace)),
+        structuredContent: ensureValidJson(
+          toWorkspaceAutomationSummary(workspace, options.serverId),
+        ),
       };
     },
   );
@@ -1571,7 +1592,7 @@ function createToolCatalog(
         .filter(
           (workspace) => !workspace.archivedAt && (includeBackground || !workspace.background),
         )
-        .map(toWorkspaceAutomationSummary);
+        .map((workspace) => toWorkspaceAutomationSummary(workspace, options.serverId));
       return {
         content: [],
         structuredContent: ensureValidJson({ workspaces }),
@@ -1638,6 +1659,10 @@ function createToolCatalog(
         currentModeId: z.string().nullable(),
         availableModes: z.array(ProviderModeSchema),
         guidance: z.string().optional(),
+        url: z
+          .string()
+          .optional()
+          .describe("Opens the agent in Paseo. Link it when you point the user at this agent."),
       },
     },
     async (args: unknown) => {
@@ -1708,6 +1733,14 @@ function createToolCatalog(
           ...(currentSnapshot.workspaceId ? { workspaceId: currentSnapshot.workspaceId } : {}),
           currentModeId: currentSnapshot.currentModeId,
           availableModes: currentSnapshot.availableModes,
+          ...(options.serverId
+            ? {
+                url: buildAgentDeepLink({
+                  serverId: options.serverId,
+                  agentId: currentSnapshot.id,
+                }),
+              }
+            : {}),
           ...(guidance ? { guidance } : {}),
         }),
       };

@@ -172,6 +172,7 @@ import {
 import { renderWorkspaceRouteGate } from "@/screens/workspace/workspace-route-state-views";
 import { ArchivedWorkspacePreview } from "@/screens/workspace/archived-workspace-preview";
 import { useWorkspaceRecovery } from "@/workspace-recovery/use-workspace-recovery";
+import { useWorkspaceRecoveryRequestedFromLink } from "@/workspace-recovery/link-requests";
 import type { WorkspaceRecoveryModel } from "@/workspace-recovery/model";
 import {
   buildWorkspaceTabSnapshot,
@@ -831,8 +832,10 @@ function shouldInspectWorkspaceRecovery(
   hasHydratedWorkspaces: boolean,
   workspace: WorkspaceDescriptor | null,
   pendingOpenTarget: WorkspaceTabTarget | null,
+  requestedFromLink: boolean,
 ): boolean {
-  return pendingOpenTarget?.kind === "agent" && hasHydratedWorkspaces && workspace === null;
+  const explicit = pendingOpenTarget?.kind === "agent" || requestedFromLink;
+  return explicit && hasHydratedWorkspaces && workspace === null;
 }
 
 function WorkspaceScreenGateFrame({ children }: { children: ReactNode }) {
@@ -1261,6 +1264,10 @@ function WorkspaceScreenContent({
     hasHydratedWorkspaces,
     workspaceExists: workspaceDescriptor !== null,
   });
+  const recoveryRequestedFromLink = useWorkspaceRecoveryRequestedFromLink(
+    normalizedServerId,
+    normalizedWorkspaceId,
+  );
   const workspaceRecovery = useWorkspaceRecovery({
     serverId: normalizedServerId,
     workspaceId: normalizedWorkspaceId,
@@ -1268,6 +1275,7 @@ function WorkspaceScreenContent({
       hasHydratedWorkspaces,
       workspaceDescriptor,
       pendingOpenTarget,
+      recoveryRequestedFromLink,
     ),
   });
 

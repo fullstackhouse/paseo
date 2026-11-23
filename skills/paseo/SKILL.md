@@ -50,6 +50,8 @@ Choose `baseBranch` explicitly: `origin/main` selects the remote-tracking branch
 
 **`list_workspaces`** — list active workspaces, excluding background workspaces unless `includeBackground: true`.
 
+Workspace descriptors and `create_agent` results carry a `url` (`paseo://h/…/workspace/…` or `…/agent/…`). When you point the user at a workspace or agent other than the one they are reading, write it as a Markdown link to that `url`, for example `[Explain: search A30](paseo://h/srv_1/workspace/wks_2f10)`. Tapping it opens the workspace in Paseo, including an archived one; a bare title gives them nothing to tap.
+
 **`archive_workspace`** — `{ workspaceId }`. Archives the workspace, its agents, and its terminals. Local directories remain; Paseo removes an owned worktree only after its final active workspace reference is archived.
 
 **`rename_workspace`** — `{ workspaceId, name }`. Rename workspace.
