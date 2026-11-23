@@ -167,15 +167,18 @@ is the storyboard in `.ai/prototypes/overview-v3/`.
   then the agent's summary. "Now" stays in the Status tab; next to the summary it repeated the same progress. When
   someone prompted an agent after the card's last update and no agent runs now, the line dims and says so. Without a
   card, nothing.
-- **What do I do?** Your move: the attention items, one row per plugin `entries` item, then failing checks and the
-  header's primary git action, from the same `useGitActions` result so the two can't disagree. The first item is a card
-  with its actions; the rest are one-line rows. A plain tool permission is answered in place with its own actions;
-  plans and questions open the agent. A summary item with an `EntryComponent` renders its entries itself
-  (`plugins/workspace-summary/entry-view.tsx`), so an ask is answered in place too. While an agent runs, only blocking
-  items show. Archive is only a move once the work shipped: the branch PR merged, or a current status card says done (its PRs may live in other repos). Once shipped, in a worktree or after a merge, Archive also replaces a leftover pull, push or update from base of a stale branch; commit and PR steps stay. With nothing to do, nothing: no section and no "nothing needs you" line.
+- **What do I do?** Your move: what waits on you, in the attention ladder's order (permission prompts, one row per
+  plugin `entries` item such as an ask, failed agents), then Archive. Git steps and failing checks are not moves: the
+  agent handles git, and the Pull requests section shows the facts. The first item is a card with its actions; the rest
+  are one-line rows. A plain tool permission is answered in place with its own actions; plans and questions open the
+  agent. A summary item with an `EntryComponent` renders its entries itself (`plugins/workspace-summary/entry-view.tsx`),
+  so an ask is answered in place too. Archive is its own row, only once the work shipped: the branch PR merged, or a
+  current status card says done (its PRs may live in other repos). It never shows while an agent runs, and only in a
+  worktree or after a merge. It shows when the header's primary git action is Archive or a leftover pull, push or
+  update from base; a commit or PR step means work that isn't in the PR yet, so Archive waits. A merged PR ends one agent's job, not the workspace's: while the host still counts the workspace running (an idle agent's background shell, monitor or subagent), the newest status card says working or blocked, or the plugins' report is working, blocked or needs you, Archive stays in the header (`isWorkStillOpen`). The report is the plugin's verdict, the same one that groups the sidebar, so it includes your open asks and the merged agent's own card. Live work holds Archive even when the report says done: paseo-status counts only agents with a card. The card holds it even after paseo-status stops believing it (a Working card with nothing live for 5 minutes). Archive also waits while a permission prompt or a failed agent is listed: their workspace status outranks running, so another agent's live work would no longer show. When live background work is what holds a shipped workspace's Archive, Your move says so in its place, with no button: a dev server a finished agent left running would otherwise hide Archive with nothing on screen to say why, while the sidebar shows the workspace as Done. With nothing to do, nothing: no section and no "nothing needs you" line.
 - **Context**: one-line facts the blocks above don't say, under a rule, and nothing when there are none: From (the
   nearest ancestor's workspace), Started (the workspaces the focused agent started), the PR or a branch with something
-  to report when the git move doesn't already name it, Agents when several root agents share the workspace, and plugin
+  to report, Agents when several root agents share the workspace, and plugin
   facts. Each lineage row carries one state word, from that workspace's status card, else its agents
   (`overview/model.ts`).
 

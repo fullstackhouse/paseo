@@ -21,9 +21,13 @@ import {
 export interface UseFileLinkResult {
   target: InlinePathTarget | null;
   tooltipPath: string | null;
+  /** True when the link may name a local file or folder (some need a daemon lookup). */
+  isFileLink: boolean;
   onHoverIn: () => void;
   onPress: () => void;
   open: (source: AssistantFileLinkSource, disposition: OpenFileDisposition) => void;
+  /** The link's file, looked up on the daemon when needed. Null for non-file links and misses. */
+  resolve: () => Promise<InlinePathTarget | null>;
 }
 
 export interface AssistantFileLinkActions {
@@ -132,6 +136,15 @@ export function useFileLink(source: AssistantFileLinkSource): UseFileLinkResult 
     open(stableSource, "preferred");
   });
 
+  const resolve = useStableEvent(() =>
+    resolveAssistantFileLink({
+      source: stableSource,
+      context,
+      queryClient,
+      formatNoFileFoundMessage: (token) => t("common.errors.noFileFound", { token }),
+    }),
+  );
+
   const target = useMemo(() => {
     if (resolution.kind === "resolved") {
       return resolution.value.kind === "file" ? resolution.value.target : null;
@@ -140,9 +153,10 @@ export function useFileLink(source: AssistantFileLinkSource): UseFileLinkResult 
   }, [query.data, resolution]);
 
   const tooltipPath = target ? formatFileLinkTooltipPath({ target, workspaceRoot }) : null;
+  const isFileLink = resolution.kind === "needsLookup" || resolution.value.kind === "file";
   return useMemo(
-    () => ({ target, tooltipPath, onHoverIn, onPress, open }),
-    [target, tooltipPath, onHoverIn, onPress, open],
+    () => ({ target, tooltipPath, isFileLink, onHoverIn, onPress, open, resolve }),
+    [target, tooltipPath, isFileLink, onHoverIn, onPress, open, resolve],
   );
 }
 
@@ -233,6 +247,47 @@ function openAssistantFileLink(input: {
   };
 
   void run();
+}
+
+async function resolveAssistantFileLink(input: {
+  source: AssistantFileLinkSource;
+  context: AssistantFileLinkResolverContextValue;
+  queryClient: ReturnType<typeof useQueryClient>;
+  formatNoFileFoundMessage: (token: string) => string;
+}): Promise<InlinePathTarget | null> {
+  const config = input.context.configRef.current;
+  const resolution = classifyForResolution(input.source, {
+    workspaceRoot: config.workspaceRoot,
+    relativePathBase: config.relativePathBase,
+  });
+  if (resolution.kind === "resolved") {
+    return resolution.value.kind === "file" ? resolution.value.target : null;
+  }
+  try {
+    return await input.queryClient.fetchQuery({
+      queryKey: assistantFileLinkQueryKey({
+        serverId: config.serverId,
+        workspaceRoot: config.workspaceRoot,
+        resolution,
+      }),
+      queryFn: () =>
+        fetchDaemonResolution({
+          ambiguousQuery: resolution.ambiguousQuery,
+          token: resolution.token,
+          target: resolution.target,
+          workspaceRoot: config.workspaceRoot,
+          getDirectorySuggestions: input.context.getDirectorySuggestions,
+        }),
+      retry: 0,
+      staleTime: Infinity,
+    });
+  } catch {
+    config.toast?.show(input.formatNoFileFoundMessage(resolution.token), {
+      variant: "error",
+      testID: "assistant-file-link-not-found-toast",
+    });
+    return null;
+  }
 }
 
 function canOpenAssistantFileLink(

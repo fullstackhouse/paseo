@@ -75,6 +75,8 @@ export const ar: TranslationResources = {
       daemonClientUnavailable: "عميل Daemon غير متوفر",
       daemonClientDisconnected: "تم قطع اتصال عميل Daemon",
       noFileFound: "لم يتم العثور على ملف لـ{{token}}",
+      openWithDefaultAppUnsupported:
+        "يفتح Paseo المستندات والصور والوسائط والمجلدات فقط في تطبيقها الافتراضي. {{path}} ليس منها",
       folderOutsideWorkspace: "{{path}} خارج مساحة العمل هذه",
       unexpectedDictationError: "حدث خطأ غير متوقع أثناء معالجة الإملاء.",
     },
@@ -179,6 +181,9 @@ export const ar: TranslationResources = {
       openImage: "فتح مرفق الصورة",
       removeImage: "إزالة مرفق الصورة",
       removeFile: "Remove file attachment",
+      quoteText: "الاقتباس {{number}}",
+      quoteComment: "تعليق على الاقتباس {{number}}",
+      removeQuote: "إزالة الاقتباس {{number}}",
       openGithub: "افتح {{kind}} {{number}}",
       removeGithub: "إزالة {{kind}} {{number}}",
       element: "عنصر",
@@ -246,6 +251,7 @@ export const ar: TranslationResources = {
   agentStream: {
     empty: "ابدأ الدردشة مع هذا الوكيل...",
     scrollToBottom: "قم بالتمرير إلى الأسفل",
+    cite: "اقتباس",
     historyLoadFailed: "تعذر تحميل سجل الوكيل",
     messageCapped: "تم اقتطاع هذه الرسالة ({{bytes}} بايت).",
     permission: {
@@ -2250,6 +2256,8 @@ export const ar: TranslationResources = {
       prMergedTitle: "تم دمج PR #{{number}}",
       outdated: "رددت {{time}}؛ لم يحدّث الوكيل هذا منذ ذلك الحين.",
       readyToArchive: "جاهز للأرشفة",
+      archiveHeldTitle: "الأرشفة بانتظار العمل في الخلفية",
+      archiveHeldFacts: "لا يزال shell أو مراقب أو وكيل فرعي قيد التشغيل. الأرشفة من الترويسة توقفه.",
       pullRequests: "طلبات السحب",
       noPrYet: "لا يوجد PR بعد",
       notRefreshed: "لم يُحدَّث",
@@ -2265,6 +2273,7 @@ export const ar: TranslationResources = {
         one: "{{count}} مدموج أو مغلق",
         other: "{{count}} مدموجة أو مغلقة",
       },
+      prsShowLess: "عرض أقل",
       prState: {
         open: "مفتوح",
         draft: "مسودة",

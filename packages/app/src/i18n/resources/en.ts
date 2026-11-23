@@ -71,6 +71,8 @@ export const en = {
       daemonClientUnavailable: "Daemon client unavailable",
       daemonClientDisconnected: "Daemon client is disconnected",
       noFileFound: "No file found for {{token}}",
+      openWithDefaultAppUnsupported:
+        "Paseo only opens documents, images, media and folders in their default app. {{path}} isn't one of them",
       folderOutsideWorkspace: "{{path}} is outside this workspace",
       unexpectedDictationError: "An unexpected error occurred while handling dictation.",
     },
@@ -175,6 +177,9 @@ export const en = {
       openImage: "Open image attachment",
       removeImage: "Remove image attachment",
       removeFile: "Remove file attachment",
+      quoteText: "Quote {{number}}",
+      quoteComment: "Comment on quote {{number}}",
+      removeQuote: "Remove quote {{number}}",
       openGithub: "Open {{kind}} {{number}}",
       removeGithub: "Remove {{kind}} {{number}}",
       element: "Element",
@@ -242,6 +247,7 @@ export const en = {
   agentStream: {
     empty: "Start chatting with this agent...",
     scrollToBottom: "Scroll to bottom",
+    cite: "Cite",
     historyLoadFailed: "Couldn't load agent history",
     messageCapped: "This message was capped ({{bytes}} bytes).",
     permission: {
@@ -2279,6 +2285,9 @@ export const en = {
       prMergedTitle: "PR #{{number}} merged",
       outdated: "You replied {{time}}; the agent hasn't updated this since.",
       readyToArchive: "Ready to archive",
+      archiveHeldTitle: "Archive waits for background work",
+      archiveHeldFacts:
+        "A shell, monitor or subagent is still running. Archiving from the header stops it.",
       pullRequests: "Pull requests",
       noPrYet: "No PR yet",
       notRefreshed: "not refreshed",
@@ -2294,6 +2303,7 @@ export const en = {
         one: "{{count}} merged or closed",
         other: "{{count}} merged or closed",
       },
+      prsShowLess: "Show less",
       prState: {
         open: "Open",
         draft: "Draft",

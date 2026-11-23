@@ -40,6 +40,8 @@ const URL_GROUP = String.raw`\(${URL_CHARACTER}*\)`;
 const BARE_URL = String.raw`(?<![a-zA-Z0-9\x2b.-])(?:https?|file)://(?:${URL_CHARACTER}|${URL_GROUP})*(?:[^\s<>()"'\x60.,;:!?]|${URL_GROUP})`;
 
 const FILE_PATTERN = createFilePattern(PROSE_PATH);
+// Cheap pre-parse check for a possible GFM table delimiter row, inside quotes or lists too.
+const TABLE_DELIMITER_ROW = /^[ \t>]*\|?[ \t]*:?-+:?[ \t]*(?:\||$)/m;
 function linkMetadata(inlineCodePaths: ReadonlySet<string>) {
   // The engine accepts regexes on both platforms. Classify complete code spans
   // first, then pass literal matches rather than maintaining a second path grammar.
@@ -117,7 +119,7 @@ function workspaceHoverTitle(link: Link, markup: string, workspaceRoot?: string)
   return link.url.slice(workspaceRoot.length + 1);
 }
 
-/** Preserve source spelling; adapt workspace images, spoiler delimiters, and entity text. */
+/** Preserve source spelling; adapt workspace images, tables, spoiler delimiters, and entity text. */
 export function prepareMarkdownSource(
   source: string,
   workspaceRoot?: string,
@@ -138,6 +140,7 @@ export function prepareMarkdownSource(
   if (
     !source.includes("![") &&
     !source.includes("||") &&
+    !TABLE_DELIMITER_ROW.test(source) &&
     !source.includes("&") &&
     !(workspaceRoot && source.includes("]("))
   ) {
@@ -176,6 +179,24 @@ export function prepareMarkdownSource(
   }
   // Line boundaries already turned into paragraph breaks, by offset of their newline.
   const splitBoundaries = new Set<number>();
+  /** Turn the newline at `boundary` into a blank line; `prefix` is the next line's container markup. */
+  function splitParagraph(boundary: number, prefix: string) {
+    if (splitBoundaries.has(boundary)) return;
+    splitBoundaries.add(boundary);
+    // Continuation lines inside quotes and lists keep their quote markers on the blank line.
+    const blank = prefix.replace(/[^>]/g, " ").trimEnd();
+    // A trailing backslash was a hard break; at a paragraph end it would render literally.
+    const cut = source[boundary - 1] === "\\" ? boundary - 1 : boundary;
+    edits.push({ start: cut, end: boundary + 1, text: `\n${blank}\n` });
+  }
+  // GFM lets a table interrupt a paragraph; MD4C only starts one on a paragraph's first line.
+  function separateTable(start: number) {
+    const lineStart = source.lastIndexOf("\n", start - 1) + 1;
+    if (lineStart === 0) return;
+    const previousLine = source.slice(source.lastIndexOf("\n", lineStart - 2) + 1, lineStart - 1);
+    if (/^[\s>]*$/.test(previousLine)) return;
+    splitParagraph(lineStart - 1, source.slice(lineStart, start));
+  }
   function isImageLike(node: PhrasingContent): boolean {
     if (node.type === "image" || node.type === "imageReference") return true;
     return (
@@ -200,17 +221,8 @@ export function prepareMarkdownSource(
       const aloneBefore = childStart === start || /^[\s>]*$/.test(prefix);
       const aloneAfter = /^\s*\\?$/.test(suffix);
       if (!aloneBefore || !aloneAfter) continue;
-      // Continuation lines inside quotes and lists keep their quote markers on the blank line.
-      const blank = prefix.replace(/[^>]/g, " ").trimEnd();
-      const split = (boundary: number) => {
-        if (splitBoundaries.has(boundary)) return;
-        splitBoundaries.add(boundary);
-        // A trailing backslash was a hard break; at a paragraph end it would render literally.
-        const cut = source[boundary - 1] === "\\" ? boundary - 1 : boundary;
-        edits.push({ start: cut, end: boundary + 1, text: `\n${blank}\n` });
-      };
-      if (lineStart > start) split(lineStart - 1);
-      if (lineEnd < end) split(lineEnd);
+      if (lineStart > start) splitParagraph(lineStart - 1, prefix);
+      if (lineEnd < end) splitParagraph(lineEnd, prefix);
     }
   }
   function visit(node: Nodes) {
@@ -218,6 +230,7 @@ export function prepareMarkdownSource(
     const end = node.position?.end.offset;
     if (start !== undefined && end !== undefined) {
       if (node.type === "paragraph") splitStandaloneImages(node, start, end);
+      if (node.type === "table") separateTable(start);
       if (node.type === "link") {
         const title = workspaceHoverTitle(node, source.slice(start, end), workspaceRoot);
         if (title !== null)

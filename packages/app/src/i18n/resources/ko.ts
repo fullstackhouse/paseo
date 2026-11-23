@@ -75,6 +75,8 @@ export const ko: TranslationResources = {
       daemonClientUnavailable: "데몬 클라이언트를 사용할 수 없습니다",
       daemonClientDisconnected: "데몬 클라이언트 연결이 끊어졌습니다",
       noFileFound: "{{token}}에 해당하는 파일을 찾을 수 없습니다",
+      openWithDefaultAppUnsupported:
+        "Paseo는 문서, 이미지, 미디어, 폴더만 기본 앱으로 엽니다. {{path}}은(는) 해당하지 않습니다",
       folderOutsideWorkspace: "{{path}}은(는) 이 워크스페이스 밖에 있습니다",
       unexpectedDictationError: "받아쓰기를 처리하는 중 예기치 않은 오류가 발생했습니다.",
     },
@@ -179,6 +181,9 @@ export const ko: TranslationResources = {
       openImage: "이미지 첨부 열기",
       removeImage: "이미지 첨부 제거",
       removeFile: "파일 첨부 제거",
+      quoteText: "인용 {{number}}",
+      quoteComment: "인용 {{number}}에 댓글",
+      removeQuote: "인용 {{number}} 삭제",
       openGithub: "{{kind}} {{number}} 열기",
       removeGithub: "{{kind}} {{number}} 제거",
       element: "요소",
@@ -246,6 +251,7 @@ export const ko: TranslationResources = {
   agentStream: {
     empty: "이 에이전트와 대화를 시작하세요...",
     scrollToBottom: "맨 아래로 스크롤",
+    cite: "인용",
     historyLoadFailed: "에이전트 기록을 로드할 수 없습니다.",
     messageCapped: "이 메시지는 길이 제한으로 잘렸습니다({{bytes}}바이트).",
     permission: {
@@ -2263,6 +2269,9 @@ export const ko: TranslationResources = {
       prMergedTitle: "PR #{{number}} 병합됨",
       outdated: "{{time}}에 답장했지만 에이전트가 그 후로 업데이트하지 않았습니다.",
       readyToArchive: "보관 준비됨",
+      archiveHeldTitle: "보관은 백그라운드 작업을 기다리는 중",
+      archiveHeldFacts:
+        "셸, 모니터 또는 하위 에이전트가 아직 실행 중입니다. 헤더에서 보관하면 중지됩니다.",
       pullRequests: "풀 리퀘스트",
       noPrYet: "아직 PR 없음",
       notRefreshed: "새로 고침 안 됨",
@@ -2278,6 +2287,7 @@ export const ko: TranslationResources = {
         one: "{{count}}개 병합 또는 닫힘",
         other: "{{count}}개 병합 또는 닫힘",
       },
+      prsShowLess: "간략히 보기",
       prState: {
         open: "열림",
         draft: "초안",

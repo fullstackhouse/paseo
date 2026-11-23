@@ -76,6 +76,8 @@ export const fr: TranslationResources = {
       daemonClientUnavailable: "Client du daemon indisponible",
       daemonClientDisconnected: "Le client du daemon est déconnecté",
       noFileFound: "Aucun fichier trouvé pour {{token}}",
+      openWithDefaultAppUnsupported:
+        "Paseo n'ouvre dans leur app par défaut que les documents, images, médias et dossiers. {{path}} n'en fait pas partie",
       folderOutsideWorkspace: "{{path}} se trouve en dehors de cet espace de travail",
       unexpectedDictationError: "Une erreur inattendue s’est produite pendant la dictée.",
     },
@@ -181,6 +183,9 @@ export const fr: TranslationResources = {
       openImage: "Ouvrir l’image jointe",
       removeImage: "Retirer l’image jointe",
       removeFile: "Retirer le fichier joint",
+      quoteText: "Citation {{number}}",
+      quoteComment: "Commenter la citation {{number}}",
+      removeQuote: "Retirer la citation {{number}}",
       openGithub: "Ouvrir {{kind}} {{number}}",
       removeGithub: "Retirer {{kind}} {{number}}",
       element: "Élément",
@@ -249,6 +254,7 @@ export const fr: TranslationResources = {
   agentStream: {
     empty: "Commencez à discuter avec cet agent…",
     scrollToBottom: "Faire défiler vers le bas",
+    cite: "Citer",
     historyLoadFailed: "Impossible de charger l’historique de l’agent",
     messageCapped: "Ce message a été tronqué ({{bytes}} octets).",
     permission: {
@@ -2304,6 +2310,9 @@ export const fr: TranslationResources = {
       prMergedTitle: "PR #{{number}} fusionnée",
       outdated: "Vous avez répondu {{time}} ; l'agent ne l'a pas mis à jour depuis.",
       readyToArchive: "Prêt à archiver",
+      archiveHeldTitle: "L'archivage attend le travail en arrière-plan",
+      archiveHeldFacts:
+        "Un shell, un moniteur ou un sous-agent tourne encore. Archiver depuis l'en-tête l'arrête.",
       pullRequests: "Pull requests",
       noPrYet: "Pas encore de PR",
       notRefreshed: "non actualisé",
@@ -2319,6 +2328,7 @@ export const fr: TranslationResources = {
         one: "{{count}} fusionnée ou fermée",
         other: "{{count}} fusionnées ou fermées",
       },
+      prsShowLess: "Afficher moins",
       prState: {
         open: "Ouverte",
         draft: "Brouillon",
