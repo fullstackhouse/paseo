@@ -10,6 +10,16 @@ export const zhCN: TranslationResources = {
     more: "另外 {{count}} 个",
     resumeAll: "全部继续",
   },
+  failedAgents: {
+    title_one: "{{count}} 个代理失败",
+    title_other: "{{count}} 个代理失败",
+    description: "因网络或 API 错误而中断：{{names}}",
+    pill: "失败",
+    panelTitle: "回合失败",
+    retryAll: "全部重试",
+    retry: "重试",
+    retryAccessibilityLabel: "重试失败的回合",
+  },
   paneFind: {
     connectionFailure: "无法搜索此聊天。请检查主机连接后重试。",
     historyChangedFailure: "搜索期间聊天已更改。请重新搜索。",

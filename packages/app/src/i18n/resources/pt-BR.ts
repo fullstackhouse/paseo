@@ -10,6 +10,16 @@ export const ptBR: TranslationResources = {
     more: "+{{count}} outros",
     resumeAll: "Retomar todos",
   },
+  failedAgents: {
+    title_one: "{{count}} agente falhou",
+    title_other: "{{count}} agentes falharam",
+    description: "O turno parou por um erro de rede ou da API: {{names}}",
+    pill: "Falhou",
+    panelTitle: "O turno falhou",
+    retryAll: "Tentar todos novamente",
+    retry: "Tentar novamente",
+    retryAccessibilityLabel: "Tentar novamente o turno com falha",
+  },
   paneFind: {
     connectionFailure:
       "Não foi possível pesquisar nesta conversa. Verifique a conexão com o host e tente novamente.",

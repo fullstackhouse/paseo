@@ -10,6 +10,16 @@ export const fr: TranslationResources = {
     more: "+{{count}} de plus",
     resumeAll: "Tout reprendre",
   },
+  failedAgents: {
+    title_one: "{{count}} agent a échoué",
+    title_other: "{{count}} agents ont échoué",
+    description: "Leur tour s'est arrêté sur une erreur réseau ou d'API : {{names}}",
+    pill: "Échec",
+    panelTitle: "Le tour a échoué",
+    retryAll: "Tout réessayer",
+    retry: "Réessayer",
+    retryAccessibilityLabel: "Réessayer le tour échoué",
+  },
   paneFind: {
     connectionFailure:
       "Impossible de rechercher dans cette conversation. Vérifiez la connexion à l’hôte et réessayez.",

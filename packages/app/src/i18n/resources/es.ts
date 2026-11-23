@@ -10,6 +10,16 @@ export const es: TranslationResources = {
     more: "+{{count}} más",
     resumeAll: "Reanudar todos",
   },
+  failedAgents: {
+    title_one: "Falló {{count}} agente",
+    title_other: "Fallaron {{count}} agentes",
+    description: "Su turno se detuvo por un error de red o de la API: {{names}}",
+    pill: "Falló",
+    panelTitle: "El turno falló",
+    retryAll: "Reintentar todos",
+    retry: "Reintentar",
+    retryAccessibilityLabel: "Reintentar el turno fallido",
+  },
   paneFind: {
     connectionFailure:
       "No se pudo buscar en este chat. Comprueba la conexión con el host y vuelve a intentarlo.",
