@@ -14,6 +14,7 @@ export type {
   PluginScreenParams,
   PluginOpenScreenInput,
   PluginScreenTarget,
+  AgentTimelinePosition,
   PluginScreenLocation,
   PluginSidebarItemProps,
   PluginSidebarViewProps,

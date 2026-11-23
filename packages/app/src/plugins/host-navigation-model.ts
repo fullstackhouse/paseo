@@ -9,7 +9,11 @@ import type { InstalledPlugin } from "./types";
 interface HostNavigationOwner {
   browserAvailable: boolean;
   isHostRegistered(serverId: string): boolean;
-  openAgent(input: { serverId: string; agentId: string }): string;
+  openAgent(input: {
+    serverId: string;
+    agentId: string;
+    timelinePosition?: { epoch: string; seq: number };
+  }): string;
   openWorkspace(input: NavigateToWorkspaceInput): string;
   resolveWorkspace(input: { serverId: string; workspaceId: string }): string | null;
   /** Shows the workspace's Explorer sidebar; the placement opens a tab in it. */
@@ -67,8 +71,14 @@ export function createPluginHostNavigation(
     },
     hasPluginScreen: (input) => findScreen(input) !== null,
     supportsFocusHost: true,
-    openAgent: ({ agentId, serverId: targetServerId, focusHost }) => {
-      const route = owner.openAgent({ serverId: targetServerId ?? serverId, agentId });
+    openAgent: ({ agentId, serverId: targetServerId, focusHost, timelinePosition }) => {
+      const route = owner.openAgent({
+        serverId: targetServerId ?? serverId,
+        agentId,
+        ...(timelinePosition
+          ? { timelinePosition: { epoch: timelinePosition.epoch, seq: timelinePosition.seq } }
+          : {}),
+      });
       if (focusHost) focusRouteHost(route);
     },
     openWorkspace: ({ workspaceId, serverId: targetServerId, focusHost }) => {

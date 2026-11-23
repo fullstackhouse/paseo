@@ -83,6 +83,8 @@ import { type NearBottom, useIsNearBottom, useNearBottom } from "./near-bottom";
 import { ChatOutlineRail } from "@/agent-stream/chat-outline/rail";
 import { useChatOutline } from "@/agent-stream/chat-outline/use-chat-outline";
 import { CHAT_COLUMN_RAIL_DATASET, useChatOutlineRail } from "@/chat-rail";
+import { useTimelineJump } from "@/agent-stream/timeline-jump/use-timeline-jump";
+import { useRequestedTimelineJump } from "@/agent-stream/timeline-jump/pending";
 import { getHostRuntimeStore } from "@/runtime/host-runtime";
 import { planTimelineTailFetch } from "@/timeline/timeline-sync-plan";
 import {
@@ -631,18 +633,6 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
     }, [baseRenderModel.segments.liveHead, mountedHistoryMessageIds]);
     const outlineRail = useChatOutlineRail();
     const outlineInset = outlineRail.inset;
-    const chatOutline = useChatOutline({
-      agentId,
-      serverId: resolvedServerId,
-      timelineEpoch,
-      tail: effectiveStreamItems,
-      head: effectiveStreamHead,
-      enabled: outlineRail.enabled,
-      viewportRef,
-      onJumpError: handleTimelineHistoryLoadError,
-      mountedHistoryMessageIds,
-      revealLoadedMessage: revealLoadedHistory,
-    });
 
     useImperativeHandle(
       ref,
@@ -711,6 +701,33 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
         return true;
       }
       return revealLoadedHistory(messageId);
+    });
+    const { jumpToSeq } = useTimelineJump({
+      agentId,
+      serverId: resolvedServerId,
+      timelineEpoch,
+      tail: effectiveStreamItems,
+      head: effectiveStreamHead,
+      viewportRef,
+      onJumpError: handleTimelineHistoryLoadError,
+      mountedHistoryMessageIds,
+      revealLoadedMessage,
+    });
+    const chatOutline = useChatOutline({
+      agentId,
+      serverId: resolvedServerId,
+      timelineEpoch,
+      tail: effectiveStreamItems,
+      head: effectiveStreamHead,
+      enabled: outlineRail.enabled,
+      jumpToSeq,
+    });
+    useRequestedTimelineJump({
+      serverId: resolvedServerId,
+      agentId,
+      timelineEpoch,
+      ready: isAuthoritativeHistoryReady,
+      jumpToSeq,
     });
     // Read through a stable event so a collapse rerun does not change the renderer identity;
     // nested rows are revised through `historyRowRevision`.

@@ -62,6 +62,13 @@ export interface PluginNavigableHostProps extends PluginHostProps {
       readonly serverId?: string;
       /** Select only the destination host in the sidebar and clear project/label filters. */
       readonly focusHost?: boolean;
+      /**
+       * Scrolls the chat to the timeline entry at this position: `seq` is an entry's `seqStart` from a
+       * projected timeline fetch (`agents.ref(id).timeline.refetch()` on the plugin server). Ignored
+       * when `epoch` is not the chat's current epoch, on native, and by older hosts; the chat then
+       * opens at its tail.
+       */
+      readonly timelinePosition?: AgentTimelinePosition;
     }) => void;
     readonly openWorkspace: (input: {
       readonly workspaceId: string;
@@ -77,6 +84,12 @@ export interface PluginNavigableHostProps extends PluginHostProps {
     /** Whether `openPluginScreen` would open that screen now. Undefined on older hosts. */
     readonly hasPluginScreen?: (input: Omit<PluginScreenTarget, "params">) => boolean;
   };
+}
+
+/** A position in an agent's timeline. */
+export interface AgentTimelinePosition {
+  readonly epoch: string;
+  readonly seq: number;
 }
 
 /** A screen of any plugin on a host; `serverId` defaults to the rendering host. */

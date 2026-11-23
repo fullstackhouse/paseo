@@ -5,6 +5,7 @@ import { useMemo } from "react";
 import { navigateToWorkspace } from "@/stores/navigation-active-workspace-store";
 import { navigateToAgent } from "@/utils/navigate-to-agent";
 import { getHostRuntimeStore } from "@/runtime/host-runtime";
+import { requestTimelineJump } from "@/agent-stream/timeline-jump/pending";
 
 import { getIsElectron } from "@/constants/platform";
 import { createWorkspaceBrowser } from "@/desktop/browser/store";
@@ -26,7 +27,11 @@ export function usePluginHostNavigation(
           getHostRuntimeStore()
             .getHosts()
             .some((host) => host.serverId === targetServerId),
-        openAgent: navigateToAgent,
+        openAgent: ({ serverId: targetServerId, agentId, timelinePosition }) => {
+          // Set before navigating so a chat that is already open picks it up too.
+          if (timelinePosition) requestTimelineJump(targetServerId, agentId, timelinePosition);
+          return navigateToAgent({ serverId: targetServerId, agentId });
+        },
         openWorkspace: navigateToWorkspace,
         createBrowser: createWorkspaceBrowser,
         focusHost: (targetServerId) => useSidebarViewStore.getState().focusHost(targetServerId),

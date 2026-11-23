@@ -1,9 +1,7 @@
 // @vitest-environment jsdom
 
 import { act, renderHook, waitFor } from "@testing-library/react";
-import { createRef } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { StreamViewportHandle } from "../strategy";
 import { useChatOutline } from "./use-chat-outline";
 
 const runtime = vi.hoisted(() => ({
@@ -39,7 +37,6 @@ describe("useChatOutline", () => {
 
   it("waits for a served timeline before requesting its prompt index", async () => {
     runtime.listAgentTimelinePrompts.mockResolvedValue({ epoch: "epoch-1", prompts: [] });
-    const viewportRef = createRef<StreamViewportHandle>();
     const { rerender } = renderHook(
       ({ agentId, timelineEpoch }) =>
         useChatOutline({
@@ -49,8 +46,7 @@ describe("useChatOutline", () => {
           tail: [],
           head: [],
           enabled: true,
-          viewportRef,
-          onJumpError: vi.fn(),
+          jumpToSeq: vi.fn(),
         }),
       { initialProps: { agentId: "draft_msg_1", timelineEpoch: null as string | null } },
     );
@@ -71,7 +67,6 @@ describe("useChatOutline", () => {
     runtime.listAgentTimelinePrompts
       .mockReturnValueOnce(first.promise)
       .mockReturnValueOnce(second.promise);
-    const viewportRef = createRef<StreamViewportHandle>();
     const { result, rerender } = renderHook(
       ({ timelineEpoch }) =>
         useChatOutline({
@@ -81,8 +76,7 @@ describe("useChatOutline", () => {
           tail: [],
           head: [],
           enabled: true,
-          viewportRef,
-          onJumpError: vi.fn(),
+          jumpToSeq: vi.fn(),
         }),
       { initialProps: { timelineEpoch: "epoch-1" } },
     );
@@ -118,7 +112,6 @@ describe("useChatOutline", () => {
       .mockResolvedValueOnce({ epoch: "epoch-1", prompts: [] })
       .mockReturnValueOnce(older.promise)
       .mockReturnValueOnce(newer.promise);
-    const viewportRef = createRef<StreamViewportHandle>();
     const { result, rerender } = renderHook(
       ({ tail }) =>
         useChatOutline({
@@ -128,8 +121,7 @@ describe("useChatOutline", () => {
           tail,
           head: [],
           enabled: true,
-          viewportRef,
-          onJumpError: vi.fn(),
+          jumpToSeq: vi.fn(),
         }),
       { initialProps: { tail: [] as import("@/types/stream").StreamItem[] } },
     );
@@ -167,7 +159,6 @@ describe("useChatOutline", () => {
       epoch: "epoch-1",
       prompts: [{ seq: 1, timestamp: new Date(1).toISOString(), preview: "Unloaded prompt" }],
     });
-    const viewportRef = createRef<StreamViewportHandle>();
     const { result, rerender } = renderHook(
       ({ enabled, head, timelineEpoch }) =>
         useChatOutline({
@@ -177,9 +168,7 @@ describe("useChatOutline", () => {
           head,
           timelineEpoch,
           enabled,
-          viewportRef,
-          mountedHistoryMessageIds: new Set(),
-          onJumpError: vi.fn(),
+          jumpToSeq: vi.fn(),
         }),
       {
         initialProps: {
@@ -229,14 +218,9 @@ describe("useChatOutline", () => {
     expect(runtime.subscribeAgentTimeline).not.toHaveBeenCalled();
   });
 
-  it("reports a failed unloaded prompt jump", async () => {
-    runtime.listAgentTimelinePrompts.mockResolvedValue({
-      epoch: "epoch-1",
-      prompts: [{ seq: 1, timestamp: new Date(1).toISOString(), preview: "prompt" }],
-    });
-    runtime.fetchAgentTimeline.mockRejectedValue(new Error("disconnected"));
-    const onJumpError = vi.fn();
-    const viewportRef = createRef<StreamViewportHandle>();
+  it("jumps to a prompt through the chat's timeline jump", () => {
+    runtime.listAgentTimelinePrompts.mockResolvedValue({ epoch: "epoch-1", prompts: [] });
+    const jumpToSeq = vi.fn();
     const { result } = renderHook(() =>
       useChatOutline({
         agentId: "agent-1",
@@ -245,163 +229,10 @@ describe("useChatOutline", () => {
         tail: [],
         head: [],
         enabled: true,
-        viewportRef,
-        onJumpError,
+        jumpToSeq,
       }),
     );
-    await waitFor(() => expect(result.current.prompts).toHaveLength(1));
-    await act(async () => result.current.jumpToPrompt(1));
-
-    await waitFor(() => expect(onJumpError).toHaveBeenCalledOnce());
-  });
-
-  it("reveals an already-loaded older prompt before scrolling to it", async () => {
-    runtime.listAgentTimelinePrompts.mockResolvedValue({
-      epoch: "epoch-1",
-      prompts: [{ seq: 1, timestamp: new Date(1).toISOString(), preview: "prompt" }],
-    });
-    const scrollToMessage = vi.fn();
-    const revealLoadedMessage = vi.fn(() => true);
-    const viewport: StreamViewportHandle = {
-      scrollToBottom: vi.fn(),
-      prepareForViewportChange: vi.fn(),
-      holdRow: vi.fn(),
-      scrollToMessage,
-    };
-    const viewportRef = { current: viewport };
-    const tail = [
-      {
-        id: "older-prompt",
-        kind: "user_message" as const,
-        text: "prompt",
-        timestamp: new Date(1),
-        timelineCursor: { epoch: "epoch-1", seq: 1 },
-      },
-    ];
-    const { result, rerender } = renderHook(
-      ({ mountedHistoryMessageIds }) =>
-        useChatOutline({
-          agentId: "agent-1",
-          serverId: "server-1",
-          timelineEpoch: "epoch-1",
-          tail,
-          head: [],
-          enabled: true,
-          viewportRef,
-          onJumpError: vi.fn(),
-          mountedHistoryMessageIds,
-          revealLoadedMessage,
-        }),
-      { initialProps: { mountedHistoryMessageIds: new Set<string>() } },
-    );
-
-    await waitFor(() => expect(result.current.prompts).toHaveLength(1));
-    await act(async () => result.current.jumpToPrompt(1));
-    expect(revealLoadedMessage).toHaveBeenCalledWith("older-prompt");
-    expect(scrollToMessage).not.toHaveBeenCalled();
-
-    rerender({ mountedHistoryMessageIds: new Set(["older-prompt"]) });
-    await waitFor(() => expect(scrollToMessage).toHaveBeenCalledWith("older-prompt"));
-  });
-
-  it("reveals a fetched prompt that lands outside the mounted history window", async () => {
-    runtime.listAgentTimelinePrompts.mockResolvedValue({
-      epoch: "epoch-1",
-      prompts: [{ seq: 1, timestamp: new Date(1).toISOString(), preview: "prompt" }],
-    });
-    const fetch = deferred<void>();
-    runtime.fetchAgentTimeline.mockReturnValue(fetch.promise);
-    const scrollToMessage = vi.fn();
-    const revealLoadedMessage = vi.fn(() => true);
-    const viewportRef = {
-      current: {
-        scrollToBottom: vi.fn(),
-        prepareForViewportChange: vi.fn(),
-        holdRow: vi.fn(),
-        scrollToMessage,
-      },
-    };
-    const fetchedPrompt = {
-      id: "fetched-prompt",
-      kind: "user_message" as const,
-      text: "prompt",
-      timestamp: new Date(1),
-      timelineCursor: { epoch: "epoch-1", seq: 1 },
-    };
-    const { result, rerender } = renderHook(
-      ({ tail, mountedHistoryMessageIds }) =>
-        useChatOutline({
-          agentId: "agent-1",
-          serverId: "server-1",
-          timelineEpoch: "epoch-1",
-          tail,
-          head: [],
-          enabled: true,
-          viewportRef,
-          onJumpError: vi.fn(),
-          mountedHistoryMessageIds,
-          revealLoadedMessage,
-        }),
-      {
-        initialProps: {
-          tail: [] as (typeof fetchedPrompt)[],
-          mountedHistoryMessageIds: new Set<string>(),
-        },
-      },
-    );
-
-    await waitFor(() => expect(result.current.prompts).toHaveLength(1));
-    act(() => result.current.jumpToPrompt(1));
-    await waitFor(() => expect(runtime.fetchAgentTimeline).toHaveBeenCalledOnce());
-
-    rerender({ tail: [fetchedPrompt], mountedHistoryMessageIds: new Set<string>() });
-    await waitFor(() => expect(revealLoadedMessage).toHaveBeenCalledWith(fetchedPrompt.id));
-    expect(scrollToMessage).not.toHaveBeenCalled();
-
-    rerender({ tail: [fetchedPrompt], mountedHistoryMessageIds: new Set([fetchedPrompt.id]) });
-    await waitFor(() => expect(scrollToMessage).toHaveBeenCalledOnce());
-    expect(scrollToMessage).toHaveBeenCalledWith(fetchedPrompt.id);
-    await act(async () => fetch.resolve());
-  });
-
-  it("jumps directly to a loaded prompt in the live head", async () => {
-    runtime.listAgentTimelinePrompts.mockResolvedValue({
-      epoch: "epoch-1",
-      prompts: [{ seq: 2, timestamp: new Date(2).toISOString(), preview: "prompt" }],
-    });
-    const scrollToMessage = vi.fn();
-    const viewport: StreamViewportHandle = {
-      scrollToBottom: vi.fn(),
-      prepareForViewportChange: vi.fn(),
-      holdRow: vi.fn(),
-      scrollToMessage,
-    };
-    const livePrompt = {
-      id: "live-prompt",
-      kind: "user_message" as const,
-      text: "prompt",
-      timestamp: new Date(2),
-      timelineCursor: { epoch: "epoch-1", seq: 2 },
-    };
-    const revealLoadedMessage = vi.fn();
-    revealLoadedMessage.mockReturnValue(false);
-    const { result } = renderHook(() =>
-      useChatOutline({
-        agentId: "agent-1",
-        serverId: "server-1",
-        timelineEpoch: "epoch-1",
-        tail: [],
-        head: [livePrompt],
-        enabled: true,
-        viewportRef: { current: viewport },
-        onJumpError: vi.fn(),
-        mountedHistoryMessageIds: new Set<string>(),
-        revealLoadedMessage,
-      }),
-    );
-
-    await waitFor(() => expect(result.current.prompts).toHaveLength(1));
-    await act(async () => result.current.jumpToPrompt(2));
-    expect(scrollToMessage).toHaveBeenCalledWith("live-prompt");
+    result.current.jumpToPrompt(3);
+    expect(jumpToSeq).toHaveBeenCalledWith(3);
   });
 });

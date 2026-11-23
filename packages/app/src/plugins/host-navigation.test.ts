@@ -47,6 +47,16 @@ describe("plugin host navigation", () => {
     return { navigation, destinations, browsers, workspaces, focusedHosts, screens };
   }
 
+  it("passes an agent's timeline position through to the chat", () => {
+    const { navigation, destinations } = setup();
+    navigation.openAgent({ agentId: "a1", timelinePosition: { epoch: "e1", seq: 7 } });
+    navigation.openAgent({ agentId: "a2", serverId: "remote" });
+    expect(destinations).toEqual([
+      { serverId: "selected", agentId: "a1", timelinePosition: { epoch: "e1", seq: 7 } },
+      { serverId: "remote", agentId: "a2" },
+    ]);
+  });
+
   it("opens another plugin's screen on the selected or explicit host", () => {
     const { navigation, screens } = setup();
     navigation.openPluginScreen!({
