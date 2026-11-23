@@ -2562,7 +2562,7 @@ function ProjectModeList({
 
   const content = (
     <>
-      <SidebarDraftsSection />
+      <SidebarDraftsSection onDraftPress={onWorkspacePress} />
       {pinnedChats.length > 0 ? (
         <View style={styles.pinnedSection} testID="sidebar-pinned-section">
           <SidebarSectionHeader

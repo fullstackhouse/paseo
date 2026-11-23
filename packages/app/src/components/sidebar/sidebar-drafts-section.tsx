@@ -28,7 +28,12 @@ const foregroundMutedColorMapping = (theme: Theme) => ({ color: theme.colors.for
  * Unsent New workspace drafts (forks included), at the top of the sidebar, newest first.
  * The draft open on screen joins the list only once you leave it; after that it stays put.
  */
-export function SidebarDraftsSection() {
+export function SidebarDraftsSection({
+  onDraftPress,
+}: {
+  /** Runs after a row opens its draft; the left sidebar closes itself on compact layouts. */
+  onDraftPress?: () => void;
+}) {
   const { t } = useTranslation();
   const listed = useListedNewWorkspaceDrafts();
   const pathname = usePathname();
@@ -62,13 +67,26 @@ export function SidebarDraftsSection() {
     <View style={styles.section} testID="sidebar-drafts-section">
       <SidebarSectionHeader title={t("sidebar.drafts.title")} />
       {drafts.map((draft) => (
-        <DraftRow key={draft.draftKey} draft={draft} selected={isOpen(draft)} />
+        <DraftRow
+          key={draft.draftKey}
+          draft={draft}
+          selected={isOpen(draft)}
+          onPress={onDraftPress}
+        />
       ))}
     </View>
   );
 }
 
-function DraftRow({ draft, selected }: { draft: ListedNewWorkspaceDraft; selected: boolean }) {
+function DraftRow({
+  draft,
+  selected,
+  onPress,
+}: {
+  draft: ListedNewWorkspaceDraft;
+  selected: boolean;
+  onPress?: () => void;
+}) {
   const { t } = useTranslation();
   const isCompact = useIsCompactFormFactor();
   const alwaysShowDiscard = isNative || isCompact;
@@ -89,7 +107,8 @@ function DraftRow({ draft, selected }: { draft: ListedNewWorkspaceDraft; selecte
         draftId: draft.draftId,
       }),
     );
-  }, [draft]);
+    onPress?.();
+  }, [draft, onPress]);
 
   const handleDiscard = useCallback(() => {
     useNewWorkspaceDraftsStore.getState().discardDraft(draft.draftKey);

@@ -228,7 +228,7 @@ export function SidebarStatusWorkspaceList({
   );
   const content = (
     <>
-      <SidebarDraftsSection />
+      <SidebarDraftsSection onDraftPress={onWorkspacePress} />
       {pinnedWorkspaces.length > 0 ? (
         <View style={styles.pinnedSection} testID="sidebar-pinned-section">
           <SidebarSectionHeader

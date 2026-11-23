@@ -213,8 +213,10 @@ export function useRecordNewWorkspaceDraft(input: {
   const projectId = project ? getHostProjectId(project, serverId) : null;
   const projectName = project?.projectName ?? routeProjectName;
   const setup = input.forkSetup?.setup;
+  // Discarding the open draft deletes its entry; text typed after that must list it again.
+  const hasContent = useDraftStore((state) => isListedDraftRecord(state.drafts[draftKey]));
   useEffect(() => {
-    if (!serverId) return;
+    if (!serverId || !hasContent) return;
     useNewWorkspaceDraftsStore.getState().recordDraft({
       draftKey,
       ...(draftId ? { draftId } : {}),
@@ -224,5 +226,5 @@ export function useRecordNewWorkspaceDraft(input: {
       ...(projectName ? { projectName } : {}),
       ...(setup ? { setup } : {}),
     });
-  }, [draftId, draftKey, projectId, projectName, serverId, setup, sourceDirectory]);
+  }, [draftId, draftKey, hasContent, projectId, projectName, serverId, setup, sourceDirectory]);
 }
