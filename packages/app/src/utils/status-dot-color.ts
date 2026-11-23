@@ -27,6 +27,11 @@ export function getStatusDotColor(input: {
   if (bucket === "attention") {
     return theme.colors.statusDotSuccess;
   }
+  // Blocked is yellow: the work is waiting on something other than you (a PR, CI, another
+  // workspace), so it must not look like Done and must not borrow needs_input's amber.
+  if (bucket === "blocked") {
+    return theme.colors.statusDotBlocked;
+  }
   if (bucket === "done") {
     return showDoneAsInactive ? theme.colors.border : null;
   }

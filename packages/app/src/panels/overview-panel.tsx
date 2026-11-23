@@ -388,7 +388,6 @@ function StatePill({ state }: { state: StatusTone }): ReactElement {
 
 function badgeVariant(state: StatusTone): StatusBadgeVariant {
   if (state === "waiting_on_you") return "warning";
-  if (state === "blocked") return "error";
   if (state === "done") return "success";
   return "muted";
 }
@@ -396,7 +395,7 @@ function badgeVariant(state: StatusTone): StatusBadgeVariant {
 function dotStyle(state: StatusTone) {
   if (state === "working") return styles.dotRun;
   if (state === "waiting_on_you") return styles.dotWarn;
-  if (state === "blocked") return styles.dotDanger;
+  if (state === "blocked") return styles.dotBlocked;
   if (state === "done") return styles.dotOk;
   return styles.dotMuted;
 }
@@ -1397,7 +1396,6 @@ function toneOfWord(word: WorkspaceStateWord): Tone {
       return "run";
     case "waiting":
       return "warn";
-    case "blocked":
     case "failed":
       return "danger";
     case "done":
@@ -1630,6 +1628,7 @@ const styles = StyleSheet.create((theme) => {
     dotRun: { ...dot, backgroundColor: theme.colors.statusDotRunning },
     dotWarn: { ...dot, backgroundColor: theme.colors.statusDotWarning },
     dotDanger: { ...dot, backgroundColor: theme.colors.statusDotDanger },
+    dotBlocked: { ...dot, backgroundColor: theme.colors.statusDotBlocked },
     dotOk: { ...dot, backgroundColor: theme.colors.statusDotSuccess },
     dotMuted: { ...dot, backgroundColor: theme.colors.foregroundMuted },
     outdated: {

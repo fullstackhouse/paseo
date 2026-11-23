@@ -1,7 +1,7 @@
 import { memo, useMemo, useCallback, useState, type ReactNode } from "react";
 import { Text, View, type ViewStyle } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
-import { CircleAlert, Folder, FolderGit2, Monitor } from "lucide-react-native";
+import { CircleAlert, CirclePause, Folder, FolderGit2, Monitor } from "lucide-react-native";
 import { ProjectStatusIndicator } from "@/components/sidebar/project-leading-visual";
 import type { SidebarSurfaceBackdrop } from "@/styles/surface-backdrop";
 import {
@@ -39,7 +39,14 @@ const needsInputColorMapping = (theme: Theme) => ({
   fill: getStatusDotColor({ theme, bucket: "needs_input" }) ?? undefined,
 });
 
+// Outlined, unlike needs-input's filled alert, so a blocked row and a row that needs you differ in
+// shape as well as hue.
+const blockedColorMapping = (theme: Theme) => ({
+  color: getStatusDotColor({ theme, bucket: "blocked" }) ?? undefined,
+});
+
 const ThemedCircleAlert = withUnistyles(CircleAlert);
+const ThemedCirclePause = withUnistyles(CirclePause);
 
 export function SidebarWorkspaceRowFrame({
   workspace,
@@ -230,13 +237,22 @@ function WorkspaceStatusIndicator({
     );
   }
 
-  if (bucket === "done" || bucket === "blocked") {
+  if (bucket === "blocked") {
+    // Blocked asks nothing of you, but it is not finished either, so it gets its own yellow pause
+    // glyph instead of Done's dot. Without it a blocked row reads as done wherever the group
+    // header is out of view.
+    return (
+      <View style={styles.workspaceStatusDot} testID="workspace-status-indicator-blocked">
+        <ThemedCirclePause size={STATUS_INDICATOR_ALERT_SIZE} uniProps={blockedColorMapping} />
+      </View>
+    );
+  }
+
+  if (bucket === "done") {
     // An idle row still gets a dot rather than an empty slot. Nested rows are marked as
     // workspaces by indentation alone, and with nothing in the leading slot the rail has no
     // edge to read against — a workspace carrying its own glyph starts looking like a project
     // header. The dot is muted to half opacity so it holds the rail without reporting status.
-    // Blocked asks nothing of you either, so it shares Done's dot; status grouping puts it under its
-    // own header, and the row's accessibility label names it.
     return reserveIdleSpace ? (
       <View style={styles.workspaceStatusDot} testID={`workspace-status-indicator-${bucket}`}>
         <View style={styles.idleStatusDot} />
