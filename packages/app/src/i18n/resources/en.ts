@@ -7,6 +7,17 @@ export const en = {
     more: "+{{count}} more",
     resumeAll: "Resume all",
   },
+  failedAgents: {
+    title_one: "{{count}} agent failed",
+    title_other: "{{count}} agents failed",
+    description: "Their turn stopped on a network or API error: {{names}}",
+    pill: "Failed",
+    panelTitle: "Turn failed",
+    retryAll: "Retry all",
+    retryAllAction: "Retry failed agents ({{count}})",
+    retry: "Retry",
+    retryAccessibilityLabel: "Retry the failed turn",
+  },
   paneFind: {
     connectionFailure: "Could not search this chat. Check the host connection and retry.",
     historyChangedFailure: "The chat changed while searching. Search again.",

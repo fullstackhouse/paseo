@@ -10,6 +10,17 @@ export const ru: TranslationResources = {
     more: "ещё {{count}}",
     resumeAll: "Возобновить все",
   },
+  failedAgents: {
+    title_one: "Сбой агента: {{count}}",
+    title_other: "Сбой агентов: {{count}}",
+    description: "Их ход прервался из-за ошибки сети или API: {{names}}",
+    pill: "Сбой",
+    panelTitle: "Ход не удался",
+    retryAll: "Повторить все",
+    retryAllAction: "Повторить неудавшихся агентов ({{count}})",
+    retry: "Повторить",
+    retryAccessibilityLabel: "Повторить неудавшийся ход",
+  },
   paneFind: {
     connectionFailure:
       "Не удалось выполнить поиск в чате. Проверьте подключение к хосту и повторите попытку.",

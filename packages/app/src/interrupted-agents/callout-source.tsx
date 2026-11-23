@@ -8,28 +8,10 @@ import {
   interruptedAgentsDismissalKey,
   selectInterruptedAgents,
 } from "@/interrupted-agents/select";
-import { DEFAULT_RESUME_PROMPT } from "@/screens/settings/restart-recovery-card";
-import { useSessionStore, type Agent } from "@/stores/session-store";
+import { useSessionStore } from "@/stores/session-store";
+import { resumeAgents } from "@/utils/resume-agents";
 
 const CALLOUT_ID = "interrupted-agents";
-
-/** Sends the host's restart recovery prompt (Host settings → Agents), the one auto-resume uses. */
-async function resumeOnServer(serverId: string, agents: readonly Agent[]): Promise<void> {
-  const client = useSessionStore.getState().sessions[serverId]?.client;
-  if (!client) return;
-  const prompt = await client
-    .getDaemonConfig()
-    .then((result) => result.config.resumePrompt ?? DEFAULT_RESUME_PROMPT)
-    .catch(() => DEFAULT_RESUME_PROMPT);
-  await Promise.all(
-    agents.map((agent) =>
-      // Resuming isn't coming back to a snoozed workspace.
-      client.sendAgentMessage(agent.id, prompt, { keepSnoozed: true }).catch((error) => {
-        console.error("[InterruptedAgents] Failed to resume agent", agent.id, error);
-      }),
-    ),
-  );
-}
 
 /** After a daemon restart, offers to resume every agent whose turn it cut short. */
 export function InterruptedAgentsCalloutSource() {
@@ -39,13 +21,7 @@ export function InterruptedAgentsCalloutSource() {
 
   const resumeAll = useStableEvent(() => {
     callouts.dismiss(CALLOUT_ID);
-    const byServer = new Map<string, Agent[]>();
-    for (const agent of agents) {
-      byServer.set(agent.serverId, [...(byServer.get(agent.serverId) ?? []), agent]);
-    }
-    for (const [serverId, serverAgents] of byServer) {
-      void resumeOnServer(serverId, serverAgents);
-    }
+    resumeAgents(agents);
   });
 
   const descriptor = useMemo(() => {

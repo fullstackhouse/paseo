@@ -30,6 +30,7 @@ import { CommandCenterProvider } from "@/command-center/provider";
 import { CommandCenterWorkspaceActions } from "@/command-center/workspace-registration";
 import { PluginCommandCenterActions } from "@/plugins/command-center/registration";
 import { AddProjectFlowHost } from "@/components/add-project-flow-host";
+import { FailedAgentsCalloutSource } from "@/failed-agents/callout-source";
 import { InterruptedAgentsCalloutSource } from "@/interrupted-agents/callout-source";
 import { DownloadToast } from "@/components/download-toast";
 import { QuittingOverlay } from "@/components/quitting-overlay";
@@ -519,6 +520,7 @@ function AppContainer({ children, chromeEnabled: chromeEnabledOverride }: AppCon
         <UpdateCalloutSource />
         <PluginUpdateCalloutSource />
         <InterruptedAgentsCalloutSource />
+        <FailedAgentsCalloutSource />
         <LegacyAgentSkillsMigration />
         <CommandCenterRootActions />
         <CommandCenterWorkspaceActions />
