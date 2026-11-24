@@ -4359,8 +4359,22 @@ test.each(Object.keys(backgroundWorkEvents))(
   "a plugin change reopens an agent with a running %s at the first prompt after it ends",
   async (kind) => {
     const { started, ended } = backgroundWorkEvents[kind];
+    const logEntries: Record<string, unknown>[] = [];
+    const [{ default: pino }, { Writable }] = await Promise.all([
+      import("pino"),
+      import("node:stream"),
+    ]);
+    const capturedLogger = pino(
+      { level: "info" },
+      new Writable({
+        write(chunk, _encoding, done) {
+          logEntries.push(JSON.parse(chunk.toString()));
+          done();
+        },
+      }),
+    );
     const workdir = mkdtempSync(join(tmpdir(), "agent-manager-plugin-change-"));
-    const storage = new AgentStorage(join(workdir, "agents"), logger);
+    const storage = new AgentStorage(join(workdir, "agents"), capturedLogger);
     const sessions: CloseRecordingTestAgentSession[] = [];
     class RecordingClient extends TestAgentClient {
       override async createSession(config: AgentSessionConfig): Promise<AgentSession> {
@@ -4378,7 +4392,7 @@ test.each(Object.keys(backgroundWorkEvents))(
     const manager = new AgentManager({
       clients: { codex: new RecordingClient() },
       registry: storage,
-      logger,
+      logger: capturedLogger,
     });
     const agent = await manager.createAgent({ provider: "codex", cwd: workdir }, undefined, {
       workspaceId: undefined,
@@ -4408,6 +4422,21 @@ test.each(Object.keys(backgroundWorkEvents))(
 
     expect(sessions.map((session) => session.closed)).toEqual([false]);
     expect(workIsActive()).toBe(true);
+    await prompt("while the work still runs");
+
+    expect(
+      logEntries.filter(
+        ({ msg }) =>
+          msg === "Deferring stale plugin session reopen while background work is active",
+      ),
+    ).toEqual([
+      expect.objectContaining({
+        agentId: agent.id,
+        backgroundWorkItemCount: kind === "background shell" ? 1 : 0,
+        runningSubagentCount: kind === "provider subagent" ? 1 : 0,
+        generation: 1,
+      }),
+    ]);
 
     sessions[0].pushEvent(ended);
     await vi.waitFor(() => expect(workIsActive()).toBe(false));
