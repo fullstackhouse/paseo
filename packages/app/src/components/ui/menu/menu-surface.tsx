@@ -9,7 +9,14 @@ import {
   type ReactNode,
 } from "react";
 import { useTranslation } from "react-i18next";
-import { Pressable, Text, View, useWindowDimensions, type PointerEvent } from "react-native";
+import {
+  Pressable,
+  Text,
+  View,
+  useWindowDimensions,
+  type PointerEvent,
+  type ScrollView,
+} from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { BottomSheetScrollView } from "@gorhom/bottom-sheet";
 import { ChevronLeft } from "lucide-react-native";
@@ -32,6 +39,7 @@ import { currentPageId, isSubPageOpen } from "./menu-navigation";
 import { AnchoredSurface, MenuOverlay } from "./menu-overlay";
 import { isHoverPointer } from "./menu-pointer";
 import { getMenuSheetBottomPadding } from "./menu-sheet-layout";
+import { ScrollRevealContent } from "../reveal-in-scroll";
 import type { Alignment, Placement } from "../anchor";
 import type { KeyboardFocusScope } from "@/keyboard/actions";
 
@@ -483,15 +491,17 @@ function MenuSheetScrollView({
     }),
     [safeAreaInsets.bottom],
   );
+  const scrollRef = useRef<ScrollView>(null);
   return (
     <BottomSheetScrollView
+      ref={scrollRef}
       dataSet={dataSet}
       contentContainerStyle={contentStyle}
       keyboardShouldPersistTaps="handled"
       showsVerticalScrollIndicator={false}
       testID={testID ? `${testID}-content` : undefined}
     >
-      {children}
+      <ScrollRevealContent scrollRef={scrollRef}>{children}</ScrollRevealContent>
     </BottomSheetScrollView>
   );
 }

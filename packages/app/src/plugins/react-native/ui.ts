@@ -25,6 +25,7 @@ export { Action, Combobox, Select, Toggle } from "./composer-controls";
 export { Menu } from "./menu";
 export { Modal } from "./modal";
 export { ScrollView, FlatList } from "./scroll-view";
+export { useRevealInScroll } from "@/components/ui/reveal-in-scroll";
 export { TextInput } from "./text-input";
 export { copyText } from "./clipboard";
 export { useToast } from "./toast";
