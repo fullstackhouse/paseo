@@ -2200,8 +2200,17 @@ export const ja: TranslationResources = {
     detachTooltip: "サブエージェントを切り離す",
     archiveAction: "{{label}}をアーカイブ",
     archiveTooltip: "サブエージェントをアーカイブ",
-    archiveFinishedAction: "完了したサブエージェントをアーカイブ",
     archiveFinishedRetry: "再試行 ({{failed}}/{{total}})",
+    retryAction: "{{label}} を再試行",
+    clear: "クリア",
+    clearDoneAction: "完了したサブエージェントをアーカイブ",
+    clearFailedAction: "失敗したサブエージェントをアーカイブ",
+    groups: {
+      failed: "失敗 · {{count}}",
+      needsInput: "入力待ち · {{count}}",
+      working: "作業中 · {{count}}",
+      done: "完了 · {{count}}",
+    },
   },
   panels: {
     draft: {

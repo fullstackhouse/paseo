@@ -2211,8 +2211,17 @@ export const ru: TranslationResources = {
     detachTooltip: "Отсоединить субагента",
     archiveAction: "Архивировать {{label}}",
     archiveTooltip: "Архивировать субагента",
-    archiveFinishedAction: "Архивировать завершенные субагенты",
     archiveFinishedRetry: "Повторить ({{failed}}/{{total}})",
+    retryAction: "Повторить {{label}}",
+    clear: "Очистить",
+    clearDoneAction: "Архивировать завершенные субагенты",
+    clearFailedAction: "Архивировать субагенты с ошибкой",
+    groups: {
+      failed: "Ошибка · {{count}}",
+      needsInput: "Ждут ввода · {{count}}",
+      working: "В работе · {{count}}",
+      done: "Готово · {{count}}",
+    },
   },
   panels: {
     draft: {

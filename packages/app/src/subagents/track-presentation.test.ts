@@ -4,7 +4,8 @@ import type { PaseoSubagentRow, ProviderSubagentRow, SubagentRow } from "./selec
 import {
   buildSubagentPillPresentation,
   buildSubagentRowPresentationData,
-  countFinishedSubagents,
+  distinctSubagentSubtitles,
+  groupSubagentRows,
   resolveRowLabel,
 } from "./track-presentation";
 
@@ -99,52 +100,79 @@ describe("buildSubagentPillPresentation", () => {
   });
 });
 
-describe("countFinishedSubagents", () => {
-  it("counts eligible managed and terminal provider-owned children", () => {
-    const providerRows: SubagentRow[] = [
-      {
-        kind: "provider",
-        id: "native-running",
-        parentAgentId: "parent",
-        provider: "claude",
-        title: "running",
-        description: null,
-        subtitle: null,
-        status: "running",
-        requiresAttention: false,
-        createdAt: new Date("2026-04-20T00:00:00.000Z"),
-      },
-      {
-        kind: "provider",
-        id: "native-failed",
-        parentAgentId: "parent",
-        provider: "claude",
-        title: "failed",
-        description: null,
-        subtitle: null,
-        status: "failed",
-        requiresAttention: true,
-        createdAt: new Date("2026-04-20T00:00:01.000Z"),
-      },
-    ];
+function nativeRow(
+  overrides: Partial<ProviderSubagentRow> & Pick<ProviderSubagentRow, "id">,
+): ProviderSubagentRow {
+  return {
+    kind: "provider",
+    id: overrides.id,
+    parentAgentId: "parent",
+    provider: "claude",
+    title: overrides.title ?? "general-purpose",
+    description: overrides.description ?? `Task ${overrides.id}`,
+    subtitle: overrides.subtitle ?? null,
+    status: overrides.status ?? "completed",
+    requiresAttention: false,
+    createdAt: new Date("2026-04-20T00:00:00.000Z"),
+  };
+}
 
-    expect(
-      countFinishedSubagents([
-        row({ id: "managed-running", status: "running" }),
-        row({ id: "managed-idle", status: "idle" }),
-        ...providerRows,
-      ]),
-    ).toBe(2);
+describe("groupSubagentRows", () => {
+  const ids = (rows: SubagentRow[]) => rows.map((candidate) => candidate.id);
+
+  it("puts failures first and done work last, whatever order the rows came in", () => {
+    const groups = groupSubagentRows([
+      row({ id: "done-a" }),
+      row({ id: "working", status: "running" }),
+      nativeRow({ id: "provider-failed", status: "failed" }),
+      nativeRow({ id: "provider-done" }),
+      row({ id: "managed-failed", status: "error" }),
+    ]);
+    expect(groups.map((group) => [group.key, ids(group.rows)])).toEqual([
+      ["failed", ["provider-failed", "managed-failed"]],
+      ["working", ["working"]],
+      ["done", ["done-a", "provider-done"]],
+    ]);
   });
 
-  it("excludes running and initializing managed children", () => {
-    expect(
-      countFinishedSubagents([
-        row({ id: "running", status: "running" }),
-        row({ id: "initializing", status: "initializing" }),
-        row({ id: "finished", status: "idle" }),
-      ]),
-    ).toBe(1);
+  it("files canceled provider children with done work, not failures", () => {
+    const groups = groupSubagentRows([nativeRow({ id: "canceled", status: "canceled" })]);
+    expect(groups.map((group) => group.key)).toEqual(["done"]);
+  });
+
+  it("leaves empty groups out", () => {
+    expect(groupSubagentRows([])).toEqual([]);
+  });
+});
+
+describe("distinctSubagentSubtitles", () => {
+  it("drops the facts every sibling shares and keeps what tells them apart", () => {
+    const subtitles = distinctSubagentSubtitles([
+      nativeRow({ id: "a", subtitle: "general-purpose · Opus 5.5 · Medium · 333.9k tokens" }),
+      nativeRow({ id: "b", subtitle: "general-purpose · Opus 5.5 · Medium · 185.6k tokens" }),
+      nativeRow({ id: "c", subtitle: "Explore · Opus 5.5 · Medium · 287.9k tokens" }),
+    ]);
+    expect(Object.fromEntries(subtitles)).toEqual({
+      a: "general-purpose · 333.9k tokens",
+      b: "general-purpose · 185.6k tokens",
+      c: "Explore · 287.9k tokens",
+    });
+  });
+
+  it("keeps a lone subtitle whole", () => {
+    const subtitles = distinctSubagentSubtitles([
+      nativeRow({ id: "a", subtitle: "general-purpose · Opus 5.5 · Medium" }),
+      row({ id: "managed" }),
+    ]);
+    expect(Object.fromEntries(subtitles)).toEqual({ a: "general-purpose · Opus 5.5 · Medium" });
+  });
+
+  it("leaves a row with nothing distinct without a subtitle", () => {
+    const subtitles = distinctSubagentSubtitles([
+      nativeRow({ id: "a", subtitle: "general-purpose · Opus 5.5" }),
+      nativeRow({ id: "b", subtitle: "general-purpose · Opus 5.5" }),
+    ]);
+    expect(Object.fromEntries(subtitles)).toEqual({ a: "", b: "" });
   });
 });
 

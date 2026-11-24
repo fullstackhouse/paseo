@@ -5,13 +5,14 @@ import { useSessionStore } from "@/stores/session-store";
 import {
   createArchiveFinishedSubagents,
   type ArchiveFinishedOutcome,
+  type ArchiveScope,
   type ArchiveFinishedState,
   type ArchiveFinishedSubagents,
 } from "./archive-finished";
 import { useProviderSubagentStore } from "./provider-store";
 import type { SubagentRow } from "./select";
 
-export type { ArchiveFinishedStatus } from "./archive-finished";
+export type { ArchiveFinishedStatus, ArchiveScope } from "./archive-finished";
 
 export interface UseArchiveFinishedSubagentsInput {
   serverId: string;
@@ -20,7 +21,7 @@ export interface UseArchiveFinishedSubagentsInput {
 }
 
 export interface ArchiveFinishedSubagentsCapability extends ArchiveFinishedState {
-  archiveFinished: () => Promise<ArchiveFinishedOutcome>;
+  archiveFinished: (scope?: ArchiveScope) => Promise<ArchiveFinishedOutcome>;
 }
 
 export function useArchiveFinishedSubagents({

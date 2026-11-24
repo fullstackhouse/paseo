@@ -2227,8 +2227,17 @@ export const fr: TranslationResources = {
     detachTooltip: "Détacher le sous-agent",
     archiveAction: "Archiver {{label}}",
     archiveTooltip: "Archiver le sous-agent",
-    archiveFinishedAction: "Archiver les sous-agents terminés",
     archiveFinishedRetry: "Réessayer ({{failed}}/{{total}})",
+    retryAction: "Réessayer {{label}}",
+    clear: "Effacer",
+    clearDoneAction: "Archiver les sous-agents terminés",
+    clearFailedAction: "Archiver les sous-agents en échec",
+    groups: {
+      failed: "Échec · {{count}}",
+      needsInput: "En attente · {{count}}",
+      working: "En cours · {{count}}",
+      done: "Terminé · {{count}}",
+    },
   },
   panels: {
     draft: {
