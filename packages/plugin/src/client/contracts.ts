@@ -103,6 +103,7 @@ export interface PluginScreenTarget {
   /**
    * Where the `workspaceId` tab opens: `"workspace"` (default) or `"explorer"`, the sidebar beside
    * the conversation. Ignored without `workspaceId`. Older hosts ignore it and use the workspace.
+   * On compact layouts the screen opens in a bottom sheet over the current tab, whatever this says.
    */
   readonly location?: PluginPanelLocation;
 }
@@ -118,6 +119,7 @@ export interface PluginOpenScreenInput {
   /**
    * Where the `workspaceId` tab opens: `"workspace"` (default) or `"explorer"`, the sidebar beside
    * the conversation. Ignored without `workspaceId`. Older hosts ignore it and use the workspace.
+   * On compact layouts the screen opens in a bottom sheet over the current tab, whatever this says.
    */
   location?: PluginPanelLocation;
 }
