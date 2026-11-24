@@ -1,4 +1,11 @@
-import { forwardRef, useMemo, type ComponentProps, type ReactElement, type ReactNode } from "react";
+import {
+  forwardRef,
+  useMemo,
+  useRef,
+  type ComponentProps,
+  type ReactElement,
+  type ReactNode,
+} from "react";
 import {
   ScrollView,
   StyleSheet,
@@ -9,6 +16,7 @@ import {
 } from "react-native";
 import Animated from "react-native-reanimated";
 import { inlineUnistylesStyle } from "@/styles/unistyles-inline-style";
+import { ScrollRevealContent } from "./reveal-in-scroll";
 
 export interface FloatingSurfaceProps extends Omit<ComponentProps<typeof Animated.View>, "style"> {
   frameStyle?: StyleProp<ViewStyle>;
@@ -39,6 +47,9 @@ export interface FloatingScrollViewProps {
   style?: StyleProp<ViewStyle>;
 }
 
+// The content container may stretch its child (the menu's `flexGrow: 1`); keep that through the wrapper.
+const REVEAL_CONTENT_STYLE = { flexGrow: 1 } as const;
+
 export function FloatingScrollView({
   bounces,
   children,
@@ -51,16 +62,20 @@ export function FloatingScrollView({
     const flattened = StyleSheet.flatten(style);
     return flattened ? inlineUnistylesStyle(stripUnistylesMetadata(flattened)) : undefined;
   }, [style]);
+  const scrollRef = useRef<ScrollView>(null);
 
   return (
     <ScrollView
+      ref={scrollRef}
       bounces={bounces}
       contentContainerStyle={contentContainerStyle}
       keyboardShouldPersistTaps={keyboardShouldPersistTaps}
       showsVerticalScrollIndicator={showsVerticalScrollIndicator}
       style={inlineStyle}
     >
-      {children}
+      <ScrollRevealContent scrollRef={scrollRef} style={REVEAL_CONTENT_STYLE}>
+        {children}
+      </ScrollRevealContent>
     </ScrollView>
   );
 }

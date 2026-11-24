@@ -1,9 +1,11 @@
-import { useMemo, useSyncExternalStore } from "react";
+import { useMemo, useRef, useSyncExternalStore } from "react";
+import type { ScrollView as NativeScrollView } from "react-native";
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { CircleAlert } from "lucide-react-native";
 import invariant from "tiny-invariant";
 import { ScrollView } from "@/components/ui/scroll-view";
+import { ScrollRevealContent } from "@/components/ui/reveal-in-scroll";
 import { usePaneContext } from "@/panels/pane-context";
 import {
   definePanel,
@@ -44,11 +46,14 @@ function PluginButtonPanel() {
   const context = usePaneContext();
   invariant(context.target.kind === "plugin_button", "PluginButtonPanel requires a button target");
   const entry = usePanelButton(context.target, context);
+  const scrollRef = useRef<NativeScrollView>(null);
   return (
     <View style={styles.root} testID="plugin-button-panel">
       {entry ? (
-        <ScrollView style={styles.scroll} keyboardShouldPersistTaps="handled">
-          <PluginButtonPanelContent entry={entry} onClose={context.closeCurrentTab} />
+        <ScrollView ref={scrollRef} style={styles.scroll} keyboardShouldPersistTaps="handled">
+          <ScrollRevealContent scrollRef={scrollRef}>
+            <PluginButtonPanelContent entry={entry} onClose={context.closeCurrentTab} />
+          </ScrollRevealContent>
         </ScrollView>
       ) : (
         <Text style={styles.unavailable}>This plugin button is unavailable.</Text>
