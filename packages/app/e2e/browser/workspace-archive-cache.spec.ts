@@ -65,9 +65,17 @@ test.describe("Workspace archive cache coherence", () => {
       await archiveWorkspaceOutsideTheApp(workspace);
 
       await expectWorkspaceAbsentFromSidebar(page, workspace.workspaceId);
-      await expect(page.getByText("Workspace unavailable", { exact: true })).toBeVisible({
-        timeout: 30_000,
-      });
+      // The screen had it live, so it leaves for New workspace, as the app's own Archive does.
+      await expect
+        .poll(
+          () => {
+            const url = new URL(page.url());
+            return `${url.pathname}?serverId=${url.searchParams.get("serverId")}`;
+          },
+          { timeout: 30_000 },
+        )
+        .toBe(`/new?serverId=${getServerId()}`);
+      await expect(page.getByText("Workspace unavailable", { exact: true })).toHaveCount(0);
     } finally {
       await workspace.cleanup();
     }
