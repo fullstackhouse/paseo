@@ -732,6 +732,10 @@ conversation, and show the sidebar. An existing tab moves there. The default, `"
 it in the main pane. Older hosts ignore `location` and open the tab in the main pane; check that
 `client.screenTabLocations` includes `"explorer"` before relying on it.
 
+On phones and other compact layouts, a `workspaceId` screen opens in a bottom sheet over the
+current tab instead, with a button to open it as a tab, and `location` is ignored. Closing the
+sheet returns to the tab under it. The sheet isn't kept across reloads.
+
 ### Sidebar items
 
 `addSidebarHeaderItem` adds a row to the list at the top of the sidebar. `addSidebarFooterItem`
