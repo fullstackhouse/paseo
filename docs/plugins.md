@@ -384,7 +384,9 @@ keys are stored under a `param.` prefix; plugins never see it and may use any ke
 `openScreen` validates its input once (`parsePluginOpenScreenInput`); code past it trusts the
 params. With a `workspaceId`, the screen opens as a `plugin_screen` workspace tab instead
 (`plugins/screen-tab/panel.tsx`); `location: "explorer"` places it in Explorer with the same
-`pane` placement as Explorer panels (`plugins/explorer-placement.ts`). The tab target persists the params, so they survive a reload
+`pane` placement as Explorer panels (`plugins/explorer-placement.ts`). On compact layouts the
+screen opens in the workspace sheet over the chat instead, with Open as tab, and `location` is
+ignored, since Explorer would cover the chat. The tab target persists the params, so they survive a reload
 the same way the route's query does. Its identity is plugin, screen, and params, so reopening a
 review focuses its tab. A screen's `setTitle` writes `{ title }` into the tab's persisted state,
 so the tab strip shows it for tabs that aren't mounted; the full-screen route keeps it in memory.

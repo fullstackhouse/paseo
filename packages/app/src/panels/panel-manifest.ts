@@ -159,7 +159,8 @@ const manifests = {
     supportedHosts: ["main", "explorer"],
     showCloseButton: true,
     singleton: false,
-    compactSheet: null,
+    // A plugin screen opened from a chat (an Inbox review) covers it on compact; closing it returns there.
+    compactSheet: { openAsTab: true },
     resourceKey: (target) =>
       `${target.pluginId}:${target.screenId}:${JSON.stringify(Object.entries(target.params).sort())}`,
   },

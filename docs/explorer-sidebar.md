@@ -28,7 +28,7 @@ can remount. Native retained content stays live, while web chat uses its existin
 
 ## Sheets
 
-On compact layouts, files and subagents open in a sheet over the workspace, so the tab switcher
+On compact layouts, files, subagents and plugin screens (an Inbox review) open in a sheet over the workspace, so the tab switcher
 keeps only agents and terminals. A panel kind opts in with `compactSheet` in its manifest
 (`packages/app/src/panels/panel-manifest.ts`), and the layout store's `openTab` decides between
 sheet and tab, so callers open targets the same way on every layout. Each such sheet holds one

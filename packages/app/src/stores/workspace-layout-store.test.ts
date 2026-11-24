@@ -4923,6 +4923,21 @@ describe("compact workspace sheet", () => {
     expect(tabKinds(store)).toEqual(["terminal", "agent", "agent"]);
   });
 
+  it("opens plugin screens in the sheet with Open as tab", () => {
+    const store = createCompactStore();
+    const target = {
+      kind: "plugin_screen" as const,
+      pluginId: "inbox",
+      screenId: "review",
+      params: { runId: "r1" },
+    };
+
+    store.getState().openTab({ workspaceKey, target, intent: "reveal" });
+
+    expect(topSheet(store)).toMatchObject({ tab: { target }, policy: { openAsTab: true } });
+    expect(tabKinds(store)).toEqual(["terminal"]);
+  });
+
   it("describes the sheet a reveal would show without opening it, and opens it as a tab", () => {
     seedAgents([
       { id: "root", parentAgentId: null, workspaceId: "sheet-ws" },
