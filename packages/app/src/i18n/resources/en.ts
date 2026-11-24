@@ -310,6 +310,11 @@ export const en = {
     tooManyMatches: "Too many matches — narrow your search",
     hostLoadFailed: "{{host}}: Could not load history",
     searchPlaceholder: "Search history",
+    workspaceFilter: {
+      label: "Workspace: {{name}}",
+      clear: "Show all workspaces",
+      unnamed: "This workspace",
+    },
     views: {
       agents: "Agents",
       archivedWorkspaces: "Archived workspaces",
@@ -726,6 +731,9 @@ export const en = {
         pullRequest: "Pull request",
         terminalProfilesMenu: "Terminal profiles",
         editTerminalProfiles: "Edit profiles",
+        recentlyClosed: "Recently closed",
+        untitledAgent: "Untitled agent",
+        showAllClosed: "Show all in History",
       },
       explorerSidebar: {
         open: "Open Explorer sidebar",

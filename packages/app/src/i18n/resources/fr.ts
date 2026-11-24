@@ -318,6 +318,11 @@ export const fr: TranslationResources = {
     tooManyMatches: "Trop de résultats — affinez la recherche",
     hostLoadFailed: "{{host}} : impossible de charger l’historique",
     searchPlaceholder: "Rechercher dans l’historique",
+    workspaceFilter: {
+      label: "Espace de travail : {{name}}",
+      clear: "Afficher tous les espaces de travail",
+      unnamed: "Cet espace de travail",
+    },
     views: {
       agents: "Agents",
       archivedWorkspaces: "Espaces de travail archivés",
@@ -737,6 +742,9 @@ export const fr: TranslationResources = {
         pullRequest: "Pull request",
         terminalProfilesMenu: "Profils de terminal",
         editTerminalProfiles: "Modifier les profils",
+        recentlyClosed: "Fermés récemment",
+        untitledAgent: "Agent sans titre",
+        showAllClosed: "Tout voir dans l'historique",
       },
       explorerSidebar: {
         open: "Ouvrir la barre latérale de l’explorateur",

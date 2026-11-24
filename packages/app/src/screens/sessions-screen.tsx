@@ -1,9 +1,9 @@
 import { useMemo, useState, useCallback, useEffect, type ReactElement } from "react";
 import { View, Text } from "react-native";
 import { useIsFocused } from "expo-router/react-navigation";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
-import { ChevronLeft, Import } from "lucide-react-native";
+import { ChevronLeft, Import, X } from "lucide-react-native";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import { MenuHeader } from "@/components/headers/menu-header";
@@ -31,13 +31,19 @@ import {
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { useImportSession } from "@/hooks/use-import-session";
 import { useHosts } from "@/runtime/host-runtime";
+import { useSessionStore } from "@/stores/session-store";
+import { useWorkspaceFields } from "@/stores/session-store-hooks";
 import { useHasFinePointer } from "@/hooks/use-fine-pointer";
 import { useIsCompactFormFactor } from "@/constants/layout";
+import type { Theme } from "@/styles/theme";
 import { buildOpenProjectRoute } from "@/utils/host-routes";
 
 const ThemedLoadingSpinner = withUnistyles(LoadingSpinner, (theme) => ({
   color: theme.colors.foregroundMuted,
 }));
+const ThemedX = withUnistyles(X);
+const mutedIconColorMapping = (theme: Theme) => ({ color: theme.colors.foregroundMuted });
+const CLEAR_FILTER_ICON = <ThemedX size={14} uniProps={mutedIconColorMapping} />;
 
 /** Long enough that a typed word is one request, short enough to feel live. */
 const SEARCH_DEBOUNCE_MS = 200;
@@ -337,15 +343,62 @@ function AgentHistoryBody({
   );
 }
 
+/** The workspace a link narrowed History to; ignored on hosts that can't filter by workspace. */
+function useWorkspaceFilterParam(): { serverId: string; workspaceId: string } | null {
+  const params = useLocalSearchParams<{ serverId?: string; workspaceId?: string }>();
+  const serverId = typeof params.serverId === "string" ? params.serverId : "";
+  const workspaceId = typeof params.workspaceId === "string" ? params.workspaceId : "";
+  const supported = useSessionStore(
+    (state) => state.sessions[serverId]?.serverInfo?.features?.agentWorkspaceFilter === true,
+  );
+  return useMemo(
+    () => (supported && serverId && workspaceId ? { serverId, workspaceId } : null),
+    [serverId, supported, workspaceId],
+  );
+}
+
+const selectWorkspaceName = (workspace: { name: string }) => workspace.name;
+
+/** Shown in place of the view and host switches while History is narrowed to one workspace. */
+function WorkspaceFilterChip({
+  serverId,
+  workspaceId,
+}: {
+  serverId: string;
+  workspaceId: string;
+}): ReactElement {
+  const { t } = useTranslation();
+  const name = useWorkspaceFields(serverId, workspaceId, selectWorkspaceName);
+  const clear = useCallback(() => {
+    router.setParams({ serverId: undefined, workspaceId: undefined });
+  }, []);
+  return (
+    <Button
+      size="sm"
+      onPress={clear}
+      trailing={CLEAR_FILTER_ICON}
+      accessibilityLabel={t("sessions.workspaceFilter.clear")}
+      testID="sessions-workspace-filter"
+    >
+      {t("sessions.workspaceFilter.label", {
+        name: name ?? t("sessions.workspaceFilter.unnamed"),
+      })}
+    </Button>
+  );
+}
+
 function SessionsScreenContent() {
   const { t } = useTranslation();
   const hosts = useHosts();
   const autoFocusSearch = useShouldAutoFocusSearch();
-  const [selectedHost, setSelectedHost] = useState(ALL_HOSTS_OPTION_ID);
+  const workspaceFilter = useWorkspaceFilterParam();
+  const [hostChoice, setSelectedHost] = useState(ALL_HOSTS_OPTION_ID);
+  // A workspace link pins its host; clearing the filter returns to the host choice.
+  const selectedHost = workspaceFilter?.serverId ?? hostChoice;
   const view = useHistoryViewStore((state) => state.view);
   const setView = useHistoryViewStore((state) => state.setView);
   // Gate on any host that can list them; hosts that can't are named inside the view.
-  const canShowArchived = useAnyHostSupportsArchivedWorkspaces();
+  const canShowArchived = useAnyHostSupportsArchivedWorkspaces() && !workspaceFilter;
   const activeView: HistoryView = canShowArchived ? view : "agents";
   const viewOptions = useMemo(
     (): SegmentedControlOption<HistoryView>[] => [
@@ -365,20 +418,18 @@ function SessionsScreenContent() {
     serverId: historyServerId,
     search,
     enabled: activeView === "agents",
+    workspaceId: workspaceFilter?.workspaceId ?? null,
   });
 
   useEffect(() => {
-    if (
-      selectedHost !== ALL_HOSTS_OPTION_ID &&
-      !hosts.some((host) => host.serverId === selectedHost)
-    ) {
+    if (hostChoice !== ALL_HOSTS_OPTION_ID && !hosts.some((host) => host.serverId === hostChoice)) {
       setSelectedHost(ALL_HOSTS_OPTION_ID);
     }
-  }, [hosts, selectedHost]);
+  }, [hosts, hostChoice]);
 
-  const showHostFilter = hosts.length > 1;
+  const showHostFilter = hosts.length > 1 && !workspaceFilter;
   const showSearch = history.isSearchSupported || activeView === "archived";
-  const showFilterRow = showHostFilter || showSearch || canShowArchived;
+  const showFilterRow = showHostFilter || showSearch || canShowArchived || Boolean(workspaceFilter);
   const searchPlaceholder =
     activeView === "archived"
       ? t("sessions.archived.searchPlaceholder")
@@ -391,6 +442,12 @@ function SessionsScreenContent() {
       <MenuHeader title={t("sessions.title")} />
       {showFilterRow ? (
         <View style={styles.filterContainer}>
+          {workspaceFilter ? (
+            <WorkspaceFilterChip
+              serverId={workspaceFilter.serverId}
+              workspaceId={workspaceFilter.workspaceId}
+            />
+          ) : null}
           {canShowArchived ? (
             <SegmentedControl
               value={activeView}

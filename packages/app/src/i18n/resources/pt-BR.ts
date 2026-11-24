@@ -317,6 +317,11 @@ export const ptBR: TranslationResources = {
     tooManyMatches: "Muitos resultados — refine a busca",
     hostLoadFailed: "{{host}}: Não foi possível carregar o histórico",
     searchPlaceholder: "Buscar no histórico",
+    workspaceFilter: {
+      label: "Workspace: {{name}}",
+      clear: "Mostrar todos os workspaces",
+      unnamed: "Este workspace",
+    },
     views: {
       agents: "Agentes",
       archivedWorkspaces: "Workspaces arquivados",
@@ -735,6 +740,9 @@ export const ptBR: TranslationResources = {
         pullRequest: "Pull request",
         terminalProfilesMenu: "Perfis de terminal",
         editTerminalProfiles: "Editar perfis",
+        recentlyClosed: "Fechados recentemente",
+        untitledAgent: "Agente sem título",
+        showAllClosed: "Ver tudo no histórico",
       },
       explorerSidebar: {
         open: "Abrir painel lateral",

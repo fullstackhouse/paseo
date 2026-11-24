@@ -313,6 +313,11 @@ export const ar: TranslationResources = {
     tooManyMatches: "نتائج كثيرة جدًا — ضيّق نطاق البحث",
     hostLoadFailed: "{{host}}: تعذر تحميل السجل",
     searchPlaceholder: "البحث في السجل",
+    workspaceFilter: {
+      label: "مساحة العمل: {{name}}",
+      clear: "عرض كل مساحات العمل",
+      unnamed: "مساحة العمل هذه",
+    },
     views: {
       agents: "الوكلاء",
       archivedWorkspaces: "مساحات العمل المؤرشفة",
@@ -728,6 +733,9 @@ export const ar: TranslationResources = {
         pullRequest: "طلب السحب",
         terminalProfilesMenu: "Terminal profiles",
         editTerminalProfiles: "Edit profiles",
+        recentlyClosed: "المغلقة مؤخرًا",
+        untitledAgent: "وكيل بلا عنوان",
+        showAllClosed: "عرض الكل في السجل",
       },
       explorerSidebar: {
         open: "افتح اللوحة الجانبية",
