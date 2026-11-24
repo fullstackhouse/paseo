@@ -28,8 +28,10 @@ import {
   startSetupHost,
 } from "../support/helpers/onboarding";
 import {
+  answerNextRemovalWarning,
   chooseCustomSkills,
   openSkillSelection,
+  readInstalledSkills,
   saveSkillSelection,
 } from "../support/helpers/agent-skills";
 import { installDaemonWebSocketGate } from "../support/helpers/daemon-websocket-gate";
@@ -398,6 +400,49 @@ test("with no skills picked, skills read as off and Continue moves on", async ({
 
     await continueSetup(page);
     await expectSetupStep(page, "Take your agents with you");
+  } finally {
+    await host.close();
+  }
+});
+
+test("on a host that installed skills by default, turning skills off asks before uninstalling", async ({
+  page,
+}) => {
+  const host = await startSetupHost("skills-off", { defaultSkillsInstall: true });
+  const claudeSkills = path.join(host.home, ".claude", "skills");
+
+  try {
+    // A real new host installs every skill on first start, before setup reads them.
+    await expect.poll(() => readInstalledSkills(claudeSkills)).not.toEqual([]);
+    const installed = await readInstalledSkills(claudeSkills);
+
+    await openAppAsNewUser(page, host);
+    await expectSetupStep(page, "Welcome to Paseo");
+    await goToSetupStep(page, "Orchestration");
+    await expectSetupStep(page, "Let agents use Paseo");
+    const skillsSwitch = setupModal(page).getByRole("switch", {
+      name: "Orchestration skills",
+      exact: true,
+    });
+    await expect(skillsSwitch).toBeChecked();
+    await skillsSwitch.click();
+    await expect(skillsSwitch).not.toBeChecked();
+
+    await test.step("declining the confirmation keeps the skills and the step", async () => {
+      const declined = answerNextRemovalWarning(page, "dismiss");
+      await continueSetup(page);
+      expect((await declined).message()).toContain("Uninstall Paseo skills?");
+      await expectSetupStep(page, "Let agents use Paseo");
+      expect(await readInstalledSkills(claudeSkills)).toEqual(installed);
+    });
+
+    await test.step("accepting it uninstalls the skills and moves on", async () => {
+      const accepted = answerNextRemovalWarning(page, "accept");
+      await continueSetup(page);
+      expect((await accepted).message()).toContain("Uninstall Paseo skills?");
+      await expectSetupStep(page, "Take your agents with you");
+      await expect.poll(() => readInstalledSkills(claudeSkills)).toEqual([]);
+    });
   } finally {
     await host.close();
   }
