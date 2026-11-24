@@ -1,5 +1,6 @@
 import type { AgentTimelineItem, ToolCallTimelineItem } from "@getpaseo/protocol/agent-types";
 import type { AgentToolCallData, PluginTimelineStreamItem, StreamItem } from "@/types/stream";
+import { isTurnTrigger } from "@/agent-stream/turn-membership";
 import type { TimelineItemTransform } from "./model";
 
 type AssistantPhase = "streaming" | "complete";
@@ -105,7 +106,6 @@ function transformSourceItem(
       kind: "plugin",
       id: `${pluginItem.pluginId}/${pluginItem.id}`,
       sourceId: item.id,
-      sourceKind: item.kind,
       timestamp: item.timestamp,
       pluginId: pluginItem.pluginId,
       pluginItemId: pluginItem.id,
@@ -115,6 +115,7 @@ function transformSourceItem(
     };
     if (item.timelineCursor) projected.timelineCursor = item.timelineCursor;
     if (item.turnId) projected.turnId = item.turnId;
+    if (isTurnTrigger(item)) projected.replacesTurnTrigger = true;
     return projected;
   });
 }

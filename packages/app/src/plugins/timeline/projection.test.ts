@@ -123,6 +123,38 @@ describe("plugin timeline projection", () => {
     expect(transform).toHaveBeenCalledTimes(2);
   });
 
+  it("marks plugin rows that replace a turn trigger", () => {
+    const at = new Date("2026-01-01T00:00:00.000Z");
+    const heartbeat: StreamItem = {
+      kind: "tool_call",
+      id: "heartbeat-1",
+      timestamp: at,
+      payload: {
+        source: "agent",
+        data: {
+          provider: "claude",
+          callId: "heartbeat-1",
+          name: "heartbeat",
+          status: "completed",
+          error: null,
+          detail: { type: "unknown", input: null, output: null },
+        },
+      },
+    };
+    const sources: StreamItem[] = [
+      { kind: "user_message", id: "user-1", text: "Hi", timestamp: at },
+      heartbeat,
+      thought("Thinking", "ready"),
+    ];
+    const projected = projectPluginTimelineItems(sources, ({ sourceId }) => [
+      { type: "plugin", id: sourceId, pluginId: "redraw", kind: "row", version: 1, data: {} },
+    ]);
+
+    expect(
+      projected.map((item) => (item.kind === "plugin" ? item.replacesTurnTrigger : null)),
+    ).toEqual([true, true, undefined]);
+  });
+
   it("filters and explodes source rows", () => {
     const source = thought("Split", "ready");
     const exploded = projectPluginTimelineItems([source], ({ sourceId }) => [

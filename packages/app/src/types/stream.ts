@@ -812,8 +812,8 @@ export interface PluginTimelineStreamItem {
   id: string;
   /** The id of the stream item a timeline transformer replaced; set only by projection. */
   sourceId?: string;
-  /** The kind of the replaced stream item, so a redrawn user message still starts its turn. */
-  sourceKind?: StreamItem["kind"];
+  /** The replaced stream item started a turn, so the plugin row starts it instead. */
+  replacesTurnTrigger?: boolean;
   timelineCursor?: TimelinePosition;
   turnId?: string;
   timestamp: Date;

@@ -115,7 +115,7 @@ describe("collapseTurns", () => {
       kind: "plugin",
       id: `asks/${id}`,
       sourceId: id,
-      sourceKind: "user_message",
+      replacesTurnTrigger: true,
       timestamp: at,
       pluginId: "asks",
       pluginItemId: id,
