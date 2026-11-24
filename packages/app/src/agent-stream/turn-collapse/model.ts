@@ -156,7 +156,7 @@ export function collapseTurns(input: CollapseTurnsInput): TurnCollapse {
     const replyIndex = findLastReplyIndex(tail, runStart, runEnd);
     if (
       !host ||
-      (host.kind !== "user_message" && host.kind !== "tool_call") ||
+      (host.kind !== "user_message" && host.kind !== "tool_call" && !isTurnTrigger(host)) ||
       !isClosed ||
       replyIndex <= runStart
     ) {

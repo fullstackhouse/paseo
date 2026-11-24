@@ -975,12 +975,20 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
 
           case "plugin":
             return (
-              <PluginTimelineItemView
-                agentId={agentId}
-                workspaceId={context.workspaceId}
-                item={item}
-                serverId={resolvedServerId}
-              />
+              <>
+                <PluginTimelineItemView
+                  agentId={agentId}
+                  workspaceId={context.workspaceId}
+                  item={item}
+                  serverId={resolvedServerId}
+                />
+                {getCollapsedTurn(item.id) ? (
+                  <TurnSummaryLine
+                    turn={getCollapsedTurn(item.id)!}
+                    onExpandedChange={setTurnExpanded}
+                  />
+                ) : null}
+              </>
             );
 
           default:

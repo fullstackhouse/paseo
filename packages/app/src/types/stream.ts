@@ -816,6 +816,8 @@ export interface PluginTimelineStreamItem {
   sourceId?: string;
   /** The original row kind, retained by projection for turn folding. */
   sourceKind?: StreamItem["kind"];
+  /** The replaced stream item started a turn, so the plugin row starts it instead. */
+  replacesTurnTrigger?: boolean;
   timelineCursor?: TimelinePosition;
   turnId?: string;
   timestamp: Date;
