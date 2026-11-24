@@ -148,14 +148,14 @@ describe("app update check command center contribution", () => {
     expect(fixture.checks()).toBe(1);
   });
 
-  it("is listed before any check and after a failed or pending one", () => {
-    for (const status of ["idle", "pending", "error", "installed"] as const) {
+  it("is listed before any check and after a finished, failed or pending one", () => {
+    for (const status of ["idle", "up-to-date", "pending", "error"] as const) {
       expect(buildAppUpdateCheckContribution(check({ status }).value)).not.toBeNull();
     }
   });
 
   it("gives way to Update Paseo and to a running check or install", () => {
-    for (const status of ["available", "checking", "installing"] as const) {
+    for (const status of ["available", "checking", "installing", "installed"] as const) {
       expect(buildAppUpdateCheckContribution(check({ status }).value)).toBeNull();
     }
     expect(buildAppUpdateCheckContribution(check({ isInstalling: true }).value)).toBeNull();

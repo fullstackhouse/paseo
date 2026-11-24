@@ -1653,7 +1653,6 @@ export const ko: TranslationResources = {
       check: {
         upToDate: "Paseo가 최신 버전입니다 ({{version}})",
         failed: "업데이트를 확인할 수 없습니다",
-        failedWithError: "업데이트를 확인할 수 없습니다: {{error}}",
       },
       installError: "데스크톱 앱 업데이트를 설치할 수 없습니다.",
       callout: {

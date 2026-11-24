@@ -493,17 +493,15 @@ describe("formatStatusText", () => {
 });
 
 describe("formatCheckResultToast", () => {
+  const formatVersion = (version: string) => `v${version.replace(/^v/i, "")}`;
+
   it("names the running build when it is up to date", () => {
     expect(
-      formatCheckResultToast(buildFakeCheckResult({ currentVersion: "fsh-0.15.3-b245e51" })),
-    ).toEqual({ kind: "success", message: "Paseo is up to date (fsh-0.15.3-b245e51)" });
-  });
-
-  it("prefixes bare semver versions", () => {
-    expect(formatCheckResultToast(buildFakeCheckResult({ currentVersion: "1.2.3" }))).toEqual({
-      kind: "success",
-      message: "Paseo is up to date (v1.2.3)",
-    });
+      formatCheckResultToast(
+        buildFakeCheckResult({ currentVersion: "0.15.3-b245e51" }),
+        formatVersion,
+      ),
+    ).toEqual({ kind: "success", message: "Paseo is up to date (v0.15.3-b245e51)" });
   });
 
   it("says an update is ready to install", () => {
@@ -512,24 +510,44 @@ describe("formatCheckResultToast", () => {
         buildFakeCheckResult({
           hasUpdate: true,
           readyToInstall: true,
-          latestVersion: "fsh-0.15.4-abc1234",
+          latestVersion: "0.15.4-abc1234",
         }),
+        formatVersion,
       ),
-    ).toEqual({ kind: "success", message: "Update ready: fsh-0.15.4-abc1234" });
+    ).toEqual({ kind: "success", message: "Update ready: v0.15.4-abc1234" });
   });
 
   it("says an update is downloading", () => {
     expect(
-      formatCheckResultToast(buildFakeCheckResult({ hasUpdate: true, latestVersion: "1.3.0" })),
+      formatCheckResultToast(
+        buildFakeCheckResult({ hasUpdate: true, latestVersion: "1.3.0" }),
+        formatVersion,
+      ),
     ).toEqual({ kind: "success", message: "Update found: v1.3.0. Downloading..." });
   });
 
-  it("reports a failed check", () => {
-    expect(formatCheckResultToast(buildFakeCheckResult({ errorMessage: "offline" }))).toEqual({
-      kind: "error",
-      message: "Couldn't check for updates: offline",
-    });
-    expect(formatCheckResultToast(null)).toEqual({
+  it("shows a check error as the desktop reports it", () => {
+    const message = "Couldn't check for FSH updates: GitHub answered 403.";
+    expect(
+      formatCheckResultToast(buildFakeCheckResult({ errorMessage: message }), formatVersion),
+    ).toEqual({ kind: "error", message });
+  });
+
+  it("does not claim the check failed when a found update failed to download", () => {
+    expect(
+      formatCheckResultToast(
+        buildFakeCheckResult({
+          hasUpdate: true,
+          latestVersion: "1.2.4",
+          errorMessage: "sha512 checksum mismatch",
+        }),
+        formatVersion,
+      ),
+    ).toEqual({ kind: "error", message: "sha512 checksum mismatch" });
+  });
+
+  it("reports a check that threw", () => {
+    expect(formatCheckResultToast(null, formatVersion)).toEqual({
       kind: "error",
       message: "Couldn't check for updates",
     });

@@ -1661,7 +1661,6 @@ export const ja: TranslationResources = {
       check: {
         upToDate: "Paseo は最新です ({{version}})",
         failed: "アップデートを確認できませんでした",
-        failedWithError: "アップデートを確認できませんでした: {{error}}",
       },
       installError: "デスクトップアプリの更新をインストールできません。",
       callout: {

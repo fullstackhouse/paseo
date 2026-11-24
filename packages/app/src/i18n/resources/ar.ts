@@ -1643,7 +1643,6 @@ export const ar: TranslationResources = {
       check: {
         upToDate: "Paseo محدَّث ({{version}})",
         failed: "تعذّر التحقق من التحديثات",
-        failedWithError: "تعذّر التحقق من التحديثات: {{error}}",
       },
       installError: "غير قادر على تثبيت تحديث تطبيق سطح المكتب.",
       callout: {

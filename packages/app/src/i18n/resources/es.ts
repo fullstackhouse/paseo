@@ -1685,7 +1685,6 @@ export const es: TranslationResources = {
       check: {
         upToDate: "Paseo está actualizado ({{version}})",
         failed: "No se pudo buscar actualizaciones",
-        failedWithError: "No se pudo buscar actualizaciones: {{error}}",
       },
       installError: "No se puede instalar la actualización de la aplicación de escritorio.",
       callout: {

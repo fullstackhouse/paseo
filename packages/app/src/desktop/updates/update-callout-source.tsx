@@ -15,6 +15,7 @@ import {
 import { useSidebarCallouts } from "@/contexts/sidebar-callout-context";
 import { useToast } from "@/contexts/toast-context";
 import { formatCheckResultToast } from "@/desktop/updates/desktop-app-updater";
+import { formatVersionWithPrefix } from "@/desktop/updates/desktop-updates";
 import {
   resolveUpdateCalloutDescriptor,
   type UpdateCalloutActionDescriptor,
@@ -124,10 +125,12 @@ export function UpdateCalloutSource() {
       });
   });
   // Runs on this source's updater, so a found update shows up here as Update Paseo and the callout.
+  // Silent: a failed check reports in the toast only, and "Update failed" stays for failed installs.
   const checkFromPalette = useStableEvent(async () => {
     // The next toast replaces this one, so the result needs no explicit dismiss.
     toast.show(t("desktop.updates.status.checking"), { durationMs: null });
-    const { kind, message } = formatCheckResultToast(await checkForUpdates());
+    const result = await checkForUpdates({ silent: true });
+    const { kind, message } = formatCheckResultToast(result, formatVersionWithPrefix);
     if (kind === "error") toast.error(message);
     else toast.show(message, { variant: "success" });
   });

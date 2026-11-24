@@ -1679,7 +1679,6 @@ export const fr: TranslationResources = {
       check: {
         upToDate: "Paseo est à jour ({{version}})",
         failed: "Impossible de rechercher des mises à jour",
-        failedWithError: "Impossible de rechercher des mises à jour : {{error}}",
       },
       installError: "Impossible d’installer la mise à jour de l’application de bureau.",
       callout: {

@@ -194,25 +194,22 @@ export interface CheckResultToast {
   message: string;
 }
 
-// FSH builds report release tags ("fsh-0.15.3-b245e51"); only bare semver gets a "v".
-function displayVersion(version: string): string {
-  return /^\d/.test(version) ? `v${version}` : version;
-}
-
-/** The toast for a check started by hand; `null` means the check threw. */
+/**
+ * The toast for a check started by hand; `null` means the check threw. A check error is shown
+ * as the desktop reports it: FSH errors are already sentences, and an upstream result can carry
+ * a failed download next to a found update, where "couldn't check" would be untrue.
+ */
 export function formatCheckResultToast(
   result: DesktopAppUpdateCheckResult | null,
+  formatVersion: (version: string) => string,
 ): CheckResultToast {
   if (!result) {
     return { kind: "error", message: i18n.t("desktop.updates.check.failed") };
   }
   if (result.errorMessage) {
-    return {
-      kind: "error",
-      message: i18n.t("desktop.updates.check.failedWithError", { error: result.errorMessage }),
-    };
+    return { kind: "error", message: result.errorMessage };
   }
-  const latest = result.latestVersion ? displayVersion(result.latestVersion) : null;
+  const latest = result.latestVersion ? formatVersion(result.latestVersion) : null;
   if (result.readyToInstall) {
     return {
       kind: "success",
@@ -232,9 +229,7 @@ export function formatCheckResultToast(
   return {
     kind: "success",
     message: result.currentVersion
-      ? i18n.t("desktop.updates.check.upToDate", {
-          version: displayVersion(result.currentVersion),
-        })
+      ? i18n.t("desktop.updates.check.upToDate", { version: formatVersion(result.currentVersion) })
       : i18n.t("desktop.updates.status.upToDate"),
   };
 }

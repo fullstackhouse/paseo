@@ -1628,7 +1628,6 @@ export const zhCN: TranslationResources = {
       check: {
         upToDate: "Paseo 已是最新版本（{{version}}）",
         failed: "无法检查更新",
-        failedWithError: "无法检查更新：{{error}}",
       },
       installError: "无法安装 desktop app 更新。",
       callout: {

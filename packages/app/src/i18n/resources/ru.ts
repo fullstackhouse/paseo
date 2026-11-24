@@ -1667,7 +1667,6 @@ export const ru: TranslationResources = {
       check: {
         upToDate: "Paseo обновлён ({{version}})",
         failed: "Не удалось проверить обновления",
-        failedWithError: "Не удалось проверить обновления: {{error}}",
       },
       installError: "Не удалось установить обновление настольного приложения.",
       callout: {

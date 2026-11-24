@@ -1675,7 +1675,6 @@ export const ptBR: TranslationResources = {
       check: {
         upToDate: "O Paseo está atualizado ({{version}})",
         failed: "Não foi possível verificar atualizações",
-        failedWithError: "Não foi possível verificar atualizações: {{error}}",
       },
       installError: "Não foi possível instalar a atualização do app desktop.",
       callout: {

@@ -83,13 +83,21 @@ export interface AppUpdateCheckCommandCenterSource {
   check(): Promise<void>;
 }
 
+const HIDES_APP_UPDATE_CHECK: ReadonlySet<DesktopAppUpdateStatus> = new Set([
+  "available",
+  "checking",
+  "installing",
+  // An FSH install reports "installed" while its script still downloads; a check then finds
+  // the same release and offers a second install.
+  "installed",
+]);
+
 // Takes Update Paseo's slot: hidden while that entry is listed or a check or install is running.
 export function buildAppUpdateCheckContribution(
   source: AppUpdateCheckCommandCenterSource,
 ): CommandCenterContribution | null {
   if (!source.isDesktopApp || source.isInstalling) return null;
-  if (source.status === "available" || source.status === "checking") return null;
-  if (source.status === "installing") return null;
+  if (HIDES_APP_UPDATE_CHECK.has(source.status)) return null;
   return {
     id: "check-paseo-updates",
     group: "actions",

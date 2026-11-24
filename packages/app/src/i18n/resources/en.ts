@@ -1670,7 +1670,6 @@ export const en = {
       check: {
         upToDate: "Paseo is up to date ({{version}})",
         failed: "Couldn't check for updates",
-        failedWithError: "Couldn't check for updates: {{error}}",
       },
       installError: "Unable to install the desktop app update.",
       callout: {
