@@ -123,6 +123,7 @@ export const ar: TranslationResources = {
       groupByProject: "تجميع حسب المشروع",
       groupByStatus: "تجميع حسب الحالة",
       updatePaseo: "تحديث Paseo",
+      checkPaseoUpdates: "التحقق من تحديثات Paseo",
       modelGroupLabel: "النموذج",
       modelSearchKeywords: "تبديل النموذج تغيير النموذج تعيين النموذج اختيار النموذج",
       thinkingGroupLabel: "التفكير",
@@ -1638,6 +1639,10 @@ export const ar: TranslationResources = {
         installed: "تم تثبيت تحديث التطبيق. إعادة التشغيل مطلوبة.",
         failed: "فشل في تحديث التطبيق.",
         idle: "لم يتم التحقق من حالة التحديث بعد.",
+      },
+      check: {
+        upToDate: "Paseo محدَّث ({{version}})",
+        failed: "تعذّر التحقق من التحديثات",
       },
       installError: "غير قادر على تثبيت تحديث تطبيق سطح المكتب.",
       callout: {
