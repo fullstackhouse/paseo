@@ -313,6 +313,11 @@ export const zhCN: TranslationResources = {
     tooManyMatches: "匹配过多 — 请缩小搜索范围",
     hostLoadFailed: "{{host}}：无法加载历史",
     searchPlaceholder: "搜索历史",
+    workspaceFilter: {
+      label: "工作区：{{name}}",
+      clear: "显示所有工作区",
+      unnamed: "此工作区",
+    },
     views: {
       agents: "代理",
       archivedWorkspaces: "已归档的工作区",
@@ -729,6 +734,7 @@ export const zhCN: TranslationResources = {
         editTerminalProfiles: "Edit profiles",
         recentlyClosed: "最近关闭",
         untitledAgent: "未命名 agent",
+        showAllClosed: "在历史记录中查看全部",
       },
       explorerSidebar: {
         open: "打开侧边面板",

@@ -8,7 +8,7 @@ import {
 } from "react";
 import { useRouter, type Href } from "expo-router";
 import { useTranslation } from "react-i18next";
-import { Globe, SquarePen, SquareTerminal } from "lucide-react-native";
+import { Globe, History, SquarePen, SquareTerminal } from "lucide-react-native";
 import invariant from "tiny-invariant";
 import { useProviderIcons } from "@/components/provider-icons";
 import { useIsCompactFormFactor } from "@/constants/layout";
@@ -18,7 +18,7 @@ import { pluginIconComponent } from "@/plugins/icons";
 import { useInstalledPlugins } from "@/plugins/registry";
 import { pluginPanelSupportsLocation } from "@/plugins/workspace-panels/locations";
 import { toErrorMessage } from "@/utils/error-messages";
-import { buildSettingsHostSectionRoute } from "@/utils/host-routes";
+import { buildSettingsHostSectionRoute, buildWorkspaceHistoryRoute } from "@/utils/host-routes";
 import type { NewTabSelection } from "@/workspace-tabs/new-tab";
 import type { WorkspaceTabTarget } from "@/workspace-tabs/model";
 import { useWorkspaceRecentlyClosed } from "@/workspace-tabs/recently-closed";
@@ -137,6 +137,9 @@ export function useWorkspaceTabLaunchCatalog(input: {
     },
     [launcher],
   );
+  const showAllClosed = useCallback(() => {
+    router.push(buildWorkspaceHistoryRoute(serverId, launcher.workspaceId));
+  }, [launcher.workspaceId, router, serverId]);
   const editTerminalProfiles = useCallback(() => {
     router.push(buildSettingsHostSectionRoute(serverId, "terminals") as Href);
   }, [router, serverId]);
@@ -265,14 +268,30 @@ export function useWorkspaceTabLaunchCatalog(input: {
       groups.push({
         id: "recently-closed",
         label: t("workspace.tabs.actions.recentlyClosed"),
-        items: recentlyClosed.agents.map((agent) => ({
-          id: `recently-closed:${agent.id}`,
-          label: agent.title ?? t("workspace.tabs.actions.untitledAgent"),
-          Icon: getProviderIcon(agent.provider),
-          disabled: false,
-          panelKind: "agent",
-          launch: reopenAgent(agent.id),
-        })),
+        items: [
+          ...recentlyClosed.agents.map(
+            (agent): WorkspaceTabLaunchItem => ({
+              id: `recently-closed:${agent.id}`,
+              label: agent.title ?? t("workspace.tabs.actions.untitledAgent"),
+              Icon: getProviderIcon(agent.provider),
+              disabled: false,
+              panelKind: "agent",
+              launch: reopenAgent(agent.id),
+            }),
+          ),
+          ...(recentlyClosed.hasMore
+            ? [
+                {
+                  id: "recently-closed-all",
+                  label: t("workspace.tabs.actions.showAllClosed"),
+                  Icon: History,
+                  disabled: false,
+                  panelKind: "agent",
+                  launch: showAllClosed,
+                } satisfies WorkspaceTabLaunchItem,
+              ]
+            : []),
+        ],
       });
     }
     if (pluginItems.length > 0) {
@@ -309,7 +328,9 @@ export function useWorkspaceTabLaunchCatalog(input: {
     editTerminalProfiles,
     getProviderIcon,
     recentlyClosed.agents,
+    recentlyClosed.hasMore,
     reopenAgent,
+    showAllClosed,
     isCompact,
     launchSelection,
     launcher,

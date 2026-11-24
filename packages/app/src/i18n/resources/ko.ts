@@ -314,6 +314,11 @@ export const ko: TranslationResources = {
     tooManyMatches: "일치 항목이 너무 많습니다 — 검색 범위를 좁히세요",
     hostLoadFailed: "{{host}}: 기록을 불러오지 못했습니다",
     searchPlaceholder: "기록 검색",
+    workspaceFilter: {
+      label: "워크스페이스: {{name}}",
+      clear: "모든 워크스페이스 보기",
+      unnamed: "이 워크스페이스",
+    },
     views: {
       agents: "에이전트",
       archivedWorkspaces: "보관된 워크스페이스",
@@ -732,6 +737,7 @@ export const ko: TranslationResources = {
         editTerminalProfiles: "프로필 편집",
         recentlyClosed: "최근 닫은 탭",
         untitledAgent: "제목 없는 에이전트",
+        showAllClosed: "기록에서 모두 보기",
       },
       explorerSidebar: {
         open: "사이드 패널 열기",

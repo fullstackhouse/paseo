@@ -8,9 +8,10 @@ import { useSessionStore, type Agent } from "@/stores/session-store";
 import { buildAgentDirectoryState } from "@/utils/agent-directory-sync";
 
 const QUERY_ROOT = ["workspaceRecentlyClosedAgents"] as const;
-const PAGE_LIMIT = 200;
-/** The launcher lists the newest few; older ones stay in History. */
+/** The launcher lists the newest few; the rest are a click away in History. */
 export const RECENTLY_CLOSED_LIMIT = 5;
+/** Headroom over the limit for archived subagents, which the list leaves out. */
+const PAGE_LIMIT = 25;
 
 export interface RecentlyClosedAgent {
   id: string;
@@ -28,8 +29,10 @@ export interface RecentlyClosedAgent {
 export function selectRecentlyClosedAgents(input: {
   workspaceId: string;
   fetched: Iterable<Agent>;
+  /** The host has archived agents beyond the fetched page. */
+  fetchedHasMore: boolean;
   live: Iterable<Agent> | undefined;
-}): RecentlyClosedAgent[] {
+}): { agents: RecentlyClosedAgent[]; hasMore: boolean } {
   const byId = new Map<string, Agent>();
   for (const agent of input.fetched) {
     if (agent.workspaceId === input.workspaceId) byId.set(agent.id, agent);
@@ -47,34 +50,36 @@ export function selectRecentlyClosedAgents(input: {
       archivedAt: agent.archivedAt,
     });
   }
-  return rows
-    .sort((a, b) => b.archivedAt.getTime() - a.archivedAt.getTime())
-    .slice(0, RECENTLY_CLOSED_LIMIT);
+  rows.sort((a, b) => b.archivedAt.getTime() - a.archivedAt.getTime());
+  return {
+    agents: rows.slice(0, RECENTLY_CLOSED_LIMIT),
+    hasMore: input.fetchedHasMore || rows.length > RECENTLY_CLOSED_LIMIT,
+  };
 }
 
-export async function fetchWorkspaceAgents(input: {
+/**
+ * One page of the workspace's archived agents, most recently archived first: archiving stamps an
+ * agent's updatedAt, so updated_at order is close order.
+ */
+export async function fetchRecentlyArchivedAgents(input: {
   client: Pick<DaemonClient, "fetchAgentHistory">;
   serverId: string;
   workspaceId: string;
-}): Promise<Agent[]> {
-  const agents: Agent[] = [];
-  let cursor: string | null = null;
-  do {
-    const payload = await input.client.fetchAgentHistory({
-      filter: { workspaceIds: [input.workspaceId], includeArchived: true },
-      sort: [{ key: "updated_at", direction: "desc" }],
-      page: cursor ? { limit: PAGE_LIMIT, cursor } : { limit: PAGE_LIMIT },
-    });
-    const state = buildAgentDirectoryState({ serverId: input.serverId, entries: payload.entries });
-    agents.push(...state.agents.values());
-    cursor = payload.pageInfo.hasMore ? payload.pageInfo.nextCursor : null;
-  } while (cursor);
-  return agents;
+}): Promise<{ agents: Agent[]; hasMore: boolean }> {
+  const payload = await input.client.fetchAgentHistory({
+    filter: { workspaceIds: [input.workspaceId], includeArchived: true, archivedOnly: true },
+    sort: [{ key: "updated_at", direction: "desc" }],
+    page: { limit: PAGE_LIMIT },
+  });
+  const state = buildAgentDirectoryState({ serverId: input.serverId, entries: payload.entries });
+  return { agents: [...state.agents.values()], hasMore: payload.pageInfo.hasMore };
 }
 
 export interface WorkspaceRecentlyClosed {
   agents: RecentlyClosedAgent[];
-  /** Unarchives the agent. Rejects with the host's error. */
+  /** More closed agents than listed; History has them all. */
+  hasMore: boolean;
+  /** Refreshes the agent, which unarchives it. Rejects with the host's error. */
   reopen: (agentId: string) => Promise<void>;
 }
 
@@ -93,23 +98,24 @@ export function useWorkspaceRecentlyClosed(
   const queryKey = useMemo(() => [...QUERY_ROOT, serverId, workspaceId], [serverId, workspaceId]);
   const query = useFetchQuery({
     queryKey,
-    dataShape: "list",
+    dataShape: "value",
     staleTimeMs: 5_000,
     enabled,
     queryFn: () => {
       invariant(client, "The query runs only while enabled");
-      return fetchWorkspaceAgents({ client, serverId, workspaceId });
+      return fetchRecentlyArchivedAgents({ client, serverId, workspaceId });
     },
   });
-  const agents = useMemo(
+  const selected = useMemo(
     () =>
       enabled
         ? selectRecentlyClosedAgents({
             workspaceId,
-            fetched: query.data ?? [],
+            fetched: query.data?.agents ?? [],
+            fetchedHasMore: query.data?.hasMore ?? false,
             live: liveAgents?.values(),
           })
-        : [],
+        : { agents: [], hasMore: false },
     [enabled, liveAgents, query.data, workspaceId],
   );
 
@@ -125,5 +131,5 @@ export function useWorkspaceRecentlyClosed(
     [client, queryKey],
   );
 
-  return { agents, reopen };
+  return { agents: selected.agents, hasMore: selected.hasMore, reopen };
 }

@@ -312,10 +312,12 @@ the workspace comes back with the tabs it had. Agents archived on their own befo
 and agents since moved elsewhere, stay archived. Unarchiving an agent clears the tag.
 
 Closing an agent's tab archives the agent, so the New tab screen and the tab bar's + menu list the
-workspace's archived top-level agents under **Recently closed** (newest five; older ones are in
-History). Reopen unarchives the agent, then focuses its tab: opened first, the tab would be
-dropped while the agent still reads as archived. The list comes from `fetch_agent_history_request`
-filtered by `workspaceIds`, gated on `server_info.features.agentWorkspaceFilter`.
+workspace's archived top-level agents under **Recently closed**: the newest five, then **Show all in
+History**, which opens History narrowed to that workspace (`/sessions?serverId=…&workspaceId=…`).
+The list reads one page of `fetch_agent_history_request` with `workspaceIds` and `archivedOnly`; archiving stamps `updatedAt`, so `updated_at` order is
+close order. Reopen unarchives the agent, then focuses its tab: opened first, the tab would be
+dropped while the agent still reads as archived. Both filters are gated on
+`server_info.features.agentWorkspaceFilter`.
 
 Opening an agent is a navigation choice, independent of whether its details are cached. The
 layout retains that choice across reload while the panel fetches the agent from the daemon.

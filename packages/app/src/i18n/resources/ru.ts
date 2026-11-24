@@ -317,6 +317,11 @@ export const ru: TranslationResources = {
     tooManyMatches: "Слишком много совпадений — уточните запрос",
     hostLoadFailed: "{{host}}: не удалось загрузить историю",
     searchPlaceholder: "Поиск по истории",
+    workspaceFilter: {
+      label: "Рабочее пространство: {{name}}",
+      clear: "Показать все рабочие пространства",
+      unnamed: "Это рабочее пространство",
+    },
     views: {
       agents: "Агенты",
       archivedWorkspaces: "Архивные рабочие пространства",
@@ -738,6 +743,7 @@ export const ru: TranslationResources = {
         editTerminalProfiles: "Изменить профили",
         recentlyClosed: "Недавно закрытые",
         untitledAgent: "Агент без названия",
+        showAllClosed: "Показать всё в истории",
       },
       explorerSidebar: {
         open: "Открыть боковую панель",

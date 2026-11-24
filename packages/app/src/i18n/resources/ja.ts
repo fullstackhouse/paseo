@@ -318,6 +318,11 @@ export const ja: TranslationResources = {
     tooManyMatches: "一致が多すぎます — 検索条件を絞ってください",
     hostLoadFailed: "{{host}}: 履歴を読み込めませんでした",
     searchPlaceholder: "履歴を検索",
+    workspaceFilter: {
+      label: "ワークスペース: {{name}}",
+      clear: "すべてのワークスペースを表示",
+      unnamed: "このワークスペース",
+    },
     views: {
       agents: "エージェント",
       archivedWorkspaces: "アーカイブ済みワークスペース",
@@ -740,6 +745,7 @@ export const ja: TranslationResources = {
         editTerminalProfiles: "プロファイルを編集",
         recentlyClosed: "最近閉じたタブ",
         untitledAgent: "無題のエージェント",
+        showAllClosed: "履歴ですべて表示",
       },
       explorerSidebar: {
         open: "サイドパネルを開く",
