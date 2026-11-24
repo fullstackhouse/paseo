@@ -3,6 +3,7 @@ import type { WorkspaceDescriptor } from "@/stores/session-store";
 import type { WorkspaceRecoveryModel } from "@/workspace-recovery/model";
 import {
   resolveArchivedPreviewAgentId,
+  resolveRemovedWorkspaceRedirect,
   resolveWorkspaceRouteState,
   shouldInspectWorkspaceRecovery,
 } from "./workspace-route-state";
@@ -251,5 +252,49 @@ describe("shouldInspectWorkspaceRecovery", () => {
       shouldInspectWorkspaceRecovery(true, createWorkspaceDescriptor(), { kind: "overview" }),
     ).toBe(false);
     expect(shouldInspectWorkspaceRecovery(false, null, { kind: "overview" })).toBe(false);
+  });
+});
+
+describe("resolveRemovedWorkspaceRedirect", () => {
+  const worktree: WorkspaceDescriptor = {
+    ...createWorkspaceDescriptor(),
+    id: "/repo/project/.paseo/worktrees/feature",
+    workspaceDirectory: "/repo/project/.paseo/worktrees/feature",
+    workspaceKind: "worktree",
+  };
+
+  it("opens New workspace for the project when a workspace it showed goes missing", () => {
+    expect(
+      resolveRemovedWorkspaceRedirect({
+        serverId: "server-1",
+        state: resolve({ workspace: null, recovery: { kind: "idle" } }),
+        lastLiveWorkspace: worktree,
+      }),
+    ).toBe("/new?serverId=server-1&dir=%2Frepo%2Fproject&name=Project&projectId=project-1");
+  });
+
+  it("keeps the unavailable screen for a route that never showed the workspace", () => {
+    expect(
+      resolveRemovedWorkspaceRedirect({
+        serverId: "server-1",
+        state: resolve({ workspace: null, recovery: { kind: "idle" } }),
+        lastLiveWorkspace: null,
+      }),
+    ).toBeNull();
+  });
+
+  it("stays while the host is offline or the workspace is still there", () => {
+    for (const state of [
+      resolve({ workspace: null, connectionStatus: "offline", recovery: { kind: "idle" } }),
+      resolve({ workspace: worktree }),
+    ]) {
+      expect(
+        resolveRemovedWorkspaceRedirect({
+          serverId: "server-1",
+          state,
+          lastLiveWorkspace: worktree,
+        }),
+      ).toBeNull();
+    }
   });
 });
