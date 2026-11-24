@@ -133,6 +133,29 @@ describe("workspace navigation", () => {
     ]);
   });
 
+  it("keeps the saved tab when only finished agents need attention", () => {
+    const workspace = {
+      id: "workspace-a",
+      workspaceDirectory: "/repo/workspace-a",
+    } as WorkspaceDescriptor;
+    const agent = {
+      id: "agent-1",
+      cwd: "/repo/workspace-a",
+      workspaceId: "workspace-a",
+      requiresAttention: true,
+      attentionReason: "finished",
+    } as unknown as Agent;
+    const { deps, openedTabs, revealed } = createFakeDeps({
+      getSessionWorkspaces: () => new Map([[workspace.id, workspace]]),
+      getSessionAgents: () => [agent],
+    });
+
+    navigateToWorkspace({ serverId: "server-1", workspaceId: "workspace-a" }, deps);
+
+    expect(openedTabs).toEqual([]);
+    expect(revealed).toEqual([null]);
+  });
+
   it("keeps an explicit tab authoritative over an attention agent", () => {
     const workspace = {
       id: "workspace-a",
