@@ -2196,6 +2196,8 @@ export class VoiceAssistantWebSocketServer {
         workspaceAttentionReport: true,
         // COMPAT(workspaceManualGroup): FSH-only, added after v0.15.4, remove gate after 2027-05-21.
         workspaceManualGroup: true,
+        // COMPAT(workspaceAppearance): FSH-only, added after v0.17.1, remove gate after 2027-05-23.
+        workspaceAppearance: true,
         // COMPAT(scheduleRunAttention): FSH-only, added after v0.15.4, remove gate after 2027-05-16.
         scheduleRunAttention: true,
         // COMPAT(skillManagement): added in v0.4.0, remove gate after 2027-08-16.

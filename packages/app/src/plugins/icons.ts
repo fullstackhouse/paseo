@@ -139,7 +139,8 @@ export function PluginIconView({ icon, size, color }: PluginIconViewProps): Reac
   return createElement(pluginIconComponent(icon), { size, color });
 }
 
-function isRenderable(icon: PluginIcon): boolean {
+/** Whether `icon` draws anything: a known Lucide name, valid SVG, or a component. */
+export function isRenderablePluginIcon(icon: PluginIcon): boolean {
   if (typeof icon === "string") return findLucideIcon(icon) !== null;
   if (isSvgIcon(icon)) return findSvgIconProblem(icon.svg) === null;
   return isComponent(icon);
@@ -148,7 +149,7 @@ function isRenderable(icon: PluginIcon): boolean {
 /** The kit `Icon`. Plugin code passes it anything, so an unusable icon renders nothing. */
 export function Icon(props: IconProps): ReactElement | null {
   const icon = props.icon === undefined ? props.name : props.icon;
-  if (!isRenderable(icon)) return null;
+  if (!isRenderablePluginIcon(icon)) return null;
   const size = props.size ?? 24;
   const color = props.color ?? "currentColor";
   return createElement(PluginIconView, { icon, size, color });

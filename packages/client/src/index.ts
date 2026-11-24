@@ -36,10 +36,15 @@ import type {
   WorkspaceProjectDescriptorPayload,
   RefreshProvidersSnapshotResponseMessage,
   SessionOutboundMessage,
+  WorkspaceAppearance,
   WorkspaceDescriptorPayload,
   WorkspaceCreateRequest,
 } from "@getpaseo/protocol/messages";
-import { DaemonClient, type CreateAgentRequestOptions } from "./daemon-client.js";
+import {
+  DaemonClient,
+  type CreateAgentRequestOptions,
+  type WorkspaceAppearanceInput,
+} from "./daemon-client.js";
 import {
   createTerminalActions,
   type PaseoTerminalActions,
@@ -71,6 +76,7 @@ import type {
   SendMessageOptions,
   WaitForFinishResult,
 } from "./daemon-client.js";
+export type { WorkspaceAppearance, WorkspaceAppearanceInput };
 
 /**
  * Coding turns routinely run for minutes, so the handle waits far longer than
@@ -211,6 +217,16 @@ export interface PaseoWorkspaceHandle {
    * and the sidebar skip background workspaces. Needs `server_info.features.workspaceBackgroundSet`.
    */
   setBackground(background: boolean, requestId?: string): Promise<{ background: boolean }>;
+  /**
+   * Marks the workspace in the sidebar: `avatar` (base64 PNG, JPEG, GIF or WebP, square, up to
+   * 256 px and 16 KB) replaces the project icon on its row, and `titleIcon` (a Lucide icon name, `Inbox`)
+   * sits before its title. Replaces the whole appearance; both null clears it.
+   * Needs `server_info.features.workspaceAppearance`.
+   */
+  setAppearance(
+    appearance: WorkspaceAppearanceInput,
+    requestId?: string,
+  ): Promise<WorkspaceAppearance | null>;
   /**
    * Snoozes the workspace until `until` (ISO), or indefinitely when `until` is null or omitted;
    * `snoozed: false` wakes it. Needs `server_info.features.workspaceSnooze`. `wakePrompt` is sent
@@ -1093,6 +1109,8 @@ function createWorkspaceHandleFactory(
         daemonClient.setWorkspaceBaseBranch({ ...options, workspaceId: id }),
       setBackground: (background, requestId) =>
         daemonClient.setWorkspaceBackground(id, background, requestId),
+      setAppearance: (appearance, requestId) =>
+        daemonClient.setWorkspaceAppearance(id, appearance, { requestId }),
       setSnoozed: (snoozed, until, options) =>
         daemonClient.setWorkspaceSnoozed(id, snoozed, until ?? null, options),
       reportNeedsYou: (options) => daemonClient.reportWorkspaceAttention(id, options),

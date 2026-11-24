@@ -5,8 +5,10 @@ import type { Logger } from "pino";
 import { z } from "zod";
 import {
   ProjectLastAgentSetupSchema,
+  WorkspaceAppearanceSchema,
   WorkspaceManualGroupSchema,
   type ProjectLastAgentSetup,
+  type WorkspaceAppearance,
   type WorkspaceManualGroup,
 } from "@getpaseo/protocol/messages";
 
@@ -137,6 +139,10 @@ const PersistedWorkspaceRecordSchema = z.object({
   // COMPAT(workspaceManualGroup): FSH-only. The sidebar group the user moved the workspace to by hand,
   // until one of its agents starts a turn.
   manualGroup: WorkspaceManualGroupSchema.nullable()
+    .optional()
+    .transform((value) => value ?? null),
+  // COMPAT(workspaceAppearance): FSH-only. How a plugin marks the workspace in the sidebar.
+  appearance: WorkspaceAppearanceSchema.nullable()
     .optional()
     .transform((value) => value ?? null),
   labels: z.array(z.string()).optional(),
@@ -764,6 +770,7 @@ export function createPersistedWorkspaceRecord(input: {
   snoozedUntil?: string | null;
   snoozeWakePrompt?: string | null;
   manualGroup?: WorkspaceManualGroup | null;
+  appearance?: WorkspaceAppearance | null;
   labels?: string[];
   metadata?: Record<string, JsonValue>;
   untrustedSource?: UntrustedWorkspaceSource;
@@ -787,6 +794,7 @@ export function createPersistedWorkspaceRecord(input: {
     snoozedUntil: input.snoozedUntil ?? null,
     snoozeWakePrompt: input.snoozeWakePrompt ?? null,
     manualGroup: input.manualGroup ?? null,
+    appearance: input.appearance ?? null,
   });
 }
 

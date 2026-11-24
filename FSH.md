@@ -20,6 +20,7 @@ temporary by design: every patch is meant to go upstream and then drop out of `f
 
 - FSH-only: `latestTurn()` in `@getpaseo/plugin/server` reads an agent's last turn (its last user message and everything after it). Upstream took the rest of getpaseo/paseo#9307 as #9573 but reads turns with `timeline.refetch({ wholeTurns: true })`; paseo-asks and paseo-status still call `latestTurn()`. Drop it once they don't
 - FSH-only: a Claude turn that ends on a usage limit, login or API error keeps Claude's reply as a plain assistant message and adds no `[System Error]` copy of the same text; the turn still fails (upstream #8480). Upstream shows only the `[System Error]` row, which paseo-limits' anchored patterns don't match, so its Retry / Log in card would never appear
+- FSH-only (upstreamable): plugins mark the workspaces they create in the sidebar. `workspaces.ref(id).setAppearance({ avatar, titleIcon })` puts an avatar in place of the project icon (status badge kept) and a Lucide icon before the title. Gated on `features.workspaceAppearance`. Inbox uses it for reviews: the PR author's avatar and an `Inbox` icon
 
 - FSH-only (upstreamable): agent snapshots carry `capabilities.supportsSteering` (Claude, Codex, OpenCode, Pi, OMP, and provider plugins that negotiate `prompt.steer`), so plugins steer a running agent when it joins the turn and wait for the turn to end when a steer would interrupt it.
 

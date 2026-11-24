@@ -406,7 +406,22 @@ describe("ReplicaCache", () => {
     ).toEqual(manualGroup);
   });
 
-  it.each(["createdAt", "lastUserMessageAt", "manualGroup"])(
+  it("keeps a plugin's mark on a workspace across cache reopen", async () => {
+    const storage = new MemoryStorage();
+    const writer = createCache(storage);
+    const baseline = directory();
+    const appearance = { avatar: { data: "aGk=", mimeType: "image/png" }, titleIcon: "Inbox" };
+    const workspace = normalizeWorkspaceDescriptor({ ...workspacePayload(), appearance });
+    baseline.workspaces.set(workspace.id, workspace);
+    commitDirectory(writer, SERVER_ID, baseline);
+    await writer.flush();
+    const reader = createCache(storage);
+    expect(
+      (await reader.readDirectory(SERVER_ID)).workspaces.get(workspace.id)?.appearance,
+    ).toEqual(appearance);
+  });
+
+  it.each(["createdAt", "lastUserMessageAt", "manualGroup", "appearance"])(
     "refetches workspaces cached without %s",
     async (field) => {
       const cached = await cacheWithoutBackgroundVisibility();
