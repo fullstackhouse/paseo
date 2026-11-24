@@ -62,6 +62,7 @@ describe("pickDeliveryAgentId", () => {
 
   it("picks the focused agent when its parent lives in another workspace", () => {
     const agents = [
+      agent("launcher", { workspaceId: "ws-2" }),
       agent("first", { parentAgentId: "launcher" }),
       agent("second", {
         parentAgentId: "launcher",
