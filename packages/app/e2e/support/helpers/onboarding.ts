@@ -154,6 +154,18 @@ export async function hostGivesAgentsPaseoTools(host: { port: number }): Promise
   }
 }
 
+/** The skills the host bundles, read from the host itself. */
+export async function hostBundledSkills(host: { port: number }): Promise<string[]> {
+  const client = await connectDaemonClient<
+    Pick<InternalDaemonClient, "connect" | "close" | "getAgentSkillsStatus">
+  >({ clientIdPrefix: "app-e2e-onboarding", port: host.port });
+  try {
+    return [...(await client.getAgentSkillsStatus()).available].sort();
+  } finally {
+    await client.close();
+  }
+}
+
 export async function finishSetup(page: Page): Promise<void> {
   await setupModal(page).getByRole("button", { name: "Finish", exact: true }).click();
   await expect(setupModal(page)).toHaveCount(0);
@@ -191,20 +203,24 @@ export async function openTailscaleDocsFromSetup(page: Page): Promise<string> {
 export interface SetupHost {
   serverId: string;
   port: number;
+  /** The host's HOME, where skills land in .agents/skills and .claude/skills. */
+  home: string;
   close(): Promise<void>;
 }
 
 /**
  * An isolated host whose only agent history is the Claude sessions given here, so suggestions
  * never depend on the machine running the test. Its HOME is a scratch folder, so the skills setup
- * installs never land in the real ~/.agents, ~/.claude, ~/.codex, or ~/.gemini/config. `withBrokenProvider` adds a
- * provider that cannot start.
+ * installs never land in the real ~/.agents, ~/.claude, ~/.codex, or ~/.gemini/config. It starts with
+ * no skills installed; `defaultSkillsInstall` lets it install every skill on first start, as a real
+ * new host does. `withBrokenProvider` adds a provider that cannot start.
  */
 export async function startSetupHost(
   label: string,
   options: {
     claudeSessionsIn?: readonly string[];
     withBrokenProvider?: boolean;
+    defaultSkillsInstall?: boolean;
     mutableRelay?: IsolatedHostDaemonOptions["mutableRelay"];
   } = {},
 ): Promise<SetupHost> {
@@ -212,13 +228,17 @@ export async function startSetupHost(
   const claudeConfigDir = await seedClaudeHistory(options.claudeSessionsIn ?? []);
   const home = await mkdtemp(path.join(tmpdir(), "paseo-onboarding-home-"));
   const daemon = await startIsolatedHostDaemon(serverId, {
-    config: claudeOnlyConfig({ withBrokenProvider: options.withBrokenProvider ?? false }),
+    config: claudeOnlyConfig({
+      withBrokenProvider: options.withBrokenProvider ?? false,
+      defaultSkillsInstall: options.defaultSkillsInstall ?? false,
+    }),
     environment: { ...process.env, HOME: home, CLAUDE_CONFIG_DIR: claudeConfigDir },
     mutableRelay: options.mutableRelay,
   });
   return {
     serverId,
     port: daemon.port,
+    home,
     close: async () => {
       await daemon.close();
       await rm(claudeConfigDir, { recursive: true, force: true });
@@ -250,7 +270,7 @@ async function seedClaudeHistory(cwds: readonly string[]): Promise<string> {
   return configDir;
 }
 
-function claudeOnlyConfig(options: { withBrokenProvider: boolean }) {
+function claudeOnlyConfig(options: { withBrokenProvider: boolean; defaultSkillsInstall: boolean }) {
   const brokenProvider = {
     "broken-acp": {
       extends: "acp",
@@ -260,7 +280,7 @@ function claudeOnlyConfig(options: { withBrokenProvider: boolean }) {
   };
   return {
     agents: {
-      ...NO_SKILLS_INSTALLED_CONFIG.agents,
+      ...(options.defaultSkillsInstall ? {} : NO_SKILLS_INSTALLED_CONFIG.agents),
       providers: {
         codex: { enabled: false },
         copilot: { enabled: false },

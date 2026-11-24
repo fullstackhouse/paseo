@@ -9,6 +9,7 @@ import {
   expectSheetCoversSetupCard,
   finishSetup,
   goToSetupStep,
+  hostBundledSkills,
   hostGivesAgentsPaseoTools,
   openAppAsNewUser,
   openRelayPairingFromSetup,
@@ -30,8 +31,10 @@ import {
   startSetupHost,
 } from "../support/helpers/onboarding";
 import {
+  answerNextRemovalWarning,
   chooseCustomSkills,
   openSkillSelection,
+  readInstalledSkills,
   saveSkillSelection,
 } from "../support/helpers/agent-skills";
 import { installDaemonWebSocketGate } from "../support/helpers/daemon-websocket-gate";
@@ -448,6 +451,56 @@ test("with no skills picked, skills read as off and Continue moves on", async ({
 
     await continueSetup(page);
     await expectSetupStep(page, "Take your agents with you");
+  } finally {
+    await host.close();
+  }
+});
+
+test("on a host that installed skills by default, turning skills off asks before uninstalling", async ({
+  page,
+}) => {
+  const host = await startSetupHost("skills-off", { defaultSkillsInstall: true });
+  const skillDirs = [
+    path.join(host.home, ".agents", "skills"),
+    path.join(host.home, ".claude", "skills"),
+  ];
+  const installedEverywhere = () => Promise.all(skillDirs.map(readInstalledSkills));
+
+  try {
+    // A real new host installs every skill on first start, one folder at a time in the
+    // background. Wait for the whole bundle so the decline check below compares full sets.
+    const bundled = await hostBundledSkills(host);
+    expect(bundled).not.toEqual([]);
+    const allInstalled = skillDirs.map(() => bundled);
+    await expect.poll(installedEverywhere).toEqual(allInstalled);
+
+    await openAppAsNewUser(page, host);
+    await expectSetupStep(page, "Welcome to Paseo");
+    await goToSetupStep(page, "Orchestration");
+    await expectSetupStep(page, "Let agents use Paseo");
+    const skillsSwitch = setupModal(page).getByRole("switch", {
+      name: "Orchestration skills",
+      exact: true,
+    });
+    await expect(skillsSwitch).toBeChecked();
+    await skillsSwitch.click();
+    await expect(skillsSwitch).not.toBeChecked();
+
+    await test.step("declining the confirmation keeps the skills and the step", async () => {
+      const declined = answerNextRemovalWarning(page, "dismiss");
+      await continueSetup(page);
+      expect((await declined).message()).toContain("Uninstall Paseo skills?");
+      await expectSetupStep(page, "Let agents use Paseo");
+      expect(await installedEverywhere()).toEqual(allInstalled);
+    });
+
+    await test.step("accepting it uninstalls the skills and moves on", async () => {
+      const accepted = answerNextRemovalWarning(page, "accept");
+      await continueSetup(page);
+      expect((await accepted).message()).toContain("Uninstall Paseo skills?");
+      await expectSetupStep(page, "Take your agents with you");
+      await expect.poll(installedEverywhere).toEqual(skillDirs.map(() => []));
+    });
   } finally {
     await host.close();
   }
