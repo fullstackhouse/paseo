@@ -4,7 +4,7 @@ import {
   formatAgentMessage,
   formatSystemNotificationPrompt,
 } from "./agent-messages/index.js";
-import { expect, test, vi, onTestFinished } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi, onTestFinished } from "vitest";
 import { spawn } from "node:child_process";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -4777,6 +4777,106 @@ test("reloadAgentSession passes daemon launch env through the provider launch co
       PASEO_AGENT_ID: snapshot.id,
       PASEO_AGENT_CWD: workdir,
     },
+  });
+});
+
+describe("agent working time", () => {
+  const AGENT_ID = "00000000-0000-4000-8000-0000000001a7";
+
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"], now: new Date("2026-07-12T10:00:00.000Z") });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  async function createWorkingAgent() {
+    const workdir = mkdtempSync(join(tmpdir(), "agent-manager-work-"));
+    onTestFinished(() => rmSync(workdir, { recursive: true, force: true }));
+    const storage = new AgentStorage(join(workdir, "agents"), logger);
+    const sessions: TestAgentSession[] = [];
+    class RecordingClient extends TestAgentClient {
+      override async createSession(config: AgentSessionConfig): Promise<AgentSession> {
+        const session = new TestAgentSession(config);
+        sessions.push(session);
+        return session;
+      }
+      override async resumeSession(): Promise<AgentSession> {
+        return this.createSession({ provider: "codex", cwd: workdir });
+      }
+    }
+    const manager = new AgentManager({
+      clients: { codex: new RecordingClient() },
+      registry: storage,
+      logger,
+      idFactory: () => AGENT_ID,
+    });
+    await manager.createAgent({ provider: "codex", cwd: workdir }, undefined, {
+      workspaceId: undefined,
+    });
+    // vi.waitFor moves the fake clock on every retry.
+    const activeTurn = async (turnId: string | null) => {
+      while (manager.getAgent(AGENT_ID)?.activeTurnId !== turnId) {
+        await new Promise((resolve) => setImmediate(resolve));
+      }
+    };
+    const openTurn = async (turnId: string) => {
+      sessions.at(-1)?.pushEvent({ type: "turn_started", provider: "codex", turnId });
+      await activeTurn(turnId);
+    };
+    const closeTurn = async (turnId: string) => {
+      sessions.at(-1)?.pushEvent({ type: "turn_completed", provider: "codex", turnId });
+      await activeTurn(null);
+    };
+    return { manager, storage, openTurn, closeTurn };
+  }
+
+  test("adds up finished turns without the idle time between them", async () => {
+    const { manager, openTurn, closeTurn } = await createWorkingAgent();
+
+    await openTurn("first");
+    vi.setSystemTime(new Date("2026-07-12T10:02:00.000Z"));
+    expect(manager.getAgent(AGENT_ID)?.workedMs).toBe(0);
+    await closeTurn("first");
+    vi.setSystemTime(new Date("2026-07-12T13:00:00.000Z"));
+    await openTurn("second");
+    vi.setSystemTime(new Date("2026-07-12T13:03:00.000Z"));
+    await closeTurn("second");
+
+    expect(manager.getAgent(AGENT_ID)?.workedMs).toBe(5 * 60_000);
+  });
+
+  test("keeps the time of a turn cut short by a reload, and stores it", async () => {
+    const { manager, storage, openTurn } = await createWorkingAgent();
+
+    await openTurn("cut-short");
+    vi.setSystemTime(new Date("2026-07-12T10:04:00.000Z"));
+    await manager.reloadAgentSession(AGENT_ID);
+    await manager.flush();
+
+    expect(manager.getAgent(AGENT_ID)?.workedMs).toBe(4 * 60_000);
+    expect((await storage.get(AGENT_ID))?.workedMs).toBe(4 * 60_000);
+  });
+
+  test("reports no total for an agent whose earlier turns were not recorded", async () => {
+    const { manager, storage, openTurn, closeTurn } = await createWorkingAgent();
+    await manager.flush();
+    const record = await storage.get(AGENT_ID);
+    if (!record?.persistence) throw new Error("expected a stored agent with a session");
+    await manager.closeAgent(AGENT_ID);
+    await manager.resumeAgentFromPersistence(
+      { ...record.persistence, provider: "codex" },
+      { cwd: record.cwd },
+      AGENT_ID,
+      { createdAt: new Date(record.createdAt) },
+    );
+
+    await openTurn("after-upgrade");
+    vi.setSystemTime(new Date("2026-07-12T10:02:00.000Z"));
+    await closeTurn("after-upgrade");
+
+    expect(manager.getAgent(AGENT_ID)?.workedMs).toBeUndefined();
   });
 });
 

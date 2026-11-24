@@ -129,6 +129,46 @@ describe("observeReplaySubagents", () => {
     expect(live.resolveSubagentId("resumed-tool")).toBe(TOOL_USE_ID);
   });
 
+  it("keeps the idle time before a resume out of a replayed child's work", async () => {
+    const entries: ClaudeReplayEntry[] = [
+      {
+        type: "user",
+        timestamp: "2026-07-12T10:00:00.000Z",
+        message: { content: "Summarize the docs" },
+      },
+      {
+        type: "assistant",
+        timestamp: "2026-07-12T10:02:00.000Z",
+        message: {
+          model: "claude-opus-5",
+          stop_reason: "end_turn",
+          usage: { input_tokens: 10, output_tokens: 2 },
+        },
+      },
+      {
+        type: "user",
+        timestamp: "2026-07-12T13:00:00.000Z",
+        message: { content: "Now the other half" },
+      },
+      {
+        type: "assistant",
+        timestamp: "2026-07-12T13:03:00.000Z",
+        message: { model: "claude-opus-5", stop_reason: "end_turn" },
+      },
+    ];
+    const replay = await observeReplaySubagents({
+      subagents: [{ agentId: AGENT_ID, meta: { toolUseId: TOOL_USE_ID }, entries }],
+      parent: parentWithTaskCall(),
+      convertEntry: () => [],
+    });
+
+    expect(applyToStore(replay.observations)).toMatchObject({
+      status: "completed",
+      workedMs: 5 * 60_000,
+      runStartedAt: null,
+    });
+  });
+
   it("links a subagent to its Task call through meta.toolUseId", async () => {
     const observations = (
       await observeReplaySubagents({

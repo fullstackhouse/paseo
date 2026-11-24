@@ -23,6 +23,10 @@ export interface ProviderSubagentDescriptor {
   toolCallId: string | null;
   cwd: string | null;
   subtitle: string | null;
+  /** Time in finished runs. Idle time between runs is not work. */
+  workedMs: number;
+  /** When the open run started, or null while the child is not running. */
+  runStartedAt: string | null;
 }
 
 export type ProviderSubagentInputEvent =
@@ -75,8 +79,31 @@ function stickyField<T>(next: T | undefined, previous: T | null | undefined): T 
   return next === undefined ? (previous ?? null) : next;
 }
 
+type ProviderSubagentWork = Pick<ProviderSubagentDescriptor, "workedMs" | "runStartedAt">;
+
+function advanceWork(
+  previous: ProviderSubagentDescriptor | undefined,
+  lastRunEndedAt: string | undefined,
+  next: Pick<ProviderSubagentDescriptor, "status" | "updatedAt">,
+): ProviderSubagentWork {
+  const { workedMs, runStartedAt } = previous ?? { workedMs: 0, runStartedAt: null };
+  const timestamp = next.updatedAt;
+  if (next.status === "running") {
+    if (runStartedAt !== null) return { workedMs, runStartedAt };
+    // A run that starts before the last one ended is history replayed over a finished child, so
+    // its time is already in the total.
+    const isReplay =
+      lastRunEndedAt !== undefined && Date.parse(timestamp) < Date.parse(lastRunEndedAt);
+    return { workedMs: isReplay ? 0 : workedMs, runStartedAt: timestamp };
+  }
+  if (runStartedAt === null) return { workedMs, runStartedAt };
+  const runMs = Math.max(0, Date.parse(timestamp) - Date.parse(runStartedAt));
+  return { workedMs: workedMs + runMs, runStartedAt: null };
+}
+
 export class ProviderSubagentStore {
   private readonly descriptors = new Map<string, ProviderSubagentDescriptor>();
+  private readonly lastRunEndedAt = new Map<string, string>();
   private readonly timelines = new InMemoryAgentTimelineStore();
 
   apply(
@@ -87,6 +114,7 @@ export class ProviderSubagentStore {
     const key = storeKey(parentAgentId, event.id);
     if (event.type === "remove") {
       this.descriptors.delete(key);
+      this.lastRunEndedAt.delete(key);
       this.timelines.delete(key);
       return { type: "remove", parentAgentId, subagentId: event.id };
     }
@@ -113,20 +141,25 @@ export class ProviderSubagentStore {
       this.timelines.initialize(key);
     }
     const timestamp = event.timestamp ?? new Date().toISOString();
+    const status = event.status ?? previous?.status ?? "running";
     const subagent: ProviderSubagentDescriptor = {
       id: event.id,
       parentAgentId,
       provider,
       title: stickyField(event.title, previous?.title),
       description: stickyField(event.description, previous?.description),
-      status: event.status ?? previous?.status ?? "running",
+      status,
       createdAt: previous?.createdAt ?? timestamp,
       updatedAt: timestamp,
       toolCallId: stickyField(event.toolCallId, previous?.toolCallId),
       cwd: stickyField(event.cwd, previous?.cwd),
       subtitle: stickyField(event.subtitle, previous?.subtitle),
       parentSubagentId: stickyField(event.parentSubagentId, previous?.parentSubagentId),
+      ...advanceWork(previous, this.lastRunEndedAt.get(key), { status, updatedAt: timestamp }),
     };
+    if (previous?.runStartedAt && subagent.runStartedAt === null) {
+      this.lastRunEndedAt.set(key, timestamp);
+    }
     this.descriptors.set(key, subagent);
     return { type: "upsert", subagent };
   }
@@ -158,6 +191,7 @@ export class ProviderSubagentStore {
     for (const subagent of this.list(parentAgentId)) {
       const key = storeKey(parentAgentId, subagent.id);
       this.descriptors.delete(key);
+      this.lastRunEndedAt.delete(key);
       this.timelines.delete(key);
       events.push({ type: "remove", parentAgentId, subagentId: subagent.id });
     }

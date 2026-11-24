@@ -14,6 +14,25 @@ function presentationStatus(row: SubagentRow) {
   return providerSubagentLifecycleStatus(row.status);
 }
 
+/** Below this a run has no duration worth reading, and "0s" would read as "did nothing". */
+const MIN_SHOWN_WORK_MS = 1000;
+
+export type SubagentRunTime =
+  | { kind: "running"; since: Date }
+  | { kind: "finished"; workedMs: number };
+
+/**
+ * How long the child has worked. A running child counts from a start moved back by its earlier
+ * runs, so the timer continues from where the last run stopped.
+ */
+export function buildSubagentRunTime(work: SubagentRow["work"]): SubagentRunTime | null {
+  if (!work) return null;
+  if (work.runStartedAt) {
+    return { kind: "running", since: new Date(work.runStartedAt.getTime() - work.workedMs) };
+  }
+  return work.workedMs < MIN_SHOWN_WORK_MS ? null : { kind: "finished", workedMs: work.workedMs };
+}
+
 export interface SubagentRowPresentationData {
   key: string;
   kind: "agent";

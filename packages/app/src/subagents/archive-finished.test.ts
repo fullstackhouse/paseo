@@ -16,6 +16,7 @@ function paseo(id: string, status: PaseoSubagentRow["status"] = "idle"): PaseoSu
       status === "running"
         ? { phase: "open", turnId: null, startedAt: null, cancellationRequestId: null }
         : { phase: "idle", cancellationRequestId: null },
+    work: null,
     requiresAttention: false,
     createdAt: new Date(),
   };
@@ -34,6 +35,7 @@ function provider(
     description: null,
     subtitle: null,
     status,
+    work: null,
     requiresAttention: false,
     createdAt: new Date(),
   };

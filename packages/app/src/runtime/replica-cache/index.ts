@@ -242,6 +242,7 @@ const StoredAgentSnapshotSchema = z.strictObject({
     })
     .nullable()
     .optional(),
+  workedMs: z.number().optional(),
   capabilities: AgentCapabilitiesSchema,
   currentModeId: z.string().nullable(),
   availableModes: z.array(z.never()).max(0),
@@ -637,6 +638,7 @@ function serializeAgent(agent: Agent): StoredAgent {
     updatedAt: agent.updatedAt.toISOString(),
     lastUserMessageAt: agent.lastUserMessageAt?.toISOString() ?? null,
     status: agent.status,
+    workedMs: agent.workedMs,
     ...(agent.turn.phase === "open" && agent.turn.turnId
       ? {
           activeTurn: {

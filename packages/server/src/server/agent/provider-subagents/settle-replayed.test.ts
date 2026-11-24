@@ -30,4 +30,39 @@ describe("settleReplayedSubagents", () => {
       { provider: "claude", event: { type: "upsert", id: "stale", status: "canceled" } },
     ]);
   });
+
+  test("dates the cancellation at the child's last event", () => {
+    const settled = settleReplayedSubagents([
+      {
+        provider: "claude",
+        event: {
+          type: "upsert",
+          id: "open",
+          status: "running",
+          timestamp: "2026-07-12T10:00:00.000Z",
+        },
+      },
+      {
+        provider: "claude",
+        event: {
+          type: "timeline",
+          id: "open",
+          item: { type: "assistant_message", text: "Still going" },
+          timestamp: "2026-07-12T10:04:00.000Z",
+        },
+      },
+    ]);
+
+    expect(settled.slice(2)).toEqual([
+      {
+        provider: "claude",
+        event: {
+          type: "upsert",
+          id: "open",
+          status: "canceled",
+          timestamp: "2026-07-12T10:04:00.000Z",
+        },
+      },
+    ]);
+  });
 });

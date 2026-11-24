@@ -266,10 +266,14 @@ async function observeSubagent(
     const timestamp = normalizeProviderReplayTimestamp(entry.timestamp);
     if (!seenEntry) firstTimestamp = timestamp;
     seenEntry = true;
-    lastTimestamp = timestamp;
     Object.assign(runtime, readRuntime(entry));
     usage = readUsage(entry) ?? usage;
-    childTerminalStatus = readChildTerminalStatus(entry, childTerminalStatus);
+    const nextTerminalStatus = readChildTerminalStatus(entry, childTerminalStatus);
+    if (childTerminalStatus && !nextTerminalStatus) {
+      timeline.push(...observeResume(link.id, childTerminalStatus, lastTimestamp, timestamp));
+    }
+    childTerminalStatus = nextTerminalStatus;
+    lastTimestamp = timestamp;
     recordReplayToolOwners(toolOwners, entry, link.id);
     for (const item of await convertEntry(entry)) {
       timeline.push({ kind: "timeline", id: link.id, item, ...(timestamp ? { timestamp } : {}) });
@@ -298,6 +302,20 @@ async function observeSubagent(
     });
   }
   return observations;
+}
+
+/** A finished child was resumed. Closing its run keeps the idle gap out of its work. */
+function observeResume(
+  id: string,
+  status: ProviderSubagentStatus,
+  finishedAt: string | null,
+  resumedAt: string | null,
+): SubagentObservation[] {
+  if (!finishedAt || !resumedAt) return [];
+  return [
+    { kind: "status", id, status, timestamp: finishedAt },
+    { kind: "status", id, status: "running", timestamp: resumedAt },
+  ];
 }
 
 /** Advance the child's fallback outcome without retaining transcript entries. */

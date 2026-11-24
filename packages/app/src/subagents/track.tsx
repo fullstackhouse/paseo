@@ -5,6 +5,7 @@ import { Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import { Archive, Unlink } from "lucide-react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
+import { LiveElapsed } from "@/components/message";
 import { useProviderIcon } from "@/components/provider-icons";
 import { ComposerTrackActions, ComposerTrackPill, ComposerTrackRow } from "@/composer/tracks";
 import { mutedIconColorMapping } from "@/components/ui/icon-button-chrome";
@@ -20,11 +21,13 @@ import { useAgentFactsLine } from "@/panels/agent-facts-line";
 import { getPanelManifest } from "@/panels/panel-manifest";
 import { useSheetPanePage } from "@/screens/workspace/sheet-pane";
 import type { SheetTab } from "@/stores/workspace-layout-store";
+import { formatDuration } from "@/utils/time";
 import type { SubagentRow } from "./select";
 import type { ArchiveFinishedStatus } from "./use-archive-finished";
 import {
   buildSubagentPillPresentation,
   buildSubagentRowPresentationData,
+  buildSubagentRunTime,
   countFinishedSubagents,
 } from "./track-presentation";
 
@@ -238,10 +241,10 @@ function SubagentsTrackRow({
           {row.kind === "paseo" ? (
             <>
               <SubagentFacts rowId={row.id} text={rowServerId !== serverId ? hostLabel : ""} />
-              <PaseoSubagentFacts serverId={rowServerId} agentId={row.id} />
+              <PaseoSubagentFacts serverId={rowServerId} agentId={row.id} work={row.work} />
             </>
           ) : (
-            <SubagentFacts rowId={row.id} text={presentation.subtitle} />
+            <SubagentFacts rowId={row.id} text={presentation.subtitle} work={row.work} />
           )}
         </View>
         {row.kind === "paseo" ? (
@@ -266,6 +269,7 @@ function SubagentsTrackRow({
       presentation,
       row.kind,
       row.id,
+      row.work,
       serverId,
       rowServerId,
       hostLabel,
@@ -285,17 +289,57 @@ function SubagentsTrackRow({
 }
 
 /** The same facts line the agent's sheet shows when it opens without its composer. */
-function PaseoSubagentFacts({ serverId, agentId }: { serverId: string; agentId: string }) {
+function PaseoSubagentFacts({
+  serverId,
+  agentId,
+  work,
+}: {
+  serverId: string;
+  agentId: string;
+  work: SubagentRow["work"];
+}) {
   const text = useAgentFactsLine(serverId, agentId);
-  return <SubagentFacts rowId={agentId} text={text} />;
+  return <SubagentFacts rowId={agentId} text={text} work={work} />;
 }
 
-function SubagentFacts({ rowId, text }: { rowId: string; text: string | null }) {
-  if (!text) return null;
+function SubagentFacts({
+  rowId,
+  text,
+  work = null,
+}: {
+  rowId: string;
+  text: string | null;
+  work?: SubagentRow["work"];
+}) {
+  const runTime = useMemo(() => buildSubagentRunTime(work), [work]);
+  if (!text && !runTime) return null;
   return (
-    <Text style={styles.rowFacts} numberOfLines={1} testID={`subagents-track-row-facts-${rowId}`}>
-      {text}
-    </Text>
+    <View style={styles.rowFactsLine}>
+      {text ? (
+        <Text
+          style={styles.rowFacts}
+          numberOfLines={1}
+          testID={`subagents-track-row-facts-${rowId}`}
+        >
+          {text}
+        </Text>
+      ) : null}
+      {runTime ? (
+        <Text style={styles.rowRunTime}>
+          {text ? " · " : null}
+          {runTime.kind === "running" ? (
+            <LiveElapsed
+              startedAt={runTime.since}
+              testID={`subagents-track-row-run-time-${rowId}`}
+            />
+          ) : (
+            <Text testID={`subagents-track-row-run-time-${rowId}`}>
+              {formatDuration(runTime.workedMs)}
+            </Text>
+          )}
+        </Text>
+      ) : null}
+    </View>
   );
 }
 
@@ -402,8 +446,20 @@ const styles = StyleSheet.create((theme) => ({
     fontSize: theme.fontSize.base,
     color: theme.colors.foreground,
   },
+  rowFactsLine: {
+    flexDirection: "row",
+  },
   rowFacts: {
+    flexShrink: 1,
+    minWidth: 0,
     fontSize: theme.fontSize.sm,
+    color: theme.colors.foregroundMuted,
+  },
+  // The time keeps its width and the facts truncate, so a long model name never hides it.
+  rowRunTime: {
+    flexShrink: 0,
+    fontSize: theme.fontSize.sm,
+    fontVariant: ["tabular-nums"],
     color: theme.colors.foregroundMuted,
   },
   // Progress on the archive row. It shrinks twice as fast as the label, so a long retry count
