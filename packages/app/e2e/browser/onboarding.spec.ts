@@ -8,6 +8,7 @@ import {
   expectSetupStep,
   finishSetup,
   goToSetupStep,
+  hostBundledSkills,
   hostGivesAgentsPaseoTools,
   openAppAsNewUser,
   openRelayPairingFromSetup,
@@ -409,12 +410,19 @@ test("on a host that installed skills by default, turning skills off asks before
   page,
 }) => {
   const host = await startSetupHost("skills-off", { defaultSkillsInstall: true });
-  const claudeSkills = path.join(host.home, ".claude", "skills");
+  const skillDirs = [
+    path.join(host.home, ".agents", "skills"),
+    path.join(host.home, ".claude", "skills"),
+  ];
+  const installedEverywhere = () => Promise.all(skillDirs.map(readInstalledSkills));
 
   try {
-    // A real new host installs every skill on first start, before setup reads them.
-    await expect.poll(() => readInstalledSkills(claudeSkills)).not.toEqual([]);
-    const installed = await readInstalledSkills(claudeSkills);
+    // A real new host installs every skill on first start, one folder at a time in the
+    // background. Wait for the whole bundle so the decline check below compares full sets.
+    const bundled = await hostBundledSkills(host);
+    expect(bundled).not.toEqual([]);
+    const allInstalled = skillDirs.map(() => bundled);
+    await expect.poll(installedEverywhere).toEqual(allInstalled);
 
     await openAppAsNewUser(page, host);
     await expectSetupStep(page, "Welcome to Paseo");
@@ -433,7 +441,7 @@ test("on a host that installed skills by default, turning skills off asks before
       await continueSetup(page);
       expect((await declined).message()).toContain("Uninstall Paseo skills?");
       await expectSetupStep(page, "Let agents use Paseo");
-      expect(await readInstalledSkills(claudeSkills)).toEqual(installed);
+      expect(await installedEverywhere()).toEqual(allInstalled);
     });
 
     await test.step("accepting it uninstalls the skills and moves on", async () => {
@@ -441,7 +449,7 @@ test("on a host that installed skills by default, turning skills off asks before
       await continueSetup(page);
       expect((await accepted).message()).toContain("Uninstall Paseo skills?");
       await expectSetupStep(page, "Take your agents with you");
-      await expect.poll(() => readInstalledSkills(claudeSkills)).toEqual([]);
+      await expect.poll(installedEverywhere).toEqual(skillDirs.map(() => []));
     });
   } finally {
     await host.close();

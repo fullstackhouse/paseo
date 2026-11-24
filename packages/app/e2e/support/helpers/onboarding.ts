@@ -143,6 +143,18 @@ export async function hostGivesAgentsPaseoTools(host: { port: number }): Promise
   }
 }
 
+/** The skills the host bundles, read from the host itself. */
+export async function hostBundledSkills(host: { port: number }): Promise<string[]> {
+  const client = await connectDaemonClient<
+    Pick<InternalDaemonClient, "connect" | "close" | "getAgentSkillsStatus">
+  >({ clientIdPrefix: "app-e2e-onboarding", port: host.port });
+  try {
+    return [...(await client.getAgentSkillsStatus()).available].sort();
+  } finally {
+    await client.close();
+  }
+}
+
 export async function finishSetup(page: Page): Promise<void> {
   await setupModal(page).getByRole("button", { name: "Finish", exact: true }).click();
   await expect(setupModal(page)).toHaveCount(0);
