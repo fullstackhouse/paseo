@@ -933,6 +933,24 @@ import { Text } from "react-native";
 
 对于水平标签页，请把 `<ScrollView horizontal style={{ flexGrow: 0 }}>…</ScrollView>` 放在默认的 `Modal.Content` 中。让内容的垂直滚动仍由宿主负责。
 
+内容高度变化后（例如用户操作后你折叠了一张卡片），如果要让某个视图保持可见，请用该视图的 ref 调用 `useRevealInScroll()` 返回的函数。最近的宿主滚动容器（SDK `ScrollView`、弹出层、输入框面板或侧边面板）会在调用后的下一帧滚动到刚好能看到它的位置。在这些容器之外它不做任何事。早于此导出的宿主中 `useRevealInScroll` 为 undefined，调用前请先检查。
+
+```tsx
+import { useRevealInScroll } from "@getpaseo/plugin/client/ui";
+
+const useReveal = useRevealInScroll ?? (() => () => {});
+
+function Card() {
+  const ref = useRef<View>(null);
+  const reveal = useReveal();
+  const fold = () => {
+    setExpanded(false);
+    reveal(ref.current);
+  };
+  return <View ref={ref}>…</View>;
+}
+```
+
 ### 复制和粘贴 {#copy-and-paste}
 
 `copyText(text): Promise<void>` 写入运行应用的设备的剪贴板。请在用户操作中调用它，并在报告成功之前 await 它。如果平台拒绝复制或剪贴板不可用，它会 reject；浏览器权限和安全上下文要求仍然适用。

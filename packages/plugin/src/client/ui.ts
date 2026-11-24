@@ -17,6 +17,7 @@ import type {
   TextInput as NativeTextInput,
   TextInputProps,
   TextProps,
+  View as NativeView,
 } from "react-native";
 import type { PluginIconProps } from "../icons.js";
 import type { PluginIcon } from "./contracts.js";
@@ -110,6 +111,12 @@ export type { PluginIconProps } from "../icons.js";
 export declare const ScrollView: ForwardRefExoticComponent<
   ScrollViewProps & RefAttributes<NativeScrollView>
 >;
+/**
+ * Returns a function that scrolls the nearest host scroll container (an SDK `ScrollView`, a popover,
+ * the composer sheet or side panel) just enough to show a view, measured a frame after the call.
+ * No-op outside one. Undefined on hosts older than the export; check `useRevealInScroll !== undefined`.
+ */
+export declare function useRevealInScroll(): (target: NativeView | null) => void;
 export declare function FlatList<Item>(
   props: FlatListProps<Item> & { ref?: Ref<NativeFlatList<Item>> },
 ): ReactElement;

@@ -1184,6 +1184,28 @@ import { Text } from "react-native";
 For horizontal tabs, place `<ScrollView horizontal style={{ flexGrow: 0 }}>…</ScrollView>` inside the
 default `Modal.Content`. Keep the content's vertical scrolling on the host.
 
+To keep a view in sight after your content changes height, such as a card you fold after the user
+acts on it, call the function `useRevealInScroll()` returns with the view's ref. The nearest host
+scroll container (an SDK `ScrollView`, a popover, a composer sheet or side panel) scrolls just enough
+to show it, a frame after the call. It does nothing outside one. Hosts older than this export leave
+`useRevealInScroll` undefined; check it before calling.
+
+```tsx
+import { useRevealInScroll } from "@getpaseo/plugin/client/ui";
+
+const useReveal = useRevealInScroll ?? (() => () => {});
+
+function Card() {
+  const ref = useRef<View>(null);
+  const reveal = useReveal();
+  const fold = () => {
+    setExpanded(false);
+    reveal(ref.current);
+  };
+  return <View ref={ref}>…</View>;
+}
+```
+
 ### Copy and paste
 
 `copyText(text): Promise<void>` writes to the clipboard on the device running the app. Call it from a
