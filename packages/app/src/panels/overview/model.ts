@@ -92,8 +92,16 @@ export function deriveYourMove(
         rows.push({ kind: "plugin", key: item.key, item: item.item });
         continue;
       }
+      // Not `item.key`: it carries the item's own key (Asks sets its newest ask), so a new entry
+      // would rekey every row, drop the pinned one and collapse the ask being answered.
+      const { pluginId, itemId } = item.item;
       for (const entry of entries) {
-        rows.push({ kind: "entry", key: `${item.key}:${entry.id}`, item: item.item, entry });
+        rows.push({
+          kind: "entry",
+          key: `entry:${pluginId}:${itemId}:${entry.id}`,
+          item: item.item,
+          entry,
+        });
       }
     }
   }
