@@ -6,6 +6,7 @@ temporary by design: every patch is meant to go upstream and then drop out of `f
 
 ## Patches on `fsh`
 
+- FSH-only (upstreamable): orchestration skills are on by default. A host that never chose and has none installed installs every bundled skill on startup and saves that choice, so turning them off in Settings survives restarts. Hosts with an older selection-less install keep their selection open for the legacy import
 - FSH-only (upstreamable): archiving a workspace replies once its records are archived; worktree teardown and deletion run in the background, one repo at a time. Creating or restoring a worktree at the same path waits for the pending removal. `paseo worktree archive` and the MCP `archive_workspace` tool still wait for the directory to be removed
 - FSH-only (upstreamable): opening an archived workspace's agent from History shows its conversation read-only under a banner with the recovery actions (Restore, Unarchive or Recreate empty folder), instead of a full-screen gate. Nothing changes until you pick one
 - FSH-only (upstreamable): workspace reconciliation leaves a workspace alone once it is archived. An archive that landed during its git read used to save the deleted worktree as a plain folder with no branch, and Restore then reported that the folder could not be recreated
