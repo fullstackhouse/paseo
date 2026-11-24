@@ -48,6 +48,15 @@ still show its screen. Only the selection read from storage at startup is
 forgotten. A workspace opened during the session may be missing only because its
 descriptor has not arrived yet.
 
+A workspace that leaves the host's list while its screen is open is different:
+the screen had it, so it was archived. The app's archive buttons leave it first
+(`redirectIfArchivingActiveWorkspace`). Archives from outside the app (a plugin,
+the CLI, an agent's `archive_workspace`) don't, so `useLeaveRemovedWorkspace`
+replaces the route with the same New workspace route once the workspace goes
+missing. It counts only a descriptor seen after the live list hydrated: the
+cached list at startup can hold a workspace already archived, and that route
+must keep its "Workspace unavailable" screen.
+
 The active-workspace observer (`useActiveWorkspaceSelection`) saves a route's
 workspace only once the host's loaded workspace list contains it. A reload or a
 link can point at an archived workspace, and the list may not have arrived yet or
@@ -78,9 +87,10 @@ When app-wide routes such as `/new`, `/settings`, or `/sessions` navigate back
 into a host workspace, use `navigateToWorkspace()`. Do not make the caller
 branch on its current route.
 
-Pass only `serverId` and `workspaceId` for normal attention-aware navigation.
-When the action names a specific tab, pass it as `target`; that explicit choice
-is authoritative. Callers should not choose between separate route and tab
+Pass only `serverId` and `workspaceId` for normal attention-aware navigation:
+an agent waiting on a permission prompt or one that failed takes focus, and
+otherwise the workspace opens on the tab you left. When the action names a
+specific tab, pass it as `target`; that explicit choice is authoritative. Callers should not choose between separate route and tab
 navigation APIs.
 
 The root stack owns `h/[serverId]`; the host stack owns

@@ -1,5 +1,7 @@
+import type { Href } from "expo-router";
 import type { HostRuntimeConnectionStatus } from "@/runtime/host-runtime";
 import type { WorkspaceDescriptor } from "@/stores/session-store";
+import { buildWorkspaceArchiveRedirectRoute } from "@/utils/workspace-archive-navigation";
 import type { WorkspaceRecoveryModel } from "@/workspace-recovery/model";
 import type { WorkspaceTabTarget } from "@/workspace-tabs/model";
 
@@ -131,4 +133,24 @@ export function shouldInspectWorkspaceRecovery(
     pendingOpenTarget?.kind === "overview" ||
     requestedFromLink;
   return explicit && hasHydratedWorkspaces && workspace === null;
+}
+
+/**
+ * Where to go when the workspace this screen showed is archived by something other than the app's
+ * own archive buttons (a plugin, the CLI, an agent): the same New workspace route those buttons
+ * open. `lastLiveWorkspace` is the descriptor last seen in the host's live list. A route that never
+ * had one (a deep link, a reloaded URL, a cached workspace that turned out archived) keeps its
+ * "Workspace unavailable" screen.
+ */
+export function resolveRemovedWorkspaceRedirect(input: {
+  serverId: string;
+  state: WorkspaceRouteState;
+  lastLiveWorkspace: WorkspaceDescriptor | null;
+}): Href | null {
+  if (input.state.kind !== "missing" || !input.lastLiveWorkspace) return null;
+  return buildWorkspaceArchiveRedirectRoute({
+    serverId: input.serverId,
+    archivedWorkspaceId: input.lastLiveWorkspace.id,
+    workspaces: [input.lastLiveWorkspace],
+  });
 }

@@ -15,17 +15,19 @@ export type AgentAttentionClearTrigger =
   | "prompt-send"
   | "agent-blur";
 
-const ATTENTION_REASON_PRIORITY = {
+// FSH: only agents that need an action take focus. "Ready to review" (finished) stays after a
+// visit here, so counting it made every entry land on the oldest finished agent instead of the
+// tab you left.
+const ATTENTION_REASON_PRIORITY: Partial<Record<NonNullable<Agent["attentionReason"]>, number>> = {
   permission: 0,
   error: 1,
-  finished: 2,
-} as const;
+};
 
 function getAttentionPriority(reason: Agent["attentionReason"]): number | null {
   if (!reason) {
     return null;
   }
-  return ATTENTION_REASON_PRIORITY[reason];
+  return ATTENTION_REASON_PRIORITY[reason] ?? null;
 }
 
 export function pickAttentionAgent(agents: Agent[]): string | null {
