@@ -11,6 +11,7 @@ import type {
   SessionEventSubscription,
   UsageReportEntry,
   ProviderUsage,
+  WorkspaceAppearance,
   WorkspaceManualGroup,
 } from "@getpaseo/protocol/messages";
 import { relative } from "node:path";
@@ -89,6 +90,7 @@ import { getErrorMessage, getErrorMessageOr } from "@getpaseo/protocol/error-uti
 import { getAgentStatusPriority } from "@getpaseo/protocol/agent-state-bucket";
 import { getParentAgentIdFromLabels } from "@getpaseo/protocol/agent-labels";
 import type { WorkspaceGitRuntimeSnapshot, WorkspaceGitService } from "./workspace-git-service.js";
+import { parseWorkspaceAppearance } from "./workspace-appearance.js";
 import type { ProjectUpdate } from "./workspace-reconciliation-service.js";
 import {
   CLIENT_SHUTDOWN_RPC_REASON,
@@ -3178,6 +3180,8 @@ export class Session {
         return this.handleWorkspaceAttentionReportRequest(msg);
       case "workspace.group.set.request":
         return this.handleWorkspaceGroupSetRequest(msg);
+      case "workspace.appearance.set.request":
+        return this.handleWorkspaceAppearanceSetRequest(msg);
       default:
         return undefined;
     }
@@ -4148,6 +4152,48 @@ export class Session {
         snoozedAt: null,
         snoozedUntil: null,
         error: getErrorMessageOr(error, "Failed to snooze workspace"),
+      });
+    }
+  }
+
+  private async handleWorkspaceAppearanceSetRequest(
+    request: Extract<SessionInboundMessage, { type: "workspace.appearance.set.request" }>,
+  ): Promise<void> {
+    const { workspaceId, requestId } = request;
+    const logContext = { workspaceId, requestId, titleIcon: request.titleIcon };
+    this.sessionLogger.info(logContext, "session: workspace.appearance.set.request");
+    const emitResponse = (input: {
+      accepted: boolean;
+      appearance: WorkspaceAppearance | null;
+      error: string | null;
+    }) => {
+      this.emit({
+        type: "workspace.appearance.set.response",
+        payload: { requestId, workspaceId, ...input },
+      });
+    };
+    try {
+      const appearance = parseWorkspaceAppearance(request);
+      const updated = await this.workspaceRegistry.update(workspaceId, (existing) => ({
+        ...existing,
+        appearance,
+        updatedAt: new Date().toISOString(),
+      }));
+      if (!updated) {
+        emitResponse({ accepted: false, appearance: null, error: "Workspace not found" });
+        return;
+      }
+      emitResponse({ accepted: true, appearance, error: null });
+      await this.emitWorkspaceUpdatesForWorkspaceIds([workspaceId]);
+    } catch (error) {
+      this.sessionLogger.error(
+        { ...logContext, err: error },
+        "session: workspace.appearance.set.request error",
+      );
+      emitResponse({
+        accepted: false,
+        appearance: null,
+        error: getErrorMessageOr(error, "Failed to set the workspace appearance"),
       });
     }
   }
@@ -6018,6 +6064,7 @@ export class Session {
       snoozedUntil: workspace.snoozedUntil,
       snoozeWakePrompt: workspace.snoozeWakePrompt,
       manualGroup: workspace.manualGroup,
+      appearance: workspace.appearance,
       ...(workspace.labels && workspace.labels.length > 0 ? { labels: workspace.labels } : {}),
       background: workspace.background,
       archivingAt: null,

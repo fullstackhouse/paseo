@@ -643,6 +643,19 @@ items after its own.
 - Previews (Settings > Host appearance) pass no `workspace` to `WorkspaceMetaRow`, so plugin items
   stay off them.
 
+### Mark a plugin's own workspaces
+
+A plugin that creates workspaces for its own work (Inbox's reviews) marks their rows with
+`workspaces.ref(id).setAppearance({ avatar, titleIcon })` (FSH-only, `workspace.appearance.set`,
+gated on `features.workspaceAppearance`). `avatar` replaces the project icon on the row, round, with
+the status badge on it; `titleIcon` is a Lucide name (`Inbox`, as for plugin icons) drawn before the title. Use them instead of a
+label or a row item when the row must read as different at a glance: both cost no meta-line space,
+where a label chip is the first thing a full line truncates.
+
+The descriptor carries the avatar inline, to every client on every workspace update, so the daemon
+takes only square PNG, JPEG, GIF or WebP up to 256 px and 16 KB
+(`packages/server/src/server/workspace-appearance.ts`). Ask the forge for a 64 px image.
+
 ## Contribute file panels
 
 Client `addFilePanel` registrations become the body of a file tab. The tab stats the file, picks a

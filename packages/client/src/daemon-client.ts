@@ -22,9 +22,14 @@ import {
 import { CreationClient } from "./creation/index.js";
 import type {
   CreationSnapshot,
+  WorkspaceAppearance,
+  WorkspaceAppearanceSetRequest,
   WorkspaceManualGroup,
   WorkspaceManualGroupName,
 } from "@getpaseo/protocol/messages";
+
+/** What a plugin sets: `avatar` is base64 image bytes, `titleIcon` a Lucide icon name. */
+export type WorkspaceAppearanceInput = Pick<WorkspaceAppearanceSetRequest, "avatar" | "titleIcon">;
 import type { z } from "zod";
 import type {
   ProviderSubagentEventFilter,
@@ -3620,6 +3625,30 @@ export class DaemonClient {
       throw new Error(payload.error ?? "setWorkspaceGroup rejected");
     }
     return payload.manualGroup;
+  }
+
+  /**
+   * Marks a workspace in the sidebar: `avatar` replaces the project icon on its row and
+   * `titleIcon` sits before its title. Replaces the whole appearance; both null clears it.
+   */
+  async setWorkspaceAppearance(
+    workspaceId: string,
+    appearance: WorkspaceAppearanceInput,
+    options: { requestId?: string } = {},
+  ): Promise<WorkspaceAppearance | null> {
+    // COMPAT(workspaceAppearance): FSH-only, added after v0.17.1, remove gate after 2027-05-23.
+    if (this.lastServerInfoMessage?.features?.workspaceAppearance !== true) {
+      throw new Error("Update the host to mark workspaces in the sidebar.");
+    }
+    const payload = await this.sendCorrelatedSessionRequest({
+      requestId: options.requestId,
+      message: { type: "workspace.appearance.set.request", workspaceId, ...appearance },
+      responseType: "workspace.appearance.set.response",
+    });
+    if (!payload.accepted) {
+      throw new Error(payload.error ?? "setWorkspaceAppearance rejected");
+    }
+    return payload.appearance;
   }
 
   async setWorkspaceSnoozed(

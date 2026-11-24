@@ -1090,6 +1090,26 @@ export const WorkspaceGroupSetRequestSchema = z.object({
   requestId: z.string(),
 });
 
+// COMPAT(workspaceAppearance): FSH-only, added after v0.17.1, remove gate after 2027-05-23.
+// How a plugin marks a workspace it owns in the sidebar: an avatar drawn in place of the project
+// icon, and a Lucide icon before the title. Descriptors carry the avatar inline, so the daemon
+// keeps it small (see `workspace-appearance.ts`).
+export const WorkspaceAppearanceSchema = z.object({
+  avatar: z.object({ data: z.string(), mimeType: z.string() }).nullable(),
+  titleIcon: z.string().nullable(),
+});
+
+// COMPAT(workspaceAppearance): FSH-only, added after v0.17.1, remove gate after 2027-05-23.
+// Replaces the whole appearance. `avatar` is base64 image bytes; the daemon detects the type.
+// Both null clears it.
+export const WorkspaceAppearanceSetRequestSchema = z.object({
+  type: z.literal("workspace.appearance.set.request"),
+  workspaceId: z.string(),
+  avatar: z.string().nullable(),
+  titleIcon: z.string().nullable(),
+  requestId: z.string(),
+});
+
 // COMPAT(workspaceAttentionReport): FSH-only, added after v0.15.4, remove gate after 2027-05-17.
 // A plugin says the workspace needs the human (an ask waits on them, the agent's work is done).
 // A snoozed workspace treats it like a permission prompt; an awake one ignores it.
@@ -2327,6 +2347,19 @@ export const WorkspaceGroupSetResponseSchema = z.object({
   payload: WorkspaceGroupSetResponsePayloadSchema,
 });
 
+export const WorkspaceAppearanceSetResponsePayloadSchema = z.object({
+  requestId: z.string(),
+  workspaceId: z.string(),
+  accepted: z.boolean(),
+  appearance: WorkspaceAppearanceSchema.nullable(),
+  error: z.string().nullable(),
+});
+
+export const WorkspaceAppearanceSetResponseSchema = z.object({
+  type: z.literal("workspace.appearance.set.response"),
+  payload: WorkspaceAppearanceSetResponsePayloadSchema,
+});
+
 export const WorkspaceAttentionReportResponsePayloadSchema = z.object({
   requestId: z.string(),
   workspaceId: z.string(),
@@ -3554,6 +3587,7 @@ export const SessionInboundMessageSchema = z.discriminatedUnion("type", [
   WorkspaceBackgroundSetRequestSchema,
   WorkspaceSnoozeSetRequestSchema,
   WorkspaceGroupSetRequestSchema,
+  WorkspaceAppearanceSetRequestSchema,
   WorkspaceAttentionReportRequestSchema,
   WorkspaceLabelListRequestSchema,
   WorkspaceLabelAssignmentSetRequestSchema,
@@ -4009,6 +4043,8 @@ export const ServerInfoStatusPayloadSchema = z
         workspaceAttentionReport: z.boolean().optional(),
         // COMPAT(workspaceManualGroup): FSH-only, added after v0.15.4, remove gate after 2027-05-21.
         workspaceManualGroup: z.boolean().optional(),
+        // COMPAT(workspaceAppearance): FSH-only, added after v0.17.1, remove gate after 2027-05-23.
+        workspaceAppearance: z.boolean().optional(),
         // COMPAT(scheduleRunAttention): FSH-only, added after v0.15.4, remove gate after 2027-05-16.
         scheduleRunAttention: z.boolean().optional(),
         // COMPAT(skillManagement): added in v0.4.0, remove gate after 2027-08-16.
@@ -4460,6 +4496,8 @@ export const WorkspaceDescriptorPayloadSchema = z
     snoozeWakePrompt: z.string().nullable().optional(),
     // COMPAT(workspaceManualGroup): FSH-only, added after v0.15.4, remove optional after 2027-05-21.
     manualGroup: WorkspaceManualGroupSchema.nullable().optional(),
+    // COMPAT(workspaceAppearance): FSH-only, added after v0.17.1, remove optional after 2027-05-23.
+    appearance: WorkspaceAppearanceSchema.nullable().optional(),
     // COMPAT(workspaceLabels): added in v0.5.0, remove optional after 2027-08-14.
     labels: z.array(z.string()).optional(),
     // Retained for wire parsing of older daemon descriptors.
@@ -7589,6 +7627,7 @@ export const SessionOutboundMessageSchema = z.discriminatedUnion("type", [
   WorkspaceBackgroundSetResponseSchema,
   WorkspaceSnoozeSetResponseSchema,
   WorkspaceGroupSetResponseSchema,
+  WorkspaceAppearanceSetResponseSchema,
   WorkspaceAttentionReportResponseSchema,
   WorkspaceRecoveryInspectResponseSchema,
   WorkspaceRecoveryRestoreResponseSchema,
@@ -7808,6 +7847,8 @@ export type WorkspacePinSetResponsePayload = z.infer<typeof WorkspacePinSetRespo
 export type WorkspaceBackgroundSetResponse = z.infer<typeof WorkspaceBackgroundSetResponseSchema>;
 export type WorkspaceSnoozeSetResponse = z.infer<typeof WorkspaceSnoozeSetResponseSchema>;
 export type WorkspaceGroupSetResponse = z.infer<typeof WorkspaceGroupSetResponseSchema>;
+export type WorkspaceAppearanceSetResponse = z.infer<typeof WorkspaceAppearanceSetResponseSchema>;
+export type WorkspaceAppearance = z.infer<typeof WorkspaceAppearanceSchema>;
 export type WorkspaceManualGroup = z.infer<typeof WorkspaceManualGroupSchema>;
 export type WorkspaceManualGroupName = z.infer<typeof WorkspaceManualGroupNameSchema>;
 export type WorkspaceAttentionReportResponse = z.infer<
@@ -7976,6 +8017,7 @@ export type WorkspacePinSetRequest = z.infer<typeof WorkspacePinSetRequestSchema
 export type WorkspaceBackgroundSetRequest = z.infer<typeof WorkspaceBackgroundSetRequestSchema>;
 export type WorkspaceSnoozeSetRequest = z.infer<typeof WorkspaceSnoozeSetRequestSchema>;
 export type WorkspaceGroupSetRequest = z.infer<typeof WorkspaceGroupSetRequestSchema>;
+export type WorkspaceAppearanceSetRequest = z.infer<typeof WorkspaceAppearanceSetRequestSchema>;
 export type WorkspaceAttentionReportRequest = z.infer<typeof WorkspaceAttentionReportRequestSchema>;
 export type WorkspaceRecoveryInspectRequest = z.infer<typeof WorkspaceRecoveryInspectRequestSchema>;
 export type WorkspaceRecoveryRestoreRequest = z.infer<typeof WorkspaceRecoveryRestoreRequestSchema>;
