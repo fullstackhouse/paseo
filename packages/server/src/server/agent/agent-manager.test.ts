@@ -4927,6 +4927,128 @@ test("a prompt after provider replacement reopens the stale session", async () =
   }
 });
 
+interface BackgroundWorkEvents {
+  started: AgentStreamEvent;
+  ended: AgentStreamEvent;
+}
+
+const backgroundWorkEvents: Record<string, BackgroundWorkEvents> = {
+  "provider subagent": {
+    started: {
+      type: "provider_subagent",
+      provider: "codex",
+      event: { type: "upsert", id: "child-1", title: "Child", status: "running" },
+    },
+    ended: {
+      type: "provider_subagent",
+      provider: "codex",
+      event: { type: "upsert", id: "child-1", title: "Child", status: "completed" },
+    },
+  },
+  "background shell": {
+    started: {
+      type: "background_work",
+      provider: "codex",
+      items: [{ id: "bash-1", kind: "shell", description: "npm test" }],
+    },
+    ended: { type: "background_work", provider: "codex", items: [] },
+  },
+};
+
+test.each(Object.keys(backgroundWorkEvents))(
+  "a plugin change reopens an agent with a running %s at the first prompt after it ends",
+  async (kind) => {
+    const { started, ended } = backgroundWorkEvents[kind];
+    const logEntries: Record<string, unknown>[] = [];
+    const [{ default: pino }, { Writable }] = await Promise.all([
+      import("pino"),
+      import("node:stream"),
+    ]);
+    const capturedLogger = pino(
+      { level: "info" },
+      new Writable({
+        write(chunk, _encoding, done) {
+          logEntries.push(JSON.parse(chunk.toString()));
+          done();
+        },
+      }),
+    );
+    const workdir = mkdtempSync(join(tmpdir(), "agent-manager-plugin-change-"));
+    const storage = new AgentStorage(join(workdir, "agents"), capturedLogger);
+    const sessions: CloseRecordingTestAgentSession[] = [];
+    class RecordingClient extends TestAgentClient {
+      override async createSession(config: AgentSessionConfig): Promise<AgentSession> {
+        const session = new CloseRecordingTestAgentSession(config);
+        sessions.push(session);
+        return session;
+      }
+      override async resumeSession(
+        _handle: AgentPersistenceHandle,
+        config?: Partial<AgentSessionConfig>,
+      ): Promise<AgentSession> {
+        return this.createSession({ provider: "codex", cwd: workdir, ...config });
+      }
+    }
+    const manager = new AgentManager({
+      clients: { codex: new RecordingClient() },
+      registry: storage,
+      logger: capturedLogger,
+    });
+    const agent = await manager.createAgent({ provider: "codex", cwd: workdir }, undefined, {
+      workspaceId: undefined,
+    });
+    onTestFinished(async () => {
+      await manager.closeAgent(agent.id);
+      await manager.flush();
+      await storage.flush();
+      rmSync(workdir, { recursive: true, force: true });
+    });
+    const workIsActive = () => {
+      const subagents = manager.listProviderSubagents(agent.id);
+      return (
+        manager.listAgentBackgroundWork(agent.id).length > 0 ||
+        subagents.some((subagent) => subagent.status === "running")
+      );
+    };
+    const prompt = async (text: string) => {
+      await startAgentRun(manager, agent.id, text, logger);
+      await manager.waitForAgentEvent(agent.id);
+    };
+
+    sessions[0].pushEvent(started);
+    await vi.waitFor(() => expect(workIsActive()).toBe(true));
+    manager.invalidatePluginSessions();
+    await prompt("while the work runs");
+
+    expect(sessions.map((session) => session.closed)).toEqual([false]);
+    expect(workIsActive()).toBe(true);
+    await prompt("while the work still runs");
+
+    expect(
+      logEntries.filter(
+        ({ msg }) =>
+          msg === "Deferring stale plugin session reopen while background work is active",
+      ),
+    ).toEqual([
+      expect.objectContaining({
+        agentId: agent.id,
+        backgroundWorkItemCount: kind === "background shell" ? 1 : 0,
+        runningSubagentCount: kind === "provider subagent" ? 1 : 0,
+        generation: 1,
+      }),
+    ]);
+
+    sessions[0].pushEvent(ended);
+    await vi.waitFor(() => expect(workIsActive()).toBe(false));
+    expect(sessions.map((session) => session.closed)).toEqual([false]);
+    await prompt("after the work ended");
+
+    expect(sessions.map((session) => session.closed)).toEqual([true, false]);
+    await prompt("after the reopen");
+    expect(sessions.map((session) => session.closed)).toEqual([true, false]);
+  },
+);
+
 test("a replacement prompt recovers when the retired session fails to start", async () => {
   const workdir = mkdtempSync(join(tmpdir(), "agent-manager-stale-replacement-"));
   const storage = new AgentStorage(join(workdir, "agents"), logger);

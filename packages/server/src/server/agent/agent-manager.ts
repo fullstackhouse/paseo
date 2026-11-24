@@ -912,6 +912,7 @@ export class AgentManager {
   private readonly mcpAuthToken: string | null;
   private sessionOpenGeneration = 0;
   private readonly sessionOpenGenerations = new Map<string, number>();
+  private readonly deferredPluginReloadGenerations = new Map<string, number>();
   private readonly attachedPluginTools = new Map<string, AttachedAgentTool[]>();
   private readonly pluginAgentTools: PluginAgentToolsRuntime | undefined;
   private paseoToolsEnabled = true;
@@ -1044,12 +1045,44 @@ export class AgentManager {
   }
 
   async reloadStalePluginSession(agentId: string): Promise<void> {
-    if (!this.needsPluginSessionReload(agentId)) return;
+    if (!this.needsPluginSessionReload(agentId)) {
+      this.logDeferredPluginSessionReload(agentId);
+      return;
+    }
     await this.trackAgentRegistrationOperation(
       this.runLifecycleMutation(agentId, async () => {
-        if (!this.needsPluginSessionReload(agentId)) return;
+        if (!this.needsPluginSessionReload(agentId)) {
+          this.logDeferredPluginSessionReload(agentId);
+          return;
+        }
         await this.reloadAgentSessionInternal(agentId);
       }),
+    );
+  }
+
+  private logDeferredPluginSessionReload(agentId: string): void {
+    const agent = this.getAgent(agentId);
+    const generation = this.sessionOpenGeneration;
+    if (
+      agent === null ||
+      agent.lifecycle === "closed" ||
+      this.sessionOpenGenerations.get(agentId) === generation ||
+      this.hasInFlightRun(agentId)
+    ) {
+      return;
+    }
+    if (this.deferredPluginReloadGenerations.get(agentId) === generation) return;
+
+    const backgroundWorkItemCount = this.backgroundWork.list(agentId).length;
+    const runningSubagentCount = this.providerSubagents
+      .list(agentId)
+      .filter((subagent) => subagent.status === "running").length;
+    if (backgroundWorkItemCount === 0 && runningSubagentCount === 0) return;
+
+    this.deferredPluginReloadGenerations.set(agentId, generation);
+    this.logger.info(
+      { agentId, backgroundWorkItemCount, runningSubagentCount, generation },
+      "Deferring stale plugin session reopen while background work is active",
     );
   }
 
@@ -1059,7 +1092,8 @@ export class AgentManager {
       agent !== null &&
       agent.lifecycle !== "closed" &&
       this.sessionOpenGenerations.get(agentId) !== this.sessionOpenGeneration &&
-      !this.hasInFlightRun(agentId)
+      !this.hasInFlightRun(agentId) &&
+      !this.hasActiveBackgroundWork(agentId)
     );
   }
 
@@ -1092,6 +1126,7 @@ export class AgentManager {
   private detachPluginTools(agentId: string): void {
     this.attachedPluginTools.delete(agentId);
     this.sessionOpenGenerations.delete(agentId);
+    this.deferredPluginReloadGenerations.delete(agentId);
     this.pluginAgentTools?.detachTools(agentId);
   }
 
@@ -1489,6 +1524,13 @@ export class AgentManager {
 
   setDaemonBackgroundWork(input: DaemonBackgroundWorkInput): void {
     this.publishBackgroundWork(input.agentId, this.backgroundWork.setDaemonBackgroundWork(input));
+  }
+
+  /** Work that dies with the provider process, so reopening the session would stop it. */
+  private hasActiveBackgroundWork(agentId: string): boolean {
+    return (
+      this.backgroundWork.list(agentId).length > 0 || this.hasRunningProviderSubagents(agentId)
+    );
   }
 
   removeDaemonBackgroundWork(key: DaemonBackgroundWorkKey): void {
