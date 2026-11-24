@@ -3,7 +3,11 @@
 import { act, renderHook } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import type { HostProjectListItem } from "@/projects/host-projects";
-import { resolveRecentProjectChoices, useNewWorkspaceProjectPicker } from "./project-picker";
+import {
+  resolvePinnedProjectChoices,
+  resolveRecentProjectChoices,
+  useNewWorkspaceProjectPicker,
+} from "./project-picker";
 
 function project(input: {
   viewKey: string;
@@ -140,6 +144,21 @@ describe("resolveRecentProjectChoices", () => {
         serverId: "host",
       }),
     ).toEqual([]);
+  });
+
+  it("lists pinned projects in pin order, in the selected category, with their latest setup", () => {
+    expect(
+      resolvePinnedProjectChoices({
+        projects: [alpha, beta, gamma],
+        pinnedViewKeys: ["gamma", "missing", "beta", "alpha"],
+        matchesCategory: (viewKey) => viewKey !== "beta",
+        recentProjects: [recent("p-alpha", 5, setup), recent("p-alpha", 1)],
+        serverId: "host",
+      }),
+    ).toEqual([
+      { optionId: "project:gamma", project: gamma, lastUsedAt: 0, agentSetup: null },
+      { optionId: "project:alpha", project: alpha, lastUsedAt: 5, agentSetup: setup },
+    ]);
   });
 
   it("ignores projects that live on another host", () => {

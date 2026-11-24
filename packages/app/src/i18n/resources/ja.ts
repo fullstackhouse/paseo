@@ -1450,6 +1450,8 @@ export const ja: TranslationResources = {
         openFolderFailed: "Couldn't open folder",
         remove: "プロジェクトを削除",
         removing: "削除中...",
+        pin: "プロジェクトをピン留め",
+        unpin: "プロジェクトのピン留めを外す",
       },
       confirmations: {
         removeTitle: "プロジェクトを削除しますか？",
@@ -1543,6 +1545,7 @@ export const ja: TranslationResources = {
   newWorkspace: {
     title: "新しいワークスペース",
     recentProjects: "最近のプロジェクト",
+    pinnedProjects: "ピン留めしたプロジェクト",
     create: "作成",
     startAnother: "別のワークスペースを作成",
     isolation: {

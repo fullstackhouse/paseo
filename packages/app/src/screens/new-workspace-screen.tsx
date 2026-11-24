@@ -1076,6 +1076,7 @@ export function NewWorkspaceScreen({
     projectPickerOptions,
     projectByOptionId,
     recentProjectChoices,
+    pinnedProjectChoices,
     selectedProjectOptionId,
     projectTriggerLabel,
     handleSelectProjectOption: selectProjectOption,
@@ -1760,6 +1761,30 @@ export function NewWorkspaceScreen({
       selectedServerId,
     ],
   );
+  const pinnedProjects = useMemo(
+    () => (
+      <RecentProjectCards
+        kind="pinned"
+        layout={isCompact ? "scroll" : "grid"}
+        serverId={selectedServerId}
+        choices={pinnedProjectChoices}
+        iconDataByProjectViewKey={projectIconDataByProjectViewKey}
+        selectedOptionId={selectedProjectOptionId}
+        disabled={isPending}
+        onSelect={handleSelectRecentProject}
+        style={isCompact ? styles.compactRecentProjects : styles.widePinnedProjects}
+      />
+    ),
+    [
+      handleSelectRecentProject,
+      isCompact,
+      isPending,
+      pinnedProjectChoices,
+      projectIconDataByProjectViewKey,
+      selectedProjectOptionId,
+      selectedServerId,
+    ],
+  );
 
   const importSession = useImportSession({ serverId: selectedServerId });
 
@@ -1831,6 +1856,7 @@ export function NewWorkspaceScreen({
         fullscreen={isComposerFullscreen}
         title={t("newWorkspace.title")}
         recentProjects={recentProjects}
+        pinnedProjects={pinnedProjects}
         formStack={formStack}
         onImportSession={importSession.open}
       >
@@ -1994,6 +2020,7 @@ function NewWorkspaceLayout({
   fullscreen,
   title,
   recentProjects,
+  pinnedProjects,
   formStack,
   onImportSession,
   children,
@@ -2004,6 +2031,8 @@ function NewWorkspaceLayout({
   title: string;
   /** Recent project cards: under the composer when wide, above the fields when compact. */
   recentProjects: ReactNode;
+  /** Pinned project cards: at the top, above the title when wide and the recent row when compact. */
+  pinnedProjects: ReactNode;
   formStack: ReactNode;
   onImportSession: () => void;
   children: ReactNode;
@@ -2015,11 +2044,13 @@ function NewWorkspaceLayout({
   const setupFields = isCompact ? (
     <>
       <View style={styles.compactSetupSpace} pointerEvents="none" />
+      {pinnedProjects}
       {recentProjects}
       {formStack}
     </>
   ) : (
     <>
+      {fullscreen ? null : pinnedProjects}
       <View style={styles.composerTitleContainer} pointerEvents="none">
         <Text style={styles.composerTitle}>{title}</Text>
       </View>
@@ -2067,6 +2098,11 @@ const styles = StyleSheet.create((theme) => ({
   // On the composer's inset, like the Import session pill above it.
   wideRecentProjects: {
     marginTop: theme.spacing[8],
+    paddingHorizontal: theme.spacing[4],
+  },
+  // Above the title, on the same inset as the recent cards under the composer.
+  widePinnedProjects: {
+    marginBottom: theme.spacing[8],
     paddingHorizontal: theme.spacing[4],
   },
   // On the compact fields' inset; the cards' row bleeds back out to the screen edges.

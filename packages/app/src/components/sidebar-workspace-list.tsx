@@ -39,7 +39,15 @@ import { getSidebarRowBackdrop } from "@/components/sidebar/sidebar-row-backdrop
 import { type GestureType } from "react-native-gesture-handler";
 import { useSidebarWorkspaceRename } from "@/workspace-rename";
 import { useWorkspaceClipboardActions } from "@/hooks/use-workspace-clipboard-actions";
-import { ExternalLink, Settings, MoreVertical, Plus, Trash2 } from "lucide-react-native";
+import {
+  ExternalLink,
+  Settings,
+  MoreVertical,
+  Pin,
+  PinOff,
+  Plus,
+  Trash2,
+} from "lucide-react-native";
 import { NestableScrollContainer } from "react-native-draggable-flatlist";
 import { DraggableList, type DraggableRenderItemInfo } from "./draggable-list";
 import type { DraggableListDragHandleProps } from "./draggable-list.types";
@@ -164,6 +172,7 @@ import {
   resolveProjectCategorySelection,
 } from "@/projects/categories/model";
 import { useProjectCategoriesStore } from "@/projects/categories/store";
+import { usePinnedProjectsStore } from "@/projects/pins/store";
 
 const workspaceKeyExtractor = (workspace: SidebarWorkspacePlacement) => workspace.workspaceKey;
 
@@ -176,6 +185,8 @@ const ThemedPlus = withUnistyles(Plus);
 const ThemedMoreVertical = withUnistyles(MoreVertical);
 const ThemedTrash2 = withUnistyles(Trash2);
 const ThemedSettings = withUnistyles(Settings);
+const ThemedPin = withUnistyles(Pin);
+const ThemedPinOff = withUnistyles(PinOff);
 
 const foregroundColorMapping = (theme: Theme) => ({
   color: theme.colors.foreground,
@@ -470,6 +481,8 @@ function ProjectRowTrailingActions({
 
 const trash2LeadingIcon = <ThemedTrash2 size={14} uniProps={foregroundMutedColorMapping} />;
 const settingsLeadingIcon = <ThemedSettings size={14} uniProps={foregroundMutedColorMapping} />;
+const pinLeadingIcon = <ThemedPin size={14} uniProps={foregroundMutedColorMapping} />;
+const pinOffLeadingIcon = <ThemedPinOff size={14} uniProps={foregroundMutedColorMapping} />;
 const openInNewWindowLeadingIcon = (
   <ThemedExternalLink size={14} uniProps={foregroundMutedColorMapping} />
 );
@@ -564,6 +577,9 @@ function ProjectMenuItems({
     if (!settingsTarget) return;
     router.navigate(buildProjectSettingsRoute(settingsTarget.serverId, settingsTarget.projectId));
   }, [settingsTarget]);
+  const isPinned = usePinnedProjectsStore((state) => state.pinnedViewKeys.includes(projectViewKey));
+  const togglePin = usePinnedProjectsStore((state) => state.togglePin);
+  const handleTogglePin = useCallback(() => togglePin(projectViewKey), [projectViewKey, togglePin]);
   const canOpenInNewWindow = getIsElectron() && projectPath.trim().length > 0;
   const handleOpenInNewWindow = useCallback(() => {
     const trimmedPath = projectPath.trim();
@@ -598,6 +614,14 @@ function ProjectMenuItems({
           {t("sidebar.project.actions.openNewWindow")}
         </ProjectMenuItem>
       ) : null}
+      <ProjectMenuItem
+        surface={surface}
+        testID={`sidebar-project-menu-pin-${projectViewKey}`}
+        leading={isPinned ? pinOffLeadingIcon : pinLeadingIcon}
+        onSelect={handleTogglePin}
+      >
+        {isPinned ? t("sidebar.project.actions.unpin") : t("sidebar.project.actions.pin")}
+      </ProjectMenuItem>
       <ProjectCategorySubTrigger projectViewKey={projectViewKey} />
       <OpenInFileManagerMenuItem
         surface={surface}
