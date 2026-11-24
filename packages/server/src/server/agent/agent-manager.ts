@@ -956,7 +956,8 @@ export class AgentManager {
       agent !== null &&
       agent.lifecycle !== "closed" &&
       this.sessionOpenGenerations.get(agentId) !== this.sessionOpenGeneration &&
-      !this.hasInFlightRun(agentId)
+      !this.hasInFlightRun(agentId) &&
+      !this.hasActiveBackgroundWork(agentId)
     );
   }
 
@@ -1359,6 +1360,13 @@ export class AgentManager {
       const agent = this.agents.get(agentId);
       return agent !== undefined && !agent.internal;
     });
+  }
+
+  /** Work that dies with the provider process, so reopening the session would stop it. */
+  private hasActiveBackgroundWork(agentId: string): boolean {
+    return (
+      this.backgroundWork.list(agentId).length > 0 || this.hasRunningProviderSubagents(agentId)
+    );
   }
 
   private clearBackgroundWork(agentId: string): void {
