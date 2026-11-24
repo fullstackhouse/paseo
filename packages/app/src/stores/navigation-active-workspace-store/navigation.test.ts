@@ -71,9 +71,10 @@ function createLastSelectionDeps(
 }
 
 describe("workspace navigation", () => {
-  it("reveals even a current workspace without agents", () => {
-    const { deps, revealed } = createFakeDeps();
+  it("reveals the workspace without opening a tab when no tab is named", () => {
+    const { deps, openedTabs, revealed } = createFakeDeps();
     navigateToWorkspace({ serverId: "server", workspaceId: "workspace" }, deps);
+    expect(openedTabs).toEqual([]);
     expect(revealed).toEqual([null]);
   });
 
@@ -102,21 +103,6 @@ describe("workspace navigation", () => {
 
     expect(navigations).toEqual(["/h/server-1/workspace/workspace-a"]);
     expect(remembered).toEqual([{ serverId: "server-1", workspaceId: "workspace-a" }]);
-  });
-
-  it("opens a workspace on its saved tab when no tab is named", () => {
-    const workspace = {
-      id: "workspace-a",
-      workspaceDirectory: "/repo/workspace-a",
-    } as WorkspaceDescriptor;
-    const { deps, openedTabs, revealed } = createFakeDeps({
-      getSessionWorkspaces: () => new Map([[workspace.id, workspace]]),
-    });
-
-    navigateToWorkspace({ serverId: "server-1", workspaceId: "workspace-a" }, deps);
-
-    expect(openedTabs).toEqual([]);
-    expect(revealed).toEqual([null]);
   });
 
   it("opens the named tab", () => {

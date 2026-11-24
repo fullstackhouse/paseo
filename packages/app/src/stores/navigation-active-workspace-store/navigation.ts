@@ -97,8 +97,9 @@ export function navigateToWorkspace(
     return tabId;
   };
   // FSH: without a named tab, the workspace opens on the tab you left (agent, terminal, file or
-  // plugin). Agents that need you show it with badges instead of taking focus: "Ready to review"
-  // outlives a visit here, so jumping to them always landed on the oldest finished agent.
+  // plugin). No agent takes focus, not even one waiting on a permission prompt; badges show what
+  // needs you. The old jump ended on the oldest finished agent whenever nothing else was waiting,
+  // and since "Ready to review" outlives a visit here, that was almost every entry.
   if (input.target) {
     prepareWorkspaceTab({ ...input, target: input.target }, { openTab });
   } else {
