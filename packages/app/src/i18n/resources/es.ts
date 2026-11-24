@@ -737,6 +737,8 @@ export const es: TranslationResources = {
         pullRequest: "Solicitud de extracción",
         terminalProfilesMenu: "Terminal profiles",
         editTerminalProfiles: "Edit profiles",
+        recentlyClosed: "Cerrados recientemente",
+        untitledAgent: "Agente sin título",
       },
       explorerSidebar: {
         open: "Abrir panel lateral",
@@ -2361,10 +2363,6 @@ export const es: TranslationResources = {
         one: "{{count}} iniciado",
         other: "{{count}} iniciados",
       },
-      archivedAgents: "Agentes archivados",
-      unarchive: "Desarchivar",
-      unarchiveAll: "Desarchivar todos",
-      untitledAgent: "Agente sin título",
     },
     lineage: {
       label: "Linaje",

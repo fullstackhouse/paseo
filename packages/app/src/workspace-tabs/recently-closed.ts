@@ -1,17 +1,18 @@
 import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo } from "react";
 import invariant from "tiny-invariant";
 import { useFetchQuery } from "@/data/query";
 import { queryClient } from "@/data/query-client";
 import { useHostRuntimeClient, useHostRuntimeIsConnected } from "@/runtime/host-runtime";
 import { useSessionStore, type Agent } from "@/stores/session-store";
 import { buildAgentDirectoryState } from "@/utils/agent-directory-sync";
-import { toErrorMessage } from "@/utils/error-messages";
 
-const QUERY_ROOT = ["workspaceArchivedAgents"] as const;
+const QUERY_ROOT = ["workspaceRecentlyClosedAgents"] as const;
 const PAGE_LIMIT = 200;
+/** The launcher lists the newest few; older ones stay in History. */
+export const RECENTLY_CLOSED_LIMIT = 5;
 
-export interface ArchivedAgentRow {
+export interface RecentlyClosedAgent {
   id: string;
   title: string | null;
   provider: string;
@@ -19,23 +20,25 @@ export interface ArchivedAgentRow {
 }
 
 /**
- * The workspace's archived top-level agents, newest archive first. The live session store wins
- * over the fetched page, so an agent unarchived here (or anywhere) drops out without a refetch.
- * Subagents stay out: they come back with their parent's track.
+ * The workspace's archived top-level agents, newest archive first. Closing an agent's tab archives
+ * it, so these are its recently closed tabs. The live session store wins over the fetched page, so
+ * an agent reopened anywhere drops out without a refetch. Subagents stay out: they come back with
+ * their parent's track.
  */
-export function selectArchivedAgentRows(input: {
+export function selectRecentlyClosedAgents(input: {
   workspaceId: string;
   fetched: Iterable<Agent>;
   live: Iterable<Agent> | undefined;
-}): ArchivedAgentRow[] {
+}): RecentlyClosedAgent[] {
   const byId = new Map<string, Agent>();
-  for (const agent of input.fetched) byId.set(agent.id, agent);
+  for (const agent of input.fetched) {
+    if (agent.workspaceId === input.workspaceId) byId.set(agent.id, agent);
+  }
   for (const agent of input.live ?? []) {
     if (agent.workspaceId === input.workspaceId) byId.set(agent.id, agent);
   }
-  const rows: ArchivedAgentRow[] = [];
+  const rows: RecentlyClosedAgent[] = [];
   for (const agent of byId.values()) {
-    if (agent.workspaceId !== input.workspaceId) continue;
     if (!agent.archivedAt || agent.parentAgentId) continue;
     rows.push({
       id: agent.id,
@@ -44,10 +47,12 @@ export function selectArchivedAgentRows(input: {
       archivedAt: agent.archivedAt,
     });
   }
-  return rows.sort((a, b) => b.archivedAt.getTime() - a.archivedAt.getTime());
+  return rows
+    .sort((a, b) => b.archivedAt.getTime() - a.archivedAt.getTime())
+    .slice(0, RECENTLY_CLOSED_LIMIT);
 }
 
-export async function fetchWorkspaceArchivedAgents(input: {
+export async function fetchWorkspaceAgents(input: {
   client: Pick<DaemonClient, "fetchAgentHistory">;
   serverId: string;
   workspaceId: string;
@@ -67,19 +72,17 @@ export async function fetchWorkspaceArchivedAgents(input: {
   return agents;
 }
 
-export interface WorkspaceArchivedAgents {
-  rows: ArchivedAgentRow[];
-  /** Ids being unarchived right now; their buttons show progress. */
-  pendingIds: ReadonlySet<string>;
-  error: string | null;
-  unarchive: (agentIds: string[]) => Promise<void>;
+export interface WorkspaceRecentlyClosed {
+  agents: RecentlyClosedAgent[];
+  /** Unarchives the agent. Rejects with the host's error. */
+  reopen: (agentId: string) => Promise<void>;
 }
 
-/** Hosts without `features.agentWorkspaceFilter` show nothing: they can't list one workspace's agents. */
-export function useWorkspaceArchivedAgents(
+/** Hosts without `features.agentWorkspaceFilter` list nothing: they can't list one workspace's agents. */
+export function useWorkspaceRecentlyClosed(
   serverId: string,
   workspaceId: string,
-): WorkspaceArchivedAgents {
+): WorkspaceRecentlyClosed {
   const client = useHostRuntimeClient(serverId);
   const isConnected = useHostRuntimeIsConnected(serverId);
   const supported = useSessionStore(
@@ -95,13 +98,13 @@ export function useWorkspaceArchivedAgents(
     enabled,
     queryFn: () => {
       invariant(client, "The query runs only while enabled");
-      return fetchWorkspaceArchivedAgents({ client, serverId, workspaceId });
+      return fetchWorkspaceAgents({ client, serverId, workspaceId });
     },
   });
-  const rows = useMemo(
+  const agents = useMemo(
     () =>
       enabled
-        ? selectArchivedAgentRows({
+        ? selectRecentlyClosedAgents({
             workspaceId,
             fetched: query.data ?? [],
             live: liveAgents?.values(),
@@ -110,27 +113,17 @@ export function useWorkspaceArchivedAgents(
     [enabled, liveAgents, query.data, workspaceId],
   );
 
-  const [pendingIds, setPendingIds] = useState<ReadonlySet<string>>(new Set());
-  const [error, setError] = useState<string | null>(null);
-  const unarchive = useCallback(
-    async (agentIds: string[]) => {
-      if (!client || !isConnected || agentIds.length === 0) return;
-      setError(null);
-      setPendingIds((current) => new Set([...current, ...agentIds]));
+  const reopen = useCallback(
+    async (agentId: string) => {
+      invariant(client, "Reopen is offered only while the host is connected");
       try {
-        // One at a time: each resumes a provider session, and a failure stops the rest.
-        for (const agentId of agentIds) {
-          await client.refreshAgent(agentId);
-        }
-      } catch (unarchiveError) {
-        setError(toErrorMessage(unarchiveError));
+        await client.refreshAgent(agentId);
       } finally {
-        setPendingIds((current) => new Set([...current].filter((id) => !agentIds.includes(id))));
         void queryClient.invalidateQueries({ queryKey });
       }
     },
-    [client, isConnected, queryKey],
+    [client, queryKey],
   );
 
-  return { rows, pendingIds, error, unarchive };
+  return { agents, reopen };
 }

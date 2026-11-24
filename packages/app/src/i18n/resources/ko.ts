@@ -730,6 +730,8 @@ export const ko: TranslationResources = {
         pullRequest: "풀 리퀘스트",
         terminalProfilesMenu: "터미널 프로필",
         editTerminalProfiles: "프로필 편집",
+        recentlyClosed: "최근 닫은 탭",
+        untitledAgent: "제목 없는 에이전트",
       },
       explorerSidebar: {
         open: "사이드 패널 열기",
@@ -2319,10 +2321,6 @@ export const ko: TranslationResources = {
         one: "{{count}}개 시작",
         other: "{{count}}개 시작",
       },
-      archivedAgents: "보관된 에이전트",
-      unarchive: "보관 해제",
-      unarchiveAll: "모두 보관 해제",
-      untitledAgent: "제목 없는 에이전트",
     },
     lineage: {
       label: "계보",

@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { Agent } from "@/stores/session-store";
-import { fetchWorkspaceArchivedAgents, selectArchivedAgentRows } from "./archived-agents";
+import {
+  fetchWorkspaceAgents,
+  RECENTLY_CLOSED_LIMIT,
+  selectRecentlyClosedAgents,
+} from "./recently-closed";
 
 function agent(input: Partial<Agent> & Pick<Agent, "id">): Agent {
   return {
@@ -16,9 +20,9 @@ function agent(input: Partial<Agent> & Pick<Agent, "id">): Agent {
 const OLDER = new Date("2026-11-20T10:00:00.000Z");
 const NEWER = new Date("2026-11-23T10:00:00.000Z");
 
-describe("selectArchivedAgentRows", () => {
+describe("selectRecentlyClosedAgents", () => {
   it("lists this workspace's archived top-level agents, newest archive first", () => {
-    const rows = selectArchivedAgentRows({
+    const rows = selectRecentlyClosedAgents({
       workspaceId: "ws-1",
       fetched: [
         agent({ id: "old", archivedAt: OLDER }),
@@ -32,8 +36,17 @@ describe("selectArchivedAgentRows", () => {
     expect(rows.map((row) => row.id)).toEqual(["new", "old"]);
   });
 
-  it("lets the live store drop an agent unarchived since the fetch", () => {
-    const rows = selectArchivedAgentRows({
+  it("keeps only the newest few", () => {
+    const fetched = Array.from({ length: RECENTLY_CLOSED_LIMIT + 2 }, (_, index) =>
+      agent({ id: `a${index}`, archivedAt: new Date(OLDER.getTime() + index * 1000) }),
+    );
+    const rows = selectRecentlyClosedAgents({ workspaceId: "ws-1", fetched, live: undefined });
+    expect(rows).toHaveLength(RECENTLY_CLOSED_LIMIT);
+    expect(rows[0]?.id).toBe(`a${RECENTLY_CLOSED_LIMIT + 1}`);
+  });
+
+  it("lets the live store drop an agent reopened since the fetch", () => {
+    const rows = selectRecentlyClosedAgents({
       workspaceId: "ws-1",
       fetched: [agent({ id: "a", archivedAt: OLDER })],
       live: [agent({ id: "a", archivedAt: null })],
@@ -42,7 +55,7 @@ describe("selectArchivedAgentRows", () => {
   });
 
   it("adds an agent the live store saw archived after the fetch", () => {
-    const rows = selectArchivedAgentRows({
+    const rows = selectRecentlyClosedAgents({
       workspaceId: "ws-1",
       fetched: [],
       live: [agent({ id: "a", archivedAt: NEWER }), agent({ id: "b", workspaceId: "ws-2" })],
@@ -51,7 +64,7 @@ describe("selectArchivedAgentRows", () => {
   });
 });
 
-describe("fetchWorkspaceArchivedAgents", () => {
+describe("fetchWorkspaceAgents", () => {
   it("asks for one workspace's agents, archived included, across every page", async () => {
     const requests: unknown[] = [];
     const entry = (id: string) => ({
@@ -92,8 +105,8 @@ describe("fetchWorkspaceArchivedAgents", () => {
         requests.push(options);
         return pages[requests.length - 1];
       },
-    } as unknown as Parameters<typeof fetchWorkspaceArchivedAgents>[0]["client"];
-    const agents = await fetchWorkspaceArchivedAgents({
+    } as unknown as Parameters<typeof fetchWorkspaceAgents>[0]["client"];
+    const agents = await fetchWorkspaceAgents({
       client,
       serverId: "s",
       workspaceId: "ws-1",

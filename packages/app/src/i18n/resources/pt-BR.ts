@@ -735,6 +735,8 @@ export const ptBR: TranslationResources = {
         pullRequest: "Pull request",
         terminalProfilesMenu: "Perfis de terminal",
         editTerminalProfiles: "Editar perfis",
+        recentlyClosed: "Fechados recentemente",
+        untitledAgent: "Agente sem título",
       },
       explorerSidebar: {
         open: "Abrir painel lateral",
@@ -2346,10 +2348,6 @@ export const ptBR: TranslationResources = {
         one: "{{count}} iniciado",
         other: "{{count}} iniciados",
       },
-      archivedAgents: "Agentes arquivados",
-      unarchive: "Desarquivar",
-      unarchiveAll: "Desarquivar todos",
-      untitledAgent: "Agente sem título",
     },
     lineage: {
       label: "Linhagem",

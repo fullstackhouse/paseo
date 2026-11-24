@@ -59,7 +59,7 @@ import { isWorkspaceRootAgent } from "@/subagents/workspace-root-policy";
 import { useLineageFocus } from "@/subagents/lineage-focus";
 import { navigateToAgent } from "@/utils/navigate-to-agent";
 import { openExternalUrl } from "@/utils/open-external-url";
-import { formatCompactTimeAgo, formatTimeAgo } from "@/utils/time";
+import { formatTimeAgo } from "@/utils/time";
 import { normalizeWorkspaceOpaqueId } from "@/utils/workspace-identity";
 import { useWorkspaceAttention } from "@/workspace-attention/attention";
 import { hasRunningAgent } from "@/workspace-attention/model";
@@ -96,7 +96,6 @@ import {
   type WorkspaceStateWord,
   type YourMoveRow,
 } from "./overview/model";
-import { useWorkspaceArchivedAgents, type ArchivedAgentRow } from "./overview/archived-agents";
 
 const ThemedLayoutDashboard = withUnistyles(LayoutDashboard);
 const ThemedChevronRight = withUnistyles(ChevronRight);
@@ -155,8 +154,7 @@ type WorkspaceFacts = ReturnType<typeof selectWorkspaceFacts>;
 
 /**
  * Top to bottom: what is this (title, goal), where does it stand (status, what it waits on), what
- * do I do (Your move), where it sits (Tree), the agents archived here, other plugins' facts, then
- * its PRs for information.
+ * do I do (Your move), where it sits (Tree), other plugins' facts, then its PRs for information.
  */
 function OverviewPanel(): ReactElement {
   const { serverId, workspaceId, target } = usePaneContext();
@@ -225,7 +223,6 @@ function OverviewPanel(): ReactElement {
           name={name}
           status={statusCard}
         />
-        <ArchivedAgents serverId={serverId} workspaceId={workspaceId} />
         <ContextFooter workspaceKey={workspaceKey} more={more} />
         {showPullRequests ? (
           <PullRequests item={pullRequests} facts={facts} workspaceKey={workspaceKey} />
@@ -1282,128 +1279,6 @@ function ChildRow({ workspace, level }: { workspace: WorkspaceRef; level: number
   );
 }
 
-/**
- * Agents archived in this workspace, so a restored workspace isn't empty while their conversations
- * still exist. They stay archived until the user opens or unarchives them.
- */
-function ArchivedAgents({
-  serverId,
-  workspaceId,
-}: {
-  serverId: string;
-  workspaceId: string;
-}): ReactElement | null {
-  const { t } = useTranslation();
-  const { rows, pendingIds, error, unarchive } = useWorkspaceArchivedAgents(serverId, workspaceId);
-  const [showAll, setShowAll] = useState(false);
-  const expand = useCallback(() => setShowAll(true), []);
-  const unarchiveAll = useCallback(() => {
-    void unarchive(rows.map((row) => row.id));
-  }, [rows, unarchive]);
-  if (rows.length === 0) return null;
-  const visible = showAll ? rows : rows.slice(0, VISIBLE_CHILDREN);
-  return (
-    <Section
-      title="panels.overview.archivedAgents"
-      count={rows.length}
-      testID="overview-archived-agents"
-    >
-      <View style={styles.context}>
-        {visible.map((row) => (
-          <ArchivedAgentRowView
-            key={row.id}
-            row={row}
-            serverId={serverId}
-            workspaceId={workspaceId}
-            pending={pendingIds.has(row.id)}
-            onUnarchive={unarchive}
-          />
-        ))}
-        {visible.length < rows.length ? (
-          <PressHighlight
-            accessibilityRole="button"
-            onPress={expand}
-            style={styles.contextRow}
-            highlightStyle={styles.pressed}
-            testID="overview-archived-agents-show-all"
-          >
-            <Text style={styles.showAllText}>
-              {t("panels.overview.showAll", { count: rows.length })}
-            </Text>
-          </PressHighlight>
-        ) : null}
-      </View>
-      {rows.length > 1 ? (
-        <View style={styles.archivedActions}>
-          <Button
-            size="sm"
-            onPress={unarchiveAll}
-            loading={pendingIds.size > 0}
-            testID="overview-archived-agents-unarchive-all"
-          >
-            {t("panels.overview.unarchiveAll")}
-          </Button>
-        </View>
-      ) : null}
-      {error ? <Text style={styles.archivedError}>{error}</Text> : null}
-    </Section>
-  );
-}
-
-function ArchivedAgentRowView({
-  row,
-  serverId,
-  workspaceId,
-  pending,
-  onUnarchive,
-}: {
-  row: ArchivedAgentRow;
-  serverId: string;
-  workspaceId: string;
-  pending: boolean;
-  onUnarchive: (agentIds: string[]) => Promise<void>;
-}): ReactElement {
-  const { t } = useTranslation();
-  const title = row.title ?? t("panels.overview.untitledAgent");
-  // Opens read-only with the agent's own Unarchive callout, as from History.
-  const open = useCallback(
-    () => navigateToAgent({ serverId, agentId: row.id, workspaceId, pin: true }),
-    [row.id, serverId, workspaceId],
-  );
-  const unarchive = useCallback(() => {
-    void onUnarchive([row.id]);
-  }, [onUnarchive, row.id]);
-  return (
-    <View style={styles.archivedRow} testID={`overview-archived-agent-${row.id}`}>
-      <PressHighlight
-        accessibilityRole="button"
-        accessibilityLabel={`${t("panels.overview.open")}: ${title}`}
-        onPress={open}
-        style={styles.archivedOpen}
-        highlightStyle={styles.pressed}
-        testID={`overview-archived-agent-open-${row.id}`}
-      >
-        <Text style={styles.contextValue} numberOfLines={1}>
-          {title}
-        </Text>
-        <Text style={styles.word} numberOfLines={1}>
-          {formatCompactTimeAgo(row.archivedAt)}
-        </Text>
-      </PressHighlight>
-      <Button
-        size="sm"
-        variant="ghost"
-        onPress={unarchive}
-        loading={pending}
-        accessibilityLabel={`${t("panels.overview.unarchive")}: ${title}`}
-        testID={`overview-archived-agent-unarchive-${row.id}`}
-      >
-        {t("panels.overview.unarchive")}
-      </Button>
-    </View>
-  );
-}
-
 /** Plugins' one-line facts that are neither a status, a move nor PRs. Renders nothing without any. */
 function ContextFooter({
   workspaceKey,
@@ -1993,24 +1868,5 @@ const styles = StyleSheet.create((theme) => {
       textDecorationLine: "underline",
     },
     pressed: { backgroundColor: theme.colors.interactionHighlight },
-    archivedRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: theme.spacing[1],
-    },
-    archivedOpen: {
-      ...contextRow,
-      flex: 1,
-      minWidth: 0,
-      marginHorizontal: 0,
-      marginLeft: -theme.spacing[1.5],
-    },
-    archivedActions: {
-      flexDirection: "row",
-    },
-    archivedError: {
-      fontSize: theme.fontSize.sm,
-      color: theme.colors.statusDanger,
-    },
   };
 });

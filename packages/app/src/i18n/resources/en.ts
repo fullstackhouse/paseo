@@ -726,6 +726,8 @@ export const en = {
         pullRequest: "Pull request",
         terminalProfilesMenu: "Terminal profiles",
         editTerminalProfiles: "Edit profiles",
+        recentlyClosed: "Recently closed",
+        untitledAgent: "Untitled agent",
       },
       explorerSidebar: {
         open: "Open Explorer sidebar",
@@ -2335,10 +2337,6 @@ export const en = {
         one: "{{count}} started",
         other: "{{count}} started",
       },
-      archivedAgents: "Archived agents",
-      unarchive: "Unarchive",
-      unarchiveAll: "Unarchive all",
-      untitledAgent: "Untitled agent",
     },
     lineage: {
       label: "Lineage",

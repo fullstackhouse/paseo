@@ -736,6 +736,8 @@ export const ru: TranslationResources = {
         pullRequest: "PR",
         terminalProfilesMenu: "Профили терминала",
         editTerminalProfiles: "Изменить профили",
+        recentlyClosed: "Недавно закрытые",
+        untitledAgent: "Агент без названия",
       },
       explorerSidebar: {
         open: "Открыть боковую панель",
@@ -2345,10 +2347,6 @@ export const ru: TranslationResources = {
         one: "запущен {{count}}",
         other: "запущено: {{count}}",
       },
-      archivedAgents: "Архивные агенты",
-      unarchive: "Разархивировать",
-      unarchiveAll: "Разархивировать все",
-      untitledAgent: "Агент без названия",
     },
     lineage: {
       label: "Происхождение",

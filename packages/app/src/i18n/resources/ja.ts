@@ -738,6 +738,8 @@ export const ja: TranslationResources = {
         pullRequest: "プルリクエスト",
         terminalProfilesMenu: "ターミナルプロファイル",
         editTerminalProfiles: "プロファイルを編集",
+        recentlyClosed: "最近閉じたタブ",
+        untitledAgent: "無題のエージェント",
       },
       explorerSidebar: {
         open: "サイドパネルを開く",
@@ -2334,10 +2336,6 @@ export const ja: TranslationResources = {
         one: "{{count}}件開始",
         other: "{{count}}件開始",
       },
-      archivedAgents: "アーカイブ済みエージェント",
-      unarchive: "アーカイブ解除",
-      unarchiveAll: "すべてアーカイブ解除",
-      untitledAgent: "無題のエージェント",
     },
     lineage: {
       label: "系譜",

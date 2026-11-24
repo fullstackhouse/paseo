@@ -10,14 +10,18 @@ import { useRouter, type Href } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { Globe, SquarePen, SquareTerminal } from "lucide-react-native";
 import invariant from "tiny-invariant";
+import { useProviderIcons } from "@/components/provider-icons";
 import { useIsCompactFormFactor } from "@/constants/layout";
+import { useToast } from "@/contexts/toast-api-context";
 import { useDaemonConfig } from "@/hooks/use-daemon-config";
 import { pluginIconComponent } from "@/plugins/icons";
 import { useInstalledPlugins } from "@/plugins/registry";
 import { pluginPanelSupportsLocation } from "@/plugins/workspace-panels/locations";
+import { toErrorMessage } from "@/utils/error-messages";
 import { buildSettingsHostSectionRoute } from "@/utils/host-routes";
 import type { NewTabSelection } from "@/workspace-tabs/new-tab";
 import type { WorkspaceTabTarget } from "@/workspace-tabs/model";
+import { useWorkspaceRecentlyClosed } from "@/workspace-tabs/recently-closed";
 import type { TerminalProfile } from "@getpaseo/protocol/messages";
 import { panelCanLaunchInPane, panelSupportsHost, type PaneHost } from "@/panels/panel-manifest";
 import {
@@ -38,6 +42,7 @@ export type WorkspaceTabLaunchDestination =
   | { kind: "replace"; tabId: string };
 
 export interface NewTabLauncher {
+  workspaceId: string;
   showChanges: boolean;
   showPullRequest: boolean;
   showBrowser: boolean;
@@ -57,7 +62,7 @@ export interface WorkspaceTabLaunchItem {
 }
 
 export interface WorkspaceTabLaunchGroup {
-  id: "tabs" | "plugin-panels" | "terminal-profiles";
+  id: "tabs" | "recently-closed" | "plugin-panels" | "terminal-profiles";
   label: string | null;
   items: readonly WorkspaceTabLaunchItem[];
   accessory?: { id: string; label: string; run: () => void };
@@ -110,6 +115,21 @@ export function useWorkspaceTabLaunchCatalog(input: {
   const { config } = useDaemonConfig(serverId);
   const plugins = useInstalledPlugins();
   const isCompact = useIsCompactFormFactor();
+  const toast = useToast();
+  const getProviderIcon = useProviderIcons(serverId);
+  const recentlyClosed = useWorkspaceRecentlyClosed(serverId, launcher.workspaceId);
+  const { reopen } = recentlyClosed;
+  // Closing an agent's tab archives it, so reopening unarchives it, then focuses its tab. Opening
+  // first would lose the tab: the layout drops tabs of agents it still sees as archived.
+  const reopenAgent = useCallback(
+    (agentId: string) => (destination: WorkspaceTabLaunchDestination) => {
+      reopen(agentId).then(
+        () => launcher.launch({ kind: "target", target: { kind: "agent", agentId } }, destination),
+        (error: unknown) => toast.error(toErrorMessage(error)),
+      );
+    },
+    [launcher, reopen, toast],
+  );
 
   const launchSelection = useCallback(
     (selection: NewTabSelection) => (destination: WorkspaceTabLaunchDestination) => {
@@ -241,6 +261,20 @@ export function useWorkspaceTabLaunchCatalog(input: {
 
     const profiles = resolveTerminalProfiles(config?.terminalProfiles);
     const groups: WorkspaceTabLaunchGroup[] = [{ id: "tabs", label: null, items: tabItems }];
+    if (recentlyClosed.agents.length > 0 && panelSupportsHost("agent", host)) {
+      groups.push({
+        id: "recently-closed",
+        label: t("workspace.tabs.actions.recentlyClosed"),
+        items: recentlyClosed.agents.map((agent) => ({
+          id: `recently-closed:${agent.id}`,
+          label: agent.title ?? t("workspace.tabs.actions.untitledAgent"),
+          Icon: getProviderIcon(agent.provider),
+          disabled: false,
+          panelKind: "agent",
+          launch: reopenAgent(agent.id),
+        })),
+      });
+    }
     if (pluginItems.length > 0) {
       groups.push({ id: "plugin-panels", label: null, items: pluginItems });
     }
@@ -273,6 +307,9 @@ export function useWorkspaceTabLaunchCatalog(input: {
   }, [
     config?.terminalProfiles,
     editTerminalProfiles,
+    getProviderIcon,
+    recentlyClosed.agents,
+    reopenAgent,
     isCompact,
     launchSelection,
     launcher,
