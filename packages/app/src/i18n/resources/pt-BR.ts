@@ -317,6 +317,11 @@ export const ptBR: TranslationResources = {
     tooManyMatches: "Muitos resultados — refine a busca",
     hostLoadFailed: "{{host}}: Não foi possível carregar o histórico",
     searchPlaceholder: "Buscar no histórico",
+    workspaceFilter: {
+      label: "Workspace: {{name}}",
+      clear: "Mostrar todos os workspaces",
+      unnamed: "Este workspace",
+    },
     views: {
       agents: "Agentes",
       archivedWorkspaces: "Workspaces arquivados",
@@ -735,6 +740,9 @@ export const ptBR: TranslationResources = {
         pullRequest: "Pull request",
         terminalProfilesMenu: "Perfis de terminal",
         editTerminalProfiles: "Editar perfis",
+        recentlyClosed: "Fechados recentemente",
+        untitledAgent: "Agente sem título",
+        showAllClosed: "Ver tudo no histórico",
       },
       explorerSidebar: {
         open: "Abrir painel lateral",
@@ -1410,6 +1418,8 @@ export const ptBR: TranslationResources = {
         openFolderFailed: "Couldn't open folder",
         remove: "Remover projeto",
         removing: "Removendo...",
+        pin: "Fixar projeto",
+        unpin: "Desafixar projeto",
       },
       confirmations: {
         removeTitle: "Remover projeto?",
@@ -1500,6 +1510,7 @@ export const ptBR: TranslationResources = {
   newWorkspace: {
     title: "Novo workspace",
     recentProjects: "Projetos recentes",
+    pinnedProjects: "Projetos fixados",
     create: "Criar",
     startAnother: "Criar outro",
     isolation: {
@@ -2202,8 +2213,17 @@ export const ptBR: TranslationResources = {
     detachTooltip: "Desanexar subagente",
     archiveAction: "Arquivar {{label}}",
     archiveTooltip: "Arquivar subagente",
-    archiveFinishedAction: "Arquivar subagentes concluídos",
     archiveFinishedRetry: "Tentar novamente ({{failed}}/{{total}})",
+    retryAction: "Tentar novamente {{label}}",
+    clear: "Limpar",
+    clearDoneAction: "Arquivar subagentes concluídos",
+    clearFailedAction: "Arquivar subagentes com falha",
+    groups: {
+      failed: "Com falha · {{count}}",
+      needsInput: "Aguardando resposta · {{count}}",
+      working: "Trabalhando · {{count}}",
+      done: "Concluídos · {{count}}",
+    },
   },
   panels: {
     draft: {

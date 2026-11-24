@@ -310,6 +310,11 @@ export const en = {
     tooManyMatches: "Too many matches — narrow your search",
     hostLoadFailed: "{{host}}: Could not load history",
     searchPlaceholder: "Search history",
+    workspaceFilter: {
+      label: "Workspace: {{name}}",
+      clear: "Show all workspaces",
+      unnamed: "This workspace",
+    },
     views: {
       agents: "Agents",
       archivedWorkspaces: "Archived workspaces",
@@ -726,6 +731,9 @@ export const en = {
         pullRequest: "Pull request",
         terminalProfilesMenu: "Terminal profiles",
         editTerminalProfiles: "Edit profiles",
+        recentlyClosed: "Recently closed",
+        untitledAgent: "Untitled agent",
+        showAllClosed: "Show all in History",
       },
       explorerSidebar: {
         open: "Open Explorer sidebar",
@@ -1391,6 +1399,8 @@ export const en = {
         openFolderFailed: "Couldn't open folder",
         remove: "Remove project",
         removing: "Removing...",
+        pin: "Pin project",
+        unpin: "Unpin project",
       },
       confirmations: {
         removeTitle: "Remove project?",
@@ -1481,6 +1491,7 @@ export const en = {
   newWorkspace: {
     title: "New workspace",
     recentProjects: "Recent projects",
+    pinnedProjects: "Pinned projects",
     create: "Create",
     startAnother: "Start another",
     isolation: {
@@ -2191,8 +2202,17 @@ export const en = {
     detachTooltip: "Detach subagent",
     archiveAction: "Archive {{label}}",
     archiveTooltip: "Archive subagent",
-    archiveFinishedAction: "Archive finished subagents",
     archiveFinishedRetry: "Retry ({{failed}}/{{total}})",
+    retryAction: "Retry {{label}}",
+    clear: "Clear",
+    clearDoneAction: "Archive finished subagents",
+    clearFailedAction: "Archive failed subagents",
+    groups: {
+      failed: "Failed · {{count}}",
+      needsInput: "Needs input · {{count}}",
+      working: "Working · {{count}}",
+      done: "Done · {{count}}",
+    },
   },
   panels: {
     draft: {

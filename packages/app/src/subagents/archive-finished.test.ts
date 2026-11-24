@@ -66,6 +66,55 @@ function deferred<T>() {
 }
 
 describe("createArchiveFinishedSubagents", () => {
+  it("clears done work without the failures, and failures only when asked", async () => {
+    const current = new Map([
+      ["done", managed("done")],
+      ["failed", managed("failed", "error")],
+    ]);
+    const archived: string[] = [];
+    const dismissed: string[] = [];
+    const archive = createArchiveFinishedSubagents(
+      [
+        paseo("done"),
+        paseo("failed", "error"),
+        provider("native-done"),
+        provider("native-failed", "failed"),
+      ],
+      {
+        parentAgentId: "parent",
+        getManagedSubagent: ({ agentId: id }) => current.get(id),
+        archiveManagedSubagent: async ({ agentId: id }) => {
+          archived.push(id);
+        },
+        dismissProviderSubagents: (ids) => dismissed.push(...ids),
+      },
+    );
+
+    await archive.archiveFinished("done");
+    expect(archived).toEqual(["done"]);
+    expect(dismissed).toEqual(["native-done"]);
+
+    await archive.archiveFinished("failed");
+    expect(archived).toEqual(["done", "failed"]);
+    expect(dismissed).toEqual(["native-done", "native-failed"]);
+  });
+
+  it("reports which group a clear is working on", () => {
+    const archive = createArchiveFinishedSubagents([provider("native-failed", "failed")], {
+      parentAgentId: "parent",
+      getManagedSubagent: () => undefined,
+      archiveManagedSubagent: async () => {},
+      dismissProviderSubagents: () => {},
+    });
+    const scopes: unknown[] = [];
+    archive.subscribe(() => {
+      const status = archive.getState().status;
+      if (status.kind === "archiving") scopes.push(status.scope);
+    });
+    void archive.archiveFinished("failed");
+    expect(new Set(scopes)).toEqual(new Set(["failed"]));
+  });
+
   it("dismisses provider rows before sequential managed archives and reports combined progress", async () => {
     const first = deferred<void>();
     const second = deferred<void>();

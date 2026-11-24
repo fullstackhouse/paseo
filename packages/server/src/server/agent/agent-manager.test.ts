@@ -9227,6 +9227,40 @@ test("fires onAgentArchived for stored-only snapshot archives", async () => {
   expect(archivedIds).toEqual([storedOnly.id]);
 });
 
+test("unarchiveSnapshot broadcasts a stored-only agent's state", async () => {
+  const workdir = mkdtempSync(join(tmpdir(), "agent-unarchive-broadcast-"));
+  const storage = new AgentStorage(join(workdir, "agents"), logger);
+  const manager = new AgentManager({
+    clients: { codex: new TestAgentClient() },
+    registry: storage,
+    logger,
+  });
+  try {
+    const storedOnly = await manager.createAgent(
+      { provider: "codex", cwd: workdir, title: "Stored only" },
+      undefined,
+      { workspaceId: "ws-1" },
+    );
+    await manager.closeAgent(storedOnly.id);
+    await manager.archiveSnapshot(storedOnly.id, new Date().toISOString());
+    const statesSeen: string[] = [];
+    const unsubscribe = manager.subscribe(
+      (event) => {
+        if (event.type === "agent_state") statesSeen.push(event.agent.id);
+      },
+      { agentId: storedOnly.id, replayState: false },
+    );
+
+    await manager.unarchiveSnapshot(storedOnly.id);
+    unsubscribe();
+
+    expect((await storage.get(storedOnly.id))?.archivedAt).toBeNull();
+    expect(statesSeen).toEqual([storedOnly.id]);
+  } finally {
+    rmSync(workdir, { recursive: true, force: true });
+  }
+});
+
 test("native archive and restore release the loaded session writer", async () => {
   const workdir = mkdtempSync(join(tmpdir(), "agent-native-archive-writer-"));
   class WriterClient extends NativeArchiveRecordingClient {

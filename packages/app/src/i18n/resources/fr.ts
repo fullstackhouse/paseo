@@ -318,6 +318,11 @@ export const fr: TranslationResources = {
     tooManyMatches: "Trop de résultats — affinez la recherche",
     hostLoadFailed: "{{host}} : impossible de charger l’historique",
     searchPlaceholder: "Rechercher dans l’historique",
+    workspaceFilter: {
+      label: "Espace de travail : {{name}}",
+      clear: "Afficher tous les espaces de travail",
+      unnamed: "Cet espace de travail",
+    },
     views: {
       agents: "Agents",
       archivedWorkspaces: "Espaces de travail archivés",
@@ -737,6 +742,9 @@ export const fr: TranslationResources = {
         pullRequest: "Pull request",
         terminalProfilesMenu: "Profils de terminal",
         editTerminalProfiles: "Modifier les profils",
+        recentlyClosed: "Fermés récemment",
+        untitledAgent: "Agent sans titre",
+        showAllClosed: "Tout voir dans l'historique",
       },
       explorerSidebar: {
         open: "Ouvrir la barre latérale de l’explorateur",
@@ -1414,6 +1422,8 @@ export const fr: TranslationResources = {
         openFolderFailed: "Impossible d’ouvrir le dossier",
         remove: "Retirer le projet",
         removing: "Retrait…",
+        pin: "Épingler le projet",
+        unpin: "Désépingler le projet",
       },
       confirmations: {
         removeTitle: "Retirer le projet ?",
@@ -1504,6 +1514,7 @@ export const fr: TranslationResources = {
   newWorkspace: {
     title: "Nouvel espace de travail",
     recentProjects: "Projets récents",
+    pinnedProjects: "Projets épinglés",
     create: "Créer",
     startAnother: "En créer un autre",
     isolation: {
@@ -2216,8 +2227,17 @@ export const fr: TranslationResources = {
     detachTooltip: "Détacher le sous-agent",
     archiveAction: "Archiver {{label}}",
     archiveTooltip: "Archiver le sous-agent",
-    archiveFinishedAction: "Archiver les sous-agents terminés",
     archiveFinishedRetry: "Réessayer ({{failed}}/{{total}})",
+    retryAction: "Réessayer {{label}}",
+    clear: "Effacer",
+    clearDoneAction: "Archiver les sous-agents terminés",
+    clearFailedAction: "Archiver les sous-agents en échec",
+    groups: {
+      failed: "Échec · {{count}}",
+      needsInput: "En attente · {{count}}",
+      working: "En cours · {{count}}",
+      done: "Terminé · {{count}}",
+    },
   },
   panels: {
     draft: {

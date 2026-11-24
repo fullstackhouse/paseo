@@ -297,6 +297,27 @@ describe("matchesAgentUpdatesFilter", () => {
       matchesAgentUpdatesFilter({ agent, project: otherProject, filter: { projectKeys: ["  "] } }),
     ).toBe(true);
   });
+
+  test("archivedOnly filter keeps only archived agents", () => {
+    const archived = makeAgentPayload({ id: "a", archivedAt: "2026-03-02T00:00:00.000Z" });
+    const active = makeAgentPayload({ id: "b" });
+    const filter = { includeArchived: true, archivedOnly: true };
+    expect(matchesAgentUpdatesFilter({ agent: archived, project, filter })).toBe(true);
+    expect(matchesAgentUpdatesFilter({ agent: active, project, filter })).toBe(false);
+  });
+
+  test("workspaceIds filter keeps only agents in those workspaces", () => {
+    const here = makeAgentPayload({ id: "a", workspaceId: "ws-1" });
+    const elsewhere = makeAgentPayload({ id: "b", workspaceId: "ws-2" });
+    const unplaced = makeAgentPayload({ id: "c", workspaceId: undefined });
+    const filter = { workspaceIds: ["ws-1"] };
+    expect(matchesAgentUpdatesFilter({ agent: here, project, filter })).toBe(true);
+    expect(matchesAgentUpdatesFilter({ agent: elsewhere, project, filter })).toBe(false);
+    expect(matchesAgentUpdatesFilter({ agent: unplaced, project, filter })).toBe(false);
+    expect(
+      matchesAgentUpdatesFilter({ agent: elsewhere, project, filter: { workspaceIds: [] } }),
+    ).toBe(true);
+  });
 });
 
 describe("forwardLiveAgent", () => {

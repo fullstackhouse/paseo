@@ -1,13 +1,17 @@
 import type { AgentAddress } from "@getpaseo/protocol/addresses";
 import { useHosts } from "@/runtime/host-runtime";
-import { useCallback, useMemo, type ReactElement, type ReactNode } from "react";
+import { Fragment, useCallback, useMemo, useState, type ReactElement, type ReactNode } from "react";
+import type { TFunction } from "i18next";
 import { Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
-import { Archive, Unlink } from "lucide-react-native";
+import { Archive, RotateCcw, Unlink } from "lucide-react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { LiveElapsed } from "@/components/message";
 import { useProviderIcon } from "@/components/provider-icons";
-import { ComposerTrackActions, ComposerTrackPill, ComposerTrackRow } from "@/composer/tracks";
+import { ComposerTrackGroupHeader, ComposerTrackPill, ComposerTrackRow } from "@/composer/tracks";
+import { Button } from "@/components/ui/button";
+import { MenuSeparator } from "@/components/ui/menu";
+import { sendResumePrompt } from "@/utils/resume-agents";
 import { mutedIconColorMapping } from "@/components/ui/icon-button-chrome";
 import { ToolbarButton, paneContentToolbarIconSize } from "@/components/ui/pane-content-toolbar";
 import { useIsCompactFormFactor } from "@/constants/layout";
@@ -16,28 +20,26 @@ import {
   WorkspaceTabIcon,
   type WorkspaceTabPresentation,
 } from "@/screens/workspace/workspace-tab-presentation";
-import type { Theme } from "@/styles/theme";
 import { useAgentFactsLine } from "@/panels/agent-facts-line";
 import { getPanelManifest } from "@/panels/panel-manifest";
 import { useSheetPanePage } from "@/screens/workspace/sheet-pane";
 import type { SheetTab } from "@/stores/workspace-layout-store";
 import { formatDuration } from "@/utils/time";
 import type { SubagentRow } from "./select";
-import type { ArchiveFinishedStatus } from "./use-archive-finished";
+import type { ArchiveFinishedStatus, ArchiveScope } from "./use-archive-finished";
 import {
   buildSubagentPillPresentation,
   buildSubagentRowPresentationData,
   buildSubagentRunTime,
-  countFinishedSubagents,
+  distinctSubagentSubtitles,
+  groupSubagentRows,
+  type SubagentGroup,
+  type SubagentGroupKey,
 } from "./track-presentation";
 
 const ThemedArchive = withUnistyles(Archive);
 const ThemedUnlink = withUnistyles(Unlink);
-
-const foregroundColorMapping = (theme: Theme) => ({ color: theme.colors.foreground });
-const foregroundMutedColorMapping = (theme: Theme) => ({
-  color: theme.colors.foregroundMuted,
-});
+const ThemedRotateCcw = withUnistyles(RotateCcw);
 
 export interface SubagentsTrackProps {
   serverId: string;
@@ -50,14 +52,13 @@ export interface SubagentsTrackProps {
    */
   sheetTabFor: (row: SubagentRow) => SheetTab | null;
   onArchiveSubagent: (address: AgentAddress) => void;
-  onArchiveFinished?: () => void;
+  /** Clears one group's finished children: Done's, or Failed's. */
+  onArchiveFinished?: (scope: ArchiveScope) => void;
   archiveFinishedStatus?: ArchiveFinishedStatus;
   onDetachSubagent?: (address: AgentAddress) => void;
 }
 
 const IDLE_ARCHIVE_FINISHED_STATUS: ArchiveFinishedStatus = { kind: "idle" };
-
-const ROW_ICON_SIZE = 14;
 
 function useRowPresentation(row: SubagentRow, serverId: string): WorkspaceTabPresentation {
   const icon = useProviderIcon(row.provider, serverId);
@@ -69,6 +70,29 @@ function useRowPresentation(row: SubagentRow, serverId: string): WorkspaceTabPre
     showCloseButton: getPanelManifest(data.kind).showCloseButton,
     icon,
   };
+}
+
+function rowKey(row: SubagentRow): string {
+  return row.kind === "paseo" ? `${row.address.serverId}:${row.id}` : row.id;
+}
+
+/** The scope a bulk clear is working on. An unscoped status predates scopes and meant done. */
+function archiveStatusScope(status: ArchiveFinishedStatus): ArchiveScope | null {
+  return status.kind === "idle" ? null : (status.scope ?? "done");
+}
+
+/** Failed managed children, by host: a retry resumes each one on the daemon that runs it. */
+function retryFailedSubagents(rows: readonly SubagentRow[]): void {
+  const idsByServer = new Map<string, string[]>();
+  for (const row of rows) {
+    if (row.kind !== "paseo" || row.status !== "error") continue;
+    const ids = idsByServer.get(row.address.serverId) ?? [];
+    ids.push(row.id);
+    idsByServer.set(row.address.serverId, ids);
+  }
+  for (const [rowServerId, ids] of idsByServer) {
+    void sendResumePrompt(rowServerId, ids);
+  }
 }
 
 export function SubagentsTrack({
@@ -84,18 +108,29 @@ export function SubagentsTrack({
 }: SubagentsTrackProps): ReactElement | null {
   const { t } = useTranslation();
   const sheetPanePage = useSheetPanePage();
+  // Null until the user folds or unfolds Done, so the default can follow what the list holds.
+  const [doneExpanded, setDoneExpanded] = useState<boolean | null>(null);
+  const toggleDone = useCallback((folded: boolean) => () => setDoneExpanded(folded), []);
 
-  const isArchivingFinished = archiveFinishedStatus.kind === "archiving";
-  const isArchiveFinishedFailed = archiveFinishedStatus.kind === "failed";
-  if (rows.length === 0 && !isArchivingFinished && !isArchiveFinishedFailed) {
+  const archivingScope = archiveStatusScope(archiveFinishedStatus);
+  if (rows.length === 0 && archivingScope === null) {
     return null;
   }
 
   const pill = buildSubagentPillPresentation(t, rows);
-  const finishedCount = countFinishedSubagents(rows);
-  const showArchiveFinished = finishedCount > 0 || isArchivingFinished || isArchiveFinishedFailed;
-  const sheets = rows.map(sheetTabFor);
-  const pages = sheets.flatMap((sheet) => (sheet ? [sheetPanePage(sheet)] : []));
+  const groups = groupSubagentRows(rows);
+  // A clear in flight keeps its heading, and its progress, after its last row has gone.
+  if (archivingScope && !groups.some((group) => group.key === archivingScope)) {
+    groups.push({ key: archivingScope, rows: [] });
+  }
+  const subtitles = distinctSubagentSubtitles(rows);
+  const sheets = new Map(rows.map((row) => [rowKey(row), sheetTabFor(row)]));
+  const pages = [...sheets.values()].flatMap((sheet) => (sheet ? [sheetPanePage(sheet)] : []));
+  // Done folds when anything else is in the list: it asks nothing of you, and twenty finished
+  // rows would push the one failure off the panel. Alone, it is the list.
+  const doneFolded = doneExpanded === null ? groups.length > 1 : !doneExpanded;
+  // One heading over a list that is all one kind of thing repeats the pill.
+  const showHeadings = groups.length > 1 || groups.some((group) => group.key !== "working");
 
   return (
     <ComposerTrackPill
@@ -105,92 +140,138 @@ export function SubagentsTrack({
       accessibilityLabel={pill.accessibilityLabel}
       panelTitle={t("subagents.title")}
     >
-      {showArchiveFinished && onArchiveFinished ? (
-        <ComposerTrackActions divided={rows.length > 0}>
-          <ArchiveFinishedRow
-            status={archiveFinishedStatus}
-            disabled={isArchivingFinished}
-            onPress={onArchiveFinished}
-          />
-        </ComposerTrackActions>
-      ) : null}
-      {rows.map((row, index) => (
-        <SubagentsTrackRow
-          key={row.kind === "paseo" ? `${row.address.serverId}:${row.id}` : row.id}
-          row={row}
-          serverId={serverId}
-          onOpenSubagent={onOpenSubagent}
-          onOpenProviderSubagent={onOpenProviderSubagent}
-          sheetTabId={sheets[index]?.tab.tabId ?? null}
-          onArchiveSubagent={onArchiveSubagent}
-          onDetachSubagent={onDetachSubagent}
-        />
-      ))}
+      {groups.map((group, index) => {
+        const folded = group.key === "done" && doneFolded;
+        return (
+          <Fragment key={group.key}>
+            {index > 0 ? <MenuSeparator /> : null}
+            {showHeadings ? (
+              <SubagentGroupHeader
+                group={group}
+                collapsed={group.key === "done" ? folded : undefined}
+                onToggle={group.key === "done" ? toggleDone(folded) : undefined}
+                archiveStatus={archivingScope === group.key ? archiveFinishedStatus : null}
+                archiveDisabled={
+                  archivingScope !== null && archiveFinishedStatus.kind === "archiving"
+                }
+                onArchiveFinished={onArchiveFinished}
+              />
+            ) : null}
+            {folded
+              ? null
+              : group.rows.map((row) => (
+                  <SubagentsTrackRow
+                    key={rowKey(row)}
+                    row={row}
+                    serverId={serverId}
+                    subtitle={subtitles.get(row.id) ?? ""}
+                    onOpenSubagent={onOpenSubagent}
+                    onOpenProviderSubagent={onOpenProviderSubagent}
+                    sheetTabId={sheets.get(rowKey(row))?.tab.tabId ?? null}
+                    onArchiveSubagent={onArchiveSubagent}
+                    onDetachSubagent={onDetachSubagent}
+                  />
+                ))}
+          </Fragment>
+        );
+      })}
     </ComposerTrackPill>
   );
 }
 
+function groupLabel(t: TFunction, key: SubagentGroupKey, count: number): string {
+  switch (key) {
+    case "failed":
+      return t("subagents.groups.failed", { count });
+    case "needs_input":
+      return t("subagents.groups.needsInput", { count });
+    case "working":
+      return t("subagents.groups.working", { count });
+    case "done":
+      return t("subagents.groups.done", { count });
+  }
+}
+
 /**
- * Bulk archive, as a row above the list rather than an icon next to the count. The pill has no
- * header to hang an icon off, and a destructive-ish action reads better with its name attached.
+ * A group's heading and the actions that apply to its rows. Failed offers Retry all and Clear;
+ * Done offers Clear. They are separate presses on purpose: clearing finished work must never sweep
+ * away a failure nobody has looked at.
  */
-function ArchiveFinishedRow({
-  status,
-  disabled,
-  onPress,
+function SubagentGroupHeader({
+  group,
+  collapsed,
+  onToggle,
+  archiveStatus,
+  archiveDisabled,
+  onArchiveFinished,
 }: {
-  status: ArchiveFinishedStatus;
-  disabled: boolean;
-  onPress: () => void;
+  group: SubagentGroup;
+  collapsed: boolean | undefined;
+  onToggle: (() => void) | undefined;
+  /** This group's bulk clear, while one is running or after it partly failed. */
+  archiveStatus: ArchiveFinishedStatus | null;
+  archiveDisabled: boolean;
+  onArchiveFinished?: (scope: ArchiveScope) => void;
 }): ReactElement {
   const { t } = useTranslation();
-
-  const renderRow = useCallback(
-    ({ active }: { active: boolean }) => (
-      <>
-        <ThemedArchive
-          size={ROW_ICON_SIZE}
-          uniProps={active ? foregroundColorMapping : foregroundMutedColorMapping}
-        />
-        <Text style={styles.rowLabel} numberOfLines={1}>
-          {t("subagents.archiveFinishedAction")}
-        </Text>
-        {status.kind === "archiving" ? (
-          <Text style={styles.rowTrailing} testID="subagents-track-archive-progress">
-            {status.completedCount}/{status.totalCount}
-          </Text>
-        ) : null}
-        {status.kind === "failed" ? (
-          <Text style={styles.rowTrailing} testID="subagents-track-archive-failed">
-            {t("subagents.archiveFinishedRetry", {
-              failed: status.failedCount,
-              total: status.totalCount,
-            })}
-          </Text>
-        ) : null}
-      </>
-    ),
-    [status, t],
-  );
+  const scope: ArchiveScope | null =
+    group.key === "failed" || group.key === "done" ? group.key : null;
+  const canRetry = group.key === "failed" && group.rows.some((row) => row.kind === "paseo");
+  const handleRetry = useCallback(() => retryFailedSubagents(group.rows), [group.rows]);
+  const handleClear = useCallback(() => {
+    if (scope) onArchiveFinished?.(scope);
+  }, [onArchiveFinished, scope]);
 
   return (
-    <ComposerTrackRow
-      accessibilityLabel={t("subagents.archiveFinishedAction")}
-      testID="subagents-track-archive-finished"
-      disabled={disabled}
-      // Progress and the retry count land on this row, so the panel is where the result of
-      // pressing it shows up. Dismissing would hide the thing the press produces.
-      closeOnSelect={false}
-      onPress={onPress}
+    <ComposerTrackGroupHeader
+      label={groupLabel(t, group.key, group.rows.length)}
+      collapsed={collapsed}
+      onToggle={onToggle}
+      testID={`subagents-track-group-${group.key}`}
     >
-      {renderRow}
-    </ComposerTrackRow>
+      {archiveStatus?.kind === "archiving" ? (
+        <Text style={styles.rowTrailing} testID={`subagents-track-archive-progress-${group.key}`}>
+          {archiveStatus.completedCount}/{archiveStatus.totalCount}
+        </Text>
+      ) : null}
+      {canRetry ? (
+        <Button
+          variant="ghost"
+          size="sm"
+          onPress={handleRetry}
+          testID="subagents-track-retry-failed"
+        >
+          {t("failedAgents.retryAll")}
+        </Button>
+      ) : null}
+      {scope && onArchiveFinished && group.rows.length > 0 ? (
+        <Button
+          variant="ghost"
+          size="sm"
+          disabled={archiveDisabled}
+          onPress={handleClear}
+          accessibilityLabel={t(
+            scope === "failed" ? "subagents.clearFailedAction" : "subagents.clearDoneAction",
+          )}
+          testID={`subagents-track-clear-${scope}`}
+        >
+          {archiveStatus?.kind === "failed"
+            ? t("subagents.archiveFinishedRetry", {
+                failed: archiveStatus.failedCount,
+                total: archiveStatus.totalCount,
+              })
+            : t("subagents.clear")}
+        </Button>
+      ) : null}
+    </ComposerTrackGroupHeader>
   );
 }
 
 interface SubagentsTrackRowProps {
   serverId: string;
   row: SubagentRow;
+  /** The row's facts minus what every sibling shares. Provider rows only. */
+  subtitle: string;
   onOpenSubagent: (address: AgentAddress) => void;
   onOpenProviderSubagent: (parentAgentId: string, subagentId: string) => void;
   /** The sheet page the row opens in place of the list, when it opens in a sheet. */
@@ -202,6 +283,7 @@ interface SubagentsTrackRowProps {
 function SubagentsTrackRow({
   serverId,
   row,
+  subtitle,
   onOpenSubagent,
   onOpenProviderSubagent,
   sheetTabId,
@@ -228,6 +310,8 @@ function SubagentsTrackRow({
   const handleDetachPress = useCallback(() => {
     if (row.kind === "paseo") onDetachSubagent?.(row.address);
   }, [onDetachSubagent, row]);
+  const handleRetryPress = useCallback(() => retryFailedSubagents([row]), [row]);
+  const canRetry = row.kind === "paseo" && row.status === "error";
   const actionsAlwaysVisible = isNative || isCompact;
 
   const renderRow = useCallback(
@@ -244,7 +328,7 @@ function SubagentsTrackRow({
               <PaseoSubagentFacts serverId={rowServerId} agentId={row.id} work={row.work} />
             </>
           ) : (
-            <SubagentFacts rowId={row.id} text={presentation.subtitle} work={row.work} />
+            <SubagentFacts rowId={row.id} text={subtitle} work={row.work} />
           )}
         </View>
         {row.kind === "paseo" ? (
@@ -253,6 +337,7 @@ function SubagentsTrackRow({
             displayLabel={displayLabel}
             compact={isCompact}
             visible={actionsAlwaysVisible || active}
+            onRetryPress={canRetry ? handleRetryPress : undefined}
             onDetachPress={onDetachSubagent ? handleDetachPress : undefined}
             onArchivePress={handleArchivePress}
           />
@@ -261,8 +346,11 @@ function SubagentsTrackRow({
     ),
     [
       actionsAlwaysVisible,
+      canRetry,
       displayLabel,
       handleArchivePress,
+      handleRetryPress,
+      subtitle,
       handleDetachPress,
       isCompact,
       onDetachSubagent,
@@ -348,6 +436,7 @@ function SubagentRowActions({
   displayLabel,
   compact,
   visible,
+  onRetryPress,
   onDetachPress,
   onArchivePress,
 }: {
@@ -355,6 +444,7 @@ function SubagentRowActions({
   displayLabel: string;
   compact: boolean;
   visible: boolean;
+  onRetryPress?: () => void;
   onDetachPress?: () => void;
   onArchivePress: () => void;
 }): ReactElement {
@@ -365,6 +455,17 @@ function SubagentRowActions({
       style={visible ? styles.actionClusterVisible : styles.actionClusterHidden}
       pointerEvents={visible ? "auto" : "none"}
     >
+      {onRetryPress ? (
+        <SubagentActionButton
+          label={t("subagents.retryAction", { label: displayLabel })}
+          tooltipLabel={t("failedAgents.retry")}
+          compact={compact}
+          onPress={onRetryPress}
+          testID={`subagents-track-retry-${rowId}`}
+        >
+          <ThemedRotateCcw size={iconSize} uniProps={mutedIconColorMapping} />
+        </SubagentActionButton>
+      ) : null}
       {onDetachPress ? (
         <SubagentActionButton
           label={t("subagents.detachAction", { label: displayLabel })}
@@ -424,18 +525,10 @@ function SubagentActionButton({
 }
 
 const styles = StyleSheet.create((theme) => ({
-  // `flexBasis: "auto"` rather than `flex: 1`: a zero-basis label contributes nothing to the row's
-  // intrinsic width, so the panel measures itself at its floor and truncates every label at once.
-  rowLabel: {
-    flexGrow: 1,
-    flexShrink: 1,
-    flexBasis: "auto",
-    minWidth: 0,
-    fontSize: theme.fontSize.base,
-    color: theme.colors.foreground,
-  },
   // Title over facts. The facts sit under the title rather than beside it, so a long task name
-  // keeps the row's full width and neither line truncates the other.
+  // keeps the row's full width and neither line truncates the other. `flexBasis: "auto"` rather
+  // than `flex: 1`: a zero-basis label adds nothing to the row's intrinsic width, so the panel
+  // would measure itself at its floor and truncate every label at once.
   rowText: {
     flexGrow: 1,
     flexShrink: 1,
@@ -462,8 +555,7 @@ const styles = StyleSheet.create((theme) => ({
     fontVariant: ["tabular-nums"],
     color: theme.colors.foregroundMuted,
   },
-  // Progress on the archive row. It shrinks twice as fast as the label, so a long retry count
-  // gives way first instead of squeezing the thing that names the row.
+  // Progress on archive and clear rows. It shrinks before the heading, so the count gives way first.
   rowTrailing: {
     flexShrink: 2,
     minWidth: 0,

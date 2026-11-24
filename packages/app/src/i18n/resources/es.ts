@@ -318,6 +318,11 @@ export const es: TranslationResources = {
     tooManyMatches: "Demasiadas coincidencias: acota la búsqueda",
     hostLoadFailed: "{{host}}: No se pudo cargar el historial",
     searchPlaceholder: "Buscar en el historial",
+    workspaceFilter: {
+      label: "Espacio de trabajo: {{name}}",
+      clear: "Mostrar todos los espacios de trabajo",
+      unnamed: "Este espacio de trabajo",
+    },
     views: {
       agents: "Agentes",
       archivedWorkspaces: "Espacios de trabajo archivados",
@@ -737,6 +742,9 @@ export const es: TranslationResources = {
         pullRequest: "Solicitud de extracción",
         terminalProfilesMenu: "Terminal profiles",
         editTerminalProfiles: "Edit profiles",
+        recentlyClosed: "Cerrados recientemente",
+        untitledAgent: "Agente sin título",
+        showAllClosed: "Ver todo en el historial",
       },
       explorerSidebar: {
         open: "Abrir panel lateral",
@@ -1420,6 +1428,8 @@ export const es: TranslationResources = {
         openFolderFailed: "Couldn't open folder",
         remove: "Eliminar proyecto",
         removing: "Eliminando...",
+        pin: "Fijar proyecto",
+        unpin: "Desfijar proyecto",
       },
       confirmations: {
         removeTitle: "¿Quitar proyecto?",
@@ -1510,6 +1520,7 @@ export const es: TranslationResources = {
   newWorkspace: {
     title: "Nuevo espacio de trabajo",
     recentProjects: "Proyectos recientes",
+    pinnedProjects: "Proyectos fijados",
     create: "Crear",
     startAnother: "Crear otro",
     isolation: {
@@ -2217,8 +2228,17 @@ export const es: TranslationResources = {
     detachTooltip: "Separar subagente",
     archiveAction: "Archivo{{label}}",
     archiveTooltip: "Subagente de archivo",
-    archiveFinishedAction: "Archivar subagentes finalizados",
     archiveFinishedRetry: "Reintentar ({{failed}}/{{total}})",
+    retryAction: "Reintentar {{label}}",
+    clear: "Borrar",
+    clearDoneAction: "Archivar subagentes finalizados",
+    clearFailedAction: "Archivar subagentes fallidos",
+    groups: {
+      failed: "Fallidos · {{count}}",
+      needsInput: "Esperan respuesta · {{count}}",
+      working: "Trabajando · {{count}}",
+      done: "Terminados · {{count}}",
+    },
   },
   panels: {
     draft: {

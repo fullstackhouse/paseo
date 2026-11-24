@@ -35,7 +35,7 @@ export interface ArchiveDependencies {
   github: ForgeService;
   workspaceGitService: Pick<WorkspaceGitService, "getSnapshot" | "invalidateWorktrees">;
   agentManager: Pick<AgentManager, "listAgents" | "getAgent" | "archiveAgent" | "archiveSnapshot">;
-  agentStorage: Pick<AgentStorage, "listByWorkspace">;
+  agentStorage: Pick<AgentStorage, "listByWorkspace" | "setArchivedWithWorkspace">;
   // Resolves the worktree at a path to its workspaceId for archive-by-path. The
   // path uniquely identifies a worktree workspace; this is a directory lookup for
   // the archive target, not status/ownership.
@@ -591,7 +591,67 @@ export async function archiveWorkspaceContents(
     }
   }
 
+  // Tag what this archive took down (subagents in this workspace included), so unarchiving the
+  // workspace brings exactly these back. Agents already archived lose any tag left by an earlier
+  // archive of this workspace: an unarchive that didn't restore them (an agent created at the
+  // archived path reuses the workspace) must not let a later restore bring them back.
+  const staleTagIds = matchingStoredRecords
+    .filter((record) => record.archivedAt && record.archivedWithWorkspaceId === workspaceId)
+    .map((record) => record.id);
+  const tagResults = await Promise.allSettled([
+    ...[...agentIdsToArchive].map(async (agentId) =>
+      dependencies.agentStorage.setArchivedWithWorkspace(agentId, workspaceId),
+    ),
+    ...staleTagIds.map(async (agentId) =>
+      dependencies.agentStorage.setArchivedWithWorkspace(agentId, null),
+    ),
+  ]);
+  for (const result of tagResults) {
+    if (result.status === "rejected") {
+      dependencies.sessionLogger?.warn(
+        { err: result.reason, workspaceId },
+        "Failed to tag an agent archived with its workspace; continuing",
+      );
+    }
+  }
+
   return archivedAgents;
+}
+
+export interface RestoreWorkspaceAgentsDependencies {
+  agentStorage: Pick<AgentStorage, "listByWorkspace">;
+  unarchiveAgent: (agentId: string) => Promise<unknown>;
+  sessionLogger?: Logger;
+}
+
+/**
+ * Unarchives the agents that this workspace's archive took down. Agents archived on their own
+ * before the workspace, and ones since moved to another workspace, stay as they are. Returns the
+ * unarchived agent ids.
+ */
+export async function restoreWorkspaceAgents(
+  dependencies: RestoreWorkspaceAgentsDependencies,
+  workspaceId: string,
+): Promise<string[]> {
+  const records = await dependencies.agentStorage.listByWorkspace(workspaceId);
+  const agentIds = records
+    .filter((record) => record.archivedAt && record.archivedWithWorkspaceId === workspaceId)
+    .map((record) => record.id);
+  const results = await Promise.allSettled(
+    agentIds.map(async (agentId) => dependencies.unarchiveAgent(agentId)),
+  );
+  const restored: string[] = [];
+  results.forEach((result, index) => {
+    if (result.status === "fulfilled") {
+      restored.push(agentIds[index]);
+    } else {
+      dependencies.sessionLogger?.warn(
+        { err: result.reason, workspaceId, agentId: agentIds[index] },
+        "Failed to unarchive an agent with its workspace; continuing",
+      );
+    }
+  });
+  return restored;
 }
 
 // True when, after archiving

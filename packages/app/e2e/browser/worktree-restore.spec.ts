@@ -57,7 +57,7 @@ test.describe("Worktree restore", () => {
 
   async function createArchivedMissingWorktree(
     prefix: string,
-    options: { agentCount?: number; keepAgentsArchived?: boolean } = {},
+    options: { agentCount?: number; keepAgentsArchived?: boolean; closedBeforeCount?: number } = {},
   ) {
     const project = await openProjectViaDaemon(worktreeClient, tempRepo.path);
     createdProjectIds.add(project.projectKey);
@@ -80,6 +80,18 @@ test.describe("Worktree restore", () => {
     if (!agent) {
       throw new Error("Expected at least one archived-worktree agent");
     }
+    // Agents whose tabs were closed before the workspace was archived.
+    const closedBefore = await Promise.all(
+      Array.from({ length: options.closedBeforeCount ?? 0 }, async () => {
+        const closed = await createIdleAgent(client, {
+          cwd: worktree.workspaceDirectory,
+          workspaceId: worktree.workspaceId,
+          title: `${prefix}-closed-${randomUUID().slice(0, 8)}`,
+        });
+        await client.archiveAgent(closed.id);
+        return closed;
+      }),
+    );
 
     await archiveWorkspaceFromDaemon(worktreeClient, worktree.workspaceDirectory);
     await expect
@@ -103,7 +115,7 @@ test.describe("Worktree restore", () => {
     }
     expect(existsSync(worktree.workspaceDirectory)).toBe(false);
 
-    return { agent, agents, worktree };
+    return { agent, agents, closedBefore, worktree };
   }
 
   async function openArchivedWorkspaceFromHistory(page: Page, prefix: string) {
@@ -303,16 +315,15 @@ test.describe("Worktree restore", () => {
     ).toHaveText(switchedBranch, { timeout: 30_000 });
   });
 
-  test("restores the workspace before explicitly unarchiving each selected agent", async ({
-    page,
-  }) => {
-    const { agents, worktree } = await createArchivedMissingWorktree("restore-agents", {
-      agentCount: 2,
-      keepAgentsArchived: true,
-    });
+  test("restoring the workspace brings back the agents its archive took down", async ({ page }) => {
+    const { agents, closedBefore, worktree } = await createArchivedMissingWorktree(
+      "restore-agents",
+      { agentCount: 2, keepAgentsArchived: true, closedBeforeCount: 1 },
+    );
     const [firstAgent, secondAgent] = agents;
-    if (!firstAgent || !secondAgent) {
-      throw new Error("Expected two archived agents");
+    const [closedAgent] = closedBefore;
+    if (!firstAgent || !secondAgent || !closedAgent) {
+      throw new Error("Expected two archived agents and one closed before");
     }
 
     await gotoAppShell(page);
@@ -329,33 +340,19 @@ test.describe("Worktree restore", () => {
       .toBe(true);
     await expect(
       page.getByTestId(`workspace-tab-agent_${firstAgent.id}`).filter({ visible: true }).first(),
-    ).toBeVisible({ timeout: 30_000 });
-    await expect(
-      page.getByTestId(`workspace-tab-agent_${firstAgent.id}`).filter({ visible: true }).first(),
-    ).toHaveAttribute("aria-selected", "true");
-    expect(await fetchAgentArchivedAt(client, firstAgent.id)).not.toBeNull();
-    expect(await fetchAgentArchivedAt(client, secondAgent.id)).not.toBeNull();
-    await page.getByRole("button", { name: "Unarchive", exact: true }).click();
+    ).toHaveAttribute("aria-selected", "true", { timeout: 30_000 });
     await expect
       .poll(() => fetchAgentArchivedAt(client, firstAgent.id), { timeout: 30_000 })
       .toBeNull();
-    expect(await fetchAgentArchivedAt(client, secondAgent.id)).not.toBeNull();
-    await expect(page.getByRole("button", { name: "Unarchive" })).toHaveCount(0, {
-      timeout: 30_000,
-    });
-
-    await openSessions(page);
-    await page.getByTestId(`agent-row-${getServerId()}-${secondAgent.id}`).click();
-    await expect(
-      page.getByTestId(`workspace-tab-agent_${secondAgent.id}`).filter({ visible: true }).first(),
-    ).toBeVisible({ timeout: 30_000 });
-    await expect(page.getByRole("button", { name: "Unarchive" })).toBeVisible({
-      timeout: 30_000,
-    });
-    await page.getByRole("button", { name: "Unarchive" }).click();
     await expect
       .poll(() => fetchAgentArchivedAt(client, secondAgent.id), { timeout: 30_000 })
       .toBeNull();
+    await expect(
+      page.getByTestId(`workspace-tab-agent_${secondAgent.id}`).filter({ visible: true }).first(),
+    ).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByRole("button", { name: "Unarchive", exact: true })).toHaveCount(0);
+    // A tab closed before the archive stays closed.
+    expect(await fetchAgentArchivedAt(client, closedAgent.id)).not.toBeNull();
   });
 
   test("restores a branchless workspace so its archived agent can be used again", async ({
@@ -413,15 +410,12 @@ test.describe("Worktree restore", () => {
     await expect
       .poll(() => existsSync(backingWorktree.workspaceDirectory), { timeout: 30_000 })
       .toBe(true);
-    await expect(page.getByRole("button", { name: "Unarchive", exact: true })).toBeVisible({
+    // Restore brings back the agent the archive took down.
+    await expect.poll(() => fetchAgentArchivedAt(client, agent.id), { timeout: 30_000 }).toBeNull();
+    await expect(page.getByRole("textbox", { name: "Message agent..." })).toBeEditable({
       timeout: 30_000,
     });
-    await captureBranchlessRestoreStep(page, "02-unarchive-agent.png");
-
-    await page.getByRole("button", { name: "Unarchive", exact: true }).click();
-    await expect.poll(() => fetchAgentArchivedAt(client, agent.id)).toBeNull();
-    await expect(page.getByRole("textbox", { name: "Message agent..." })).toBeEditable();
-    await captureBranchlessRestoreStep(page, "03-agent-ready.png");
+    await captureBranchlessRestoreStep(page, "02-agent-ready.png");
 
     const restoredHead = execFileSync("git", ["rev-parse", "HEAD"], {
       cwd: backingWorktree.workspaceDirectory,

@@ -313,6 +313,11 @@ export const ar: TranslationResources = {
     tooManyMatches: "نتائج كثيرة جدًا — ضيّق نطاق البحث",
     hostLoadFailed: "{{host}}: تعذر تحميل السجل",
     searchPlaceholder: "البحث في السجل",
+    workspaceFilter: {
+      label: "مساحة العمل: {{name}}",
+      clear: "عرض كل مساحات العمل",
+      unnamed: "مساحة العمل هذه",
+    },
     views: {
       agents: "الوكلاء",
       archivedWorkspaces: "مساحات العمل المؤرشفة",
@@ -728,6 +733,9 @@ export const ar: TranslationResources = {
         pullRequest: "طلب السحب",
         terminalProfilesMenu: "Terminal profiles",
         editTerminalProfiles: "Edit profiles",
+        recentlyClosed: "المغلقة مؤخرًا",
+        untitledAgent: "وكيل بلا عنوان",
+        showAllClosed: "عرض الكل في السجل",
       },
       explorerSidebar: {
         open: "افتح اللوحة الجانبية",
@@ -1382,6 +1390,8 @@ export const ar: TranslationResources = {
         openFolderFailed: "Couldn't open folder",
         remove: "إزالة المشروع",
         removing: "جارٍ الإزالة...",
+        pin: "تثبيت المشروع",
+        unpin: "إلغاء تثبيت المشروع",
       },
       confirmations: {
         removeTitle: "هل تريد إزالة المشروع؟",
@@ -1472,6 +1482,7 @@ export const ar: TranslationResources = {
   newWorkspace: {
     title: "مساحة عمل جديدة",
     recentProjects: "المشاريع الأخيرة",
+    pinnedProjects: "المشاريع المثبتة",
     create: "يخلق",
     startAnother: "ابدأ مساحة أخرى",
     isolation: {
@@ -2162,8 +2173,17 @@ export const ar: TranslationResources = {
     detachTooltip: "فصل الوكيل الفرعي",
     archiveAction: "أرشيف{{label}}",
     archiveTooltip: "أرشفة الوكيل الفرعي",
-    archiveFinishedAction: "أرشفة الوكلاء الفرعيين المكتملين",
     archiveFinishedRetry: "إعادة المحاولة ({{failed}}/{{total}})",
+    retryAction: "إعادة محاولة {{label}}",
+    clear: "مسح",
+    clearDoneAction: "أرشفة الوكلاء الفرعيين المكتملين",
+    clearFailedAction: "أرشفة الوكلاء الفرعيين الفاشلين",
+    groups: {
+      failed: "فشل · {{count}}",
+      needsInput: "بانتظار إدخال · {{count}}",
+      working: "قيد العمل · {{count}}",
+      done: "مكتمل · {{count}}",
+    },
   },
   panels: {
     draft: {
