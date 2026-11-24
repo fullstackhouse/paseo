@@ -1,10 +1,14 @@
-import type { WorkspaceDescriptor } from "@/stores/session-store";
+import type { Agent, WorkspaceDescriptor } from "@/stores/session-store";
+import { pickAttentionAgent } from "@/utils/agent-attention";
 import {
   buildHostWorkspaceRoute,
   decodeWorkspaceIdFromPathSegment,
   parseHostWorkspaceRouteFromPathname,
 } from "@/utils/host-routes";
-import { resolveWorkspaceMapKeyByIdentity } from "@/utils/workspace-identity";
+import {
+  normalizeWorkspaceOpaqueId,
+  resolveWorkspaceMapKeyByIdentity,
+} from "@/utils/workspace-identity";
 import type { ActiveWorkspaceSelection } from "@/stores/last-workspace-selection";
 import type { WorkspaceTabTarget } from "@/workspace-tabs/model";
 import { prepareWorkspaceTab, type PrepareWorkspaceTabDeps } from "@/utils/prepare-workspace-tab";
@@ -31,6 +35,7 @@ export interface NavigateToWorkspaceInput {
 
 export interface NavigateToWorkspaceDeps extends PrepareWorkspaceTabDeps {
   getSessionWorkspaces: (serverId: string) => Map<string, WorkspaceDescriptor> | null | undefined;
+  getSessionAgents: (serverId: string) => Iterable<Agent>;
   isWorkspaceLayoutHydrated: () => boolean;
   deferOpenTab: (input: OpenWorkspaceTabInput) => null;
   rememberLastWorkspace: (selection: ActiveWorkspaceSelection) => void;
@@ -101,10 +106,29 @@ export function navigateToWorkspace(
   if (input.target) {
     prepareWorkspaceTab({ ...input, target: input.target }, { openTab });
   } else {
-    deps.revealWorkspace(
-      `${input.serverId}:${resolvedWorkspaceId ?? input.workspaceId}`,
-      input.surface,
-    );
+    // FSH: without a named tab, an agent waiting on a permission prompt or one that failed takes
+    // focus; otherwise the workspace opens on the tab you left. Ready to review doesn't count: it
+    // outlives a visit on fsh, so it would land every entry on the oldest finished agent.
+    const attentionAgentId =
+      resolvedWorkspaceId && input.surface !== "sidebar"
+        ? pickAttentionAgent(
+            Array.from(deps.getSessionAgents(input.serverId)).filter(
+              (agent) => normalizeWorkspaceOpaqueId(agent.workspaceId) === resolvedWorkspaceId,
+            ),
+          )
+        : null;
+    if (attentionAgentId && resolvedWorkspaceId) {
+      openTab({
+        workspaceKey: `${input.serverId}:${resolvedWorkspaceId}`,
+        target: { kind: "agent", agentId: attentionAgentId },
+        intent: "reveal",
+      });
+    } else {
+      deps.revealWorkspace(
+        `${input.serverId}:${resolvedWorkspaceId ?? input.workspaceId}`,
+        input.surface,
+      );
+    }
   }
 
   const route = buildHostWorkspaceRoute(input.serverId, input.workspaceId);
