@@ -313,6 +313,11 @@ export const zhCN: TranslationResources = {
     tooManyMatches: "匹配过多 — 请缩小搜索范围",
     hostLoadFailed: "{{host}}：无法加载历史",
     searchPlaceholder: "搜索历史",
+    workspaceFilter: {
+      label: "工作区：{{name}}",
+      clear: "显示所有工作区",
+      unnamed: "此工作区",
+    },
     views: {
       agents: "代理",
       archivedWorkspaces: "已归档的工作区",
@@ -727,6 +732,9 @@ export const zhCN: TranslationResources = {
         pullRequest: "拉取请求",
         terminalProfilesMenu: "Terminal profiles",
         editTerminalProfiles: "Edit profiles",
+        recentlyClosed: "最近关闭",
+        untitledAgent: "未命名 agent",
+        showAllClosed: "在历史记录中查看全部",
       },
       explorerSidebar: {
         open: "打开侧边面板",
@@ -1372,6 +1380,8 @@ export const zhCN: TranslationResources = {
         openFolderFailed: "Couldn't open folder",
         remove: "移除 project",
         removing: "正在移除...",
+        pin: "固定 project",
+        unpin: "取消固定 project",
       },
       confirmations: {
         removeTitle: "移除 project？",
@@ -1460,6 +1470,7 @@ export const zhCN: TranslationResources = {
   newWorkspace: {
     title: "新建 workspace",
     recentProjects: "最近的项目",
+    pinnedProjects: "已固定的项目",
     create: "创建",
     startAnother: "再创建一个",
     isolation: {
@@ -2137,8 +2148,17 @@ export const zhCN: TranslationResources = {
     detachTooltip: "分离 subagent",
     archiveAction: "归档 {{label}}",
     archiveTooltip: "归档 subagent",
-    archiveFinishedAction: "归档已完成的 subagent",
     archiveFinishedRetry: "重试 ({{failed}}/{{total}})",
+    retryAction: "重试 {{label}}",
+    clear: "清除",
+    clearDoneAction: "归档已完成的 subagent",
+    clearFailedAction: "归档失败的 subagent",
+    groups: {
+      failed: "失败 · {{count}}",
+      needsInput: "需要输入 · {{count}}",
+      working: "进行中 · {{count}}",
+      done: "已完成 · {{count}}",
+    },
   },
   panels: {
     draft: {

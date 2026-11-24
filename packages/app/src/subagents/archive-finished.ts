@@ -2,10 +2,16 @@ import type { AgentAddress } from "@getpaseo/protocol/addresses";
 import type { Agent } from "@/stores/session-store";
 import type { SubagentRow } from "./select";
 
+/**
+ * Which finished children one press clears. The list keeps failures apart from completed work, so
+ * clearing the done pile never takes a failure nobody has looked at with it. Omitted, it clears both.
+ */
+export type ArchiveScope = "done" | "failed";
+
 export type ArchiveFinishedStatus =
   | { kind: "idle" }
-  | { kind: "archiving"; completedCount: number; totalCount: number }
-  | { kind: "failed"; failedCount: number; totalCount: number };
+  | { kind: "archiving"; scope?: ArchiveScope; completedCount: number; totalCount: number }
+  | { kind: "failed"; scope?: ArchiveScope; failedCount: number; totalCount: number };
 
 export interface ArchiveFinishedState {
   eligibleCount: number;
@@ -32,12 +38,21 @@ export interface ArchiveFinishedSubagents {
   getState(): ArchiveFinishedState;
   setRows(rows: readonly SubagentRow[]): void;
   subscribe(listener: () => void): () => void;
-  archiveFinished(): Promise<ArchiveFinishedOutcome>;
+  archiveFinished(scope?: ArchiveScope): Promise<ArchiveFinishedOutcome>;
 }
 
 export function isFinishedSubagent(row: SubagentRow): boolean {
   if (row.kind === "paseo") return row.status === "idle" || row.status === "error";
   return row.status === "completed" || row.status === "failed" || row.status === "canceled";
+}
+
+export function isFailedSubagent(row: SubagentRow): boolean {
+  return row.kind === "paseo" ? row.status === "error" : row.status === "failed";
+}
+
+function isInScope(row: SubagentRow, scope: ArchiveScope | undefined): boolean {
+  if (scope === undefined) return true;
+  return isFailedSubagent(row) === (scope === "failed");
 }
 
 function canArchiveManagedSubagent(
@@ -119,21 +134,21 @@ export function createArchiveFinishedSubagents(
     }
   };
 
-  const archiveFinished = () => {
-    if (state.status.kind === "archiving" || eligibleRows.length === 0) {
+  const archiveFinished = (scope?: ArchiveScope) => {
+    const snapshot = eligibleRows.filter((row) => isInScope(row, scope));
+    if (state.status.kind === "archiving" || snapshot.length === 0) {
       return Promise.resolve(emptyOutcome());
     }
 
-    const snapshot = eligibleRows;
     const totalCount = snapshot.length;
     setState({
       eligibleCount: eligibleRows.length,
-      status: { kind: "archiving", completedCount: 0, totalCount },
+      status: { kind: "archiving", scope, completedCount: 0, totalCount },
     });
     return runArchiveFinished(snapshot, deps, (completedCount) => {
       setState({
         eligibleCount: eligibleRows.length,
-        status: { kind: "archiving", completedCount, totalCount },
+        status: { kind: "archiving", scope, completedCount, totalCount },
       });
     }).then(({ outcome, retryableFailureIds }) => {
       failedSignature =
@@ -144,6 +159,7 @@ export function createArchiveFinishedSubagents(
           retryableFailureIds.size > 0
             ? {
                 kind: "failed",
+                scope,
                 failedCount: retryableFailureIds.size,
                 totalCount: retryableFailureIds.size,
               }

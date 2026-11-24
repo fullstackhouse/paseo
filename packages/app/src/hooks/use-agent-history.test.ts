@@ -190,6 +190,23 @@ describe("fetchAgentHistoryPage", () => {
     } satisfies FetchAgentHistoryOptions);
   });
 
+  it("narrows to one workspace when asked", async () => {
+    const client = createClient([historyPayload({ entries: [] })]);
+
+    await fetchAgentHistoryPage({
+      client,
+      serverId: "server-1",
+      cursor: null,
+      workspaceId: "ws-1",
+    });
+
+    expect(client.calls.at(-1)).toEqual({
+      filter: { workspaceIds: ["ws-1"] },
+      sort: [{ key: "updated_at", direction: "desc" }],
+      page: { limit: 200 },
+    } satisfies FetchAgentHistoryOptions);
+  });
+
   it("maps daemon history entries into aggregated agents tagged with the requested server", async () => {
     const client = createClient([
       historyPayload({

@@ -26,6 +26,7 @@ import type { RecentProjectChoice } from "./project-picker";
  * order when you pick, so one never moves under the pointer.
  */
 export function RecentProjectCards({
+  kind = "recent",
   layout,
   serverId,
   choices,
@@ -35,6 +36,8 @@ export function RecentProjectCards({
   onSelect,
   style,
 }: {
+  /** "pinned" is the same cards under their own heading, for the projects pinned on this device. */
+  kind?: "recent" | "pinned";
   layout: "grid" | "scroll";
   serverId: string;
   choices: readonly RecentProjectChoice[];
@@ -56,15 +59,18 @@ export function RecentProjectCards({
         selected={choice.optionId === selectedOptionId}
         disabled={disabled}
         onSelect={onSelect}
+        testID={`new-workspace-${kind}-project-${choice.project.viewKey}`}
       />
     </View>
   ));
   return (
     <SettingsSection
-      title={t("newWorkspace.recentProjects")}
+      title={
+        kind === "pinned" ? t("newWorkspace.pinnedProjects") : t("newWorkspace.recentProjects")
+      }
       flush
       style={style}
-      testID="new-workspace-recent-projects"
+      testID={`new-workspace-${kind}-projects`}
     >
       {layout === "grid" ? (
         <View style={styles.grid} accessibilityRole="radiogroup">
@@ -122,6 +128,7 @@ function RecentProjectCard({
   selected,
   disabled,
   onSelect,
+  testID,
 }: {
   choice: RecentProjectChoice;
   entries: readonly ProviderSnapshotEntry[] | undefined;
@@ -129,6 +136,7 @@ function RecentProjectCard({
   selected: boolean;
   disabled: boolean;
   onSelect: (choice: RecentProjectChoice) => void;
+  testID: string;
 }): ReactElement {
   const { project, agentSetup, lastUsedAt } = choice;
   const summary = agentSetup ? summarizeAgentSetup(agentSetup, entries) : "";
@@ -157,7 +165,7 @@ function RecentProjectCard({
       accessibilityRole="radio"
       accessibilityLabel={accessibilityLabel}
       aria-checked={selected}
-      testID={`new-workspace-recent-project-${project.viewKey}`}
+      testID={testID}
     >
       <View style={styles.titleLine}>
         <ProjectIcon

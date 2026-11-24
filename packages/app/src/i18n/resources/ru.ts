@@ -317,6 +317,11 @@ export const ru: TranslationResources = {
     tooManyMatches: "Слишком много совпадений — уточните запрос",
     hostLoadFailed: "{{host}}: не удалось загрузить историю",
     searchPlaceholder: "Поиск по истории",
+    workspaceFilter: {
+      label: "Рабочее пространство: {{name}}",
+      clear: "Показать все рабочие пространства",
+      unnamed: "Это рабочее пространство",
+    },
     views: {
       agents: "Агенты",
       archivedWorkspaces: "Архивные рабочие пространства",
@@ -736,6 +741,9 @@ export const ru: TranslationResources = {
         pullRequest: "PR",
         terminalProfilesMenu: "Профили терминала",
         editTerminalProfiles: "Изменить профили",
+        recentlyClosed: "Недавно закрытые",
+        untitledAgent: "Агент без названия",
+        showAllClosed: "Показать всё в истории",
       },
       explorerSidebar: {
         open: "Открыть боковую панель",
@@ -1401,6 +1409,8 @@ export const ru: TranslationResources = {
         openFolderFailed: "Не удалось открыть папку",
         remove: "Удалить проект",
         removing: "Удаление...",
+        pin: "Закрепить проект",
+        unpin: "Открепить проект",
       },
       confirmations: {
         removeTitle: "Удалить проект?",
@@ -1491,6 +1501,7 @@ export const ru: TranslationResources = {
   newWorkspace: {
     title: "Новое рабочее пространство",
     recentProjects: "Недавние проекты",
+    pinnedProjects: "Закреплённые проекты",
     create: "Создать",
     startAnother: "Создать ещё один",
     isolation: {
@@ -2200,8 +2211,17 @@ export const ru: TranslationResources = {
     detachTooltip: "Отсоединить субагента",
     archiveAction: "Архивировать {{label}}",
     archiveTooltip: "Архивировать субагента",
-    archiveFinishedAction: "Архивировать завершенные субагенты",
     archiveFinishedRetry: "Повторить ({{failed}}/{{total}})",
+    retryAction: "Повторить {{label}}",
+    clear: "Очистить",
+    clearDoneAction: "Архивировать завершенные субагенты",
+    clearFailedAction: "Архивировать субагенты с ошибкой",
+    groups: {
+      failed: "Ошибка · {{count}}",
+      needsInput: "Ждут ввода · {{count}}",
+      working: "В работе · {{count}}",
+      done: "Готово · {{count}}",
+    },
   },
   panels: {
     draft: {

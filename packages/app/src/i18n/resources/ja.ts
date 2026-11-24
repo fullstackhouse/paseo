@@ -318,6 +318,11 @@ export const ja: TranslationResources = {
     tooManyMatches: "一致が多すぎます — 検索条件を絞ってください",
     hostLoadFailed: "{{host}}: 履歴を読み込めませんでした",
     searchPlaceholder: "履歴を検索",
+    workspaceFilter: {
+      label: "ワークスペース: {{name}}",
+      clear: "すべてのワークスペースを表示",
+      unnamed: "このワークスペース",
+    },
     views: {
       agents: "エージェント",
       archivedWorkspaces: "アーカイブ済みワークスペース",
@@ -738,6 +743,9 @@ export const ja: TranslationResources = {
         pullRequest: "プルリクエスト",
         terminalProfilesMenu: "ターミナルプロファイル",
         editTerminalProfiles: "プロファイルを編集",
+        recentlyClosed: "最近閉じたタブ",
+        untitledAgent: "無題のエージェント",
+        showAllClosed: "履歴ですべて表示",
       },
       explorerSidebar: {
         open: "サイドパネルを開く",
@@ -1399,6 +1407,8 @@ export const ja: TranslationResources = {
         openFolderFailed: "Couldn't open folder",
         remove: "プロジェクトを削除",
         removing: "削除中...",
+        pin: "プロジェクトをピン留め",
+        unpin: "プロジェクトのピン留めを外す",
       },
       confirmations: {
         removeTitle: "プロジェクトを削除しますか？",
@@ -1489,6 +1499,7 @@ export const ja: TranslationResources = {
   newWorkspace: {
     title: "新しいワークスペース",
     recentProjects: "最近のプロジェクト",
+    pinnedProjects: "ピン留めしたプロジェクト",
     create: "作成",
     startAnother: "別のワークスペースを作成",
     isolation: {
@@ -2189,8 +2200,17 @@ export const ja: TranslationResources = {
     detachTooltip: "サブエージェントを切り離す",
     archiveAction: "{{label}}をアーカイブ",
     archiveTooltip: "サブエージェントをアーカイブ",
-    archiveFinishedAction: "完了したサブエージェントをアーカイブ",
     archiveFinishedRetry: "再試行 ({{failed}}/{{total}})",
+    retryAction: "{{label}} を再試行",
+    clear: "クリア",
+    clearDoneAction: "完了したサブエージェントをアーカイブ",
+    clearFailedAction: "失敗したサブエージェントをアーカイブ",
+    groups: {
+      failed: "失敗 · {{count}}",
+      needsInput: "入力待ち · {{count}}",
+      working: "作業中 · {{count}}",
+      done: "完了 · {{count}}",
+    },
   },
   panels: {
     draft: {

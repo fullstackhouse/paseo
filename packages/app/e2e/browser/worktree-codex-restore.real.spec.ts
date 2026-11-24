@@ -18,21 +18,20 @@ test("a fresh client restores an archived Codex agent across a reload without ag
     await codexRestore.connectFreshBrowser();
     await codexRestore.openArchivedWorkspaceFromHistory();
     await codexRestore.restoreWorkspace();
-    await codexRestore.expectArchivedAgentSelectedWithHistory();
+    await codexRestore.expectRestoredAgentSelectedWithHistory();
   });
-  await test.step("Reload without cached agent data and keep the selected archived agent", async () => {
+  await test.step("Reload without cached agent data and keep the selected restored agent", async () => {
     await codexRestore.reloadWithoutAgentCache();
     await codexRestore.waitForWorkspaceHydration();
-    await codexRestore.expectArchivedAgentSelectedWithHistory();
+    await codexRestore.expectRestoredAgentSelectedWithHistory();
   });
-  await test.step("Unarchive the agent and keep its idle composer after another cache-empty reload", async () => {
-    await codexRestore.unarchiveAgent();
+  await test.step("Keep its idle composer after another cache-empty reload", async () => {
     await codexRestore.reloadWithoutAgentCache();
     await codexRestore.expectIdleAgentWithVisibleComposer();
   });
 });
 
-test("restore an archived worktree, then unarchive its completed Codex agent", async ({
+test("restoring an archived worktree brings back its completed Codex agent", async ({
   codexRestore,
 }) => {
   await test.step("1. Create a managed worktree with a real Codex agent through Paseo MCP", async () => {
@@ -52,12 +51,9 @@ test("restore an archived worktree, then unarchive its completed Codex agent", a
   });
   await test.step("6. Restore the workspace", async () => {
     await codexRestore.restoreWorkspace();
-    await codexRestore.expectWorktreeRestoredWithArchivedAgentSelected();
+    await codexRestore.expectWorktreeRestoredWithAgentSelected();
   });
-  await test.step("7. Click Unarchive on the agent", async () => {
-    await codexRestore.unarchiveAgent();
-  });
-  await test.step("8. Expect an idle agent with a visible editable composer", async () => {
+  await test.step("7. Expect an idle agent with a visible editable composer", async () => {
     await codexRestore.expectIdleAgentWithVisibleComposer(60_000);
   });
 });

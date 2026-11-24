@@ -329,7 +329,8 @@ function readChildTerminalStatus(
   if (entry.type !== "user") return previous;
   const texts = readUserTexts(entry);
   if (texts.length === 0) return previous;
-  return texts.some(isClaudeInterruptPlaceholderText) ? "canceled" : null;
+  if (texts.some(isClaudeInterruptPlaceholderText)) return "canceled";
+  return previous === "canceled" ? "running" : null;
 }
 
 /** Tool results carry no user text and do not change the child's terminal status. */
