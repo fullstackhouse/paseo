@@ -84,7 +84,9 @@ When app-wide routes such as `/new`, `/settings`, or `/sessions` navigate back
 into a host workspace, use `navigateToWorkspace()`. Do not make the caller
 branch on its current route.
 
-Pass only `serverId` and `workspaceId` to restore the workspace’s selected tab.
+Pass only `serverId` and `workspaceId` to restore the workspace’s selected tab,
+unless an agent there waits on a permission prompt or failed: that agent takes
+focus (FSH; Ready to review doesn’t count).
 When the action names a specific tab, pass it as `target`; that explicit choice
 is authoritative. Callers should not choose between separate route and tab
 navigation APIs.

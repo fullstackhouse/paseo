@@ -9,7 +9,7 @@ import {
   type NavigateToLastWorkspaceDeps,
   type NavigateToWorkspaceDeps,
 } from "./navigation";
-import type { WorkspaceDescriptor } from "@/stores/session-store";
+import type { Agent, WorkspaceDescriptor } from "@/stores/session-store";
 
 interface RecordedTab {
   workspaceKey: string;
@@ -35,6 +35,7 @@ function createFakeDeps(overrides: Partial<NavigateToWorkspaceDeps> = {}) {
       return null;
     },
     getSessionWorkspaces: () => null,
+    getSessionAgents: () => [] as Agent[],
     isWorkspaceLayoutHydrated: () => true,
     openTab: ({ workspaceKey, target, pin = false }) => {
       openedTabs.push({ workspaceKey, target, pin });
@@ -112,6 +113,66 @@ describe("workspace navigation", () => {
 
     expect(navigations).toEqual(["/h/server-1/workspace/workspace-a"]);
     expect(remembered).toEqual([{ serverId: "server-1", workspaceId: "workspace-a" }]);
+  });
+
+  // FSH: permission prompts and failures take focus on entry; Ready to review does not.
+  function workspaceWithAgent(attentionReason: Agent["attentionReason"]) {
+    const workspace = {
+      id: "workspace-a",
+      workspaceDirectory: "/repo/workspace-a",
+    } as WorkspaceDescriptor;
+    const agent = {
+      id: "agent-1",
+      cwd: "/repo/workspace-a",
+      workspaceId: "workspace-a",
+      requiresAttention: true,
+      attentionReason,
+    } as unknown as Agent;
+    return {
+      getSessionWorkspaces: () => new Map([[workspace.id, workspace]]),
+      getSessionAgents: () => [agent],
+    };
+  }
+
+  it("focuses an agent waiting on a permission prompt when no tab is named", () => {
+    const { deps, openedTabs } = createFakeDeps(workspaceWithAgent("permission"));
+    navigateToWorkspace({ serverId: "server-1", workspaceId: "workspace-a" }, deps);
+    expect(openedTabs).toEqual([
+      {
+        workspaceKey: "server-1:workspace-a",
+        target: { kind: "agent", agentId: "agent-1" },
+        pin: false,
+      },
+    ]);
+  });
+
+  it("keeps the saved tab when only finished agents need attention", () => {
+    const { deps, openedTabs, revealed } = createFakeDeps(workspaceWithAgent("finished"));
+    navigateToWorkspace({ serverId: "server-1", workspaceId: "workspace-a" }, deps);
+    expect(openedTabs).toEqual([]);
+    expect(revealed).toEqual([null]);
+  });
+
+  it("keeps an explicit tab authoritative over an attention agent", () => {
+    const { deps, openedTabs } = createFakeDeps(workspaceWithAgent("permission"));
+    navigateToWorkspace(
+      {
+        serverId: "server-1",
+        workspaceId: "workspace-a",
+        target: { kind: "agent", agentId: "agent-2" },
+      },
+      deps,
+    );
+    expect(openedTabs.map((tab) => tab.target)).toEqual([{ kind: "agent", agentId: "agent-2" }]);
+  });
+
+  it("returns to the sidebar without focusing an attention agent", () => {
+    const { deps, openedTabs } = createFakeDeps(workspaceWithAgent("permission"));
+    navigateToWorkspace(
+      { serverId: "server-1", workspaceId: "workspace-a", surface: "sidebar" },
+      deps,
+    );
+    expect(openedTabs).toEqual([]);
   });
 
   it("reveals the workspace without choosing a different tab", () => {
