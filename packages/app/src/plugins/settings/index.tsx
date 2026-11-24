@@ -41,6 +41,23 @@ function PluginSettingsMenuItem({
   );
 }
 
+/** The plugin's first settings screen and a way to open it, or null when it has none on this host. */
+export function usePluginSettingsEntry(
+  serverId: string,
+  pluginId: string,
+): { title: string; open: () => void } | null {
+  const plugin = useInstalledPlugin(serverId, pluginId);
+  const supported = useHostFeature(serverId, "pluginSettings");
+  const screen = supported ? plugin?.settingsScreens[0] : undefined;
+  const screenId = screen?.id;
+  const open = useCallback(() => {
+    if (screenId) router.push(buildPluginSettingsRoute(serverId, pluginId, screenId));
+  }, [serverId, pluginId, screenId]);
+  if (!plugin || !screen) return null;
+  return { title: plugin.i18n.resolve(screen.title, plugin.locale), open };
+}
+
+/** Lists every settings screen once there is more than the one the plugin row opens. */
 export function PluginSettingsMenuItems({
   serverId,
   pluginId,
@@ -48,7 +65,7 @@ export function PluginSettingsMenuItems({
 }: Omit<SettingsIdentity, "screenId"> & { disabled?: boolean }) {
   const plugin = useInstalledPlugin(serverId, pluginId);
   const supported = useHostFeature(serverId, "pluginSettings");
-  if (!supported || !plugin) return null;
+  if (!supported || !plugin || plugin.settingsScreens.length < 2) return null;
   return (
     <>
       {plugin.settingsScreens.map((screen) => (

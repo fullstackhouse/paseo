@@ -1,8 +1,8 @@
 import { formatPluginInstallation } from "@getpaseo/protocol/plugin-source-reference";
-import { PluginSettingsMenuItems } from "@/plugins/settings";
+import { PluginSettingsMenuItems, usePluginSettingsEntry } from "@/plugins/settings";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useTranslation } from "react-i18next";
-import { Text, View } from "react-native";
+import { Text, View, type GestureResponderEvent } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { useMutation } from "@tanstack/react-query";
 import type { PluginListItem, PluginLogEntry } from "@getpaseo/protocol/messages";
@@ -42,6 +42,10 @@ const pluginQueryKey = (serverId: string) => ["plugins", serverId] as const;
 const PLUGIN_SOURCE_DOCS_URL = "https://paseo.sh/docs/plugins/reference#plugin-sources";
 type PluginRowAction = "reload" | "enable" | "disable" | "remove";
 type PluginNotificationsToggle = (plugin: PluginListItem, enabled: boolean) => void;
+
+function stopPressInPropagation(event: GestureResponderEvent) {
+  event.stopPropagation();
+}
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -94,6 +98,7 @@ function PluginActionsMenu({
         accessibilityLabel={menuLabel}
         disabled={pending}
         hitSlop={8}
+        onPressIn={stopPressInPropagation}
         style={styles.menuButton}
       >
         <MoreHorizontal size={18} color={styles.menuIcon.color} />
@@ -161,6 +166,7 @@ function PluginRow({
   onToggleNotifications: PluginNotificationsToggle;
 }) {
   const { t } = useTranslation();
+  const settings = usePluginSettingsEntry(serverId, plugin.id);
   const toggle = useCallback(
     (enabled: boolean) => onAction(enabled ? "enable" : "disable", plugin),
     [onAction, plugin],
@@ -198,6 +204,9 @@ function PluginRow({
       hint={hint}
       error={clientError ?? plugin.error}
       testID={`plugin-row-${plugin.id}`}
+      onPress={settings?.open}
+      pressLabel={settings ? `${plugin.id}: ${settings.title}` : undefined}
+      pressDisabled={pending}
     >
       <View style={styles.pluginControls} accessibilityLabel={`${plugin.id} ${statusLabel}`}>
         <Switch
