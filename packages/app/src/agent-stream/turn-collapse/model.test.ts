@@ -110,6 +110,43 @@ describe("collapseTurns", () => {
     expect(result.turnsByHostId.has("u1")).toBe(true);
   });
 
+  it("folds a turn whose user message a plugin redrew", () => {
+    const answer = (id: string): StreamItem => ({
+      kind: "plugin",
+      id: `asks/${id}`,
+      sourceId: id,
+      sourceKind: "user_message",
+      timestamp: at,
+      pluginId: "asks",
+      pluginItemId: id,
+      itemKind: "answer",
+      version: 1,
+      data: {},
+    });
+    const tail = [
+      user("u1"),
+      shell("c0"),
+      reply("first"),
+      answer("u2"),
+      shell("c1"),
+      reply("early"),
+      shell("c2"),
+      reply("final"),
+    ];
+
+    const result = collapse(tail);
+
+    expect(ids(result.tail)).toEqual(["u1", "first", "asks/u2", "final"]);
+    expect(result.turnsByHostId.get("asks/u2")?.summary.tools).toMatchObject({ commandCount: 2 });
+    expect(result.hostIdByHiddenRowId.get("early")).toBe("asks/u2");
+
+    const withTurnIds = collapse(
+      tail.map((item, index) => Object.assign(item, { turnId: index < 3 ? "t1" : "t2" })),
+    );
+    expect(ids(withTurnIds.tail)).toEqual(["u1", "first", "asks/u2", "final"]);
+    expect(withTurnIds.turnsByHostId.has("asks/u2")).toBe(true);
+  });
+
   it("folds a finished turn's work into its user message and keeps the reply", () => {
     const result = collapse([
       user("u1"),

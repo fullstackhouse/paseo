@@ -37,6 +37,8 @@ export function belongsToTurn(item: StreamItem, turnId: string | null): boolean 
 
 /** Inputs that start a turn when older history has no canonical turn IDs. */
 export function isTurnTrigger(item: StreamItem): boolean {
+  // A plugin may redraw the user's message, as Asks does for a clicked answer.
+  if (item.kind === "plugin") return item.sourceKind === "user_message";
   return isTimelineTurnTrigger(
     item.kind === "tool_call" && item.payload.source === "agent"
       ? { type: item.kind, ...item.payload.data }
