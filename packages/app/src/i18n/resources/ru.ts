@@ -124,6 +124,7 @@ export const ru: TranslationResources = {
       groupByProject: "Группировать по проекту",
       groupByStatus: "Группировать по статусу",
       updatePaseo: "Обновить Paseo",
+      checkPaseoUpdates: "Проверить обновления Paseo",
       modelGroupLabel: "Модель",
       modelSearchKeywords: "Сменить, изменить, выбрать или установить модель",
       thinkingGroupLabel: "Мышление",
@@ -1662,6 +1663,11 @@ export const ru: TranslationResources = {
         installed: "Обновление приложения установлено. Требуется перезапуск.",
         failed: "Не удалось обновить приложение.",
         idle: "Статус обновления ещё не проверен.",
+      },
+      check: {
+        upToDate: "Paseo обновлён ({{version}})",
+        failed: "Не удалось проверить обновления",
+        failedWithError: "Не удалось проверить обновления: {{error}}",
       },
       installError: "Не удалось установить обновление настольного приложения.",
       callout: {

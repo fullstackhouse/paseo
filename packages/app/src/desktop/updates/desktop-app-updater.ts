@@ -189,6 +189,56 @@ export function formatStatusText(input: {
   return i18n.t("desktop.updates.status.idle");
 }
 
+export interface CheckResultToast {
+  kind: "success" | "error";
+  message: string;
+}
+
+// FSH builds report release tags ("fsh-0.15.3-b245e51"); only bare semver gets a "v".
+function displayVersion(version: string): string {
+  return /^\d/.test(version) ? `v${version}` : version;
+}
+
+/** The toast for a check started by hand; `null` means the check threw. */
+export function formatCheckResultToast(
+  result: DesktopAppUpdateCheckResult | null,
+): CheckResultToast {
+  if (!result) {
+    return { kind: "error", message: i18n.t("desktop.updates.check.failed") };
+  }
+  if (result.errorMessage) {
+    return {
+      kind: "error",
+      message: i18n.t("desktop.updates.check.failedWithError", { error: result.errorMessage }),
+    };
+  }
+  const latest = result.latestVersion ? displayVersion(result.latestVersion) : null;
+  if (result.readyToInstall) {
+    return {
+      kind: "success",
+      message: latest
+        ? i18n.t("desktop.updates.status.availableWithVersion", { version: latest })
+        : i18n.t("desktop.updates.status.available"),
+    };
+  }
+  if (result.hasUpdate) {
+    return {
+      kind: "success",
+      message: latest
+        ? i18n.t("desktop.updates.status.pendingWithVersion", { version: latest })
+        : i18n.t("desktop.updates.status.pending"),
+    };
+  }
+  return {
+    kind: "success",
+    message: result.currentVersion
+      ? i18n.t("desktop.updates.check.upToDate", {
+          version: displayVersion(result.currentVersion),
+        })
+      : i18n.t("desktop.updates.status.upToDate"),
+  };
+}
+
 export function createDesktopAppUpdater(deps: DesktopAppUpdaterDeps): DesktopAppUpdater {
   let state: InternalState = { ...INITIAL_STATE };
   let cachedSnapshot: DesktopAppUpdaterSnapshot = buildSnapshot(state);

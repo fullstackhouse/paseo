@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 import type { SidebarGroupMode } from "@/stores/sidebar-view-store";
 import type { CommandCenterIconProps } from "./contributions";
 import {
+  buildAppUpdateCheckContribution,
   buildGroupingContribution,
   buildPluginUpdateCheckContribution,
   buildUpdateContribution,
+  type AppUpdateCheckCommandCenterSource,
   type GroupingCommandCenterSource,
   type PluginUpdateCheckCommandCenterSource,
   type UpdateCommandCenterSource,
@@ -115,6 +117,52 @@ describe("update command center contribution", () => {
     expect(buildUpdateContribution(update({ status: "up-to-date" }).value)).toBeNull();
     expect(buildUpdateContribution(update({ isInstalling: true }).value)).toBeNull();
     expect(buildUpdateContribution(update({ isDesktopApp: false }).value)).toBeNull();
+  });
+});
+
+describe("app update check command center contribution", () => {
+  function check(overrides: Partial<AppUpdateCheckCommandCenterSource> = {}) {
+    let checks = 0;
+    const value: AppUpdateCheckCommandCenterSource = {
+      isDesktopApp: true,
+      status: "up-to-date",
+      isInstalling: false,
+      labels: { section: "Actions", title: "Check for Paseo updates" },
+      check: async () => {
+        checks += 1;
+      },
+      ...overrides,
+    };
+    return { value, checks: () => checks };
+  }
+
+  it("runs the check from the query results", () => {
+    const fixture = check();
+    const contribution = buildAppUpdateCheckContribution(fixture.value);
+
+    expect(contribution).toMatchObject({
+      visibility: "query",
+      presentation: { title: "Check for Paseo updates" },
+    });
+    contribution?.run();
+    expect(fixture.checks()).toBe(1);
+  });
+
+  it("is listed before any check and after a failed or pending one", () => {
+    for (const status of ["idle", "pending", "error", "installed"] as const) {
+      expect(buildAppUpdateCheckContribution(check({ status }).value)).not.toBeNull();
+    }
+  });
+
+  it("gives way to Update Paseo and to a running check or install", () => {
+    for (const status of ["available", "checking", "installing"] as const) {
+      expect(buildAppUpdateCheckContribution(check({ status }).value)).toBeNull();
+    }
+    expect(buildAppUpdateCheckContribution(check({ isInstalling: true }).value)).toBeNull();
+  });
+
+  it("is absent outside the desktop app", () => {
+    expect(buildAppUpdateCheckContribution(check({ isDesktopApp: false }).value)).toBeNull();
   });
 });
 

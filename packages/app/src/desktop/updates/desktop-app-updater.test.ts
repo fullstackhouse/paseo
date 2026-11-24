@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { i18n } from "@/i18n/i18next";
 import {
   createDesktopAppUpdater,
+  formatCheckResultToast,
   formatStatusText,
   type DesktopAppUpdater,
   type DesktopAppUpdaterErrorReport,
@@ -488,5 +489,49 @@ describe("formatStatusText", () => {
     } finally {
       await i18n.changeLanguage("en");
     }
+  });
+});
+
+describe("formatCheckResultToast", () => {
+  it("names the running build when it is up to date", () => {
+    expect(
+      formatCheckResultToast(buildFakeCheckResult({ currentVersion: "fsh-0.15.3-b245e51" })),
+    ).toEqual({ kind: "success", message: "Paseo is up to date (fsh-0.15.3-b245e51)" });
+  });
+
+  it("prefixes bare semver versions", () => {
+    expect(formatCheckResultToast(buildFakeCheckResult({ currentVersion: "1.2.3" }))).toEqual({
+      kind: "success",
+      message: "Paseo is up to date (v1.2.3)",
+    });
+  });
+
+  it("says an update is ready to install", () => {
+    expect(
+      formatCheckResultToast(
+        buildFakeCheckResult({
+          hasUpdate: true,
+          readyToInstall: true,
+          latestVersion: "fsh-0.15.4-abc1234",
+        }),
+      ),
+    ).toEqual({ kind: "success", message: "Update ready: fsh-0.15.4-abc1234" });
+  });
+
+  it("says an update is downloading", () => {
+    expect(
+      formatCheckResultToast(buildFakeCheckResult({ hasUpdate: true, latestVersion: "1.3.0" })),
+    ).toEqual({ kind: "success", message: "Update found: v1.3.0. Downloading..." });
+  });
+
+  it("reports a failed check", () => {
+    expect(formatCheckResultToast(buildFakeCheckResult({ errorMessage: "offline" }))).toEqual({
+      kind: "error",
+      message: "Couldn't check for updates: offline",
+    });
+    expect(formatCheckResultToast(null)).toEqual({
+      kind: "error",
+      message: "Couldn't check for updates",
+    });
   });
 });

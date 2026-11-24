@@ -1,15 +1,20 @@
-import { Download, Gift } from "lucide-react-native";
+import { Download, Gift, RefreshCw } from "lucide-react-native";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useUnistyles, withUnistyles } from "react-native-unistyles";
 import type { CommandCenterIconProps } from "@/command-center/contributions";
 import { useCommandCenterActions } from "@/command-center/provider";
-import { buildUpdateContribution } from "@/command-center/root-contributions";
+import {
+  buildAppUpdateCheckContribution,
+  buildUpdateContribution,
+} from "@/command-center/root-contributions";
 import {
   type SidebarCalloutAction,
   SidebarCalloutDescriptionText,
 } from "@/components/sidebar-callout";
 import { useSidebarCallouts } from "@/contexts/sidebar-callout-context";
+import { useToast } from "@/contexts/toast-context";
+import { formatCheckResultToast } from "@/desktop/updates/desktop-app-updater";
 import {
   resolveUpdateCalloutDescriptor,
   type UpdateCalloutActionDescriptor,
@@ -29,8 +34,16 @@ const ThemedDownload = withUnistyles(Download, (theme) => ({
   color: theme.colors.foregroundMuted,
 }));
 
+const ThemedRefreshCw = withUnistyles(RefreshCw, (theme) => ({
+  color: theme.colors.foregroundMuted,
+}));
+
 function UpdateIcon({ size }: CommandCenterIconProps) {
   return <ThemedDownload size={size} strokeWidth={2.2} />;
+}
+
+function CheckUpdateIcon({ size }: CommandCenterIconProps) {
+  return <ThemedRefreshCw size={size} strokeWidth={2.2} />;
 }
 
 function renderBody(body: UpdateCalloutBody, t: ReturnType<typeof useTranslation>["t"]): ReactNode {
@@ -60,6 +73,7 @@ function materializeActions(
 export function UpdateCalloutSource() {
   const { t } = useTranslation();
   const callouts = useSidebarCallouts();
+  const toast = useToast();
   const { theme } = useUnistyles();
   const {
     isDesktopApp,
@@ -109,21 +123,35 @@ export function UpdateCalloutSource() {
         console.error("[Updates] Failed to open app update confirmation", error);
       });
   });
+  // Runs on this source's updater, so a found update shows up here as Update Paseo and the callout.
+  const checkFromPalette = useStableEvent(async () => {
+    // The next toast replaces this one, so the result needs no explicit dismiss.
+    toast.show(t("desktop.updates.status.checking"), { durationMs: null });
+    const { kind, message } = formatCheckResultToast(await checkForUpdates());
+    if (kind === "error") toast.error(message);
+    else toast.show(message, { variant: "success" });
+  });
   const commandCenterActions = useMemo(() => {
+    const labels = { section: t("shell.commandCenter.actions") };
+    const check = buildAppUpdateCheckContribution({
+      isDesktopApp,
+      status,
+      isInstalling,
+      labels: { ...labels, title: t("shell.commandCenter.checkPaseoUpdates") },
+      icon: CheckUpdateIcon,
+      check: checkFromPalette,
+    });
     const contribution = buildUpdateContribution({
       isDesktopApp,
       status,
       isInstalling,
       versionLabel: latestVersion ? `v${latestVersion.replace(/^v/i, "")}` : null,
-      labels: {
-        section: t("shell.commandCenter.actions"),
-        title: t("shell.commandCenter.updatePaseo"),
-      },
+      labels: { ...labels, title: t("shell.commandCenter.updatePaseo") },
       icon: UpdateIcon,
       install: confirmAndInstall,
     });
-    return contribution ? [contribution] : [];
-  }, [confirmAndInstall, isDesktopApp, isInstalling, latestVersion, status, t]);
+    return [check, contribution].filter((entry) => entry !== null);
+  }, [checkFromPalette, confirmAndInstall, isDesktopApp, isInstalling, latestVersion, status, t]);
   useCommandCenterActions({
     sourceId: "desktop-update",
     enabled: commandCenterActions.length > 0,
