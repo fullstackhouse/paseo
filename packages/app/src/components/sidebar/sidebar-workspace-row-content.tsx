@@ -33,7 +33,8 @@ import { TrailingActionScrim } from "@/components/ui/trailing-action-scrim";
 import { shouldShowSidebarArchiveButton } from "@/components/sidebar/archive-button-visibility";
 import { SidebarWorkspaceArchiveButton } from "@/components/sidebar/sidebar-workspace-archive-button";
 import { useWorkspaceLabelDefinitions } from "@/workspace-labels";
-import { Icon } from "@/plugins/icons";
+import { WorkspaceTitleIcon, WORKSPACE_TITLE_LINE_HEIGHT } from "./workspace-title-icon";
+import { workspaceLeadingVisualKind } from "./workspace-leading-visual-kind";
 
 const needsInputColorMapping = (theme: Theme) => ({
   color: theme.colors.surface0,
@@ -47,9 +48,6 @@ const blockedColorMapping = (theme: Theme) => ({
 });
 
 const ThemedCircleAlert = withUnistyles(CircleAlert);
-const ThemedIcon = withUnistyles(Icon);
-
-const foregroundMutedColorMapping = (theme: Theme) => ({ color: theme.colors.foregroundMuted });
 const ThemedCirclePause = withUnistyles(CirclePause);
 
 export function SidebarWorkspaceRowFrame({
@@ -168,11 +166,7 @@ export const SidebarWorkspaceRowContent = memo(function SidebarWorkspaceRowConte
         />
         <View style={styles.workspaceContentColumn}>
           <View style={styles.workspaceTitleRow}>
-            {titleIcon === null ? null : (
-              <View style={styles.workspaceTitleIcon} testID="sidebar-row-title-icon">
-                <ThemedIcon name={titleIcon} size={14} uniProps={foregroundMutedColorMapping} />
-              </View>
-            )}
+            <WorkspaceTitleIcon name={titleIcon} />
             <Text style={workspaceBranchTextStyle} numberOfLines={1}>
               {workspaceLabel}
             </Text>
@@ -198,10 +192,6 @@ export const SidebarWorkspaceRowContent = memo(function SidebarWorkspaceRowConte
   );
 });
 
-/**
- * A plugin's avatar wins over the project icon a hoisted row would show, and over the bare status
- * of a row inside its project: either way the row reads as the plugin's at a glance.
- */
 function WorkspaceLeadingVisual({
   workspace,
   avatarDataUri,
@@ -219,7 +209,8 @@ function WorkspaceLeadingVisual({
   isLoading: boolean;
   reserveIdleStatusIndicatorSpace: boolean;
 }) {
-  if (avatarDataUri !== null) {
+  const kind = workspaceLeadingVisualKind({ avatarDataUri, leadingProjectName });
+  if (kind === "avatar" && avatarDataUri !== null) {
     return (
       <ProjectStatusIndicator
         iconDataUri={null}
@@ -233,7 +224,7 @@ function WorkspaceLeadingVisual({
       />
     );
   }
-  if (leadingProjectName) {
+  if (kind === "project" && leadingProjectName) {
     return (
       <ProjectStatusIndicator
         iconDataUri={leadingProjectIconDataUri}
@@ -576,7 +567,7 @@ export function SidebarWorkspaceTrailingActionOverlay({
 const ARCHIVE_BUTTON_SCRIM_WIDTH = 72;
 
 // The status dot centres on the title's first line, so both share its line height.
-const TITLE_LINE_HEIGHT = 20;
+const TITLE_LINE_HEIGHT = WORKSPACE_TITLE_LINE_HEIGHT;
 
 const styles = StyleSheet.create((theme) => ({
   workspaceRowContent: {
@@ -597,13 +588,6 @@ const styles = StyleSheet.create((theme) => ({
     alignItems: "flex-start",
     justifyContent: "space-between",
     gap: theme.spacing[2],
-  },
-  // As tall as the title's line box so the glyph centers on the text, and pulled toward the
-  // title so it reads as part of it rather than as a separate item on the row.
-  workspaceTitleIcon: {
-    height: TITLE_LINE_HEIGHT,
-    justifyContent: "center",
-    marginRight: -theme.spacing[1],
   },
   shortcutBadgeOverlay: {
     position: "absolute",
