@@ -1414,6 +1414,8 @@ export const fr: TranslationResources = {
         openFolderFailed: "Impossible d’ouvrir le dossier",
         remove: "Retirer le projet",
         removing: "Retrait…",
+        pin: "Épingler le projet",
+        unpin: "Désépingler le projet",
       },
       confirmations: {
         removeTitle: "Retirer le projet ?",
@@ -1504,6 +1506,7 @@ export const fr: TranslationResources = {
   newWorkspace: {
     title: "Nouvel espace de travail",
     recentProjects: "Projets récents",
+    pinnedProjects: "Projets épinglés",
     create: "Créer",
     startAnother: "En créer un autre",
     isolation: {

@@ -23,6 +23,9 @@ import {
   type RecentAgentSetup,
   type RecentProjectActivity,
 } from "@/stores/session-store-hooks";
+import { useProjectCategoryMatcher } from "@/projects/categories/store";
+import { selectPinnedProjects } from "@/projects/pins/model";
+import { usePinnedProjectsStore } from "@/projects/pins/store";
 
 const PROJECT_OPTION_PREFIX = "project:";
 const RECENT_PROJECT_LIMIT = 6;
@@ -42,6 +45,7 @@ interface NewWorkspaceProjectPickerState {
   projectPickerOptions: ComboboxOptionType[];
   projectByOptionId: Map<string, HostProjectListItem>;
   recentProjectChoices: RecentProjectChoice[];
+  pinnedProjectChoices: RecentProjectChoice[];
   selectedProjectOptionId: string;
   projectTriggerLabel: string;
   handleSelectProjectOption: (id: string) => void;
@@ -99,6 +103,34 @@ export function resolveRecentProjectChoices(input: {
     if (choices.length === (input.limit ?? RECENT_PROJECT_LIMIT)) break;
   }
   return choices.length > 1 ? choices : [];
+}
+
+/**
+ * The pinned projects this host can start a workspace in, in pin order and narrowed to the
+ * sidebar's project category. Each carries its latest agent setup when it has one, like a recent
+ * project card.
+ */
+export function resolvePinnedProjectChoices(input: {
+  projects: readonly HostProjectListItem[];
+  pinnedViewKeys: readonly string[];
+  matchesCategory: ((viewKey: string) => boolean) | null;
+  recentProjects: readonly RecentProjectActivity[];
+  serverId: string;
+}): RecentProjectChoice[] {
+  const recentByProjectId = new Map<string, RecentProjectActivity>();
+  for (const recent of input.recentProjects) {
+    if (!recentByProjectId.has(recent.projectId)) recentByProjectId.set(recent.projectId, recent);
+  }
+  return selectPinnedProjects(input).map((project) => {
+    const hostProjectId = getHostProjectId(project, input.serverId);
+    const recent = hostProjectId ? recentByProjectId.get(hostProjectId) : undefined;
+    return {
+      optionId: projectOptionId(project.viewKey),
+      project,
+      lastUsedAt: recent?.lastUsedAt ?? 0,
+      agentSetup: recent?.agentSetup ?? null,
+    };
+  });
 }
 
 function resolveWorkspaceIdFromProjectWorkspaceKey(input: {
@@ -212,15 +244,30 @@ export function useNewWorkspaceProjectPicker({
     [selectableProjects],
   );
   const recentProjects = useRecentProjects(selectedServerId);
-  const recentProjectChoices = useMemo(
+  const pinnedViewKeys = usePinnedProjectsStore((state) => state.pinnedViewKeys);
+  const matchesCategory = useProjectCategoryMatcher();
+  const pinnedProjectChoices = useMemo(
     () =>
-      resolveRecentProjectChoices({
+      resolvePinnedProjectChoices({
         projects: selectableProjects,
+        pinnedViewKeys,
+        matchesCategory,
         recentProjects,
         serverId: selectedServerId,
       }),
-    [recentProjects, selectableProjects, selectedServerId],
+    [matchesCategory, pinnedViewKeys, recentProjects, selectableProjects, selectedServerId],
   );
+  // A pinned project already has its card at the top; the recent list skips it.
+  const recentProjectChoices = useMemo(() => {
+    const pinned = new Set(pinnedProjectChoices.map((choice) => choice.optionId));
+    return resolveRecentProjectChoices({
+      projects: selectableProjects.filter(
+        (project) => !pinned.has(projectOptionId(project.viewKey)),
+      ),
+      recentProjects,
+      serverId: selectedServerId,
+    });
+  }, [pinnedProjectChoices, recentProjects, selectableProjects, selectedServerId]);
   const handleSelectProjectOption = useCallback(
     (id: string) => {
       const project = projectByOptionId.get(id);
@@ -248,6 +295,7 @@ export function useNewWorkspaceProjectPicker({
     projectPickerOptions,
     projectByOptionId,
     recentProjectChoices,
+    pinnedProjectChoices,
     selectedProjectOptionId: selectedProject ? projectOptionId(selectedProject.viewKey) : "",
     projectTriggerLabel: selectedProject?.projectName ?? "Choose project",
     handleSelectProjectOption,

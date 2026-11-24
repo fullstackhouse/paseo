@@ -1410,6 +1410,8 @@ export const ptBR: TranslationResources = {
         openFolderFailed: "Couldn't open folder",
         remove: "Remover projeto",
         removing: "Removendo...",
+        pin: "Fixar projeto",
+        unpin: "Desafixar projeto",
       },
       confirmations: {
         removeTitle: "Remover projeto?",
@@ -1500,6 +1502,7 @@ export const ptBR: TranslationResources = {
   newWorkspace: {
     title: "Novo workspace",
     recentProjects: "Projetos recentes",
+    pinnedProjects: "Projetos fixados",
     create: "Criar",
     startAnother: "Criar outro",
     isolation: {

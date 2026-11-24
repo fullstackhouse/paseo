@@ -1382,6 +1382,8 @@ export const ar: TranslationResources = {
         openFolderFailed: "Couldn't open folder",
         remove: "إزالة المشروع",
         removing: "جارٍ الإزالة...",
+        pin: "تثبيت المشروع",
+        unpin: "إلغاء تثبيت المشروع",
       },
       confirmations: {
         removeTitle: "هل تريد إزالة المشروع؟",
@@ -1472,6 +1474,7 @@ export const ar: TranslationResources = {
   newWorkspace: {
     title: "مساحة عمل جديدة",
     recentProjects: "المشاريع الأخيرة",
+    pinnedProjects: "المشاريع المثبتة",
     create: "يخلق",
     startAnother: "ابدأ مساحة أخرى",
     isolation: {

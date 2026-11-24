@@ -1372,6 +1372,8 @@ export const zhCN: TranslationResources = {
         openFolderFailed: "Couldn't open folder",
         remove: "移除 project",
         removing: "正在移除...",
+        pin: "固定 project",
+        unpin: "取消固定 project",
       },
       confirmations: {
         removeTitle: "移除 project？",
@@ -1460,6 +1462,7 @@ export const zhCN: TranslationResources = {
   newWorkspace: {
     title: "新建 workspace",
     recentProjects: "最近的项目",
+    pinnedProjects: "已固定的项目",
     create: "创建",
     startAnother: "再创建一个",
     isolation: {

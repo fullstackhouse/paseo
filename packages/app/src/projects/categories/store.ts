@@ -1,5 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useMemo } from "react";
 import { create } from "zustand";
+import { useShallow } from "zustand/shallow";
 import { persist } from "zustand/middleware";
 import { z } from "zod";
 import { createValidatedPersistStorage } from "@/storage/validated-persist-storage";
@@ -7,6 +9,7 @@ import {
   EMPTY_PROJECT_CATEGORIES_STATE,
   addProjectCategory,
   assignProjectCategory,
+  createProjectCategoryMatcher,
   createProjectCategoryId,
   deleteProjectCategory,
   renameProjectCategory,
@@ -74,3 +77,9 @@ export const useProjectCategoriesStore = create<ProjectCategoriesStore>()(
     },
   ),
 );
+
+/** Whether a project is in the selected category, or `null` when every project is. */
+export function useProjectCategoryMatcher(): ((viewKey: string) => boolean) | null {
+  const state = useProjectCategoriesStore(useShallow(pickState));
+  return useMemo(() => createProjectCategoryMatcher(state), [state]);
+}

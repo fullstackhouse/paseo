@@ -1389,6 +1389,8 @@ export const ko: TranslationResources = {
         openFolderFailed: "폴더를 열 수 없습니다.",
         remove: "프로젝트 제거",
         removing: "제거하는 중...",
+        pin: "프로젝트 고정",
+        unpin: "프로젝트 고정 해제",
       },
       confirmations: {
         removeTitle: "프로젝트를 제거할까요?",
@@ -1479,6 +1481,7 @@ export const ko: TranslationResources = {
   newWorkspace: {
     title: "새 워크스페이스",
     recentProjects: "최근 프로젝트",
+    pinnedProjects: "고정된 프로젝트",
     create: "생성",
     startAnother: "다른 워크스페이스 시작",
     isolation: {
