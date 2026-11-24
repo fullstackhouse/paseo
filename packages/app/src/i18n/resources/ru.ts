@@ -1401,6 +1401,8 @@ export const ru: TranslationResources = {
         openFolderFailed: "Не удалось открыть папку",
         remove: "Удалить проект",
         removing: "Удаление...",
+        pin: "Закрепить проект",
+        unpin: "Открепить проект",
       },
       confirmations: {
         removeTitle: "Удалить проект?",
@@ -1491,6 +1493,7 @@ export const ru: TranslationResources = {
   newWorkspace: {
     title: "Новое рабочее пространство",
     recentProjects: "Недавние проекты",
+    pinnedProjects: "Закреплённые проекты",
     create: "Создать",
     startAnother: "Создать ещё один",
     isolation: {

@@ -1391,6 +1391,8 @@ export const en = {
         openFolderFailed: "Couldn't open folder",
         remove: "Remove project",
         removing: "Removing...",
+        pin: "Pin project",
+        unpin: "Unpin project",
       },
       confirmations: {
         removeTitle: "Remove project?",
@@ -1481,6 +1483,7 @@ export const en = {
   newWorkspace: {
     title: "New workspace",
     recentProjects: "Recent projects",
+    pinnedProjects: "Pinned projects",
     create: "Create",
     startAnother: "Start another",
     isolation: {
