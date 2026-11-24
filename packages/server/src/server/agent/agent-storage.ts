@@ -76,6 +76,11 @@ const STORED_AGENT_SCHEMA = z.object({
   attentionTimestamp: z.string().nullable().optional(),
   internal: z.boolean().optional(),
   archivedAt: z.string().nullable().optional(),
+  /**
+   * The workspace whose archive also archived this agent. Unarchiving that workspace brings the
+   * agent back; an agent archived on its own before then has none. Cleared on unarchive.
+   */
+  archivedWithWorkspaceId: z.string().nullable().optional(),
   /** Set when a daemon stop or crash cut a turn short; cleared when the next turn starts. */
   interruptedAt: z.string().nullable().optional(),
   owner: AgentOwnerSchema.optional(),
@@ -163,9 +168,17 @@ export class AgentStorage {
     return this.queueRecordMutation(record.id, () => record);
   }
 
+  /** Tags an archived agent as archived by its workspace's archive. No-op unless it is archived. */
+  async markArchivedWithWorkspace(agentId: string, workspaceId: string): Promise<void> {
+    await this.load();
+    await this.queueRecordMutation(agentId, (existing) =>
+      existing?.archivedAt ? { ...existing, archivedWithWorkspaceId: workspaceId } : null,
+    );
+  }
+
   private queueRecordMutation(
     agentId: string,
-    mutate: (existing: StoredAgentRecord | null) => StoredAgentRecord,
+    mutate: (existing: StoredAgentRecord | null) => StoredAgentRecord | null,
   ): Promise<void> {
     const prev = this.pendingWrites.get(agentId) ?? Promise.resolve();
     const next = prev.then(async () => {
@@ -174,7 +187,7 @@ export class AgentStorage {
       }
 
       const record = mutate(this.cache.get(agentId) ?? null);
-      await this.writeRecord(record);
+      if (record) await this.writeRecord(record);
       return undefined;
     });
 
@@ -262,6 +275,7 @@ export class AgentStorage {
       // stale pre-archive record after the archive mutation.
       if (existing && existing.archivedAt !== undefined) {
         record.archivedAt = existing.archivedAt;
+        record.archivedWithWorkspaceId = existing.archivedWithWorkspaceId;
       }
       record.resumeOnStartup =
         existing?.resumeOnStartup && agent.lifecycle !== "idle" && agent.lifecycle !== "error";

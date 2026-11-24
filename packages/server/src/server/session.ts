@@ -207,6 +207,7 @@ import type { PushNotifications } from "./push/index.js";
 import {
   archivePersistedWorkspaceRecord,
   archiveWorkspaceContents,
+  restoreWorkspaceAgents,
 } from "./workspace-archive-service.js";
 import type { ServiceProxySubsystem } from "./service-proxy.js";
 import { renameCurrentBranch as renameCurrentBranchDefault } from "../utils/checkout-git.js";
@@ -1005,6 +1006,15 @@ export class Session {
       isDirectory: (path) => this.filesystem.isDirectory(path),
       unarchiveWorkspace: async (workspace) => {
         await this.workspaceProvisioning.ensureWorkspaceRecordUnarchived(workspace);
+        await restoreWorkspaceAgents(
+          {
+            agentStorage: this.agentStorage,
+            unarchiveAgent: (agentId) =>
+              unarchiveAgentState(this.agentStorage, this.agentManager, agentId),
+            sessionLogger: this.sessionLogger,
+          },
+          workspace.workspaceId,
+        );
       },
     });
     this.checkoutSession = new CheckoutSession({

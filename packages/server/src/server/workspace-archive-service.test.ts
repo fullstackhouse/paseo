@@ -11,10 +11,12 @@ import { getPaseoWorktreeMetadataPath } from "../utils/worktree-metadata.js";
 import { archiveCommand } from "./worktree/commands.js";
 import { createWorktree, listPaseoWorktrees, type WorktreeConfig } from "../utils/worktree.js";
 import type { ManagedAgent } from "./agent/agent-manager.js";
-import type { AgentStorage, StoredAgentRecord } from "./agent/agent-storage.js";
+import { AgentStorage, type StoredAgentRecord } from "./agent/agent-storage.js";
 import type { WorkspaceGitService } from "./workspace-git-service.js";
 import {
   archiveByScope,
+  archiveWorkspaceContents,
+  restoreWorkspaceAgents,
   type ActiveWorkspaceRef,
   type ArchiveDependencies,
   type ArchiveResult,
@@ -158,7 +160,8 @@ function createArchiveDeps(input: ArchiveDepsInput): ArchiveTestDependencies {
     },
     agentStorage: {
       listByWorkspace: async (): Promise<StoredAgentRecord[]> => [],
-    } as Pick<AgentStorage, "listByWorkspace">,
+      markArchivedWithWorkspace: async () => {},
+    } as Pick<AgentStorage, "listByWorkspace" | "markArchivedWithWorkspace">,
     findWorkspaceIdForCwd: input.findWorkspaceIdForCwd ?? vi.fn(async () => null),
     listActiveWorkspaces: async () =>
       active.filter((workspace) => !archivedWorkspaceIds.has(workspace.workspaceId)),
@@ -936,7 +939,8 @@ describe("archiveByScope", () => {
           : ([
               { id: otherStoredAgentId, workspaceId: otherWorkspaceId, archivedAt: null },
             ] as StoredAgentRecord[]),
-    } as Pick<AgentStorage, "listByWorkspace">;
+      markArchivedWithWorkspace: async () => {},
+    } as Pick<AgentStorage, "listByWorkspace" | "markArchivedWithWorkspace">;
 
     const result = await archiveByScope(deps, {
       scope: { kind: "workspace", workspaceId: targetWorkspaceId },
@@ -1050,5 +1054,112 @@ describe("resolveWorkspaceIdAtPath", () => {
     );
 
     expect(result).toBe("ws-nested");
+  });
+});
+
+describe("workspace archive and unarchive of its agents", () => {
+  function storedAgent(
+    overrides: Pick<StoredAgentRecord, "id"> & Partial<StoredAgentRecord>,
+  ): StoredAgentRecord {
+    return {
+      provider: "codex",
+      cwd: "/repo",
+      workspaceId: "ws-1",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+      lastUserMessageAt: null,
+      title: null,
+      labels: {},
+      lastStatus: "idle",
+      lastModeId: null,
+      config: null,
+      persistence: null,
+      archivedAt: null,
+      ...overrides,
+    };
+  }
+
+  async function createStorage(records: StoredAgentRecord[]): Promise<AgentStorage> {
+    const dir = mkdtempSync(path.join(tmpdir(), "paseo-archive-agents-"));
+    cleanupPaths.push(dir);
+    const storage = new AgentStorage(dir, createLogger());
+    await storage.initialize();
+    for (const record of records) await storage.upsert(record);
+    return storage;
+  }
+
+  // Archives a stored agent the way AgentManager.archiveSnapshot persists it.
+  function archiveIn(storage: AgentStorage) {
+    return vi.fn(async (agentId: string, archivedAt: string) => {
+      const record = await storage.get(agentId);
+      if (!record) throw new Error(`missing ${agentId}`);
+      const archived = { ...record, archivedAt };
+      await storage.upsert(archived);
+      return archived;
+    });
+  }
+
+  test("tags only the agents the workspace archive took down", async () => {
+    const storage = await createStorage([
+      storedAgent({ id: "open" }),
+      storedAgent({ id: "closed-before", archivedAt: "2026-01-02T00:00:00.000Z" }),
+      storedAgent({ id: "elsewhere", workspaceId: "ws-2" }),
+    ]);
+
+    await archiveWorkspaceContents(
+      {
+        agentManager: {
+          listAgents: () => [],
+          getAgent: () => null,
+          archiveAgent: vi.fn(),
+          archiveSnapshot: archiveIn(storage),
+        },
+        agentStorage: storage,
+        killTerminalsForWorkspace: async () => {},
+      },
+      "ws-1",
+    );
+
+    expect((await storage.get("open"))?.archivedWithWorkspaceId).toBe("ws-1");
+    expect((await storage.get("closed-before"))?.archivedWithWorkspaceId).toBeUndefined();
+    expect((await storage.get("elsewhere"))?.archivedAt).toBeNull();
+  });
+
+  test("unarchiving the workspace brings back only the agents its archive took down", async () => {
+    const storage = await createStorage([
+      storedAgent({
+        id: "with-workspace",
+        archivedAt: "2026-01-03T00:00:00.000Z",
+        archivedWithWorkspaceId: "ws-1",
+      }),
+      storedAgent({ id: "closed-before", archivedAt: "2026-01-02T00:00:00.000Z" }),
+      // Archived with ws-1, then moved: not this workspace's to bring back.
+      storedAgent({
+        id: "moved",
+        workspaceId: "ws-2",
+        archivedAt: "2026-01-03T00:00:00.000Z",
+        archivedWithWorkspaceId: "ws-1",
+      }),
+    ]);
+    const unarchiveAgent = vi.fn(async () => true);
+
+    const restored = await restoreWorkspaceAgents(
+      { agentStorage: storage, unarchiveAgent },
+      "ws-1",
+    );
+
+    expect(restored).toEqual(["with-workspace"]);
+    expect(unarchiveAgent).toHaveBeenCalledTimes(1);
+    expect(unarchiveAgent).toHaveBeenCalledWith("with-workspace");
+  });
+
+  test("tagging leaves an agent that is not archived untouched", async () => {
+    const storage = await createStorage([storedAgent({ id: "active" })]);
+
+    await storage.markArchivedWithWorkspace("active", "ws-1");
+    await storage.markArchivedWithWorkspace("missing", "ws-1");
+
+    expect((await storage.get("active"))?.archivedWithWorkspaceId).toBeUndefined();
+    expect(await storage.get("missing")).toBeNull();
   });
 });
