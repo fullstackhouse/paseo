@@ -101,6 +101,8 @@ export function navigateToWorkspace(
     deps.revealTab(request.workspaceKey, tabId);
     return tabId;
   };
+  // Without a named tab, an agent waiting on a permission prompt or one that failed takes focus;
+  // otherwise the workspace opens on the tab you left. Ready to review doesn't count (FSH).
   if (input.target) {
     prepareWorkspaceTab({ ...input, target: input.target }, { openTab });
   } else {

@@ -254,6 +254,67 @@ describe("skills controller", () => {
     expect(await installedEverywhere(harness.targets)).toEqual([[], [], []]);
   });
 
+  describe("startup on a host that never chose", () => {
+    function createUnsetSelectionStore(): SkillSelectionStore & { explicit: () => boolean } {
+      let current: SkillSelection = { mode: "all" };
+      let explicit = false;
+      return {
+        get: async () => current,
+        set: async (selection) => {
+          current = selection as SkillSelection;
+          explicit = true;
+          return current;
+        },
+        isSet: async () => explicit,
+        explicit: () => explicit,
+      };
+    }
+
+    it("installs every bundled skill and saves the choice", async () => {
+      const store = createUnsetSelectionStore();
+      const fresh = await makeHarness(store);
+      try {
+        const snapshot = await fresh.controller.autoUpdate();
+
+        expect(snapshot.state).toBe("up-to-date");
+        expect(snapshot.installed).toEqual(BUNDLED_SKILLS);
+        expect(store.explicit()).toBe(true);
+      } finally {
+        await rm(fresh.root, { recursive: true, force: true });
+      }
+    });
+
+    it("leaves skills off after the user turns them off", async () => {
+      const store = createUnsetSelectionStore();
+      const fresh = await makeHarness(store);
+      try {
+        await fresh.controller.autoUpdate();
+        await fresh.controller.uninstall();
+
+        const snapshot = await fresh.controller.autoUpdate();
+
+        expect(snapshot.state).toBe("not-installed");
+        expect(await installedEverywhere(fresh.targets)).toEqual([[], [], []]);
+      } finally {
+        await rm(fresh.root, { recursive: true, force: true });
+      }
+    });
+
+    it("keeps an older install's selection open for the legacy import", async () => {
+      const store = createUnsetSelectionStore();
+      const legacy = await makeHarness(store);
+      try {
+        await legacy.controller.install();
+
+        await legacy.controller.autoUpdate();
+
+        expect(store.explicit()).toBe(false);
+      } finally {
+        await rm(legacy.root, { recursive: true, force: true });
+      }
+    });
+  });
+
   let harness: Harness;
 
   beforeEach(async () => {

@@ -220,13 +220,22 @@ test("ready to review survives opening and leaving until Mark as read", async ({
   await markBackgroundWorkspaceAndRead(page, workspaces.subject.workspaceId);
 });
 
-test("clicking a multi-agent workspace reveals its marked agent", async ({ page, workspaces }) => {
+// FSH: marking a workspace unread puts Ready to review on its newest agent, but opening the
+// workspace still shows the tab you left; the marked agent waits behind its badge.
+test("clicking a marked multi-agent workspace keeps the tab you left", async ({
+  page,
+  workspaces,
+}) => {
   await openAgentRoute(page, workspaces.subject);
   await expectSelectedAgent(page, workspaces.subject.agentId);
   await openWorkspace(page, workspaces.other.workspaceId);
   const newest = await addFinishedAgent(workspaces.subject);
   await markBackgroundWorkspaceAndReopen(page, workspaces.subject.workspaceId);
-  await expectSelectedAgent(page, newest.id);
+  await expectSelectedAgent(page, workspaces.subject.agentId);
+  await expect(page.getByTestId(`workspace-tab-agent_${newest.id}`).first()).toHaveAttribute(
+    "aria-selected",
+    "false",
+  );
 });
 
 test("manual unread survives leaving the current workspace on compact layout", async ({

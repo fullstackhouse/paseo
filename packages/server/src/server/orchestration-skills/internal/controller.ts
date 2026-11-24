@@ -158,12 +158,24 @@ export function createSkillsController({
     return { imported: true, selection: imported };
   }
 
+  // Skills are on by default: a host that never chose and has nothing installed
+  // gets the full bundle once. Saving the selection records that choice, so
+  // turning skills off afterwards survives restarts. A host with an older,
+  // selection-less install keeps its selection unset for the legacy import.
+  async function autoUpdate(): Promise<SkillsSnapshot> {
+    const snapshot = await converge(autoUpdateInstalledSkills);
+    if (snapshot.state !== "not-installed" || (await selectionStore.isSet())) return snapshot;
+    const installed = await converge(updateSkills);
+    if (installed.state === "up-to-date") await selectionStore.set(installed.selection);
+    return installed;
+  }
+
   return {
     status: () => serialize(() => converge(getSkillsStatus)),
     install: () => serialize(() => converge(updateSkills)),
     update: () => serialize(() => converge(updateSkills)),
     uninstall: () => serialize(() => converge(uninstallSkills)),
-    autoUpdate: () => serialize(() => converge(autoUpdateInstalledSkills)),
+    autoUpdate: () => serialize(autoUpdate),
     save: (selection) => serialize(() => saveSelection(selection)),
     importLegacySelectionIfUnset: (selection) =>
       serialize(() => importLegacySelectionIfUnset(selection)),

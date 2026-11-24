@@ -208,7 +208,39 @@ describe("pickAttentionAgent", () => {
     ).toBe("agent-1");
   });
 
-  it("prioritizes permission over error over finished", () => {
+  it("ignores finished agents (Ready to review)", () => {
+    expect(
+      pickAttentionAgent([
+        createAgent({
+          id: "finished-agent",
+          requiresAttention: true,
+          attentionReason: "finished",
+          attentionTimestamp: new Date("2026-01-01T00:00:00.000Z"),
+        }),
+      ]),
+    ).toBeNull();
+  });
+
+  it("prefers a failed agent over an older finished one", () => {
+    expect(
+      pickAttentionAgent([
+        createAgent({
+          id: "finished-agent",
+          requiresAttention: true,
+          attentionReason: "finished",
+          attentionTimestamp: new Date("2026-01-01T00:00:00.000Z"),
+        }),
+        createAgent({
+          id: "error-agent",
+          requiresAttention: true,
+          attentionReason: "error",
+          attentionTimestamp: new Date("2026-01-02T00:00:00.000Z"),
+        }),
+      ]),
+    ).toBe("error-agent");
+  });
+
+  it("prioritizes permission over error", () => {
     expect(
       pickAttentionAgent([
         createAgent({
@@ -265,7 +297,7 @@ describe("pickAttentionAgent", () => {
         createAgent({
           id: "top-level-agent",
           requiresAttention: true,
-          attentionReason: "finished",
+          attentionReason: "error",
           attentionTimestamp: new Date("2026-01-02T00:00:00.000Z"),
         }),
       ]),

@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { expect, type Locator, type Page } from "@playwright/test";
 import type { DaemonClient as InternalDaemonClient } from "@getpaseo/client/internal/daemon-client";
+import { NO_SKILLS_INSTALLED_CONFIG } from "./agent-skills";
 import { addProjectFlow, addProjectFlowInput, chooseAddProjectMethod } from "./add-project-flow";
 import { connectDaemonClient } from "./daemon-client-loader";
 import { buildCreateAgentPreferences, buildSeededHost } from "./daemon-registry";
@@ -248,6 +249,7 @@ function claudeOnlyConfig(options: { withBrokenProvider: boolean }) {
   };
   return {
     agents: {
+      ...NO_SKILLS_INSTALLED_CONFIG.agents,
       providers: {
         codex: { enabled: false },
         copilot: { enabled: false },
