@@ -7,6 +7,7 @@ import {
   createWorkspaceStructureProjectsSelector,
   selectHasWorkspaces,
   selectHydratedWorkspaceServerIds,
+  selectIsWorkspaceInSidebar,
   selectWorkspaceDirectoryServerIds,
   selectProjectOrder,
   selectRecentProjects,
@@ -280,6 +281,20 @@ describe("selectWorkspace", () => {
     expect(tracked.current).toBe(before);
 
     tracked.stop();
+  });
+});
+
+describe("selectIsWorkspaceInSidebar", () => {
+  it("is true for a loaded workspace and false for a background or missing one", () => {
+    const listed = createWorkspace({ id: "listed" });
+    const background = { ...createWorkspace({ id: "background" }), background: true };
+    initializeWorkspaces([listed, background]);
+    const state = useSessionStore.getState();
+
+    expect(selectIsWorkspaceInSidebar(state, SERVER_ID, "listed")).toBe(true);
+    expect(selectIsWorkspaceInSidebar(state, SERVER_ID, "background")).toBe(false);
+    expect(selectIsWorkspaceInSidebar(state, SERVER_ID, "archived")).toBe(false);
+    expect(selectIsWorkspaceInSidebar(state, SERVER_ID, null)).toBe(false);
   });
 });
 
