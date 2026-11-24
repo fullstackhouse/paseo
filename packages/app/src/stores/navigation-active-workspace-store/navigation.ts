@@ -1,10 +1,14 @@
-import type { WorkspaceDescriptor } from "@/stores/session-store";
+import type { Agent, WorkspaceDescriptor } from "@/stores/session-store";
+import { pickAttentionAgent } from "@/utils/agent-attention";
 import {
   buildHostWorkspaceRoute,
   decodeWorkspaceIdFromPathSegment,
   parseHostWorkspaceRouteFromPathname,
 } from "@/utils/host-routes";
-import { resolveWorkspaceMapKeyByIdentity } from "@/utils/workspace-identity";
+import {
+  normalizeWorkspaceOpaqueId,
+  resolveWorkspaceMapKeyByIdentity,
+} from "@/utils/workspace-identity";
 import type { ActiveWorkspaceSelection } from "@/stores/last-workspace-selection";
 import type { WorkspaceTabTarget } from "@/workspace-tabs/model";
 import { prepareWorkspaceTab, type PrepareWorkspaceTabDeps } from "@/utils/prepare-workspace-tab";
@@ -29,6 +33,7 @@ export interface NavigateToWorkspaceInput {
 
 export interface NavigateToWorkspaceDeps extends PrepareWorkspaceTabDeps {
   getSessionWorkspaces: (serverId: string) => Map<string, WorkspaceDescriptor> | null | undefined;
+  getSessionAgents: (serverId: string) => Iterable<Agent>;
   isWorkspaceLayoutHydrated: () => boolean;
   deferOpenTab: (input: OpenWorkspaceTabInput) => null;
   rememberLastWorkspace: (selection: ActiveWorkspaceSelection) => void;
@@ -96,14 +101,26 @@ export function navigateToWorkspace(
     deps.revealTab(request.workspaceKey, tabId);
     return tabId;
   };
-  // FSH: without a named tab, the workspace opens on the tab you left (agent, terminal, file or
-  // plugin). No agent takes focus, not even one waiting on a permission prompt; badges show what
-  // needs you. The old jump ended on the oldest finished agent whenever nothing else was waiting,
-  // and since "Ready to review" outlives a visit here, that was almost every entry.
+  // Without a named tab, an agent waiting on a permission prompt or one that failed takes focus;
+  // otherwise the workspace opens on the tab you left. Ready to review doesn't count (FSH).
   if (input.target) {
     prepareWorkspaceTab({ ...input, target: input.target }, { openTab });
   } else {
-    deps.revealWorkspace();
+    const workspaceAgents = resolvedWorkspaceId
+      ? Array.from(deps.getSessionAgents(input.serverId)).filter(
+          (agent) => normalizeWorkspaceOpaqueId(agent.workspaceId) === resolvedWorkspaceId,
+        )
+      : [];
+    const attentionAgentId = pickAttentionAgent(workspaceAgents);
+    if (attentionAgentId && resolvedWorkspaceId) {
+      openTab({
+        workspaceKey: `${input.serverId}:${resolvedWorkspaceId}`,
+        target: { kind: "agent", agentId: attentionAgentId },
+        intent: "reveal",
+      });
+    } else {
+      deps.revealWorkspace();
+    }
   }
 
   const route = buildHostWorkspaceRoute(input.serverId, input.workspaceId);

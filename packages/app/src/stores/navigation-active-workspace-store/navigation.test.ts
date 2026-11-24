@@ -9,7 +9,7 @@ import {
   type NavigateToLastWorkspaceDeps,
   type NavigateToWorkspaceDeps,
 } from "./navigation";
-import type { WorkspaceDescriptor } from "@/stores/session-store";
+import type { Agent, WorkspaceDescriptor } from "@/stores/session-store";
 
 interface RecordedTab {
   workspaceKey: string;
@@ -35,6 +35,7 @@ function createFakeDeps(overrides: Partial<NavigateToWorkspaceDeps> = {}) {
       return null;
     },
     getSessionWorkspaces: () => null,
+    getSessionAgents: () => [] as Agent[],
     isWorkspaceLayoutHydrated: () => true,
     openTab: ({ workspaceKey, target, pin = false }) => {
       openedTabs.push({ workspaceKey, target, pin });
@@ -71,10 +72,9 @@ function createLastSelectionDeps(
 }
 
 describe("workspace navigation", () => {
-  it("reveals the workspace without opening a tab when no tab is named", () => {
-    const { deps, openedTabs, revealed } = createFakeDeps();
+  it("reveals even a current workspace without agents", () => {
+    const { deps, revealed } = createFakeDeps();
     navigateToWorkspace({ serverId: "server", workspaceId: "workspace" }, deps);
-    expect(openedTabs).toEqual([]);
     expect(revealed).toEqual([null]);
   });
 
@@ -105,13 +105,72 @@ describe("workspace navigation", () => {
     expect(remembered).toEqual([{ serverId: "server-1", workspaceId: "workspace-a" }]);
   });
 
-  it("opens the named tab", () => {
+  it("focuses the attention agent's tab when a workspace has one", () => {
     const workspace = {
       id: "workspace-a",
       workspaceDirectory: "/repo/workspace-a",
     } as WorkspaceDescriptor;
+    const agent = {
+      id: "agent-1",
+      cwd: "/repo/workspace-a",
+      workspaceId: "workspace-a",
+      requiresAttention: true,
+      attentionReason: "permission",
+    } as unknown as Agent;
     const { deps, openedTabs } = createFakeDeps({
       getSessionWorkspaces: () => new Map([[workspace.id, workspace]]),
+      getSessionAgents: () => [agent],
+    });
+
+    navigateToWorkspace({ serverId: "server-1", workspaceId: "workspace-a" }, deps);
+
+    expect(openedTabs).toEqual([
+      {
+        workspaceKey: "server-1:workspace-a",
+        target: { kind: "agent", agentId: "agent-1" },
+        pin: false,
+      },
+    ]);
+  });
+
+  it("keeps the saved tab when only finished agents need attention", () => {
+    const workspace = {
+      id: "workspace-a",
+      workspaceDirectory: "/repo/workspace-a",
+    } as WorkspaceDescriptor;
+    const agent = {
+      id: "agent-1",
+      cwd: "/repo/workspace-a",
+      workspaceId: "workspace-a",
+      requiresAttention: true,
+      attentionReason: "finished",
+    } as unknown as Agent;
+    const { deps, openedTabs, revealed } = createFakeDeps({
+      getSessionWorkspaces: () => new Map([[workspace.id, workspace]]),
+      getSessionAgents: () => [agent],
+    });
+
+    navigateToWorkspace({ serverId: "server-1", workspaceId: "workspace-a" }, deps);
+
+    expect(openedTabs).toEqual([]);
+    expect(revealed).toEqual([null]);
+  });
+
+  it("keeps an explicit tab authoritative over an attention agent", () => {
+    const workspace = {
+      id: "workspace-a",
+      workspaceDirectory: "/repo/workspace-a",
+    } as WorkspaceDescriptor;
+    const agent = {
+      id: "agent-1",
+      cwd: "/repo/workspace-a",
+      workspaceId: "workspace-a",
+      requiresAttention: true,
+      attentionReason: "permission",
+    } as unknown as Agent;
+    const { deps, openedTabs } = createFakeDeps({
+      getSessionWorkspaces: () => new Map([[workspace.id, workspace]]),
+      getSessionAgents: () => [agent],
     });
 
     navigateToWorkspace(
