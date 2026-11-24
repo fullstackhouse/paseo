@@ -139,6 +139,7 @@ export const es: TranslationResources = {
       groupByStatus: "Agrupar por estado",
       copyBrowserHostName: "Copiar el nombre del host del navegador",
       updatePaseo: "Actualizar Paseo",
+      checkPaseoUpdates: "Buscar actualizaciones de Paseo",
       modelGroupLabel: "Modelo",
       modelSearchKeywords: "cambiar modelo modificar modelo establecer modelo seleccionar modelo",
       thinkingGroupLabel: "Razonamiento",
@@ -1763,6 +1764,10 @@ export const es: TranslationResources = {
         installed: "Actualización de la aplicación instalada. Se requiere reinicio.",
         failed: "No se pudo actualizar la aplicación.",
         idle: "El estado de la actualización aún no se ha comprobado.",
+      },
+      check: {
+        upToDate: "Paseo está actualizado ({{version}})",
+        failed: "No se pudo buscar actualizaciones",
       },
       installError: "No se puede instalar la actualización de la aplicación de escritorio.",
       callout: {

@@ -57,6 +57,8 @@ export interface DesktopAppUpdater {
     releaseChannel: DesktopReleaseChannel;
     intent?: DesktopAppUpdateCheckIntent;
     silent?: boolean;
+    /** Show "checking", but leave the status as it was if a check without an update fails. */
+    quietErrors?: boolean;
   }): Promise<DesktopAppUpdateCheckResult | null>;
   installUpdate(options: {
     releaseChannel: DesktopReleaseChannel;
@@ -189,6 +191,59 @@ export function formatStatusText(input: {
   return i18n.t("desktop.updates.status.idle");
 }
 
+export interface CheckResultToast {
+  kind: "success" | "error";
+  message: string;
+}
+
+/**
+ * The toast for a check started by hand; `null` means the check threw. A check error is shown
+ * as the desktop reports it: FSH errors are already sentences, and an upstream result can carry
+ * a failed download next to a found update, where "couldn't check" would be untrue.
+ */
+export function formatCheckResultToast(
+  result: DesktopAppUpdateCheckResult | null,
+  formatVersion: (version: string) => string,
+): CheckResultToast {
+  if (!result) {
+    return { kind: "error", message: i18n.t("desktop.updates.check.failed") };
+  }
+  if (result.errorMessage) {
+    return { kind: "error", message: result.errorMessage };
+  }
+  const latest = result.latestVersion ? formatVersion(result.latestVersion) : null;
+  if (result.readyToInstall) {
+    return {
+      kind: "success",
+      message: latest
+        ? i18n.t("desktop.updates.status.availableWithVersion", { version: latest })
+        : i18n.t("desktop.updates.status.available"),
+    };
+  }
+  if (result.hasUpdate) {
+    return {
+      kind: "success",
+      message: latest
+        ? i18n.t("desktop.updates.status.pendingWithVersion", { version: latest })
+        : i18n.t("desktop.updates.status.pending"),
+    };
+  }
+  return {
+    kind: "success",
+    message: result.currentVersion
+      ? i18n.t("desktop.updates.check.upToDate", { version: formatVersion(result.currentVersion) })
+      : i18n.t("desktop.updates.status.upToDate"),
+  };
+}
+
+function resolveCheckedStatus(
+  result: DesktopAppUpdateCheckResult,
+): Pick<DesktopAppUpdaterSnapshot, "status" | "availableUpdate"> {
+  if (result.readyToInstall) return { status: "available", availableUpdate: result };
+  if (result.hasUpdate) return { status: "pending", availableUpdate: result };
+  return { status: "up-to-date", availableUpdate: null };
+}
+
 export function createDesktopAppUpdater(deps: DesktopAppUpdaterDeps): DesktopAppUpdater {
   let state: InternalState = { ...INITIAL_STATE };
   let cachedSnapshot: DesktopAppUpdaterSnapshot = buildSnapshot(state);
@@ -206,16 +261,23 @@ export function createDesktopAppUpdater(deps: DesktopAppUpdaterDeps): DesktopApp
     releaseChannel: DesktopReleaseChannel;
     intent?: DesktopAppUpdateCheckIntent;
     silent?: boolean;
+    quietErrors?: boolean;
   }): Promise<DesktopAppUpdateCheckResult | null> {
     if (!options) {
       return null;
     }
-    const { releaseChannel, intent = "manual", silent = false } = options;
+    const { releaseChannel, intent = "manual", silent = false, quietErrors = false } = options;
     if (silent && state.status === "checking") {
       return null;
     }
 
     const requestVersion = state.requestVersion + 1;
+    const { status: statusBefore, errorMessage: errorBefore } = state;
+    // A failed check is not a failed update, so a quiet one must not raise "Update failed".
+    const failQuietly = (message: string) => {
+      if (quietErrors) commit({ ...state, status: statusBefore, errorMessage: errorBefore });
+      else console.warn("[DesktopUpdater] Silent update check failed", message);
+    };
 
     commit({
       ...state,
@@ -232,8 +294,8 @@ export function createDesktopAppUpdater(deps: DesktopAppUpdaterDeps): DesktopApp
 
       const nextLastCheckedAt = intent === "manual" ? deps.now() : state.lastCheckedAt;
       if (result.errorMessage) {
-        if (silent && !result.hasUpdate) {
-          console.warn("[DesktopUpdater] Silent update check failed", result.errorMessage);
+        if ((quietErrors || silent) && !result.hasUpdate) {
+          failQuietly(result.errorMessage);
           return result;
         }
 
@@ -248,24 +310,9 @@ export function createDesktopAppUpdater(deps: DesktopAppUpdaterDeps): DesktopApp
         return result;
       }
 
-      let nextStatus: DesktopAppUpdateStatus;
-      let nextAvailable: DesktopAppUpdateCheckResult | null;
-
-      if (result.readyToInstall) {
-        nextStatus = "available";
-        nextAvailable = result;
-      } else if (result.hasUpdate) {
-        nextStatus = "pending";
-        nextAvailable = result;
-      } else {
-        nextStatus = "up-to-date";
-        nextAvailable = null;
-      }
-
       commit({
         ...state,
-        status: nextStatus,
-        availableUpdate: nextAvailable,
+        ...resolveCheckedStatus(result),
         errorMessage: null,
         installMessage: null,
         lastCheckedAt: nextLastCheckedAt,
@@ -278,8 +325,8 @@ export function createDesktopAppUpdater(deps: DesktopAppUpdaterDeps): DesktopApp
       }
 
       const message = getErrorMessage(error);
-      if (silent) {
-        console.warn("[DesktopUpdater] Silent update check failed", message);
+      if (quietErrors || silent) {
+        failQuietly(message);
       } else {
         commit({
           ...state,

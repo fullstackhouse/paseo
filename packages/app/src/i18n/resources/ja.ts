@@ -139,6 +139,7 @@ export const ja: TranslationResources = {
       groupByStatus: "ステータスでグループ化",
       copyBrowserHostName: "ブラウザホスト名をコピー",
       updatePaseo: "Paseo をアップデート",
+      checkPaseoUpdates: "Paseo のアップデートを確認",
       modelGroupLabel: "モデル",
       modelSearchKeywords: "モデルを切り替え モデルを変更 モデルを設定 モデルを選択",
       thinkingGroupLabel: "思考",
@@ -1739,6 +1740,10 @@ export const ja: TranslationResources = {
         installed: "アプリの更新がインストールされました。再起動が必要です。",
         failed: "アプリの更新に失敗しました。",
         idle: "更新ステータスはまだ確認されていません。",
+      },
+      check: {
+        upToDate: "Paseo は最新です ({{version}})",
+        failed: "アップデートを確認できませんでした",
       },
       installError: "デスクトップアプリの更新をインストールできません。",
       callout: {

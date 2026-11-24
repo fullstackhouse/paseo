@@ -74,6 +74,48 @@ export function buildUpdateContribution(
   };
 }
 
+export interface AppUpdateCheckCommandCenterSource {
+  isDesktopApp: boolean;
+  status: DesktopAppUpdateStatus;
+  isInstalling: boolean;
+  labels: { section: string; title: string };
+  icon?: CommandCenterIcon;
+  check(): Promise<void>;
+}
+
+const HIDES_APP_UPDATE_CHECK: ReadonlySet<DesktopAppUpdateStatus> = new Set([
+  "available",
+  "checking",
+  "installing",
+  // An FSH install reports "installed" while its script still downloads; a check then finds
+  // the same release and offers a second install. If that script fails, the entry stays hidden
+  // until the next background check; Settings → App updates still works.
+  "installed",
+]);
+
+// Takes Update Paseo's slot: hidden while that entry is listed or a check or install is running.
+export function buildAppUpdateCheckContribution(
+  source: AppUpdateCheckCommandCenterSource,
+): CommandCenterContribution | null {
+  if (!source.isDesktopApp || source.isInstalling) return null;
+  if (HIDES_APP_UPDATE_CHECK.has(source.status)) return null;
+  return {
+    id: "check-paseo-updates",
+    group: "actions",
+    groupRank: 0,
+    rank: 9,
+    keywords: ["update", "upgrade", "check", "version", "paseo", "app"],
+    visibility: "query",
+    run: () => void source.check(),
+    presentation: {
+      kind: "action",
+      title: source.labels.title,
+      sectionTitle: source.labels.section,
+      icon: source.icon,
+    },
+  };
+}
+
 export interface PluginUpdateCheckCommandCenterSource {
   /** True when a connected host can apply plugin updates. */
   available: boolean;

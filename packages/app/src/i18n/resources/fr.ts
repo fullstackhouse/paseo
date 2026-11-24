@@ -139,6 +139,7 @@ export const fr: TranslationResources = {
       groupByStatus: "Grouper par statut",
       copyBrowserHostName: "Copier le nom de l’hôte du navigateur",
       updatePaseo: "Mettre à jour Paseo",
+      checkPaseoUpdates: "Rechercher des mises à jour de Paseo",
       modelGroupLabel: "Modèle",
       modelSearchKeywords:
         "changer de modèle modifier le modèle définir le modèle sélectionner le modèle model",
@@ -1757,6 +1758,10 @@ export const fr: TranslationResources = {
         installed: "Mise à jour de l’application installée. Redémarrage requis.",
         failed: "Échec de la mise à jour de l’application.",
         idle: "Les mises à jour n’ont pas encore été vérifiées.",
+      },
+      check: {
+        upToDate: "Paseo est à jour ({{version}})",
+        failed: "Impossible de rechercher des mises à jour",
       },
       installError: "Impossible d’installer la mise à jour de l’application de bureau.",
       callout: {

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { i18n } from "@/i18n/i18next";
 import {
   createDesktopAppUpdater,
+  formatCheckResultToast,
   formatStatusText,
   type DesktopAppUpdater,
   type DesktopAppUpdaterErrorReport,
@@ -212,6 +213,70 @@ describe("desktop app updater — check", () => {
 
     expect(port.recordedChecks).toEqual([{ releaseChannel: "stable", intent: "manual" }]);
     expect(updater.getSnapshot().status).toBe("up-to-date");
+  });
+
+  it("shows a quiet check as checking and keeps the status when it fails without an update", async () => {
+    const { updater, port } = createUpdater();
+    await updater.checkForUpdates({ releaseChannel: "stable" });
+    const deferred = port.deferNextCheck();
+
+    const quietCheck = updater.checkForUpdates({ releaseChannel: "stable", quietErrors: true });
+    expect(updater.getSnapshot().status).toBe("checking");
+    deferred.resolve(buildFakeCheckResult({ errorMessage: "network down" }));
+
+    await expect(quietCheck).resolves.toMatchObject({ errorMessage: "network down" });
+    expect(updater.getSnapshot()).toMatchObject({ status: "up-to-date", errorMessage: null });
+  });
+
+  it("keeps an earlier install error when a quiet check throws", async () => {
+    const { updater, port } = createUpdater();
+    port.failNextInstall(new Error("disk full"));
+    await updater.installUpdate({ releaseChannel: "stable" });
+    const before = updater.getSnapshot();
+    port.failNextCheck(new Error("offline"));
+
+    await expect(
+      updater.checkForUpdates({ releaseChannel: "stable", quietErrors: true }),
+    ).resolves.toBeNull();
+
+    expect(updater.getSnapshot()).toMatchObject({
+      status: before.status,
+      errorMessage: before.errorMessage,
+    });
+  });
+
+  it("does not let a background check supersede an in-flight quiet check", async () => {
+    const { updater, port } = createUpdater();
+    const deferred = port.deferNextCheck();
+
+    const quietCheck = updater.checkForUpdates({ releaseChannel: "stable", quietErrors: true });
+    port.nextCheckResult(buildFakeCheckResult({ errorMessage: "network down" }));
+    await updater.checkForUpdates({ releaseChannel: "stable", intent: "automatic", silent: true });
+    deferred.resolve(
+      buildFakeCheckResult({ hasUpdate: true, readyToInstall: true, latestVersion: "1.2.3" }),
+    );
+    await quietCheck;
+
+    expect(port.recordedChecks).toEqual([{ releaseChannel: "stable", intent: "manual" }]);
+    expect(updater.getSnapshot()).toMatchObject({ status: "available" });
+  });
+
+  it("still reports a quiet check's failed download of a found update", async () => {
+    const { updater, port } = createUpdater();
+    port.nextCheckResult(
+      buildFakeCheckResult({
+        hasUpdate: true,
+        latestVersion: "1.2.4",
+        errorMessage: "sha512 checksum mismatch",
+      }),
+    );
+
+    await updater.checkForUpdates({ releaseChannel: "stable", quietErrors: true });
+
+    expect(updater.getSnapshot()).toMatchObject({
+      status: "error",
+      errorMessage: "sha512 checksum mismatch",
+    });
   });
 
   it("does not let an older silent check supersede a newer silent check", async () => {
@@ -488,5 +553,67 @@ describe("formatStatusText", () => {
     } finally {
       await i18n.changeLanguage("en");
     }
+  });
+});
+
+describe("formatCheckResultToast", () => {
+  const formatVersion = (version: string) => `v${version.replace(/^v/i, "")}`;
+
+  it("names the running build when it is up to date", () => {
+    expect(
+      formatCheckResultToast(
+        buildFakeCheckResult({ currentVersion: "0.15.3-b245e51" }),
+        formatVersion,
+      ),
+    ).toEqual({ kind: "success", message: "Paseo is up to date (v0.15.3-b245e51)" });
+  });
+
+  it("says an update is ready to install", () => {
+    expect(
+      formatCheckResultToast(
+        buildFakeCheckResult({
+          hasUpdate: true,
+          readyToInstall: true,
+          latestVersion: "0.15.4-abc1234",
+        }),
+        formatVersion,
+      ),
+    ).toEqual({ kind: "success", message: "Update ready: v0.15.4-abc1234" });
+  });
+
+  it("says an update is downloading", () => {
+    expect(
+      formatCheckResultToast(
+        buildFakeCheckResult({ hasUpdate: true, latestVersion: "1.3.0" }),
+        formatVersion,
+      ),
+    ).toEqual({ kind: "success", message: "Update found: v1.3.0. Downloading..." });
+  });
+
+  it("shows a check error as the desktop reports it", () => {
+    const message = "Couldn't check for FSH updates: GitHub answered 403.";
+    expect(
+      formatCheckResultToast(buildFakeCheckResult({ errorMessage: message }), formatVersion),
+    ).toEqual({ kind: "error", message });
+  });
+
+  it("does not claim the check failed when a found update failed to download", () => {
+    expect(
+      formatCheckResultToast(
+        buildFakeCheckResult({
+          hasUpdate: true,
+          latestVersion: "1.2.4",
+          errorMessage: "sha512 checksum mismatch",
+        }),
+        formatVersion,
+      ),
+    ).toEqual({ kind: "error", message: "sha512 checksum mismatch" });
+  });
+
+  it("reports a check that threw", () => {
+    expect(formatCheckResultToast(null, formatVersion)).toEqual({
+      kind: "error",
+      message: "Couldn't check for updates",
+    });
   });
 });

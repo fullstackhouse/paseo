@@ -138,6 +138,7 @@ export const zhCN: TranslationResources = {
       groupByStatus: "按状态分组",
       copyBrowserHostName: "复制浏览器宿主名称",
       updatePaseo: "更新 Paseo",
+      checkPaseoUpdates: "检查 Paseo 更新",
       modelGroupLabel: "模型",
       modelSearchKeywords: "切换模型 更改模型 设置模型 选择模型",
       thinkingGroupLabel: "思考",
@@ -1706,6 +1707,10 @@ export const zhCN: TranslationResources = {
         installed: "App 更新已安装。需要重启。",
         failed: "App 更新失败。",
         idle: "尚未检查更新状态。",
+      },
+      check: {
+        upToDate: "Paseo 已是最新版本（{{version}}）",
+        failed: "无法检查更新",
       },
       installError: "无法安装 desktop app 更新。",
       callout: {

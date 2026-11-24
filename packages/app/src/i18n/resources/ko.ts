@@ -138,6 +138,7 @@ export const ko: TranslationResources = {
       groupByStatus: "상태별 그룹화",
       copyBrowserHostName: "브라우저 호스트 이름 복사",
       updatePaseo: "Paseo 업데이트",
+      checkPaseoUpdates: "Paseo 업데이트 확인",
       modelGroupLabel: "모델",
       modelSearchKeywords: "모델 전환 모델 변경 모델 설정 모델 선택",
       thinkingGroupLabel: "추론",
@@ -1731,6 +1732,10 @@ export const ko: TranslationResources = {
         installed: "앱 업데이트가 설치되었습니다. 재시작이 필요합니다.",
         failed: "앱을 업데이트하지 못했습니다.",
         idle: "업데이트 상태를 아직 확인하지 않았습니다.",
+      },
+      check: {
+        upToDate: "Paseo가 최신 버전입니다 ({{version}})",
+        failed: "업데이트를 확인할 수 없습니다",
       },
       installError: "데스크톱 앱 업데이트를 설치할 수 없습니다.",
       callout: {

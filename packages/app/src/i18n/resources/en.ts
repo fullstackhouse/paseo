@@ -136,6 +136,7 @@ export const en = {
       groupByStatus: "Group by status",
       copyBrowserHostName: "Copy browser host name",
       updatePaseo: "Update Paseo",
+      checkPaseoUpdates: "Check for Paseo updates",
       modelGroupLabel: "Model",
       modelSearchKeywords: "switch model change model set model select model",
       thinkingGroupLabel: "Thinking",
@@ -1750,6 +1751,10 @@ export const en = {
         installed: "App update installed. Restart required.",
         failed: "Failed to update app.",
         idle: "Update status has not been checked yet.",
+      },
+      check: {
+        upToDate: "Paseo is up to date ({{version}})",
+        failed: "Couldn't check for updates",
       },
       installError: "Unable to install the desktop app update.",
       callout: {

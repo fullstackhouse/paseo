@@ -139,6 +139,7 @@ export const ptBR: TranslationResources = {
       groupByStatus: "Agrupar por status",
       copyBrowserHostName: "Copiar o nome do host do navegador",
       updatePaseo: "Atualizar Paseo",
+      checkPaseoUpdates: "Verificar atualizações do Paseo",
       modelGroupLabel: "Modelo",
       modelSearchKeywords: "trocar modelo mudar modelo definir modelo selecionar modelo",
       thinkingGroupLabel: "Raciocínio",
@@ -1753,6 +1754,10 @@ export const ptBR: TranslationResources = {
         installed: "Atualização do app instalada. Reinicialização obrigatória.",
         failed: "Falha ao atualizar o app.",
         idle: "O status de atualização ainda não foi verificado.",
+      },
+      check: {
+        upToDate: "O Paseo está atualizado ({{version}})",
+        failed: "Não foi possível verificar atualizações",
       },
       installError: "Não foi possível instalar a atualização do app desktop.",
       callout: {
