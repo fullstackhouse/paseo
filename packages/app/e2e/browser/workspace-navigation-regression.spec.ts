@@ -16,6 +16,7 @@ import {
   seedForeignPinnedAgentTab,
 } from "../support/helpers/workspace-layout";
 import { clickNewChat } from "../support/helpers/launcher";
+import { openAgentRoute } from "../support/helpers/mock-agent";
 import { expectComposerVisible } from "../support/helpers/composer";
 import { daemonWsRoutePattern } from "../support/helpers/daemon-port";
 import { seedWorkspace } from "../support/helpers/seed-client";
@@ -613,6 +614,89 @@ test.describe("Workspace navigation regression", () => {
     } finally {
       await secondWorkspace.cleanup();
       await firstWorkspace.cleanup();
+    }
+  });
+
+  // Finished agents stay Ready to review after a visit (FSH), so opening the workspace used to
+  // jump to the one that finished first and drop the tab you left.
+  test("reopens a workspace from the sidebar on the tab you left", async ({ page }, testInfo) => {
+    const serverId = getServerId();
+    const subject = await seedWorkspace({
+      repoPrefix: "workspace-last-tab-",
+      title: "Last tab workspace",
+    });
+    const other = await seedWorkspace({
+      repoPrefix: "workspace-last-tab-other-",
+      title: "Other workspace",
+    });
+    try {
+      const agentIds: string[] = [];
+      for (const title of ["First agent", "Second agent", "Third agent"]) {
+        const agent = await subject.client.createAgent({
+          provider: "mock",
+          cwd: subject.repoPath,
+          workspaceId: subject.workspaceId,
+          title,
+          modeId: "load-test",
+          model: "e2e-fast-stream",
+          initialPrompt: "Finish this turn.",
+        });
+        await subject.client.waitForFinish(agent.id, 20_000);
+        agentIds.push(agent.id);
+      }
+      const [firstAgentId, , thirdAgentId] = agentIds;
+      await createMockIdleAgent(other.client, {
+        cwd: other.repoPath,
+        workspaceId: other.workspaceId,
+        title: "Other agent",
+      });
+      const terminal = await subject.client.createTerminal(
+        subject.repoPath,
+        "Last tab terminal",
+        undefined,
+        { workspaceId: subject.workspaceId },
+      );
+      expect(terminal.error).toBeNull();
+      const terminalId = terminal.terminal!.id;
+
+      const visibleTab = (identity: string) =>
+        page.getByTestId(`workspace-tab-${identity}`).filter({ visible: true });
+      const leaveAndReturn = async () => {
+        await switchWorkspaceViaSidebar({ page, serverId, workspaceId: other.workspaceId });
+        await switchWorkspaceViaSidebar({ page, serverId, workspaceId: subject.workspaceId });
+      };
+
+      await openAgentRoute(page, { workspaceId: subject.workspaceId, agentId: thirdAgentId });
+      await waitForWorkspaceTabsVisible(page);
+      await waitForWorkspaceInSidebar(page, { serverId, workspaceId: other.workspaceId });
+      for (const agentId of agentIds) {
+        await expect(visibleTab(`agent_${agentId}`)).toBeVisible({ timeout: 30_000 });
+      }
+      await visibleTab(`agent_${thirdAgentId}`).click();
+      await expect(visibleTab(`agent_${thirdAgentId}`)).toHaveAttribute("aria-selected", "true");
+
+      await leaveAndReturn();
+      await expect(visibleTab(`agent_${thirdAgentId}`)).toHaveAttribute("aria-selected", "true");
+      await expect(visibleTab(`agent_${firstAgentId}`)).toHaveAttribute("aria-selected", "false");
+      await testInfo.attach("returned-to-third-agent", {
+        body: await page.screenshot({ path: testInfo.outputPath("returned-to-third-agent.png") }),
+        contentType: "image/png",
+      });
+
+      await expect(visibleTab(`terminal_${terminalId}`)).toBeVisible({ timeout: 30_000 });
+      await visibleTab(`terminal_${terminalId}`).click();
+      await expect(visibleTab(`terminal_${terminalId}`)).toHaveAttribute("aria-selected", "true");
+
+      await leaveAndReturn();
+      await expect(visibleTab(`terminal_${terminalId}`)).toHaveAttribute("aria-selected", "true");
+      await expect(visibleTab(`agent_${firstAgentId}`)).toHaveAttribute("aria-selected", "false");
+      await testInfo.attach("returned-to-terminal", {
+        body: await page.screenshot({ path: testInfo.outputPath("returned-to-terminal.png") }),
+        contentType: "image/png",
+      });
+    } finally {
+      await other.cleanup();
+      await subject.cleanup();
     }
   });
 });
