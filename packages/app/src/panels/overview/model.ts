@@ -74,8 +74,10 @@ export type YourMoveRow =
  * or PR step, which means work not in the PR yet. Only in a worktree, or after a merge: a regular
  * checkout doesn't offer Archive just because an agent finished, as in the header (git/policy.ts).
  * Never while other work in the workspace is still open (`isWorkStillOpen`): a merged PR finishes one
- * agent's job, and archiving would stop the rest. Nor while a permission prompt or a failed agent is
- * listed (`masksRunningWork`). When live background work is what holds it, an `archive-held` row says
+ * agent's job, and archiving would stop the rest. Nor while anything else waits on the human: an open
+ * ask means the work isn't settled (a "merge or request review" ask outlives a done card), and a
+ * permission prompt or failed agent outranks `running` in the workspace status, which would hide
+ * another agent's live work from `isWorkStillOpen`. When live background work is what holds it, an `archive-held` row says
  * so in its place: a dev server a finished agent left running would otherwise hide Archive with
  * nothing on screen to say why, while the sidebar already shows the workspace as Done.
  */
@@ -105,7 +107,7 @@ export function deriveYourMove(
       }
     }
   }
-  if (input.agentRunning || rows.some(masksRunningWork) || !archiveFits(input)) return rows;
+  if (input.agentRunning || rows.length > 0 || !archiveFits(input)) return rows;
   if (!input.workOpen) rows.push({ kind: "archive", key: `git:${ARCHIVE_ACTION_ID}` });
   else if (input.liveWork) rows.push({ kind: "archive-held", key: `held:${ARCHIVE_ACTION_ID}` });
   return rows;
@@ -135,15 +137,6 @@ function archiveFits(input: ArchiveInput): boolean {
     input.gitPrimaryId !== null &&
     ARCHIVABLE_GIT_STEPS.has(input.gitPrimaryId)
   );
-}
-
-/**
- * A permission prompt or a failed agent. The workspace status outranks `running` with `needs_input`
- * and `failed`, so while one is listed another agent's live shell, monitor or subagent no longer
- * shows as running, and `isWorkStillOpen` can't see it.
- */
-function masksRunningWork(row: YourMoveRow): boolean {
-  return row.kind === "permission" || row.kind === "failed";
 }
 
 /**
