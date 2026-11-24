@@ -202,18 +202,29 @@ describe("deriveYourMove", () => {
       expect(deriveYourMove({ ...input, statusDone: false, prMerged: true })).toEqual(archive);
     });
 
-    it("waits while a permission prompt or a failed agent is listed", () => {
-      // Their workspace status outranks running, which hides another agent's live work.
+    it("waits while anything else is listed", () => {
+      // A permission or failure outranks running in the workspace status, hiding another agent's live work.
       const permission: AttentionItem = { kind: "permission", key: "perm", agentId: "a1" };
       const failed: AttentionItem = { kind: "failed", key: "failed", agentId: "a2" };
       expect(rowKinds(deriveYourMove({ ...base, items: [permission] }))).toEqual(["permission"]);
       expect(rowKinds(deriveYourMove({ ...base, items: [failed] }))).toEqual(["failed"]);
-      const ask: AttentionItem = {
+      // An open ask ("merge or request review") means the work isn't settled, whatever the card says.
+      const plugin: AttentionItem = {
         kind: "plugin",
         key: "x",
         item: summaryItem({ needsYou: true }),
       };
-      expect(rowKinds(deriveYourMove({ ...base, items: [ask] }))).toEqual(["plugin", "archive"]);
+      const ask: AttentionItem = {
+        kind: "plugin",
+        key: "asks",
+        item: summaryItem({ needsYou: true, entries: [{ id: "A1", title: "Merge PR #1" }] }),
+      };
+      expect(rowKinds(deriveYourMove({ ...base, items: [plugin] }))).toEqual(["plugin"]);
+      expect(rowKinds(deriveYourMove({ ...base, items: [ask] }))).toEqual(["entry"]);
+      // Nor the held hint: Archive isn't the next move while the human owes an answer.
+      expect(
+        rowKinds(deriveYourMove({ ...base, items: [ask], workOpen: true, liveWork: true })),
+      ).toEqual(["entry"]);
     });
 
     it("says Archive waits when live background work holds it", () => {
