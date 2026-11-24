@@ -110,6 +110,10 @@ function matchesAgentStructuralFilter(
     }
   }
 
+  if (filter.archivedOnly && !agent.archivedAt) {
+    return false;
+  }
+
   if (filter.workspaceIds && filter.workspaceIds.length > 0) {
     if (!agent.workspaceId || !filter.workspaceIds.includes(agent.workspaceId)) {
       return false;

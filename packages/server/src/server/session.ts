@@ -373,20 +373,25 @@ type FetchAgentHistoryRequestMessage = Extract<
 >;
 type AgentDirectoryRequestMessage = FetchAgentsRequestMessage | FetchAgentHistoryRequestMessage;
 
+/** Narrows by workspace and archive state before each agent's project placement is resolved. */
+function prefilterAgents<T extends { workspaceId?: string; archivedAt?: string | null }>(
+  agents: T[],
+  filter: { workspaceIds?: string[]; archivedOnly?: boolean } | undefined,
+): T[] {
+  const workspaceIds = filter?.workspaceIds?.length ? new Set(filter.workspaceIds) : null;
+  const archivedOnly = filter?.archivedOnly === true;
+  if (!workspaceIds && !archivedOnly) return agents;
+  return agents.filter(
+    (agent) =>
+      (!archivedOnly || Boolean(agent.archivedAt)) &&
+      (!workspaceIds || (agent.workspaceId !== undefined && workspaceIds.has(agent.workspaceId))),
+  );
+}
+
 /**
  * Only history carries a query. The active-agents directory filters on
  * structure and never ranks, so it always reads as no query at all.
  */
-function filterAgentsToWorkspaces<T extends { workspaceId?: string }>(
-  agents: T[],
-  filter: { workspaceIds?: string[] } | undefined,
-): T[] {
-  const workspaceIds = filter?.workspaceIds;
-  if (!workspaceIds?.length) return agents;
-  const wanted = new Set(workspaceIds);
-  return agents.filter((agent) => agent.workspaceId !== undefined && wanted.has(agent.workspaceId));
-}
-
 function agentDirectorySearchQuery(request: AgentDirectoryRequestMessage): string {
   if (request.type !== "fetch_agent_history_request") return "";
   return request.search?.trim() ?? "";
@@ -5939,8 +5944,7 @@ export class Session {
         (request.type === "fetch_agents_request" && request.includeBackground),
       includeUnavailablePersisted: request.type === "fetch_agent_history_request",
     });
-    // Narrow before resolving each agent's project placement below.
-    agents = filterAgentsToWorkspaces(agents, filter);
+    agents = prefilterAgents(agents, filter);
     const activePlacementsByWorkspaceId =
       scope === "active" ? await this.buildActiveProjectPlacementsByWorkspaceId() : null;
     if (activePlacementsByWorkspaceId) {

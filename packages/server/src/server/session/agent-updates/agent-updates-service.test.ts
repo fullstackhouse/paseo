@@ -298,6 +298,14 @@ describe("matchesAgentUpdatesFilter", () => {
     ).toBe(true);
   });
 
+  test("archivedOnly filter keeps only archived agents", () => {
+    const archived = makeAgentPayload({ id: "a", archivedAt: "2026-03-02T00:00:00.000Z" });
+    const active = makeAgentPayload({ id: "b" });
+    const filter = { includeArchived: true, archivedOnly: true };
+    expect(matchesAgentUpdatesFilter({ agent: archived, project, filter })).toBe(true);
+    expect(matchesAgentUpdatesFilter({ agent: active, project, filter })).toBe(false);
+  });
+
   test("workspaceIds filter keeps only agents in those workspaces", () => {
     const here = makeAgentPayload({ id: "a", workspaceId: "ws-1" });
     const elsewhere = makeAgentPayload({ id: "b", workspaceId: "ws-2" });
