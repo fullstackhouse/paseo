@@ -376,6 +376,16 @@ type AgentDirectoryRequestMessage = FetchAgentsRequestMessage | FetchAgentHistor
  * Only history carries a query. The active-agents directory filters on
  * structure and never ranks, so it always reads as no query at all.
  */
+function filterAgentsToWorkspaces<T extends { workspaceId?: string }>(
+  agents: T[],
+  filter: { workspaceIds?: string[] } | undefined,
+): T[] {
+  const workspaceIds = filter?.workspaceIds;
+  if (!workspaceIds?.length) return agents;
+  const wanted = new Set(workspaceIds);
+  return agents.filter((agent) => agent.workspaceId !== undefined && wanted.has(agent.workspaceId));
+}
+
 function agentDirectorySearchQuery(request: AgentDirectoryRequestMessage): string {
   if (request.type !== "fetch_agent_history_request") return "";
   return request.search?.trim() ?? "";
@@ -5919,6 +5929,8 @@ export class Session {
         (request.type === "fetch_agents_request" && request.includeBackground),
       includeUnavailablePersisted: request.type === "fetch_agent_history_request",
     });
+    // Narrow before resolving each agent's project placement below.
+    agents = filterAgentsToWorkspaces(agents, filter);
     const activePlacementsByWorkspaceId =
       scope === "active" ? await this.buildActiveProjectPlacementsByWorkspaceId() : null;
     if (activePlacementsByWorkspaceId) {
