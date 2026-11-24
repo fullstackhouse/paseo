@@ -304,7 +304,11 @@ workspace is archived, the agent shows read-only (the sheet pane host, no compos
 carrying the recovery actions, so its conversation is readable before deciding to restore. Workspace
 **Restore** recovers only the workspace; the selected archived agent stays open with its callout.
 The agent's **Unarchive** runs the provider's native unarchive hook before interactive resume and
-history hydration. Other archived agents stay archived.
+history hydration. Other archived agents stay archived. Restoring a workspace never unarchives its
+agents; its Overview lists them under **Archived agents** (top-level agents only; subagents return
+with their parent's track) with Open, Unarchive and Unarchive all. The list comes from
+`fetch_agent_history_request` filtered by `workspaceIds`, gated on
+`server_info.features.agentWorkspaceFilter`.
 
 Opening an agent is a navigation choice, independent of whether its details are cached. The
 layout retains that choice across reload while the panel fetches the agent from the daemon.

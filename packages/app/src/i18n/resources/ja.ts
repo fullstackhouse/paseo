@@ -2334,6 +2334,10 @@ export const ja: TranslationResources = {
         one: "{{count}}件開始",
         other: "{{count}}件開始",
       },
+      archivedAgents: "アーカイブ済みエージェント",
+      unarchive: "アーカイブ解除",
+      unarchiveAll: "すべてアーカイブ解除",
+      untitledAgent: "無題のエージェント",
     },
     lineage: {
       label: "系譜",

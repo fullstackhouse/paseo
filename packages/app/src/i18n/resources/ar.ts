@@ -2305,6 +2305,10 @@ export const ar: TranslationResources = {
         one: "بدأ {{count}}",
         other: "بدأ {{count}}",
       },
+      archivedAgents: "الوكلاء المؤرشفون",
+      unarchive: "إلغاء الأرشفة",
+      unarchiveAll: "إلغاء أرشفة الكل",
+      untitledAgent: "وكيل بلا عنوان",
     },
     lineage: {
       label: "السلالة",

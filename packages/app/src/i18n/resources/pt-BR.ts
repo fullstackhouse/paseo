@@ -2346,6 +2346,10 @@ export const ptBR: TranslationResources = {
         one: "{{count}} iniciado",
         other: "{{count}} iniciados",
       },
+      archivedAgents: "Agentes arquivados",
+      unarchive: "Desarquivar",
+      unarchiveAll: "Desarquivar todos",
+      untitledAgent: "Agente sem título",
     },
     lineage: {
       label: "Linhagem",

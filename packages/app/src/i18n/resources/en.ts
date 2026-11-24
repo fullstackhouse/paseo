@@ -2335,6 +2335,10 @@ export const en = {
         one: "{{count}} started",
         other: "{{count}} started",
       },
+      archivedAgents: "Archived agents",
+      unarchive: "Unarchive",
+      unarchiveAll: "Unarchive all",
+      untitledAgent: "Untitled agent",
     },
     lineage: {
       label: "Lineage",

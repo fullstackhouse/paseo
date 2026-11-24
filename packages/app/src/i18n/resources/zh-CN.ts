@@ -2280,6 +2280,10 @@ export const zhCN: TranslationResources = {
         one: "已启动 {{count}} 个",
         other: "已启动 {{count}} 个",
       },
+      archivedAgents: "已归档的 agent",
+      unarchive: "取消归档",
+      unarchiveAll: "全部取消归档",
+      untitledAgent: "未命名 agent",
     },
     lineage: {
       label: "谱系",

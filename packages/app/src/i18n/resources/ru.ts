@@ -2345,6 +2345,10 @@ export const ru: TranslationResources = {
         one: "запущен {{count}}",
         other: "запущено: {{count}}",
       },
+      archivedAgents: "Архивные агенты",
+      unarchive: "Разархивировать",
+      unarchiveAll: "Разархивировать все",
+      untitledAgent: "Агент без названия",
     },
     lineage: {
       label: "Происхождение",

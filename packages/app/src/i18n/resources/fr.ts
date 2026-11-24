@@ -2361,6 +2361,10 @@ export const fr: TranslationResources = {
         one: "{{count}} lancé",
         other: "{{count}} lancés",
       },
+      archivedAgents: "Agents archivés",
+      unarchive: "Désarchiver",
+      unarchiveAll: "Tout désarchiver",
+      untitledAgent: "Agent sans titre",
     },
     lineage: {
       label: "Lignée",

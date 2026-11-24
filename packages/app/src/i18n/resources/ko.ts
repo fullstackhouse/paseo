@@ -2319,6 +2319,10 @@ export const ko: TranslationResources = {
         one: "{{count}}개 시작",
         other: "{{count}}개 시작",
       },
+      archivedAgents: "보관된 에이전트",
+      unarchive: "보관 해제",
+      unarchiveAll: "모두 보관 해제",
+      untitledAgent: "제목 없는 에이전트",
     },
     lineage: {
       label: "계보",
