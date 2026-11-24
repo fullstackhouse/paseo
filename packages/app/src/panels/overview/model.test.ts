@@ -14,6 +14,9 @@ import {
   permissionSubject,
   derivePullRequests,
   foldsDonePullRequests,
+  collapsePullRequests,
+  VISIBLE_PULL_REQUESTS,
+  pullRequestsFoldLabel,
   findBlocking,
   isTreeBlocker,
   orderChildren,
@@ -468,6 +471,48 @@ describe("foldsDonePullRequests", () => {
   it("keeps a lone finished PR, and open PRs alone, inline", () => {
     expect(foldsDonePullRequests({ open: [], done: [row("b")] })).toBe(false);
     expect(foldsDonePullRequests({ open: [row("a")], done: [] })).toBe(false);
+  });
+});
+
+describe("collapsePullRequests", () => {
+  const row = (key: string) =>
+    ({ key, ref: key, title: key, facts: "", tone: "muted", url: key, isBranchPr: false }) as const;
+  const rows = (prefix: string, count: number) =>
+    Array.from({ length: count }, (_, i) => row(`${prefix}${i}`));
+  const keys = (list: { key: string }[]) => list.map((r) => r.key);
+
+  it("shows a short list whole", () => {
+    expect(collapsePullRequests({ open: rows("o", 3), done: [] })).toEqual({
+      rows: rows("o", 3),
+      hidden: null,
+    });
+    expect(collapsePullRequests({ open: [], done: [row("d")] }).hidden).toBeNull();
+  });
+
+  it("folds only finished PRs when the open ones fit", () => {
+    const collapsed = collapsePullRequests({ open: rows("o", 2), done: rows("d", 2) });
+    expect(keys(collapsed.rows)).toEqual(["o0", "o1"]);
+    expect(collapsed.hidden).toBe("done");
+  });
+
+  it("caps a long open list and folds the rest behind Show all", () => {
+    const collapsed = collapsePullRequests({ open: rows("o", 50), done: rows("d", 3) });
+    expect(keys(collapsed.rows)).toEqual(keys(rows("o", VISIBLE_PULL_REQUESTS)));
+    expect(collapsed.hidden).toBe("more");
+  });
+
+  it("labels the toggle by what it hides", () => {
+    const t = (key: string, options?: Record<string, unknown>) =>
+      `${key.replace("panels.overview.", "")}:${String(options?.count)}`;
+    const list = { open: rows("o", 6), done: [{ ...row("d"), tone: "merged" as const }] };
+    expect(pullRequestsFoldLabel(list, "more", t)).toBe("showAll:7");
+    expect(pullRequestsFoldLabel(list, "done", t)).toBe("prsMerged.one:1");
+  });
+
+  it("caps a long finished list", () => {
+    const collapsed = collapsePullRequests({ open: [], done: rows("d", 9) });
+    expect(collapsed.rows).toEqual([]);
+    expect(collapsed.hidden).toBe("done");
   });
 });
 
