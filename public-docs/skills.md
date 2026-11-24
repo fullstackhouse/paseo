@@ -19,6 +19,8 @@ Skills give your agents reusable instructions for delegation, handoffs, and revi
 
 ## Installation
 
+A host installs all Paseo skills on its first start, unless skills are already installed. Turn them off in Settings and they stay off.
+
 - **In Paseo:** Open **Settings → your host → Agents → Orchestration skills** and choose which skills to install on that host.
 - **From the terminal:** Run `npx skills add getpaseo/paseo` on the machine where your agents run.
 
