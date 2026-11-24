@@ -44,11 +44,25 @@ export interface AgentSkillsSandbox {
   ): Promise<void>;
 }
 
-export async function startAgentSkillsSandbox(): Promise<AgentSkillsSandbox> {
+/**
+ * Daemon config for a host that starts with no skills installed. A daemon that
+ * never saved a selection installs every skill on first start; a saved
+ * selection stops that, and with nothing on disk startup leaves it that way.
+ * "all" is what the picker shows for an unset selection, so the host reads as
+ * a fresh one that skipped the default install.
+ */
+export const NO_SKILLS_INSTALLED_CONFIG = {
+  agents: { skills: { selection: { mode: "all" } } },
+} as const;
+
+export async function startAgentSkillsSandbox(
+  options: { defaultInstall?: boolean } = {},
+): Promise<AgentSkillsSandbox> {
   const root = await mkdtemp(path.join(os.tmpdir(), "paseo-agent-skills-e2e-"));
   const home = path.join(root, "home");
   await mkdir(home, { recursive: true });
   const daemon = await startIsolatedHostDaemon(`agent-skills-${randomUUID()}`, {
+    config: options.defaultInstall ? undefined : NO_SKILLS_INSTALLED_CONFIG,
     environment: {
       HOME: home,
       NODE_ENV: "development",
@@ -206,6 +220,15 @@ export async function expectSavedSelection(
   expected: AgentSkillSelection,
 ): Promise<void> {
   await expect.poll(async () => (await sandbox.getStatus()).selection).toEqual(expected);
+}
+
+/** The selection in the daemon's config.json; null until the daemon saves one. */
+export async function readPersistedSkillSelection(sandbox: AgentSkillsSandbox): Promise<unknown> {
+  const text = await readFile(path.join(sandbox.daemon.paseoHome, "config.json"), "utf8").catch(
+    () => null,
+  );
+  if (text === null) return null;
+  return JSON.parse(text)?.agents?.skills?.selection ?? null;
 }
 
 export async function expectSkillFile(

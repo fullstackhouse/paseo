@@ -10,6 +10,7 @@ import {
   expectSkillFile,
   openAgentSkillsSettings,
   openSkillSelection,
+  readPersistedSkillSelection,
   saveSkillSelection,
   startAgentSkillsSandbox,
   toggleSkill,
@@ -31,6 +32,16 @@ const test = base.extend<{ skills: AgentSkillsSandbox }>({
 
 test.describe("Host agent skills", () => {
   test.describe.configure({ timeout: 120_000 });
+
+  test("a host that never chose installs every skill on first start and saves that choice", async () => {
+    const fresh = await startAgentSkillsSandbox({ defaultInstall: true });
+    try {
+      await expectInstalledSkills(fresh, fresh.available);
+      await expect.poll(() => readPersistedSkillSelection(fresh)).toEqual({ mode: "all" });
+    } finally {
+      await fresh.close();
+    }
+  });
 
   test("installs a custom selection, cancels a draft, then installs all skills", async ({
     page,
