@@ -171,6 +171,7 @@ import {
   shouldInspectWorkspaceRecovery,
 } from "@/screens/workspace/workspace-route-state";
 import { renderWorkspaceRouteGate } from "@/screens/workspace/workspace-route-state-views";
+import { useLeaveRemovedWorkspace } from "@/screens/workspace/use-leave-removed-workspace";
 import { ArchivedWorkspacePreview } from "@/screens/workspace/archived-workspace-preview";
 import { useWorkspaceRecovery } from "@/workspace-recovery/use-workspace-recovery";
 import { useWorkspaceRecoveryRequestedFromLink } from "@/workspace-recovery/link-requests";
@@ -1361,6 +1362,14 @@ function WorkspaceScreenContent({
     workspace: workspaceDescriptor,
     hasHydratedWorkspaces,
     recovery: workspaceRecovery.state,
+  });
+  useLeaveRemovedWorkspace({
+    serverId: normalizedServerId,
+    workspaceId: normalizedWorkspaceId,
+    workspace: workspaceDescriptor,
+    hasHydratedWorkspaces,
+    state: workspaceRouteState,
+    isRouteFocused,
   });
   const isWorkspaceMissing = workspaceRouteState.kind === "missing";
   // The app reopens the last workspace on launch. If it was archived elsewhere, forget it so

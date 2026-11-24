@@ -113,6 +113,7 @@ temporary by design: every patch is meant to go upstream and then drop out of `f
 - FSH-only (upstreamable): `browser_new_tab` no longer times out when Electron announces the new tab before the app can read its id, which often happened in a workspace not open in the desktop window (getpaseo/paseo#7348). Registration waits one IPC round trip. getpaseo/paseo#8128 waits for `dom-ready` instead, which times out on pages slower than five seconds, downloads and 204s
 - FSH-only (upstreamable): when the last workspace you used was archived on another device, **Workspace unavailable** offers **Home** and **New workspace** instead of an unlabelled **Back**, and the app forgets that workspace, so the next launch opens the home screen instead of the same dead end. Links to an archived workspace still show its screen
 - FSH-only (upstreamable): a plugin's `navigation.openAgent` takes an optional `timelinePosition: { epoch, seq }` and opens the chat scrolled to that timeline entry, opening its collapsed turn, on web and desktop. paseo-asks uses it for **Show in chat**, which jumps to the ask in its agent's chat
+- FSH-only (upstreamable): when the workspace you have open is archived from outside the app (a plugin's **Post & archive**, the `paseo` CLI, an agent's `archive_workspace`), the app opens **New workspace** for its project, as its own Archive button does. Before, the screen stayed on **Workspace unavailable**. Links and reloaded URLs to a workspace that was already archived still show that screen
 
 Keep this list in sync with what's merged into `fsh`.
 
