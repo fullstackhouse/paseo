@@ -161,18 +161,23 @@ async function createCodexRestoreJourney(page: Page, client: SeedDaemonClient, i
         timeout: 60_000,
       });
     },
-    async expectWorktreeRestoredWithArchivedAgentSelected() {
+    async expectWorktreeRestoredWithAgentSelected() {
       await expect.poll(() => existsSync(created().cwd), { timeout: 30_000 }).toBe(true);
       await expectSelected();
-      await expect(page.getByText("This agent is archived", { exact: true })).toBeVisible();
+      // Restore brings back the agent the workspace archive took down.
+      await expect(page.getByText("This agent is archived", { exact: true })).toHaveCount(0, {
+        timeout: 60_000,
+      });
       await info.attach("after-workspace-restore", {
         body: JSON.stringify(await client.fetchAgent({ agentId: created().agentId }), null, 2),
         contentType: "application/json",
       });
     },
-    async expectArchivedAgentSelectedWithHistory() {
+    async expectRestoredAgentSelectedWithHistory() {
       await expectSelected();
-      await expect(page.getByText("This agent is archived", { exact: true })).toBeVisible();
+      await expect(page.getByText("This agent is archived", { exact: true })).toHaveCount(0, {
+        timeout: 60_000,
+      });
       await expect(page.getByTestId("assistant-message")).toContainText(REPLY);
     },
     async reloadWithoutAgentCache() {
@@ -191,12 +196,6 @@ async function createCodexRestoreJourney(page: Page, client: SeedDaemonClient, i
     },
     async waitForWorkspaceHydration() {
       await waitForSidebarHydration(page);
-    },
-    async unarchiveAgent() {
-      await page.getByRole("button", { name: "Unarchive", exact: true }).click({ timeout: 30_000 });
-      await expect(page.getByText("This agent is archived", { exact: true })).toHaveCount(0, {
-        timeout: 60_000,
-      });
     },
     async expectIdleAgentWithVisibleComposer(statusTimeout?: number) {
       await expect

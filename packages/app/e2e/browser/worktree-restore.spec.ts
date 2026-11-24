@@ -56,7 +56,7 @@ test.describe("Worktree restore", () => {
 
   async function createArchivedMissingWorktree(
     prefix: string,
-    options: { agentCount?: number; keepAgentsArchived?: boolean } = {},
+    options: { agentCount?: number; keepAgentsArchived?: boolean; closedBeforeCount?: number } = {},
   ) {
     const project = await openProjectViaDaemon(worktreeClient, tempRepo.path);
     createdProjectIds.add(project.projectKey);
@@ -79,6 +79,18 @@ test.describe("Worktree restore", () => {
     if (!agent) {
       throw new Error("Expected at least one archived-worktree agent");
     }
+    // Agents whose tabs were closed before the workspace was archived.
+    const closedBefore = await Promise.all(
+      Array.from({ length: options.closedBeforeCount ?? 0 }, async () => {
+        const closed = await createIdleAgent(client, {
+          cwd: worktree.workspaceDirectory,
+          workspaceId: worktree.workspaceId,
+          title: `${prefix}-closed-${randomUUID().slice(0, 8)}`,
+        });
+        await client.archiveAgent(closed.id);
+        return closed;
+      }),
+    );
 
     await archiveWorkspaceFromDaemon(worktreeClient, worktree.workspaceDirectory);
     await expect
@@ -102,7 +114,7 @@ test.describe("Worktree restore", () => {
     }
     expect(existsSync(worktree.workspaceDirectory)).toBe(false);
 
-    return { agent, agents, worktree };
+    return { agent, agents, closedBefore, worktree };
   }
 
   async function openArchivedWorkspaceFromHistory(page: Page, prefix: string) {
@@ -308,8 +320,9 @@ test.describe("Worktree restore", () => {
       keepAgentsArchived: true,
     });
     const [firstAgent, secondAgent] = agents;
-    if (!firstAgent || !secondAgent) {
-      throw new Error("Expected two archived agents");
+    const [closedAgent] = closedBefore;
+    if (!firstAgent || !secondAgent || !closedAgent) {
+      throw new Error("Expected two archived agents and one closed before");
     }
 
     await gotoAppShell(page);

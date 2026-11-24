@@ -1041,6 +1041,12 @@ export const AudioPlayedMessageSchema = z.object({
 const AgentDirectoryFilterSchema = z.object({
   labels: z.record(z.string(), z.string()).optional(),
   projectKeys: z.array(z.string()).optional(),
+  // COMPAT(agentWorkspaceFilter): FSH-only, added after v0.15.3, remove gate after 2027-05-24.
+  // Older daemons ignore it and return every workspace's agents.
+  workspaceIds: z.array(z.string()).optional(),
+  // COMPAT(agentWorkspaceFilter): FSH-only, same gate and same build as workspaceIds. Keeps only
+  // archived agents.
+  archivedOnly: z.boolean().optional(),
   statuses: z.array(AgentStatusSchema).optional(),
   includeArchived: z.boolean().optional(),
   requiresAttention: z.boolean().optional(),
@@ -4383,6 +4389,8 @@ export const ServerInfoStatusPayloadSchema = z
         workspaceArchiveUndo: z.boolean().optional(),
         // COMPAT(archivedWorkspaces): FSH-only, added after v0.15.3, remove gate after 2027-05-23.
         archivedWorkspaces: z.boolean().optional(),
+        // COMPAT(agentWorkspaceFilter): FSH-only, added after v0.15.3, remove gate after 2027-05-24.
+        agentWorkspaceFilter: z.boolean().optional(),
         // COMPAT(workspaceFileEditing): added in v0.2.0, remove after 2027-01-18 once daemon floor >= v0.2.0.
         workspaceFileEditing: z.boolean().optional(),
         // COMPAT(fileByteWrites): added in v0.13.0, remove gate after 2027-04-20.

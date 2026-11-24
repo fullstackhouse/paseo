@@ -333,6 +333,11 @@ export const es: TranslationResources = {
     tooManyMatches: "Demasiadas coincidencias: acota la búsqueda",
     hostLoadFailed: "{{host}}: No se pudo cargar el historial",
     searchPlaceholder: "Buscar en el historial",
+    workspaceFilter: {
+      label: "Espacio de trabajo: {{name}}",
+      clear: "Mostrar todos los espacios de trabajo",
+      unnamed: "Este espacio de trabajo",
+    },
     views: {
       agents: "Agentes",
       archivedWorkspaces: "Espacios de trabajo archivados",
@@ -775,6 +780,9 @@ export const es: TranslationResources = {
         pullRequest: "Solicitud de extracción",
         terminalProfilesMenu: "Terminal profiles",
         editTerminalProfiles: "Edit profiles",
+        recentlyClosed: "Cerrados recientemente",
+        untitledAgent: "Agente sin título",
+        showAllClosed: "Ver todo en el historial",
       },
       explorerSidebar: {
         open: "Abrir panel lateral",

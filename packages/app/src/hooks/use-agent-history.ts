@@ -83,9 +83,12 @@ export async function fetchAgentHistoryPage(input: {
   serverId: string;
   cursor: string | null;
   search?: string;
+  /** Only this workspace's agents. The host must report `features.agentWorkspaceFilter`. */
+  workspaceId?: string;
 }): Promise<AgentHistoryPage> {
   const payload = await input.client.fetchAgentHistory({
     ...(input.search ? { search: input.search } : {}),
+    ...(input.workspaceId ? { filter: { workspaceIds: [input.workspaceId] } } : {}),
     sort: AGENT_HISTORY_SORT,
     page: input.cursor
       ? { limit: AGENT_HISTORY_PAGE_LIMIT, cursor: input.cursor }
@@ -168,6 +171,7 @@ export async function fetchAgentHistoryBatch(input: {
   hosts: readonly AgentHistoryHost[];
   cursorByServerId: AgentHistoryCursorByServerId | null;
   search?: string;
+  workspaceId?: string;
 }): Promise<AgentHistoryBatchPage> {
   const cursorByServerId = input.cursorByServerId ?? {};
   const hasCursorFilter = Object.keys(cursorByServerId).length > 0;
@@ -182,6 +186,7 @@ export async function fetchAgentHistoryBatch(input: {
         serverId: host.serverId,
         cursor: cursorByServerId[host.serverId] ?? null,
         ...(input.search ? { search: input.search } : {}),
+        ...(input.workspaceId ? { workspaceId: input.workspaceId } : {}),
       });
       return { host, page };
     }),
@@ -232,6 +237,8 @@ export function useAgentHistory(options: {
   searchableHostsOnly?: boolean;
   /** Keep the previous query's results until the next query's arrive. */
   keepPreviousResults?: boolean;
+  /** Only this workspace's agents, on `serverId`. */
+  workspaceId?: string | null;
 }): AgentHistoryResult {
   const { t } = useTranslation();
   const daemons = useHosts();
@@ -293,12 +300,14 @@ export function useAgentHistory(options: {
     const trimmed = options.search?.trim() ?? "";
     return isSearchSupported ? trimmed : "";
   }, [isSearchSupported, options.search]);
+  const workspaceId = serverId ? (options.workspaceId ?? null) : null;
   const queryKey = useMemo(
     () => [
       ...(serverId ? agentHistoryQueryKey(serverId) : allAgentHistoryQueryKey(targetServerIds)),
       search,
+      ...(workspaceId ? [{ workspaceId }] : []),
     ],
-    [search, serverId, targetServerIds],
+    [search, serverId, targetServerIds, workspaceId],
   );
   const serverLabelById = useMemo(
     () => new Map(daemons.map((daemon) => [daemon.serverId, daemon.label])),
@@ -329,6 +338,7 @@ export function useAgentHistory(options: {
         hosts: targetHosts,
         cursorByServerId: pageParam,
         ...(search ? { search } : {}),
+        ...(workspaceId ? { workspaceId } : {}),
       });
     },
   });

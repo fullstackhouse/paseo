@@ -423,6 +423,21 @@ type FetchAgentHistoryRequestMessage = Extract<
 >;
 type AgentDirectoryRequestMessage = FetchAgentsRequestMessage | FetchAgentHistoryRequestMessage;
 
+/** Narrows by workspace and archive state before each agent's project placement is resolved. */
+function prefilterAgents<T extends { workspaceId?: string; archivedAt?: string | null }>(
+  agents: T[],
+  filter: { workspaceIds?: string[]; archivedOnly?: boolean } | undefined,
+): T[] {
+  const workspaceIds = filter?.workspaceIds?.length ? new Set(filter.workspaceIds) : null;
+  const archivedOnly = filter?.archivedOnly === true;
+  if (!workspaceIds && !archivedOnly) return agents;
+  return agents.filter(
+    (agent) =>
+      (!archivedOnly || Boolean(agent.archivedAt)) &&
+      (!workspaceIds || (agent.workspaceId !== undefined && workspaceIds.has(agent.workspaceId))),
+  );
+}
+
 /**
  * Only history carries a query. The active-agents directory filters on
  * structure and never ranks, so it always reads as no query at all.
@@ -1087,7 +1102,11 @@ export class Session {
       getProject: (projectId) => this.projectRegistry.get(projectId),
       isDirectory: (path) => this.filesystem.isDirectory(path),
       unarchiveWorkspace: async (workspace) => {
-        await this.workspaceProvisioning.ensureWorkspaceRecordUnarchived(workspace);
+        // FSH: pass the archive's stamp so the agents it closed come back with the workspace.
+        await this.workspaceProvisioning.ensureWorkspaceRecordUnarchived(
+          workspace,
+          workspace.archivedAt,
+        );
       },
       isCheckoutUntrusted: (checkoutPath) =>
         isCheckoutUntrusted(this.workspaceRegistry, checkoutPath),
@@ -6455,6 +6474,7 @@ export class Session {
       includeBackground: backgroundVisibility,
       includeUnavailablePersisted: request.type === "fetch_agent_history_request",
     });
+    agents = prefilterAgents(agents, filter);
     const activePlacementsByWorkspaceId =
       scope === "active" ? await this.buildActiveProjectPlacementsByWorkspaceId() : null;
     if (activePlacementsByWorkspaceId) {

@@ -424,6 +424,11 @@ export function buildSessionsRoute() {
   return "/sessions" as const;
 }
 
+/** History narrowed to one workspace's agents. */
+export function buildWorkspaceHistoryRoute(serverId: string, workspaceId: string) {
+  return { pathname: "/sessions", params: { serverId, workspaceId } } as const;
+}
+
 export function buildSchedulesRoute() {
   return "/schedules" as const;
 }
