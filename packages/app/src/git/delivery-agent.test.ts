@@ -50,6 +50,30 @@ describe("pickDeliveryAgentId", () => {
     );
   });
 
+  it("picks an agent launched from another workspace", () => {
+    const agents = [
+      agent("launcher", { workspaceId: "ws-2" }),
+      agent("launched", { parentAgentId: "launcher" }),
+    ];
+    expect(pickDeliveryAgentId({ agents, workspaceId: "ws-1", focusedAgentId: null })).toBe(
+      "launched",
+    );
+  });
+
+  it("picks the focused agent when its parent lives in another workspace", () => {
+    const agents = [
+      agent("launcher", { workspaceId: "ws-2" }),
+      agent("first", { parentAgentId: "launcher" }),
+      agent("second", {
+        parentAgentId: "launcher",
+        lastActivityAt: new Date("2026-10-29T10:00:00Z"),
+      }),
+    ];
+    expect(pickDeliveryAgentId({ agents, workspaceId: "ws-1", focusedAgentId: "first" })).toBe(
+      "first",
+    );
+  });
+
   it("returns null when the workspace has no agent", () => {
     expect(
       pickDeliveryAgentId({
