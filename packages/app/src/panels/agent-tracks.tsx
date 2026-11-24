@@ -12,6 +12,7 @@ import { PluginComposerPills } from "@/plugins";
 import { useSessionStore } from "@/stores/session-store";
 import {
   type ArchiveFinishedStatus,
+  type ArchiveScope,
   useArchiveSubagent,
   useDetachSubagent,
   useSubagentSheetTab,
@@ -51,7 +52,7 @@ export const AgentTracks = memo(function AgentTracks({
   subagentRows: SubagentRow[];
   tasks: TodoEntry[] | undefined;
   archiveFinishedStatus: ArchiveFinishedStatus;
-  onArchiveFinished: () => void;
+  onArchiveFinished: (scope: ArchiveScope) => void;
   hasPluginComposerPills: boolean;
   onExtraHeightChange: (height: number) => void;
 }): ReactElement | null {

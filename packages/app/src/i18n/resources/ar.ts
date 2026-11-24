@@ -2162,8 +2162,17 @@ export const ar: TranslationResources = {
     detachTooltip: "فصل الوكيل الفرعي",
     archiveAction: "أرشيف{{label}}",
     archiveTooltip: "أرشفة الوكيل الفرعي",
-    archiveFinishedAction: "أرشفة الوكلاء الفرعيين المكتملين",
     archiveFinishedRetry: "إعادة المحاولة ({{failed}}/{{total}})",
+    retryAction: "إعادة محاولة {{label}}",
+    clear: "مسح",
+    clearDoneAction: "أرشفة الوكلاء الفرعيين المكتملين",
+    clearFailedAction: "أرشفة الوكلاء الفرعيين الفاشلين",
+    groups: {
+      failed: "فشل · {{count}}",
+      needsInput: "بانتظار إدخال · {{count}}",
+      working: "قيد العمل · {{count}}",
+      done: "مكتمل · {{count}}",
+    },
   },
   panels: {
     draft: {

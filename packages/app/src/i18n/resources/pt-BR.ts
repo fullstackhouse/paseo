@@ -2202,8 +2202,17 @@ export const ptBR: TranslationResources = {
     detachTooltip: "Desanexar subagente",
     archiveAction: "Arquivar {{label}}",
     archiveTooltip: "Arquivar subagente",
-    archiveFinishedAction: "Arquivar subagentes concluídos",
     archiveFinishedRetry: "Tentar novamente ({{failed}}/{{total}})",
+    retryAction: "Tentar novamente {{label}}",
+    clear: "Limpar",
+    clearDoneAction: "Arquivar subagentes concluídos",
+    clearFailedAction: "Arquivar subagentes com falha",
+    groups: {
+      failed: "Com falha · {{count}}",
+      needsInput: "Aguardando resposta · {{count}}",
+      working: "Trabalhando · {{count}}",
+      done: "Concluídos · {{count}}",
+    },
   },
   panels: {
     draft: {

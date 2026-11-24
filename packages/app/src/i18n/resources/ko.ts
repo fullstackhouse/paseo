@@ -2175,8 +2175,17 @@ export const ko: TranslationResources = {
     detachTooltip: "하위 에이전트 분리",
     archiveAction: "{{label}} 보관",
     archiveTooltip: "서브에이전트 보관",
-    archiveFinishedAction: "완료된 하위 에이전트 보관",
     archiveFinishedRetry: "다시 시도 ({{failed}}/{{total}})",
+    retryAction: "{{label}} 다시 시도",
+    clear: "지우기",
+    clearDoneAction: "완료된 하위 에이전트 보관",
+    clearFailedAction: "실패한 하위 에이전트 보관",
+    groups: {
+      failed: "실패 · {{count}}",
+      needsInput: "입력 필요 · {{count}}",
+      working: "작업 중 · {{count}}",
+      done: "완료 · {{count}}",
+    },
   },
   panels: {
     draft: {
