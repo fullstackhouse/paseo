@@ -16,6 +16,7 @@ import {
   selectWorkspace,
   selectWorkspaceDirectory,
   selectWorkspaceExists,
+  selectIsWorkspaceInSidebar,
   selectWorkspaceFields,
   selectWorkspaceKeys,
   workspaceEqualityFns,
@@ -63,6 +64,19 @@ export function useWorkspaceExists(serverId: string | null, workspaceId: string 
     useSessionStore,
     (state) => selectWorkspaceExists(state, serverId, workspaceId),
     workspaceEqualityFns.identity,
+  );
+}
+
+/** How many of these workspaces have no row in the sidebar; a null workspaceId counts as none. */
+export function useCountWorkspacesNotInSidebar(
+  refs: readonly { serverId: string; workspaceId: string | null }[],
+): number {
+  return useStoreWithEqualityFn(
+    useSessionStore,
+    (state) =>
+      refs.filter((ref) => !selectIsWorkspaceInSidebar(state, ref.serverId, ref.workspaceId))
+        .length,
+    Object.is,
   );
 }
 

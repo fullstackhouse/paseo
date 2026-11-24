@@ -18,7 +18,7 @@ import {
 import { useSidebarNavItems } from "@/sidebar-nav/use-sidebar-nav-items";
 import { useKeyboardShortcutsStore } from "@/stores/keyboard-shortcuts-store";
 import { useActiveWorkspaceSelection } from "@/stores/navigation-active-workspace-store";
-import { useWorkspace } from "@/stores/session-store-hooks";
+import { useCountWorkspacesNotInSidebar, useWorkspace } from "@/stores/session-store-hooks";
 import {
   buildNewWorkspaceRoute,
   buildSchedulesRoute,
@@ -179,7 +179,8 @@ function SidebarSchedulesRow({ onBeforeNavigate }: SidebarNavRowProps) {
     router.push(buildSchedulesRoute());
   }, [onBeforeNavigate]);
 
-  const attentionCount = useScheduleAttention().length;
+  // A run whose workspace is in the sidebar already shows there; count only the ones you can't see.
+  const attentionCount = useCountWorkspacesNotInSidebar(useScheduleAttention());
   const trailing = useMemo(
     () => (attentionCount > 0 ? <SchedulesAttentionCount count={attentionCount} /> : undefined),
     [attentionCount],
@@ -198,7 +199,7 @@ function SidebarSchedulesRow({ onBeforeNavigate }: SidebarNavRowProps) {
   );
 }
 
-/** Scheduled runs waiting on you, across hosts. */
+/** Scheduled runs waiting on you, across hosts, whose workspace isn't in the sidebar. */
 function SchedulesAttentionCount({ count }: { count: number }) {
   const { t } = useTranslation();
   return (

@@ -125,6 +125,16 @@ export function selectWorkspaceExists(
   return selectWorkspace(state, serverId, workspaceId) !== null;
 }
 
+/** Whether the workspace has a row in the sidebar by default: loaded, not archived, not background. */
+export function selectIsWorkspaceInSidebar(
+  state: SessionsSnapshot,
+  serverId: string | null,
+  workspaceId: string | null,
+): boolean {
+  const workspace = selectWorkspace(state, serverId, workspaceId);
+  return workspace !== null && !workspace.background;
+}
+
 export function selectHasHydratedWorkspaces(
   state: SessionsSnapshot,
   serverId: string | null,
