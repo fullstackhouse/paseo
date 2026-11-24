@@ -160,8 +160,8 @@ function createArchiveDeps(input: ArchiveDepsInput): ArchiveTestDependencies {
     },
     agentStorage: {
       listByWorkspace: async (): Promise<StoredAgentRecord[]> => [],
-      markArchivedWithWorkspace: async () => {},
-    } as Pick<AgentStorage, "listByWorkspace" | "markArchivedWithWorkspace">,
+      setArchivedWithWorkspace: async () => {},
+    } as Pick<AgentStorage, "listByWorkspace" | "setArchivedWithWorkspace">,
     findWorkspaceIdForCwd: input.findWorkspaceIdForCwd ?? vi.fn(async () => null),
     listActiveWorkspaces: async () =>
       active.filter((workspace) => !archivedWorkspaceIds.has(workspace.workspaceId)),
@@ -939,8 +939,8 @@ describe("archiveByScope", () => {
           : ([
               { id: otherStoredAgentId, workspaceId: otherWorkspaceId, archivedAt: null },
             ] as StoredAgentRecord[]),
-      markArchivedWithWorkspace: async () => {},
-    } as Pick<AgentStorage, "listByWorkspace" | "markArchivedWithWorkspace">;
+      setArchivedWithWorkspace: async () => {},
+    } as Pick<AgentStorage, "listByWorkspace" | "setArchivedWithWorkspace">;
 
     const result = await archiveByScope(deps, {
       scope: { kind: "workspace", workspaceId: targetWorkspaceId },
@@ -1125,6 +1125,39 @@ describe("workspace archive and unarchive of its agents", () => {
     expect((await storage.get("elsewhere"))?.archivedAt).toBeNull();
   });
 
+  test("a later archive drops a stale tag from an agent the workspace left archived", async () => {
+    // Archived with ws-1 earlier; ws-1 was then reused without restoring it.
+    const storage = await createStorage([
+      storedAgent({
+        id: "left-archived",
+        archivedAt: "2026-01-02T00:00:00.000Z",
+        archivedWithWorkspaceId: "ws-1",
+      }),
+      storedAgent({ id: "open" }),
+    ]);
+
+    await archiveWorkspaceContents(
+      {
+        agentManager: {
+          listAgents: () => [],
+          getAgent: () => null,
+          archiveAgent: vi.fn(),
+          archiveSnapshot: archiveIn(storage),
+        },
+        agentStorage: storage,
+        killTerminalsForWorkspace: async () => {},
+      },
+      "ws-1",
+    );
+    const restored = await restoreWorkspaceAgents(
+      { agentStorage: storage, unarchiveAgent: vi.fn(async () => true) },
+      "ws-1",
+    );
+
+    expect((await storage.get("left-archived"))?.archivedWithWorkspaceId).toBeNull();
+    expect(restored).toEqual(["open"]);
+  });
+
   test("unarchiving the workspace brings back only the agents its archive took down", async () => {
     const storage = await createStorage([
       storedAgent({
@@ -1156,8 +1189,8 @@ describe("workspace archive and unarchive of its agents", () => {
   test("tagging leaves an agent that is not archived untouched", async () => {
     const storage = await createStorage([storedAgent({ id: "active" })]);
 
-    await storage.markArchivedWithWorkspace("active", "ws-1");
-    await storage.markArchivedWithWorkspace("missing", "ws-1");
+    await storage.setArchivedWithWorkspace("active", "ws-1");
+    await storage.setArchivedWithWorkspace("missing", "ws-1");
 
     expect((await storage.get("active"))?.archivedWithWorkspaceId).toBeUndefined();
     expect(await storage.get("missing")).toBeNull();

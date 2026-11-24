@@ -35,7 +35,7 @@ export interface ArchiveDependencies {
   github: ForgeService;
   workspaceGitService: Pick<WorkspaceGitService, "getSnapshot" | "invalidateWorktrees">;
   agentManager: Pick<AgentManager, "listAgents" | "getAgent" | "archiveAgent" | "archiveSnapshot">;
-  agentStorage: Pick<AgentStorage, "listByWorkspace" | "markArchivedWithWorkspace">;
+  agentStorage: Pick<AgentStorage, "listByWorkspace" | "setArchivedWithWorkspace">;
   // Resolves the worktree at a path to its workspaceId for archive-by-path. The
   // path uniquely identifies a worktree workspace; this is a directory lookup for
   // the archive target, not status/ownership.
@@ -591,13 +591,21 @@ export async function archiveWorkspaceContents(
     }
   }
 
-  // Tag what this archive took down (cascaded subagents included), so unarchiving the workspace
-  // brings exactly these back. Agents archived on their own before stay archived.
-  const tagResults = await Promise.allSettled(
-    [...agentIdsToArchive].map(async (agentId) =>
-      dependencies.agentStorage.markArchivedWithWorkspace(agentId, workspaceId),
+  // Tag what this archive took down (subagents in this workspace included), so unarchiving the
+  // workspace brings exactly these back. Agents already archived lose any tag left by an earlier
+  // archive of this workspace: an unarchive that didn't restore them (an agent created at the
+  // archived path reuses the workspace) must not let a later restore bring them back.
+  const staleTagIds = matchingStoredRecords
+    .filter((record) => record.archivedAt && record.archivedWithWorkspaceId === workspaceId)
+    .map((record) => record.id);
+  const tagResults = await Promise.allSettled([
+    ...[...agentIdsToArchive].map(async (agentId) =>
+      dependencies.agentStorage.setArchivedWithWorkspace(agentId, workspaceId),
     ),
-  );
+    ...staleTagIds.map(async (agentId) =>
+      dependencies.agentStorage.setArchivedWithWorkspace(agentId, null),
+    ),
+  ]);
   for (const result of tagResults) {
     if (result.status === "rejected") {
       dependencies.sessionLogger?.warn(

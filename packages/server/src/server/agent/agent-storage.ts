@@ -168,8 +168,11 @@ export class AgentStorage {
     return this.queueRecordMutation(record.id, () => record);
   }
 
-  /** Tags an archived agent as archived by its workspace's archive. No-op unless it is archived. */
-  async markArchivedWithWorkspace(agentId: string, workspaceId: string): Promise<void> {
+  /**
+   * Records which workspace archive took an archived agent down, or clears it with null. No-op
+   * unless the agent is archived.
+   */
+  async setArchivedWithWorkspace(agentId: string, workspaceId: string | null): Promise<void> {
     await this.load();
     await this.queueRecordMutation(agentId, (existing) =>
       existing?.archivedAt ? { ...existing, archivedWithWorkspaceId: workspaceId } : null,
