@@ -12,6 +12,9 @@ export interface DeliveryAgentCandidate {
  * The agent that should deliver the workspace's branch: the focused agent tab
  * when it belongs to the workspace, else the workspace's most recently active
  * top-level agent. Null when the workspace has none.
+ *
+ * Top-level means no parent in this workspace: an agent launched from another
+ * workspace keeps that agent as its parent but is the one working here.
  */
 export function pickDeliveryAgentId(input: {
   agents: Iterable<DeliveryAgentCandidate>;
@@ -19,11 +22,12 @@ export function pickDeliveryAgentId(input: {
   focusedAgentId: string | null;
 }): string | null {
   const workspaceId = normalizeWorkspaceOpaqueId(input.workspaceId);
-  const eligible = [...input.agents].filter(
-    (agent) =>
-      normalizeWorkspaceOpaqueId(agent.workspaceId) === workspaceId &&
-      !agent.archivedAt &&
-      agent.parentAgentId === null,
+  const workspaceAgents = [...input.agents].filter(
+    (agent) => normalizeWorkspaceOpaqueId(agent.workspaceId) === workspaceId && !agent.archivedAt,
+  );
+  const workspaceAgentIds = new Set(workspaceAgents.map((agent) => agent.id));
+  const eligible = workspaceAgents.filter(
+    (agent) => agent.parentAgentId === null || !workspaceAgentIds.has(agent.parentAgentId),
   );
   if (input.focusedAgentId && eligible.some((agent) => agent.id === input.focusedAgentId)) {
     return input.focusedAgentId;
