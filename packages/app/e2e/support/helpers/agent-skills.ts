@@ -267,7 +267,8 @@ async function listSkillChoices(page: Page): Promise<string[]> {
     );
 }
 
-async function readInstalledSkills(directory: string): Promise<string[]> {
+/** Skill folders in one target directory, sorted; empty when the directory is missing. */
+export async function readInstalledSkills(directory: string): Promise<string[]> {
   const entries = await readdir(directory, { withFileTypes: true }).catch(() => []);
   return entries
     .filter((entry) => entry.isDirectory())
