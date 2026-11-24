@@ -2317,8 +2317,17 @@ export const es: TranslationResources = {
     detachTooltip: "Separar subagente",
     archiveAction: "Archivo{{label}}",
     archiveTooltip: "Subagente de archivo",
-    archiveFinishedAction: "Archivar subagentes finalizados",
     archiveFinishedRetry: "Reintentar ({{failed}}/{{total}})",
+    retryAction: "Reintentar {{label}}",
+    clear: "Borrar",
+    clearDoneAction: "Archivar subagentes finalizados",
+    clearFailedAction: "Archivar subagentes fallidos",
+    groups: {
+      failed: "Fallidos · {{count}}",
+      needsInput: "Esperan respuesta · {{count}}",
+      working: "Trabajando · {{count}}",
+      done: "Terminados · {{count}}",
+    },
   },
   panels: {
     draft: {

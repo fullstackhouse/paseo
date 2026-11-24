@@ -2293,8 +2293,17 @@ export const en = {
     detachTooltip: "Detach subagent",
     archiveAction: "Archive {{label}}",
     archiveTooltip: "Archive subagent",
-    archiveFinishedAction: "Archive finished subagents",
     archiveFinishedRetry: "Retry ({{failed}}/{{total}})",
+    retryAction: "Retry {{label}}",
+    clear: "Clear",
+    clearDoneAction: "Archive finished subagents",
+    clearFailedAction: "Archive failed subagents",
+    groups: {
+      failed: "Failed · {{count}}",
+      needsInput: "Needs input · {{count}}",
+      working: "Working · {{count}}",
+      done: "Done · {{count}}",
+    },
   },
   panels: {
     draft: {

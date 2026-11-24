@@ -2237,8 +2237,17 @@ export const zhCN: TranslationResources = {
     detachTooltip: "分离 subagent",
     archiveAction: "归档 {{label}}",
     archiveTooltip: "归档 subagent",
-    archiveFinishedAction: "归档已完成的 subagent",
     archiveFinishedRetry: "重试 ({{failed}}/{{total}})",
+    retryAction: "重试 {{label}}",
+    clear: "清除",
+    clearDoneAction: "归档已完成的 subagent",
+    clearFailedAction: "归档失败的 subagent",
+    groups: {
+      failed: "失败 · {{count}}",
+      needsInput: "需要输入 · {{count}}",
+      working: "进行中 · {{count}}",
+      done: "已完成 · {{count}}",
+    },
   },
   panels: {
     draft: {

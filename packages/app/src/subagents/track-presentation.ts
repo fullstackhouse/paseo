@@ -6,7 +6,6 @@ import type { AgentBackgroundWorkSummary } from "@getpaseo/protocol/messages";
 import type { AgentLifecycleStatus } from "@getpaseo/protocol/agent-lifecycle";
 import { STATUS_BUCKET_ORDER } from "@/utils/sidebar-agent-state";
 import type { SubagentRow } from "./select";
-import { isFinishedSubagent } from "./archive-finished";
 import { providerSubagentLifecycleStatus } from "./provider-store";
 
 function presentationStatus(row: SubagentRow) {
@@ -141,10 +140,6 @@ function summarizeSubagentStatus(rows: readonly SubagentRow[]): SubagentStatusCo
   });
 }
 
-export function countFinishedSubagents(rows: readonly SubagentRow[]): number {
-  return rows.filter(isFinishedSubagent).length;
-}
-
 export function resolveRowLabel(title: string | null | undefined): string | null {
   if (typeof title !== "string") {
     return null;
@@ -157,4 +152,77 @@ export function resolveRowLabel(title: string | null | undefined): string | null
     return null;
   }
   return normalized;
+}
+
+/** The list's groups, in the order you act on them: what failed, what waits on you, what runs. */
+export type SubagentGroupKey = "failed" | "needs_input" | "working" | "done";
+
+export interface SubagentGroup {
+  key: SubagentGroupKey;
+  rows: SubagentRow[];
+}
+
+const SUBAGENT_GROUP_ORDER: readonly SubagentGroupKey[] = [
+  "failed",
+  "needs_input",
+  "working",
+  "done",
+];
+
+function subagentGroupKey(row: SubagentRow): SubagentGroupKey {
+  switch (buildSubagentRowPresentationData(row).statusBucket) {
+    case "failed":
+      return "failed";
+    case "needs_input":
+      return "needs_input";
+    case "running":
+      return "working";
+    default:
+      return "done";
+  }
+}
+
+/**
+ * Rows split by what they ask of you, empty groups left out. A failure sorts first because the
+ * pill already announced it; done work sorts last because it asks for nothing. Rows keep their
+ * incoming order inside a group.
+ */
+export function groupSubagentRows(rows: readonly SubagentRow[]): SubagentGroup[] {
+  const byKey = new Map<SubagentGroupKey, SubagentRow[]>();
+  for (const row of rows) {
+    const key = subagentGroupKey(row);
+    const group = byKey.get(key);
+    if (group) group.push(row);
+    else byKey.set(key, [row]);
+  }
+  return SUBAGENT_GROUP_ORDER.flatMap((key) => {
+    const groupRows = byKey.get(key);
+    return groupRows ? [{ key, rows: groupRows }] : [];
+  });
+}
+
+const FACT_SEPARATOR = " · ";
+
+/**
+ * Each row's subtitle without the facts every sibling shares. A fan-out runs one agent type on one
+ * model at one effort, so "general-purpose · Opus · Medium" on every row says nothing about any of
+ * them; what differs (tokens, a lone Explore) is what tells two rows apart. Keyed by row id. A
+ * lone subtitle is kept whole: with nothing to compare against, nothing is repeated.
+ */
+export function distinctSubagentSubtitles(rows: readonly SubagentRow[]): Map<string, string> {
+  const facts = new Map<string, string[]>();
+  for (const row of rows) {
+    const subtitle = buildSubagentRowPresentationData(row).subtitle;
+    if (subtitle) facts.set(row.id, subtitle.split(FACT_SEPARATOR));
+  }
+  const lists = [...facts.values()];
+  const shared =
+    lists.length < 2
+      ? new Set<string>()
+      : new Set(lists[0]?.filter((fact) => lists.every((list) => list.includes(fact))));
+  const result = new Map<string, string>();
+  for (const [id, list] of facts) {
+    result.set(id, list.filter((fact) => !shared.has(fact)).join(FACT_SEPARATOR));
+  }
+  return result;
 }

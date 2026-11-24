@@ -199,7 +199,7 @@ export async function expectManagedSubagentArchived(
 }
 
 export async function archiveFinishedSubagents(page: Page): Promise<void> {
-  await page.getByRole("menuitem", { name: "Archive finished subagents" }).click();
+  await page.getByTestId("subagents-track-clear-done").click();
 }
 
 export async function expectArchiveFinishedInProgress(
@@ -207,8 +207,9 @@ export async function expectArchiveFinishedInProgress(
   completed: number,
   total: number,
 ): Promise<void> {
-  await expect(page.getByRole("menuitem", { name: "Archive finished subagents" })).toBeDisabled();
-  await expect(page.getByText(`${completed}/${total}`, { exact: true })).toBeVisible();
+  await expect(page.getByTestId("subagents-track-archive-progress-done")).toHaveText(
+    `${completed}/${total}`,
+  );
 }
 
 export async function expectArchiveFinishedRetry(
@@ -216,8 +217,9 @@ export async function expectArchiveFinishedRetry(
   failed: number,
   total: number,
 ): Promise<void> {
-  await expect(page.getByText(`Retry (${failed}/${total})`, { exact: true })).toBeVisible();
-  await expect(page.getByRole("menuitem", { name: "Archive finished subagents" })).toBeEnabled();
+  const clear = page.getByTestId("subagents-track-clear-done");
+  await expect(clear).toHaveText(`Retry (${failed}/${total})`);
+  await expect(clear).toBeEnabled();
 }
 
 export async function holdManagedSubagentArchiveRequest(

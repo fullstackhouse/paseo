@@ -7,6 +7,7 @@ export { isWorkspaceRootAgent } from "./workspace-root-policy";
 export {
   useArchiveFinishedSubagents,
   type ArchiveFinishedStatus,
+  type ArchiveScope,
   type UseArchiveFinishedSubagentsInput,
 } from "./use-archive-finished";
 export { useSubagentSheetTab } from "./sheet-tab";

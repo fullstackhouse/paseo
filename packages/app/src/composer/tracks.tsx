@@ -1,8 +1,9 @@
 import { useCallback, useMemo, useState, type ReactElement, type ReactNode } from "react";
 import { Pressable, Text, View } from "react-native";
+import { ChevronRight } from "lucide-react-native";
 import { GestureDetector } from "react-native-gesture-handler";
 import Animated from "react-native-reanimated";
-import { StyleSheet } from "react-native-unistyles";
+import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import {
   MENU_ITEM_HEIGHT,
   MenuRoot,
@@ -27,7 +28,12 @@ import { usePanelAwareHorizontalScrollGesture } from "@/mobile-panels/gestures";
 import { getStatusDotColor } from "@/utils/status-dot-color";
 import { STATUS_INDICATOR_FILLED_DOT_SIZE } from "@/utils/status-indicator-geometry";
 import type { SidebarStateBucket } from "@/utils/sidebar-agent-state";
+import type { Theme } from "@/styles/theme";
 import { COMPOSER_PILL_CLEARANCE, composerPillStyles } from "./pill-styles";
+
+const ThemedChevronRight = withUnistyles(ChevronRight);
+const mutedColorMapping = (theme: Theme) => ({ color: theme.colors.foregroundMuted });
+const GROUP_CHEVRON_SIZE = 14;
 
 /**
  * The strip of pills where a pane's ambient trackers and plugin actions live.
@@ -206,13 +212,9 @@ function ComposerTrackPillTrigger({
 }
 
 /**
- * Actions that apply to the whole panel rather than one row — bulk archive today. Still rows:
- * they live on a menu surface, and a bordered button inside a list of menu items reads as a
- * foreign object. The divider is what separates them from the list, not their chrome.
- *
- * They go above the rows because the pointer arrives from the pill below. Reaching a bulk action
- * means travelling past every row it affects, which is the right price for it, and it cannot sit
- * under a thumb that was aiming for the nearest subagent.
+ * Actions that apply to the whole panel rather than one row, such as Retry on a failed turn. Still
+ * rows: they live on a menu surface, and the divider is what separates them from the list. An
+ * action that applies to one group of rows belongs on that group's `ComposerTrackGroupHeader`.
  */
 export function ComposerTrackActions({
   children,
@@ -227,6 +229,60 @@ export function ComposerTrackActions({
       {children}
       {divided ? <MenuSeparator /> : null}
     </>
+  );
+}
+
+/**
+ * The heading over a group of rows, with the group's own actions at its trailing edge. A group
+ * that can fold is a row you press; its chevron says which way it is. Actions on the heading apply
+ * to its rows only, so a bulk action names its scope by where it sits. Children are those actions.
+ */
+export function ComposerTrackGroupHeader({
+  label,
+  collapsed,
+  onToggle,
+  children,
+  testID,
+}: {
+  label: string;
+  /** Set only on a group that folds. */
+  collapsed?: boolean;
+  onToggle?: () => void;
+  children?: ReactNode;
+  testID?: string;
+}): ReactElement {
+  const content = (
+    <>
+      <Text style={styles.groupLabel} numberOfLines={1}>
+        {label}
+      </Text>
+      {/* After the label, so every group's label starts on the same rail whether it folds or not. */}
+      {collapsed === undefined ? null : (
+        <ThemedChevronRight
+          size={GROUP_CHEVRON_SIZE}
+          uniProps={mutedColorMapping}
+          style={collapsed ? undefined : styles.chevronOpen}
+        />
+      )}
+      {children ? <View style={styles.groupActions}>{children}</View> : null}
+    </>
+  );
+  if (!onToggle) {
+    return (
+      <View style={styles.row} testID={testID}>
+        {content}
+      </View>
+    );
+  }
+  return (
+    <ComposerTrackRow
+      accessibilityLabel={label}
+      testID={testID}
+      closeOnSelect={false}
+      onPress={onToggle}
+    >
+      {content}
+    </ComposerTrackRow>
   );
 }
 
@@ -427,6 +483,22 @@ const styles = StyleSheet.create((theme) => {
       gap: theme.spacing[1],
     },
     row: trackRow,
+    groupLabel: {
+      flexShrink: 1,
+      flexBasis: "auto",
+      minWidth: 0,
+      fontSize: theme.fontSize.sm,
+      color: theme.colors.foregroundMuted,
+    },
+    groupActions: {
+      marginLeft: "auto",
+      flexDirection: "row",
+      alignItems: "center",
+      gap: theme.spacing[1],
+    },
+    chevronOpen: {
+      transform: [{ rotate: "90deg" }],
+    },
     rowActive: { ...trackRow, backgroundColor: theme.colors.surface2 },
     // Segments sit twice as far apart as a mark sits from its own text, so a count reads as
     // belonging to the mark on its left rather than to the words on its right.

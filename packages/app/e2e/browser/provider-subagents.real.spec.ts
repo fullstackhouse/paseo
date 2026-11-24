@@ -143,7 +143,7 @@ test.describe("real provider subagent timelines", () => {
         ).toBeVisible({ timeout: 60_000 });
         // Opening the subagent's tab closed the panel with the parent's pane.
         await openSubagentsTrack(page);
-        const archiveFinished = page.getByTestId("subagents-track-archive-finished");
+        const archiveFinished = page.getByTestId("subagents-track-clear-done");
         await expect(archiveFinished).toBeVisible({ timeout: 30_000 });
         await archiveFinished.click();
         await expect(rows).toHaveCount(0, { timeout: 30_000 });

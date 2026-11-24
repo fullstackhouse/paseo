@@ -47,7 +47,7 @@ export async function expectWorkflowCompleted(page: Page): Promise<void> {
   await expect(row.getByRole("progressbar", { name: "Agent running" })).toHaveCount(0, {
     timeout: 120_000,
   });
-  await expect(page.getByTestId("subagents-track-archive-finished")).toBeVisible();
+  await expect(page.getByTestId("subagents-track-clear-done")).toBeVisible();
   await expect(
     page.getByTestId("assistant-message").filter({ hasText: WORKFLOW_ROW_MARKER }).last(),
   ).toBeVisible({ timeout: 120_000 });
