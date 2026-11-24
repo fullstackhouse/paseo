@@ -4,6 +4,7 @@ export type ProjectStatusBadgeDotBucket = "failed" | "attention" | "running";
 
 export type ProjectStatusBadgeContent =
   | { kind: "alert" }
+  | { kind: "blocked" }
   | { kind: "dot"; bucket: ProjectStatusBadgeDotBucket };
 
 /**
@@ -14,13 +15,17 @@ export type ProjectStatusBadgeContent =
  * Running is a dot like failed and attention rather than its own glyph. The badge is 14pt;
  * anything with internal detail at that size loses to a solid disc, so the buckets separate
  * by color and — for running alone — by pulsing. Only needs_input earns a glyph, because
- * "someone must act" has to survive being the one amber state next to running.
+ * "someone must act" has to survive being the one amber state next to running. Blocked gets the
+ * outlined pause the workspace row uses, so a blocked project doesn't read as done.
  */
 export function getProjectStatusBadgeContent(
   statusBucket: SidebarStateBucket | null,
 ): ProjectStatusBadgeContent | null {
   if (statusBucket === "needs_input") {
     return { kind: "alert" };
+  }
+  if (statusBucket === "blocked") {
+    return { kind: "blocked" };
   }
   if (statusBucket === "failed" || statusBucket === "attention" || statusBucket === "running") {
     return { kind: "dot", bucket: statusBucket };
