@@ -125,11 +125,11 @@ export function UpdateCalloutSource() {
       });
   });
   // Runs on this source's updater, so a found update shows up here as Update Paseo and the callout.
-  // Silent: a failed check reports in the toast only, and "Update failed" stays for failed installs.
+  // Quiet errors: a failed check reports in the toast only; "Update failed" stays for failed installs.
   const checkFromPalette = useStableEvent(async () => {
     // The next toast replaces this one, so the result needs no explicit dismiss.
     toast.show(t("desktop.updates.status.checking"), { durationMs: null });
-    const result = await checkForUpdates({ silent: true });
+    const result = await checkForUpdates({ quietErrors: true });
     const { kind, message } = formatCheckResultToast(result, formatVersionWithPrefix);
     if (kind === "error") toast.error(message);
     else toast.show(message, { variant: "success" });

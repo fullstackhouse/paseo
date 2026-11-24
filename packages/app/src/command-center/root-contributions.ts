@@ -88,7 +88,8 @@ const HIDES_APP_UPDATE_CHECK: ReadonlySet<DesktopAppUpdateStatus> = new Set([
   "checking",
   "installing",
   // An FSH install reports "installed" while its script still downloads; a check then finds
-  // the same release and offers a second install.
+  // the same release and offers a second install. If that script fails, the entry stays hidden
+  // until the next background check; Settings → App updates still works.
   "installed",
 ]);
 

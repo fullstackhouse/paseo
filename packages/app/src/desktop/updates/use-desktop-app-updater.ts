@@ -32,6 +32,7 @@ export interface UseDesktopAppUpdaterReturn {
   checkForUpdates: (options?: {
     intent?: DesktopAppUpdateCheckIntent;
     silent?: boolean;
+    quietErrors?: boolean;
   }) => Promise<DesktopAppUpdateCheckResult | null>;
   installUpdate: () => Promise<DesktopAppUpdateInstallResult | null>;
 }
@@ -62,7 +63,13 @@ export function useDesktopAppUpdater(): UseDesktopAppUpdaterReturn {
   );
 
   const checkForUpdates = useCallback(
-    async (options: { intent?: DesktopAppUpdateCheckIntent; silent?: boolean } = {}) => {
+    async (
+      options: {
+        intent?: DesktopAppUpdateCheckIntent;
+        silent?: boolean;
+        quietErrors?: boolean;
+      } = {},
+    ) => {
       if (!isDesktopApp) {
         return null;
       }
@@ -70,6 +77,7 @@ export function useDesktopAppUpdater(): UseDesktopAppUpdaterReturn {
         releaseChannel,
         intent: options.intent ?? "manual",
         silent: options.silent,
+        quietErrors: options.quietErrors,
       });
     },
     [isDesktopApp, releaseChannel, updater],

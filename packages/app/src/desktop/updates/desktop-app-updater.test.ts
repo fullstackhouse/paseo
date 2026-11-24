@@ -215,6 +215,70 @@ describe("desktop app updater — check", () => {
     expect(updater.getSnapshot().status).toBe("up-to-date");
   });
 
+  it("shows a quiet check as checking and keeps the status when it fails without an update", async () => {
+    const { updater, port } = createUpdater();
+    await updater.checkForUpdates({ releaseChannel: "stable" });
+    const deferred = port.deferNextCheck();
+
+    const quietCheck = updater.checkForUpdates({ releaseChannel: "stable", quietErrors: true });
+    expect(updater.getSnapshot().status).toBe("checking");
+    deferred.resolve(buildFakeCheckResult({ errorMessage: "network down" }));
+
+    await expect(quietCheck).resolves.toMatchObject({ errorMessage: "network down" });
+    expect(updater.getSnapshot()).toMatchObject({ status: "up-to-date", errorMessage: null });
+  });
+
+  it("keeps an earlier install error when a quiet check throws", async () => {
+    const { updater, port } = createUpdater();
+    port.failNextInstall(new Error("disk full"));
+    await updater.installUpdate({ releaseChannel: "stable" });
+    const before = updater.getSnapshot();
+    port.failNextCheck(new Error("offline"));
+
+    await expect(
+      updater.checkForUpdates({ releaseChannel: "stable", quietErrors: true }),
+    ).resolves.toBeNull();
+
+    expect(updater.getSnapshot()).toMatchObject({
+      status: before.status,
+      errorMessage: before.errorMessage,
+    });
+  });
+
+  it("does not let a background check supersede an in-flight quiet check", async () => {
+    const { updater, port } = createUpdater();
+    const deferred = port.deferNextCheck();
+
+    const quietCheck = updater.checkForUpdates({ releaseChannel: "stable", quietErrors: true });
+    port.nextCheckResult(buildFakeCheckResult({ errorMessage: "network down" }));
+    await updater.checkForUpdates({ releaseChannel: "stable", intent: "automatic", silent: true });
+    deferred.resolve(
+      buildFakeCheckResult({ hasUpdate: true, readyToInstall: true, latestVersion: "1.2.3" }),
+    );
+    await quietCheck;
+
+    expect(port.recordedChecks).toEqual([{ releaseChannel: "stable", intent: "manual" }]);
+    expect(updater.getSnapshot()).toMatchObject({ status: "available" });
+  });
+
+  it("still reports a quiet check's failed download of a found update", async () => {
+    const { updater, port } = createUpdater();
+    port.nextCheckResult(
+      buildFakeCheckResult({
+        hasUpdate: true,
+        latestVersion: "1.2.4",
+        errorMessage: "sha512 checksum mismatch",
+      }),
+    );
+
+    await updater.checkForUpdates({ releaseChannel: "stable", quietErrors: true });
+
+    expect(updater.getSnapshot()).toMatchObject({
+      status: "error",
+      errorMessage: "sha512 checksum mismatch",
+    });
+  });
+
   it("does not let an older silent check supersede a newer silent check", async () => {
     const { updater, port } = createUpdater();
     const olderCheck = port.deferNextCheck();
