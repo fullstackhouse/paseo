@@ -1,7 +1,7 @@
 import { ActivityIndicator, View, type ViewStyle } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { useTranslation } from "react-i18next";
-import { ChevronDown, ChevronRight, CircleAlert } from "lucide-react-native";
+import { ChevronDown, ChevronRight, CircleAlert, CirclePause } from "lucide-react-native";
 import { ProjectIconView } from "@/components/project-icon-view";
 import { getStatusBucketLabel } from "@/hooks/sidebar-status-view-model";
 import { densityIconBox, densityIconProps } from "@/styles/density";
@@ -44,6 +44,7 @@ const projectIconProps = densityIconProps("md", () => ({}));
 
 const ThemedActivityIndicator = withUnistyles(ActivityIndicator);
 const ThemedCircleAlert = withUnistyles(CircleAlert);
+const ThemedCirclePause = withUnistyles(CirclePause);
 
 const foregroundMutedColorMapping = (theme: Theme) => ({
   color: theme.colors.foregroundMuted,
@@ -51,6 +52,9 @@ const foregroundMutedColorMapping = (theme: Theme) => ({
 const needsInputColorMapping = (theme: Theme) => ({
   color: theme.colors.surface0,
   fill: getStatusDotColor({ theme, bucket: "needs_input" }) ?? undefined,
+});
+const blockedColorMapping = (theme: Theme) => ({
+  color: getStatusDotColor({ theme, bucket: "blocked" }) ?? undefined,
 });
 
 /**
@@ -108,8 +112,8 @@ export function ProjectLeadingVisual({
 // The project icon (the lettered box) is what marks a row as a *project* rather than a
 // workspace, so it always stays and status annotates it instead of replacing it. Every
 // surfaced bucket lands in the identical corner badge — an amber alert glyph for needs_input,
-// a colored disc for the rest, nothing for done — so the badge reads as one fixed shell and
-// only its contents change.
+// a yellow pause glyph for blocked, a colored disc for the rest, nothing for done — so the
+// badge reads as one fixed shell and only its contents change.
 export function ProjectStatusIndicator({
   iconDataUri,
   displayName,
@@ -197,13 +201,24 @@ function ProjectStatusBadge({
       style={[styles.statusBadge, getStatusBadgeBackdropStyle(backdrop)]}
       testID="project-status-badge"
     >
-      {content.kind === "alert" ? (
-        <ThemedCircleAlert size={STATUS_INDICATOR_ALERT_SIZE} uniProps={needsInputColorMapping} />
-      ) : (
-        <ProjectStatusDot bucket={content.bucket} />
-      )}
+      <ProjectStatusBadgeGlyph content={content} />
     </View>
   );
+}
+
+function ProjectStatusBadgeGlyph({ content }: { content: ProjectStatusBadgeContent }) {
+  switch (content.kind) {
+    case "alert":
+      return (
+        <ThemedCircleAlert size={STATUS_INDICATOR_ALERT_SIZE} uniProps={needsInputColorMapping} />
+      );
+    case "blocked":
+      return (
+        <ThemedCirclePause size={STATUS_INDICATOR_ALERT_SIZE} uniProps={blockedColorMapping} />
+      );
+    case "dot":
+      return <ProjectStatusDot bucket={content.bucket} />;
+  }
 }
 
 function getStatusBadgeBackdropStyle(backdrop: SidebarSurfaceBackdrop): ViewStyle {
