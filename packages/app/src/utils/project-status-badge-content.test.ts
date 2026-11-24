@@ -21,6 +21,10 @@ describe("getProjectStatusBadgeContent", () => {
     });
   });
 
+  it("shows the pause glyph when a workspace is blocked", () => {
+    expect(getProjectStatusBadgeContent("blocked")).toEqual({ kind: "blocked" });
+  });
+
   it("shows nothing when the project is done", () => {
     expect(getProjectStatusBadgeContent("done")).toBeNull();
   });
