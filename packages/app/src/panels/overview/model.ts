@@ -327,6 +327,43 @@ export function foldsDonePullRequests(list: PullRequestList): boolean {
   return list.done.length > 1 || (list.done.length > 0 && list.open.length > 0);
 }
 
+/** Rows the collapsed list shows. A stack or a track can link dozens of open PRs. */
+export const VISIBLE_PULL_REQUESTS = 5;
+
+export interface CollapsedPullRequests {
+  rows: PullRequestRow[];
+  /** What the toggle reveals: only finished PRs ("done"), open ones too ("more"), or nothing. */
+  hidden: PullRequestFold | null;
+}
+
+export type PullRequestFold = "done" | "more";
+
+/** Open PRs first, at most `VISIBLE_PULL_REQUESTS` rows; finished ones fold per `foldsDonePullRequests`. */
+export function collapsePullRequests(list: PullRequestList): CollapsedPullRequests {
+  const all = [...list.open, ...list.done];
+  const base = foldsDonePullRequests(list) ? list.open : all;
+  const rows = base.slice(0, VISIBLE_PULL_REQUESTS);
+  if (rows.length === all.length) return { rows, hidden: null };
+  return { rows, hidden: rows.length === list.open.length ? "done" : "more" };
+}
+
+/** The collapsed toggle: "Show all (53)" when open PRs are hidden, else "3 merged" or "3 done". */
+export function pullRequestsFoldLabel(
+  list: PullRequestList,
+  hidden: PullRequestFold,
+  t: Translate,
+): string {
+  if (hidden === "more") {
+    return t("panels.overview.showAll", { count: list.open.length + list.done.length });
+  }
+  const allMerged = list.done.every((row) => row.tone === "merged");
+  return countLabel(
+    t,
+    allMerged ? "panels.overview.prsMerged" : "panels.overview.prsDone",
+    list.done.length,
+  );
+}
+
 export interface HostPullRequest extends PullRequestFacts {
   number?: number;
   url: string;

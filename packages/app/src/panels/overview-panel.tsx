@@ -74,7 +74,8 @@ import {
   canAnswerPermissionInPlace,
   countLabel,
   derivePullRequests,
-  foldsDonePullRequests,
+  collapsePullRequests,
+  pullRequestsFoldLabel,
   findBlocking,
   isTreeBlocker,
   orderChildren,
@@ -1488,8 +1489,8 @@ function wordStyle(tone: Tone) {
 // ── 5. Pull requests ─────────────────────────────────────────────────────
 
 /**
- * The PRs the work lives in, for information: no buttons, the agent handles git. Open PRs show;
- * merged and closed ones fold behind a toggle row (`foldsDonePullRequests`). With no PR, a
+ * The PRs the work lives in, for information: no buttons, the agent handles git. Open PRs show,
+ * capped; merged and closed ones fold behind a toggle row (`collapsePullRequests`). With no PR, a
  * "No PR yet" row says what a PR would propose.
  */
 function PullRequests({
@@ -1502,9 +1503,9 @@ function PullRequests({
   workspaceKey: string | null;
 }): ReactElement | null {
   const { t } = useTranslation();
-  const [showDone, setShowDone] = useState(false);
-  const toggleDone = useCallback(() => setShowDone((shown) => !shown), []);
-  const doneState = useMemo(() => ({ expanded: showDone }), [showDone]);
+  const [expanded, setExpanded] = useState(false);
+  const toggleExpanded = useCallback(() => setExpanded((shown) => !shown), []);
+  const expandedState = useMemo(() => ({ expanded }), [expanded]);
   const openChanges = useCallback(
     () => openExplorerSidebarView({ isCompact: false, workspaceKey, view: "changes" }),
     [workspaceKey],
@@ -1549,8 +1550,8 @@ function PullRequests({
       </Section>
     );
   }
-  const foldable = foldsDonePullRequests(list);
-  const rows = foldable && !showDone ? list.open : [...list.open, ...list.done];
+  const collapsed = collapsePullRequests(list);
+  const rows = expanded ? [...list.open, ...list.done] : collapsed.rows;
   return (
     <Section
       title="panels.overview.pullRequests"
@@ -1562,25 +1563,19 @@ function PullRequests({
         {rows.map((row) => (
           <PullRequestRowView key={row.key} row={row} workspaceKey={workspaceKey} />
         ))}
-        {foldable ? (
+        {collapsed.hidden ? (
           <PressHighlight
             accessibilityRole="button"
-            accessibilityState={doneState}
-            onPress={toggleDone}
+            accessibilityState={expandedState}
+            onPress={toggleExpanded}
             style={styles.contextRow}
             highlightStyle={styles.pressed}
             testID="overview-pull-requests-done"
           >
             <Text style={styles.word} numberOfLines={1}>
-              {showDone
+              {expanded
                 ? t("panels.overview.prsShowLess")
-                : countLabel(
-                    t,
-                    list.done.every((row) => row.tone === "merged")
-                      ? "panels.overview.prsMerged"
-                      : "panels.overview.prsDone",
-                    list.done.length,
-                  )}
+                : pullRequestsFoldLabel(list, collapsed.hidden, t)}
             </Text>
           </PressHighlight>
         ) : null}
