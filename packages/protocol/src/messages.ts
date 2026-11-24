@@ -981,7 +981,8 @@ const AgentDirectoryFilterSchema = z.object({
   // COMPAT(agentWorkspaceFilter): FSH-only, added after v0.15.3, remove gate after 2027-05-24.
   // Older daemons ignore it and return every workspace's agents.
   workspaceIds: z.array(z.string()).optional(),
-  // COMPAT(agentWorkspaceFilter): FSH-only, same gate. Keeps only archived agents.
+  // COMPAT(agentWorkspaceFilter): FSH-only, same gate and same build as workspaceIds. Keeps only
+  // archived agents.
   archivedOnly: z.boolean().optional(),
   statuses: z.array(AgentStatusSchema).optional(),
   includeArchived: z.boolean().optional(),

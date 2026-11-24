@@ -31,6 +31,7 @@ import {
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { useImportSession } from "@/hooks/use-import-session";
 import { useHosts } from "@/runtime/host-runtime";
+import { useSessionStore } from "@/stores/session-store";
 import { useWorkspaceFields } from "@/stores/session-store-hooks";
 import { useHasFinePointer } from "@/hooks/use-fine-pointer";
 import { useIsCompactFormFactor } from "@/constants/layout";
@@ -342,13 +343,17 @@ function AgentHistoryBody({
   );
 }
 
+/** The workspace a link narrowed History to; ignored on hosts that can't filter by workspace. */
 function useWorkspaceFilterParam(): { serverId: string; workspaceId: string } | null {
   const params = useLocalSearchParams<{ serverId?: string; workspaceId?: string }>();
   const serverId = typeof params.serverId === "string" ? params.serverId : "";
   const workspaceId = typeof params.workspaceId === "string" ? params.workspaceId : "";
+  const supported = useSessionStore(
+    (state) => state.sessions[serverId]?.serverInfo?.features?.agentWorkspaceFilter === true,
+  );
   return useMemo(
-    () => (serverId && workspaceId ? { serverId, workspaceId } : null),
-    [serverId, workspaceId],
+    () => (supported && serverId && workspaceId ? { serverId, workspaceId } : null),
+    [serverId, supported, workspaceId],
   );
 }
 
