@@ -115,6 +115,34 @@ describe("deriveYourMove", () => {
     ]);
   });
 
+  it("keeps an entry's row key when the plugin item's key moves to a newer entry", () => {
+    // Asks sets the item key to its newest ask, so a new ask changes the attention key.
+    const rowsFor = (attentionKey: string, ids: string[]) =>
+      deriveYourMove({
+        items: [
+          {
+            kind: "plugin",
+            key: attentionKey,
+            item: summaryItem({
+              needsYou: true,
+              entries: ids.map((id) => ({ id, title: id })),
+            }),
+          },
+        ],
+        agentRunning: false,
+        gitPrimaryId: null,
+        canArchive: false,
+        isWorktree: true,
+        prMerged: false,
+        statusDone: false,
+        workOpen: false,
+        liveWork: false,
+      });
+    const [answering] = rowsFor("plugin:p:i:A1", ["A1"]);
+    const after = rowsFor("plugin:p:i:A2", ["A2", "A1"]);
+    expect(after.map((row) => row.key)).toContain(answering?.key);
+  });
+
   it("shows a plugin item without entries as one row", () => {
     const rows = deriveYourMove({
       items: [{ kind: "plugin", key: "x", item: summaryItem({ needsYou: true }) }],
