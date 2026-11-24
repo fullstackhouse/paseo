@@ -1,14 +1,10 @@
-import type { Agent, WorkspaceDescriptor } from "@/stores/session-store";
-import { pickAttentionAgent } from "@/utils/agent-attention";
+import type { WorkspaceDescriptor } from "@/stores/session-store";
 import {
   buildHostWorkspaceRoute,
   decodeWorkspaceIdFromPathSegment,
   parseHostWorkspaceRouteFromPathname,
 } from "@/utils/host-routes";
-import {
-  normalizeWorkspaceOpaqueId,
-  resolveWorkspaceMapKeyByIdentity,
-} from "@/utils/workspace-identity";
+import { resolveWorkspaceMapKeyByIdentity } from "@/utils/workspace-identity";
 import type { ActiveWorkspaceSelection } from "@/stores/last-workspace-selection";
 import type { WorkspaceTabTarget } from "@/workspace-tabs/model";
 import { prepareWorkspaceTab, type PrepareWorkspaceTabDeps } from "@/utils/prepare-workspace-tab";
@@ -33,7 +29,6 @@ export interface NavigateToWorkspaceInput {
 
 export interface NavigateToWorkspaceDeps extends PrepareWorkspaceTabDeps {
   getSessionWorkspaces: (serverId: string) => Map<string, WorkspaceDescriptor> | null | undefined;
-  getSessionAgents: (serverId: string) => Iterable<Agent>;
   isWorkspaceLayoutHydrated: () => boolean;
   deferOpenTab: (input: OpenWorkspaceTabInput) => null;
   rememberLastWorkspace: (selection: ActiveWorkspaceSelection) => void;
@@ -101,24 +96,13 @@ export function navigateToWorkspace(
     deps.revealTab(request.workspaceKey, tabId);
     return tabId;
   };
+  // FSH: without a named tab, the workspace opens on the tab you left (agent, terminal, file or
+  // plugin). Agents that need you show it with badges instead of taking focus: "Ready to review"
+  // outlives a visit here, so jumping to them always landed on the oldest finished agent.
   if (input.target) {
     prepareWorkspaceTab({ ...input, target: input.target }, { openTab });
   } else {
-    const workspaceAgents = resolvedWorkspaceId
-      ? Array.from(deps.getSessionAgents(input.serverId)).filter(
-          (agent) => normalizeWorkspaceOpaqueId(agent.workspaceId) === resolvedWorkspaceId,
-        )
-      : [];
-    const attentionAgentId = pickAttentionAgent(workspaceAgents);
-    if (attentionAgentId && resolvedWorkspaceId) {
-      openTab({
-        workspaceKey: `${input.serverId}:${resolvedWorkspaceId}`,
-        target: { kind: "agent", agentId: attentionAgentId },
-        intent: "reveal",
-      });
-    } else {
-      deps.revealWorkspace();
-    }
+    deps.revealWorkspace();
   }
 
   const route = buildHostWorkspaceRoute(input.serverId, input.workspaceId);

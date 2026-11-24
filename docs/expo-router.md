@@ -78,9 +78,9 @@ When app-wide routes such as `/new`, `/settings`, or `/sessions` navigate back
 into a host workspace, use `navigateToWorkspace()`. Do not make the caller
 branch on its current route.
 
-Pass only `serverId` and `workspaceId` for normal attention-aware navigation.
-When the action names a specific tab, pass it as `target`; that explicit choice
-is authoritative. Callers should not choose between separate route and tab
+Pass only `serverId` and `workspaceId` to open the workspace on the tab you
+left. When the action names a specific tab, pass it as `target`; that explicit
+choice is authoritative. Callers should not choose between separate route and tab
 navigation APIs.
 
 The root stack owns `h/[serverId]`; the host stack owns

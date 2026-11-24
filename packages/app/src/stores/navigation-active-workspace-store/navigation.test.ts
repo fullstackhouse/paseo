@@ -9,7 +9,7 @@ import {
   type NavigateToLastWorkspaceDeps,
   type NavigateToWorkspaceDeps,
 } from "./navigation";
-import type { Agent, WorkspaceDescriptor } from "@/stores/session-store";
+import type { WorkspaceDescriptor } from "@/stores/session-store";
 
 interface RecordedTab {
   workspaceKey: string;
@@ -35,7 +35,6 @@ function createFakeDeps(overrides: Partial<NavigateToWorkspaceDeps> = {}) {
       return null;
     },
     getSessionWorkspaces: () => null,
-    getSessionAgents: () => [] as Agent[],
     isWorkspaceLayoutHydrated: () => true,
     openTab: ({ workspaceKey, target, pin = false }) => {
       openedTabs.push({ workspaceKey, target, pin });
@@ -105,49 +104,28 @@ describe("workspace navigation", () => {
     expect(remembered).toEqual([{ serverId: "server-1", workspaceId: "workspace-a" }]);
   });
 
-  it("focuses the attention agent's tab when a workspace has one", () => {
+  it("opens a workspace on its saved tab when no tab is named", () => {
     const workspace = {
       id: "workspace-a",
       workspaceDirectory: "/repo/workspace-a",
     } as WorkspaceDescriptor;
-    const agent = {
-      id: "agent-1",
-      cwd: "/repo/workspace-a",
-      workspaceId: "workspace-a",
-      requiresAttention: true,
-      attentionReason: "permission",
-    } as unknown as Agent;
-    const { deps, openedTabs } = createFakeDeps({
+    const { deps, openedTabs, revealed } = createFakeDeps({
       getSessionWorkspaces: () => new Map([[workspace.id, workspace]]),
-      getSessionAgents: () => [agent],
     });
 
     navigateToWorkspace({ serverId: "server-1", workspaceId: "workspace-a" }, deps);
 
-    expect(openedTabs).toEqual([
-      {
-        workspaceKey: "server-1:workspace-a",
-        target: { kind: "agent", agentId: "agent-1" },
-        pin: false,
-      },
-    ]);
+    expect(openedTabs).toEqual([]);
+    expect(revealed).toEqual([null]);
   });
 
-  it("keeps an explicit tab authoritative over an attention agent", () => {
+  it("opens the named tab", () => {
     const workspace = {
       id: "workspace-a",
       workspaceDirectory: "/repo/workspace-a",
     } as WorkspaceDescriptor;
-    const agent = {
-      id: "agent-1",
-      cwd: "/repo/workspace-a",
-      workspaceId: "workspace-a",
-      requiresAttention: true,
-      attentionReason: "permission",
-    } as unknown as Agent;
     const { deps, openedTabs } = createFakeDeps({
       getSessionWorkspaces: () => new Map([[workspace.id, workspace]]),
-      getSessionAgents: () => [agent],
     });
 
     navigateToWorkspace(
