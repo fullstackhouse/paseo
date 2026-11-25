@@ -9,8 +9,8 @@ Map: [spec-sidebar-in-progress-ui-map.md](./spec-sidebar-in-progress-ui-map.md).
 - **Moving.** As on Overview: an in-progress item moves while its agent's turn runs, a live background job
   runs, or it watches an open PR; otherwise, after 10 minutes, it is "not moving" (Overview A8, A19).
 - **Precedence**, first match wins, for an idle workspace: a permission (Needs input) or a failure (Failed),
-  as today → an open ask or "not moving" work (Ready to review) → moving work on machines (Working) → work
-  waiting only on a reviewer (Blocked) → the status card's report → the finished turn.
+  as today → an open ask, or in-progress work where stuck items are at least as many as moving ones (Ready
+  to review) → moving work on machines (Working) → work waiting only on a reviewer (Blocked) → the status card's report → the finished turn.
 - **Permissions.** None.
 
 ## S1 Sidebar groups (P1)
@@ -21,8 +21,9 @@ Map: [spec-sidebar-in-progress-ui-map.md](./spec-sidebar-in-progress-ui-map.md).
   over moving work.
 - **Extended.** Groups and their order are unchanged. An idle workspace whose open items are all in
   progress joins Working while any of them waits on machines (CI checks running, a live background job, a
-  running turn), and Blocked when all of them wait on a requested review (A27). Any item not moving puts it
-  in Ready to review (A28). A Done status card loses to moving work (A30). When the last in-progress item
+  running turn), and Blocked when all of them wait on a requested review (A27). Items not moving put it in
+  Ready to review (A28), unless more of its items are moving than stuck: then it stays under Working or
+  Blocked and the row says "1 not moving" (A35). A Done status card loses to moving work (A30). When the last in-progress item
   finishes, the workspace falls back to today's rules.
 - **Get here.** The sidebar.
 - **Shows.** The usual groups; rows that moved because of in-progress work carry the S2 badge.
@@ -30,7 +31,7 @@ Map: [spec-sidebar-in-progress-ui-map.md](./spec-sidebar-in-progress-ui-map.md).
   Catalog" (2 not moving); Billing's merge train sits under Working, the schema PR waiting on a reviewer
   under Blocked.
 - **Variants.** CI running (Working); review only (Blocked); CI and review mixed (Working); one item not
-  moving among moving ones (Ready to review); Done card with moving asks (Working); all items finished (back
+  moving among three moving (stays under Working, "1 not moving"); Done card with moving asks (Working); all items finished (back
   to Ready to review or Done by today's rules).
 - **Edge cases.** The agent starts a turn → Working with the spinning ring, as today. An open ask arrives →
   Ready to review with "needs you (1)". A row moved by hand (Move to Done) stays until a newer status or a
@@ -57,3 +58,6 @@ Map: [spec-sidebar-in-progress-ui-map.md](./spec-sidebar-in-progress-ui-map.md).
 
 1. A row under Blocked because of a requested review says "awaiting review" ("2 awaiting review" for several); rows under Working keep "N in progress" (A33).
 2. A row under Working because of in-progress work shows a still dot, not the spinning ring (A34).
+3. Moving majority wins: with more items moving than stuck, the row stays under Working or Blocked and shows
+   "N not moving"; with stuck items at least as many as moving ones, it goes to Ready to review (A35).
+4. Stage 2 approved (A36).

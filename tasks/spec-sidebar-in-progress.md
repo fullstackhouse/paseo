@@ -1,6 +1,6 @@
 # Spec: sidebar groups a workspace by its work in progress
 
-Status: stage 2 (cards) next · 2026-11-25
+Status: design approved (atlas `.ai/prototypes/sidebar-in-progress/`) · 2026-11-25
 
 Follows [spec-overview-in-progress.md](spec-overview-in-progress.md) (shipped in fullstackhouse/paseo#237 and
 fullstackhouse/paseo-asks#91). UI map: [spec-sidebar-in-progress-ui-map.md](spec-sidebar-in-progress-ui-map.md).
@@ -41,3 +41,4 @@ To be written once the UI map and cards are agreed.
 ## Changelog
 
 - 2026-11-25 — stage 1 UI map drafted; placement options drawn (V1–V3); A27–A30 decided; stage 1 approved (A31).
+- 2026-11-25 — stage 2 cards and mockups approved (A33–A36).

@@ -6,7 +6,7 @@ import { sbPieces } from './mockups-shared.mjs'
 
 export function sidebarStates(kit) {
   const { change } = kit
-  const { needsYou, notMoving, inProgress, W, BILLING, sidebar, crop } = sbPieces(kit)
+  const { needsYou, notMoving, inProgress, awaitingReview, W, BILLING, sidebar, crop } = sbPieces(kit)
 
   const OTHERS = Object.values(W)
   const others = (...skip) => OTHERS.filter((w) => !skip.includes(w))
@@ -20,9 +20,9 @@ export function sidebarStates(kit) {
   const TODAY_DONE = { group: 'done', badge: 'done' }
 
   const billingWorking = { ...BILLING, group: 'running', badge: 'moving', badges: [inProgress(3)] }
-  const billingBlocked = { ...BILLING, group: 'blocked', badge: 'blocked', badges: [inProgress(3)] }
+  const billingBlocked = { ...BILLING, group: 'blocked', badge: 'blocked', badges: [awaitingReview(3)] }
   // Schema: relations whose only in-progress item is PR #88, waiting on a requested review.
-  const schemaReview = { ...W.SCHEMA, badges: [inProgress(1)] }
+  const schemaReview = { ...W.SCHEMA, badges: [awaitingReview(1)] }
 
   return {
     S1: [
@@ -35,8 +35,8 @@ export function sidebarStates(kit) {
       },
       {
         id: 's4',
-        caption: 'One item not moving among moving ones — Billing stays in Ready to review',
-        html: sidebar([...OTHERS, { ...BILLING, group: 'attention', badge: 'attention', badges: [notMoving(1)] }]),
+        caption: 'One item not moving among three moving — the moving majority keeps Billing under Working, "1 not moving"',
+        html: sidebar([...OTHERS, ...moved({ ...billingWorking, badges: [notMoving(1, change('new')), inProgress(3, change('new'))] }, TODAY_READY)]),
       },
       { id: 's5', caption: 'Done card with moving asks — Billing moves from Done to Working', html: sidebar([...OTHERS, ...moved(billingWorking, TODAY_DONE)]) },
       {
@@ -54,8 +54,8 @@ export function sidebarStates(kit) {
       },
       {
         id: 's2',
-        caption: 'Blocked on a review — "1 in progress"',
-        html: crop([{ ...schemaReview, badges: [inProgress(1, change('new'))] }]),
+        caption: 'Blocked on a review — "awaiting review"',
+        html: crop([{ ...schemaReview, badges: [awaitingReview(1, change('new'))] }]),
       },
       {
         id: 's3',

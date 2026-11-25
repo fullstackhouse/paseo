@@ -18,6 +18,7 @@ export const SB_ICONS = {
   'circle-pause': '<circle cx="12" cy="12" r="10"/><line x1="10" x2="10" y1="15" y2="9"/><line x1="14" x2="14" y1="15" y2="9"/>',
   'circle-x': '<circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/>',
   'circle-dashed': '<path d="M10.1 2.182a10 10 0 0 1 3.8 0"/><path d="M13.9 21.818a10 10 0 0 1-3.8 0"/><path d="M17.609 3.721a10 10 0 0 1 2.69 2.7"/><path d="M2.182 13.9a10 10 0 0 1 0-3.8"/><path d="M20.279 17.609a10 10 0 0 1-2.7 2.69"/><path d="M21.818 10.1a10 10 0 0 1 0 3.8"/><path d="M3.721 6.391a10 10 0 0 1 2.7-2.69"/><path d="M6.391 20.279a10 10 0 0 1-2.69-2.7"/>',
+  eye: '<path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/>',
   'panel-left': '<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/>',
 }
 
@@ -36,6 +37,8 @@ export function sbPieces({ ic, esc }) {
   const needsYou = (n) => ({ icon: 'hand', text: `needs you (${n})`, tone: 'warn' })
   const notMoving = (n, attr) => ({ icon: 'circle-alert', text: `${n} not moving`, tone: 'warn', attr })
   const inProgress = (n, attr) => ({ icon: 'circle-dashed', text: `${n} in progress`, tone: 'muted', attr })
+  // Under Blocked because of a requested review, the in-progress badge says what it waits on (A33).
+  const awaitingReview = (n, attr) => ({ icon: 'eye', text: n > 1 ? `${n} awaiting review` : 'awaiting review', tone: 'muted', attr })
 
   // Workspaces; min = minutes since last activity, which orders rows inside a group.
   const PROJECT = 'casteo'
@@ -85,5 +88,5 @@ export function sbPieces({ ic, esc }) {
   // A cropped sidebar around a few rows; "⋯" marks what is left out. width: a narrower sidebar.
   const crop = (workspaces, { width } = {}) => `<div class="frame sb-frame"><div class="sb-win is-crop"${width ? ` style="width:${width}px"` : ''}><div class="sb-cut">⋯</div>${groups(workspaces)}<div class="sb-cut">⋯</div></div></div>`
 
-  return { GROUPS, needsYou, notMoving, inProgress, W, BILLING, row, group, groups, sidebar, crop }
+  return { GROUPS, needsYou, notMoving, inProgress, awaitingReview, W, BILLING, row, group, groups, sidebar, crop }
 }
