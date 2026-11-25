@@ -268,12 +268,9 @@ async function observeSubagent(
     seenEntry = true;
     Object.assign(runtime, readRuntime(entry));
     usage = readUsage(entry) ?? usage;
-    const nextTerminalStatus = readChildTerminalStatus(entry, childTerminalStatus);
-    if (childTerminalStatus && !nextTerminalStatus) {
-      timeline.push(...observeResume(link.id, childTerminalStatus, lastTimestamp, timestamp));
-    }
-    childTerminalStatus = nextTerminalStatus;
-    lastTimestamp = timestamp;
+    if (isPrompt(entry)) timeline.push(...observeResume(link.id, lastTimestamp, timestamp));
+    childTerminalStatus = readChildTerminalStatus(entry, childTerminalStatus);
+    lastTimestamp = readMessageTimestamp(entry, timestamp) ?? lastTimestamp;
     recordReplayToolOwners(toolOwners, entry, link.id);
     for (const item of await convertEntry(entry)) {
       timeline.push({ kind: "timeline", id: link.id, item, ...(timestamp ? { timestamp } : {}) });
@@ -304,18 +301,32 @@ async function observeSubagent(
   return observations;
 }
 
-/** A finished child was resumed. Closing its run keeps the idle gap out of its work. */
+/**
+ * A prompt starts a run, so the one before it ended at the child's previous message. How it ended
+ * doesn't matter: a reply, a handback, an API error and a killed process all leave the child idle
+ * until the prompt. The status is replaced at once and only closes the run.
+ */
 function observeResume(
   id: string,
-  status: ProviderSubagentStatus,
   finishedAt: string | null,
   resumedAt: string | null,
 ): SubagentObservation[] {
-  if (!finishedAt || !resumedAt) return [];
+  if (!finishedAt || !resumedAt || Date.parse(resumedAt) <= Date.parse(finishedAt)) return [];
   return [
-    { kind: "status", id, status, timestamp: finishedAt },
+    { kind: "status", id, status: "completed", timestamp: finishedAt },
     { kind: "status", id, status: "running", timestamp: resumedAt },
   ];
+}
+
+/** Other records, such as attachments, can be written while the child is idle. */
+function readMessageTimestamp(entry: ClaudeReplayEntry, timestamp: string | null): string | null {
+  return entry.type === "user" || entry.type === "assistant" ? timestamp : null;
+}
+
+function isPrompt(entry: ClaudeReplayEntry): boolean {
+  if (entry.type !== "user") return false;
+  const texts = readUserTexts(entry);
+  return texts.length > 0 && !texts.some(isClaudeInterruptPlaceholderText);
 }
 
 /** Advance the child's fallback outcome without retaining transcript entries. */

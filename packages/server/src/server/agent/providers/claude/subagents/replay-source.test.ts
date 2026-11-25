@@ -169,6 +169,97 @@ describe("observeReplaySubagents", () => {
     });
   });
 
+  const prompt = (timestamp: string, text = "Go on"): ClaudeReplayEntry => ({
+    type: "user",
+    timestamp,
+    message: { content: [{ type: "text", text }] },
+  });
+  const toolCall = (name: string): ClaudeReplayEntry => ({
+    type: "assistant",
+    timestamp: "2026-07-12T10:01:00.000Z",
+    message: { stop_reason: "tool_use", content: [{ type: "tool_use", id: "call", name }] },
+  });
+  const toolResult: ClaudeReplayEntry = {
+    type: "user",
+    timestamp: "2026-07-12T10:02:00.000Z",
+    message: { content: [{ type: "tool_result", tool_use_id: "call", content: "ok" }] },
+  };
+  const reply = (timestamp: string): ClaudeReplayEntry => ({
+    type: "assistant",
+    timestamp,
+    message: { stop_reason: "end_turn", content: [{ type: "text", text: "Done" }] },
+  });
+
+  it.each<[string, ClaudeReplayEntry[]]>([
+    ["a handback", [toolCall("SubagentHandback"), toolResult]],
+    [
+      "an API error",
+      [
+        {
+          ...reply("2026-07-12T10:02:00.000Z"),
+          isApiErrorMessage: true,
+          message: { stop_reason: "stop_sequence" },
+        },
+      ],
+    ],
+    ["a killed process", [toolCall("Bash"), toolResult]],
+    [
+      "an interrupt",
+      [toolCall("Bash"), prompt("2026-07-12T10:02:00.000Z", "[Request interrupted by user]")],
+    ],
+    [
+      "a reply followed by other records",
+      [
+        reply("2026-07-12T10:02:00.000Z"),
+        { type: "api-request-blob" },
+        { type: "attachment", timestamp: "2026-07-12T13:00:00.000Z" },
+      ],
+    ],
+  ])("keeps idle time out when the run before the resume ended in %s", async (_ending, ending) => {
+    const replay = await observeReplaySubagents({
+      subagents: [
+        {
+          agentId: AGENT_ID,
+          meta: { toolUseId: TOOL_USE_ID },
+          entries: [
+            prompt("2026-07-12T10:00:00.000Z"),
+            ...ending,
+            prompt("2026-07-12T13:00:00.000Z"),
+            reply("2026-07-12T13:03:00.000Z"),
+          ],
+        },
+      ],
+      parent: parentWithTaskCall(),
+      convertEntry: () => [],
+    });
+
+    expect(applyToStore(replay.observations)).toMatchObject({
+      status: "completed",
+      workedMs: 5 * 60_000,
+    });
+  });
+
+  it("counts a long tool call as work", async () => {
+    const replay = await observeReplaySubagents({
+      subagents: [
+        {
+          agentId: AGENT_ID,
+          meta: { toolUseId: TOOL_USE_ID },
+          entries: [
+            prompt("2026-07-12T10:00:00.000Z"),
+            toolCall("Bash"),
+            { ...toolResult, timestamp: "2026-07-12T10:40:00.000Z" },
+            reply("2026-07-12T10:41:00.000Z"),
+          ],
+        },
+      ],
+      parent: parentWithTaskCall(),
+      convertEntry: () => [],
+    });
+
+    expect(applyToStore(replay.observations)).toMatchObject({ workedMs: 41 * 60_000 });
+  });
+
   it("links a subagent to its Task call through meta.toolUseId", async () => {
     const observations = (
       await observeReplaySubagents({
