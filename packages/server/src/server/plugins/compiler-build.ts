@@ -154,6 +154,10 @@ function createRuntimeBoundaryPlugin(target: PluginBuildTarget, pluginDirectory:
         if (declaration && (typeOnly || /\.d\.[cm]?ts$/.test(declaration)))
           dependencyFiles.add(declaration);
         if (typeOnly && !declaration) {
+          // Packages may reference optional type packages or probe candidate paths in their
+          // declarations (@anthropic-ai/sdk does both for undici types); TypeScript tolerates
+          // those, so only the plugin's own missing type dependencies are errors.
+          if (file.split(path.sep).includes("node_modules")) return dependencyFiles;
           throw new Error(`Could not resolve type dependency "${specifier}" imported by ${file}`);
         }
         if (!typeOnly && kind !== "type-reference") {

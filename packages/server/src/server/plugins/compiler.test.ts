@@ -186,6 +186,34 @@ describe("plugin runtime entries", () => {
     );
   });
 
+  it("tolerates unresolvable type imports inside dependency declarations", async () => {
+    // @anthropic-ai/sdk probes several possible undici-types locations in its declarations;
+    // most of them never exist. TypeScript tolerates that, so the compiler must too.
+    const entries = await createSplitPlugin();
+    const dependency = path.join(entries.directory, "node_modules/speculative-types");
+    await mkdir(dependency, { recursive: true });
+    await writeFile(
+      path.join(dependency, "package.json"),
+      JSON.stringify({ name: "speculative-types", types: "./index.d.mts" }),
+    );
+    await writeFile(
+      path.join(dependency, "index.d.mts"),
+      [
+        "type Init =",
+        "  | import('undici-types').RequestInit",
+        '  | import("../../node_modules/undici-types/index.d.ts.mjs").RequestInit;',
+        "export type Options = { init?: Init; label: string };",
+      ].join("\n"),
+    );
+    await writeFile(
+      entries.server,
+      'import type { Options } from "speculative-types"; const options: Options = { label: "server" }; export default () => options;',
+    );
+
+    const result = await compilePlugin(entries);
+    expect(result.serverBundle).toContain('"server"');
+  });
+
   it.each([
     "react",
     "react/jsx-runtime",
