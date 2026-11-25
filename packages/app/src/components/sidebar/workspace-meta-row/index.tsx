@@ -1,4 +1,4 @@
-import { Fragment, type ReactNode } from "react";
+import { Fragment, useCallback, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Text, View } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
@@ -39,6 +39,8 @@ const META_ICON_SIZE = HOST_BADGE_ICON_SIZE;
 const ThemedFolder = withUnistyles(Folder);
 const ThemedGitBranch = withUnistyles(GitBranch);
 const ThemedGlobe = withUnistyles(Globe);
+
+const NO_KEYS: ReadonlySet<string> = new Set();
 
 /** Stable identity so a row without labels doesn't re-select its items on every render. */
 const EMPTY_LABELS: readonly WorkspaceLabelDefinition[] = [];
@@ -106,6 +108,18 @@ export function WorkspaceMetaRow({
     reasonCount: workspace?.inProgressReasonCount,
   });
   const hasPluginItems = workspace !== null && pluginItems.length > 0;
+  // Only a plugin's badge knows whether it drew anything; the badges after it need to know to lead
+  // with a separator.
+  const [drawnPluginItems, setDrawnPluginItems] = useState<ReadonlySet<string>>(NO_KEYS);
+  const handlePluginDrawnChange = useCallback((key: string, drawn: boolean) => {
+    setDrawnPluginItems((current) => {
+      if (current.has(key) === drawn) return current;
+      const next = new Set(current);
+      if (drawn) next.add(key);
+      else next.delete(key);
+      return next;
+    });
+  }, []);
 
   if (items.length === 0 && !hasPluginItems && inProgressBadges.length === 0) return null;
 
@@ -122,9 +136,13 @@ export function WorkspaceMetaRow({
           targets={pluginItems}
           workspaceId={workspace.workspaceId}
           separated={items.length > 0}
+          onDrawnChange={handlePluginDrawnChange}
         />
       ) : null}
-      <InProgressBadges badges={inProgressBadges} separated={items.length > 0 || hasPluginItems} />
+      <InProgressBadges
+        badges={inProgressBadges}
+        separated={items.length > 0 || drawnPluginItems.size > 0}
+      />
     </View>
   );
 }

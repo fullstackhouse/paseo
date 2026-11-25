@@ -6,6 +6,8 @@ export interface WorkspaceRowItemFrame {
   testID: string;
   /** Something is drawn before this item on the line, so the badge leads with a separator. */
   separated: boolean;
+  /** Told whether the badge draws anything, so what follows on the line knows to lead with a separator. */
+  onDrawnChange?: (drawn: boolean) => void;
 }
 
 export const WorkspaceRowItemFrameContext = createContext<WorkspaceRowItemFrame | null>(null);

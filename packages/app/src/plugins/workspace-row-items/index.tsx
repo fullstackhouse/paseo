@@ -61,11 +61,14 @@ export function PluginWorkspaceRowItems({
   targets,
   workspaceId,
   separated,
+  onDrawnChange,
 }: {
   targets: readonly RowItemTarget[];
   workspaceId: string;
   /** The row drew items of its own, so the first plugin item leads with a separator. */
   separated: boolean;
+  /** Told, per item key, whether a `WorkspaceRowBadge` drew anything. */
+  onDrawnChange?: (key: string, drawn: boolean) => void;
 }) {
   return targets.map((target, index) => (
     <ThemedRowItemHost
@@ -73,6 +76,7 @@ export function PluginWorkspaceRowItems({
       target={target}
       workspaceId={workspaceId}
       separated={separated || index > 0}
+      onDrawnChange={onDrawnChange}
       uniProps={pluginThemeMapping}
     />
   ));
@@ -82,11 +86,13 @@ function RowItemHost({
   target: { plugin, item },
   workspaceId,
   separated,
+  onDrawnChange,
   theme,
 }: {
   target: RowItemTarget;
   workspaceId: string;
   separated: boolean;
+  onDrawnChange?: (key: string, drawn: boolean) => void;
   theme: PluginTheme;
 }) {
   const toast = useToast();
@@ -103,9 +109,15 @@ function RowItemHost({
     [plugin, toast],
   );
   const title = plugin.i18n.resolve(item.title, plugin.locale);
+  const key = workspaceRowItemKey(plugin.id, item.id);
   const frame = useMemo<WorkspaceRowItemFrame>(
-    () => ({ title, testID: `plugin-workspace-row-${plugin.id}-${item.id}`, separated }),
-    [item.id, plugin.id, separated, title],
+    () => ({
+      title,
+      testID: `plugin-workspace-row-${plugin.id}-${item.id}`,
+      separated,
+      onDrawnChange: onDrawnChange ? (drawn: boolean) => onDrawnChange(key, drawn) : undefined,
+    }),
+    [item.id, key, onDrawnChange, plugin.id, separated, title],
   );
   const props = useMemo<PluginWorkspaceRowItemProps>(
     () => ({
