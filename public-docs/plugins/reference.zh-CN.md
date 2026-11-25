@@ -287,13 +287,13 @@ export async function openDocumentation() {
 
 #### ExternalLink 属性 {#externallink-props}
 
-| 属性                            | 是否必填 | 行为 / 默认值                      |
-| ------------------------------- | -------- | ---------------------------------- |
-| `href: string`                  | 是       | 绝对的 HTTP(S) 目标地址            |
-| `children: ReactNode`           | 是       | 链接文本或内联的 React Native 内容 |
-| `accessibilityLabel: string`    | 否       | 覆盖从内容推导出的无障碍名称       |
-| `testID: string`                | 否       | 测试标识符；默认不设置             |
-| `onError(error: unknown): void` | 否       | 接收打开时的错误；默认记录到日志   |
+| 属性                            | 是否必填 | 行为 / 默认值                              |
+| ------------------------------- | -------- | ------------------------------------------ |
+| `href: string`                  | 是       | 绝对的 HTTP(S) 目标地址，或 Paseo 应用链接 |
+| `children: ReactNode`           | 是       | 链接文本或内联的 React Native 内容         |
+| `accessibilityLabel: string`    | 否       | 覆盖从内容推导出的无障碍名称               |
+| `testID: string`                | 否       | 测试标识符；默认不设置                     |
+| `onError(error: unknown): void` | 否       | 接收打开时的错误；默认记录到日志           |
 
 #### 打开工作区浏览器 {#open-a-workspace-browser}
 

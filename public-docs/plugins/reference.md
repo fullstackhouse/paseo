@@ -338,7 +338,7 @@ opener. An archived workspace shows its recovery state.
 
 | Prop                            | Required | Behavior / default                                     |
 | ------------------------------- | -------- | ------------------------------------------------------ |
-| `href: string`                  | Yes      | Absolute HTTP(S) destination                           |
+| `href: string`                  | Yes      | Absolute HTTP(S) destination, or a Paseo app link      |
 | `children: ReactNode`           | Yes      | Link text or inline React Native content               |
 | `accessibilityLabel: string`    | No       | Overrides the accessible name derived from the content |
 | `testID: string`                | No       | Test identifier; unset by default                      |
