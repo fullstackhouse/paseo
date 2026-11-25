@@ -601,3 +601,21 @@
 .ip-divider { display: flex; align-items: center; gap: 6px; margin-top: 4px; font-size: 11.5px; color: var(--app-fg-xmuted); }
 .ip-divider::after { content: ''; height: 1px; background: var(--app-line); flex: 1; }
 .ip-move > .ip-divider:first-child { margin-top: 0; }
+
+/* Overview: status lines (E2) and the expanded in-progress ask (O5) */
+.ip-replied { margin: 0; font-size: 12.5px; color: var(--app-fg-muted); }
+.ip-warnline { margin: 0; display: flex; gap: 6px; align-items: center; font-size: 12.5px; color: var(--app-warn); }
+.ip-open { margin: 2px -8px; border: 1px solid var(--app-line); border-radius: 10px; background: var(--app-surface1); }
+.ip-open .ip-row.is-open-head { margin: 0; font-weight: 500; }
+.ip-open .ip-row.is-open-head:hover { background: transparent; }
+.ip-open-body { display: flex; flex-direction: column; gap: 8px; padding: 0 12px 12px 30px; }
+.ip-body { margin: 0; font-size: 13px; line-height: 1.5; }
+.ip-more { color: var(--app-fg-muted); text-decoration: underline; text-underline-offset: 3px; }
+.ip-factsline { margin: 0; font-size: 12px; }
+.ip-links { display: flex; flex-wrap: wrap; gap: 6px; }
+.ip-linkchip { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; padding: 3px 8px; border-radius: 6px; background: var(--app-surface2); color: var(--app-fg-muted); }
+.ip-linkchip svg { width: 12px; height: 12px; }
+.ip-open-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding-top: 2px; }
+.ip-btn.is-quiet { font-size: 12.5px; padding: 4px 10px; background: transparent; color: var(--app-fg-muted); }
+.ip-mobile .ip-btn.is-quiet { flex: 0 0 auto; }
+.ip-reminded { display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; color: var(--app-fg-muted); padding: 0 6px; }
