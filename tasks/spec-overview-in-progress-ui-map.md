@@ -95,7 +95,9 @@ Views: V1 Own section, V2 Inside Status, V3 Under Your move.
    idle agent left running, and asks in progress (A5).
 2. Grouped: one row per agent and per ask; each agent's subagents and background work fold under it as
    counted lines (A6).
+3. Placement: its own "In progress" section directly after Your move (V1). V2 and V3 are dropped; O4
+   takes V1's anatomy (A4).
 
 ## Open questions
 
-See the stage 1 asks (A4, A7–A11).
+See the stage 1 asks (A7–A11).
