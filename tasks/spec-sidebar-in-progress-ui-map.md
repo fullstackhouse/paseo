@@ -61,7 +61,9 @@ Views: V1 Working, V2 Blocked, V3 Stays in Ready to review.
    a running turn) → **Working**; only on a person other than you (a requested review) → **Blocked**. Mixed
    → Working, as the existing fold ranks working work above blocked. V1 and V2 are both kept, each for its
    case; V3 is dropped.
+2. A workspace with in-progress work that nothing moves stays in Ready to review, with a warning badge
+   "N not moving" (A28).
 
 ## Open questions
 
-See the stage 1 asks (A28–A30).
+See the stage 1 asks (A29, A30).
