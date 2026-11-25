@@ -144,3 +144,61 @@ export function buildPluginUpdateCheckContribution(
     },
   };
 }
+
+export interface TestBuildCommandCenterSource {
+  isDesktopApp: boolean;
+  isInstalling: boolean;
+  installedTag: string | null;
+  onTestBuild: boolean;
+  builds: readonly { tag: string; label: string }[];
+  labels: { section: string; installTestBuild: string; backToStable: string };
+  icon?: CommandCenterIcon;
+  install(tag: string): void;
+  backToStable(): void;
+}
+
+// FSH fork: "Install test build › <build>" rows, a picker that opens as you type, and Back to
+// stable build while a test build runs. The installed build is listed as selected.
+export function buildTestBuildContributions(
+  source: TestBuildCommandCenterSource,
+): CommandCenterContribution[] {
+  if (!source.isDesktopApp || source.isInstalling) return [];
+  const contributions: CommandCenterContribution[] = source.builds.map((build, rank) => {
+    const selected = build.tag === source.installedTag;
+    return {
+      id: `install-test-build:${build.tag}`,
+      group: "install-test-build",
+      groupRank: 1,
+      rank,
+      keywords: ["test", "build", "install", "prerelease", "paseo", build.tag],
+      visibility: "query",
+      run: () => {
+        if (!selected) source.install(build.tag);
+      },
+      presentation: {
+        kind: "choice",
+        path: [source.labels.installTestBuild, build.label],
+        icon: source.icon,
+        selected,
+      },
+    };
+  });
+  if (source.onTestBuild) {
+    contributions.push({
+      id: "back-to-stable-build",
+      group: "actions",
+      groupRank: 0,
+      rank: 9,
+      keywords: ["stable", "test", "build", "update", "release", "paseo"],
+      visibility: "query",
+      run: source.backToStable,
+      presentation: {
+        kind: "action",
+        title: source.labels.backToStable,
+        sectionTitle: source.labels.section,
+        icon: source.icon,
+      },
+    });
+  }
+  return contributions;
+}

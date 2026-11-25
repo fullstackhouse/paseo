@@ -1,12 +1,22 @@
 import { spawn } from "node:child_process";
 import { openSync, readFileSync, statSync } from "node:fs";
-import { stat } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
+import { homedir } from "node:os";
 import path from "node:path";
 import { app } from "electron";
 import log from "electron-log/main";
-import { createFshUpdater, parseLatestReleaseVersion, type FshUpdater } from "./fsh-updater.js";
+import {
+  createFshUpdater,
+  parseLatestReleaseVersion,
+  parseTestBuilds,
+  type FshUpdater,
+} from "./fsh-updater.js";
 
-const LATEST_RELEASE_URL = "https://api.github.com/repos/fullstackhouse/paseo/releases/latest";
+const RELEASES_URL = "https://api.github.com/repos/fullstackhouse/paseo/releases";
+const LATEST_RELEASE_URL = `${RELEASES_URL}/latest`;
+// Where install-fsh.sh records the installed tag; it always uses ~/.paseo, whatever PASEO_HOME says.
+const INSTALLED_TAG_PATH = path.join(homedir(), ".paseo", "fsh-release");
+const ASSET_EXTENSION = process.platform === "linux" ? "rpm" : "dmg";
 const INSTALL_SCRIPT_URL =
   "https://raw.githubusercontent.com/fullstackhouse/paseo/fsh/scripts/install-fsh.sh";
 
@@ -33,17 +43,27 @@ function readFshBuildVersion(): string | null {
   }
 }
 
-function runInstallScript(): string {
+async function fetchGitHubJson(url: string): Promise<unknown> {
+  const response = await fetch(url, {
+    headers: { Accept: "application/vnd.github+json" },
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!response.ok) throw new Error(`GitHub answered ${response.status}.`);
+  return response.json();
+}
+
+function runInstallScript(args: readonly string[]): string {
   const logPath = path.join(app.getPath("logs"), "fsh-update.log");
   const out = openSync(logPath, "w");
-  // Detached into its own session: the script quits this app, and must outlive it.
+  // Detached into its own session: the script quits this app, and must outlive it. The extra
+  // arguments go in as bash's positional parameters, not into the command string.
   const child = spawn(
     "/bin/bash",
-    ["-c", `curl -fsSL "${INSTALL_SCRIPT_URL}" | bash -s -- --yes`],
+    ["-c", `curl -fsSL "${INSTALL_SCRIPT_URL}" | bash -s -- --yes "$@"`, "install-fsh", ...args],
     { detached: true, stdio: ["ignore", out, out] },
   );
   child.unref();
-  log.info("[fsh-updater] started install-fsh.sh", { pid: child.pid, logPath });
+  log.info("[fsh-updater] started install-fsh.sh", { pid: child.pid, args, logPath });
   return logPath;
 }
 
@@ -56,15 +76,20 @@ export function createElectronFshUpdater(deps: { stopDaemon(): Promise<void> }):
     buildVersion,
     initialExecutableIdentity,
     async fetchLatestVersion() {
-      const response = await fetch(LATEST_RELEASE_URL, {
-        headers: { Accept: "application/vnd.github+json" },
-        signal: AbortSignal.timeout(15_000),
-      });
-      if (!response.ok) throw new Error(`GitHub answered ${response.status}.`);
-      return parseLatestReleaseVersion(
-        await response.json(),
-        process.platform === "linux" ? "rpm" : "dmg",
+      return parseLatestReleaseVersion(await fetchGitHubJson(LATEST_RELEASE_URL), ASSET_EXTENSION);
+    },
+    async fetchTestBuilds() {
+      return parseTestBuilds(
+        await fetchGitHubJson(`${RELEASES_URL}?per_page=100`),
+        ASSET_EXTENSION,
       );
+    },
+    async readInstalledTag() {
+      try {
+        return (await readFile(INSTALLED_TAG_PATH, "utf-8")).trim() || null;
+      } catch {
+        return null;
+      }
     },
     async readExecutableIdentity() {
       return String((await stat(process.execPath)).ino);

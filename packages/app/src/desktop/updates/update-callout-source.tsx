@@ -1,4 +1,4 @@
-import { Download, Gift, RefreshCw } from "lucide-react-native";
+import { Download, FlaskConical, Gift, RefreshCw } from "lucide-react-native";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useUnistyles, withUnistyles } from "react-native-unistyles";
@@ -6,6 +6,7 @@ import type { CommandCenterIconProps } from "@/command-center/contributions";
 import { useCommandCenterActions } from "@/command-center/provider";
 import {
   buildAppUpdateCheckContribution,
+  buildTestBuildContributions,
   buildUpdateContribution,
 } from "@/command-center/root-contributions";
 import {
@@ -22,6 +23,9 @@ import {
   type UpdateCalloutBody,
 } from "@/desktop/updates/resolve-update-callout";
 import { useDesktopAppUpdater } from "@/desktop/updates/use-desktop-app-updater";
+import { formatTestBuildLabel } from "@/desktop/updates/fsh-test-builds";
+import { useConfirmFshRelease } from "@/desktop/updates/use-confirm-fsh-release";
+import { useFshTestBuilds } from "@/desktop/updates/use-fsh-test-builds";
 import { useInstallWhenIdle, useLocalHostActivity } from "@/desktop/updates/use-install-when-idle";
 import { useAppSettings } from "@/hooks/use-settings";
 import { useStableEvent } from "@/hooks/use-stable-event";
@@ -38,6 +42,14 @@ const ThemedDownload = withUnistyles(Download, (theme) => ({
 const ThemedRefreshCw = withUnistyles(RefreshCw, (theme) => ({
   color: theme.colors.foregroundMuted,
 }));
+
+const ThemedFlaskConical = withUnistyles(FlaskConical, (theme) => ({
+  color: theme.colors.foregroundMuted,
+}));
+
+function TestBuildIcon({ size }: CommandCenterIconProps) {
+  return <ThemedFlaskConical size={size} strokeWidth={2.2} />;
+}
 
 function UpdateIcon({ size }: CommandCenterIconProps) {
   return <ThemedDownload size={size} strokeWidth={2.2} />;
@@ -126,7 +138,19 @@ export function UpdateCalloutSource() {
   });
   // Runs on this source's updater, so a found update shows up here as Update Paseo and the callout.
   // Quiet errors: a failed check reports in the toast only; "Update failed" stays for failed installs.
+  const { info: testBuilds } = useFshTestBuilds();
+  const installedTestBuild = testBuilds?.installedTestBuild ?? null;
+  const confirmFshRelease = useConfirmFshRelease(installUpdate);
   const checkFromPalette = useStableEvent(async () => {
+    // FSH fork: a test build has no updates until it goes back to stable.
+    if (installedTestBuild) {
+      toast.show(
+        t("desktop.updates.testBuilds.checkOnTestBuild", {
+          build: formatTestBuildLabel(installedTestBuild),
+        }),
+      );
+      return;
+    }
     // The next toast replaces this one, so the result needs no explicit dismiss.
     toast.show(t("desktop.updates.status.checking"), { durationMs: null });
     const result = await checkForUpdates({ quietErrors: true });
@@ -153,8 +177,40 @@ export function UpdateCalloutSource() {
       icon: UpdateIcon,
       install: confirmAndInstall,
     });
-    return [check, contribution].filter((entry) => entry !== null);
-  }, [checkFromPalette, confirmAndInstall, isDesktopApp, isInstalling, latestVersion, status, t]);
+    const testBuildEntries = buildTestBuildContributions({
+      isDesktopApp,
+      isInstalling,
+      installedTag: testBuilds?.installedTag ?? null,
+      onTestBuild: installedTestBuild !== null,
+      builds: (testBuilds?.testBuilds ?? []).map((build) => ({
+        tag: build.tag,
+        label: formatTestBuildLabel(build),
+      })),
+      labels: {
+        ...labels,
+        installTestBuild: t("desktop.updates.testBuilds.installTestBuild"),
+        backToStable: t("desktop.updates.testBuilds.backToStableBuild"),
+      },
+      icon: TestBuildIcon,
+      install: (tag) => {
+        const build = testBuilds?.testBuilds.find((entry) => entry.tag === tag);
+        if (build) confirmFshRelease({ kind: "test", build });
+      },
+      backToStable: () => confirmFshRelease({ kind: "stable" }),
+    });
+    return [check, contribution, ...testBuildEntries].filter((entry) => entry !== null);
+  }, [
+    checkFromPalette,
+    confirmAndInstall,
+    confirmFshRelease,
+    installedTestBuild,
+    isDesktopApp,
+    isInstalling,
+    latestVersion,
+    status,
+    t,
+    testBuilds,
+  ]);
   useCommandCenterActions({
     sourceId: "desktop-update",
     enabled: commandCenterActions.length > 0,
