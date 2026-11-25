@@ -892,6 +892,8 @@ export const AgentSnapshotPayloadSchema = z.object({
   lastUserMessageAt: z.string().nullable(),
   status: AgentStatusSchema,
   activeTurn: AgentActiveTurnPayloadSchema.nullable().optional(),
+  // Time in finished turns. The open turn is activeTurn and is not in the total.
+  workedMs: z.number().optional(),
   capabilities: AgentCapabilityFlagsSchema,
   currentModeId: z.string().nullable(),
   availableModes: z.array(AgentModeSchema),
@@ -5217,6 +5219,9 @@ export const ProviderSubagentDescriptorPayloadSchema = z.object({
   // Compact provider-owned context for the shared track. Providers choose what belongs here and
   // format it for display; clients must not parse provider-specific facts out of this string.
   subtitle: z.string().nullable().optional(),
+  // Time in finished runs. The open run, if any, started at runStartedAt and is not in the total.
+  workedMs: z.number().optional(),
+  runStartedAt: z.string().nullable().optional(),
 });
 
 export type ProviderSubagentDescriptorPayload = z.infer<

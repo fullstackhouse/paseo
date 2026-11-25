@@ -1,5 +1,13 @@
 import { describe, expect, test } from "vitest";
-import { ProviderSubagentStore } from "./store.js";
+import {
+  type ProviderSubagentInputEvent,
+  ProviderSubagentStore,
+  type ProviderSubagentStatus,
+} from "./store.js";
+
+function statusAt(status: ProviderSubagentStatus, timestamp: string): ProviderSubagentInputEvent {
+  return { type: "upsert", id: "child-1", status, timestamp };
+}
 
 describe("ProviderSubagentStore", () => {
   test("keeps provider children and their timelines scoped to the parent agent", () => {
@@ -105,5 +113,67 @@ describe("ProviderSubagentStore", () => {
     });
     expect(page.rows.at(-1)?.seq).toBe(101);
     expect(page.hasOlder).toBe(false);
+  });
+
+  test("counts an open run from its start and keeps it out of the total", () => {
+    const subagents = new ProviderSubagentStore();
+    subagents.apply("parent", "claude", statusAt("running", "2026-07-12T10:00:00.000Z"));
+    subagents.apply("parent", "claude", statusAt("running", "2026-07-12T10:05:00.000Z"));
+
+    expect(subagents.get("parent", "child-1")).toMatchObject({
+      workedMs: 0,
+      runStartedAt: "2026-07-12T10:00:00.000Z",
+    });
+  });
+
+  test("adds up the runs of a resumed child without the idle time between them", () => {
+    const subagents = new ProviderSubagentStore();
+    subagents.apply("parent", "claude", statusAt("running", "2026-07-12T10:00:00.000Z"));
+    subagents.apply("parent", "claude", statusAt("completed", "2026-07-12T10:02:00.000Z"));
+    subagents.apply("parent", "claude", statusAt("running", "2026-07-12T13:00:00.000Z"));
+    subagents.apply("parent", "claude", statusAt("completed", "2026-07-12T13:03:00.000Z"));
+
+    expect(subagents.get("parent", "child-1")).toMatchObject({
+      workedMs: 5 * 60_000,
+      runStartedAt: null,
+    });
+  });
+
+  test("leaves a finished child's total alone when late details or a corrected outcome arrive", () => {
+    const subagents = new ProviderSubagentStore();
+    subagents.apply("parent", "claude", statusAt("running", "2026-07-12T10:00:00.000Z"));
+    subagents.apply("parent", "claude", statusAt("canceled", "2026-07-12T10:02:00.000Z"));
+    subagents.apply("parent", "claude", {
+      type: "upsert",
+      id: "child-1",
+      subtitle: "general-purpose · 12k tokens",
+      timestamp: "2026-07-12T11:00:00.000Z",
+    });
+    subagents.apply("parent", "claude", statusAt("completed", "2026-07-12T12:00:00.000Z"));
+
+    expect(subagents.get("parent", "child-1")).toMatchObject({
+      workedMs: 2 * 60_000,
+      runStartedAt: null,
+    });
+  });
+
+  test("replaces the total when history is replayed over a finished child", () => {
+    const subagents = new ProviderSubagentStore();
+    const history = [
+      statusAt("running", "2026-07-12T10:00:00.000Z"),
+      statusAt("completed", "2026-07-12T10:02:00.000Z"),
+      statusAt("running", "2026-07-12T13:00:00.000Z"),
+      statusAt("completed", "2026-07-12T13:03:00.000Z"),
+    ];
+    for (const event of [...history, ...history]) subagents.apply("parent", "claude", event);
+
+    expect(subagents.get("parent", "child-1")?.workedMs).toBe(5 * 60_000);
+  });
+
+  test("records no work for a child first seen finished", () => {
+    const subagents = new ProviderSubagentStore();
+    subagents.apply("parent", "codex", statusAt("completed", "2026-07-12T10:00:00.000Z"));
+
+    expect(subagents.get("parent", "child-1")).toMatchObject({ workedMs: 0, runStartedAt: null });
   });
 });

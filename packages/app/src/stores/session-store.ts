@@ -78,6 +78,8 @@ export interface Agent {
   provider: AgentProvider;
   status: AgentLifecycleStatus;
   turn: TurnLiveness;
+  /** Time in finished turns; absent from hosts that don't record it. */
+  workedMs?: number;
   createdAt: Date;
   updatedAt: Date;
   lastUserMessageAt: Date | null;
