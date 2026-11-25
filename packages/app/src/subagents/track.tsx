@@ -23,6 +23,7 @@ import {
 import { useAgentFactsLine } from "@/panels/agent-facts-line";
 import { getPanelManifest } from "@/panels/panel-manifest";
 import { useSheetPanePage } from "@/screens/workspace/sheet-pane";
+import { useSubagentsTrackOpen } from "./track-open-request";
 import type { SheetTab } from "@/stores/workspace-layout-store";
 import { formatDuration } from "@/utils/time";
 import type { SubagentRow } from "./select";
@@ -56,6 +57,8 @@ export interface SubagentsTrackProps {
   onArchiveFinished?: (scope: ArchiveScope) => void;
   archiveFinishedStatus?: ArchiveFinishedStatus;
   onDetachSubagent?: (address: AgentAddress) => void;
+  /** The agent whose subagents these are; its list opens on `requestSubagentsTrackOpen`. */
+  ownerAgentId?: string;
 }
 
 const IDLE_ARCHIVE_FINISHED_STATUS: ArchiveFinishedStatus = { kind: "idle" };
@@ -102,8 +105,12 @@ export function SubagentsTrack({
   onArchiveFinished,
   archiveFinishedStatus = IDLE_ARCHIVE_FINISHED_STATUS,
   onDetachSubagent,
+  ownerAgentId,
 }: SubagentsTrackProps): ReactElement | null {
   const { t } = useTranslation();
+  const { open, onOpenChange } = useSubagentsTrackOpen(
+    ownerAgentId ? { serverId, agentId: ownerAgentId } : null,
+  );
   const sheetPanePage = useSheetPanePage();
   // Null until the user folds or unfolds Done, so the default can follow what the list holds.
   const [doneExpanded, setDoneExpanded] = useState<boolean | null>(null);
@@ -136,6 +143,8 @@ export function SubagentsTrack({
       segments={pill.segments}
       accessibilityLabel={pill.accessibilityLabel}
       panelTitle={t("subagents.title")}
+      open={open}
+      onOpenChange={onOpenChange}
     >
       {groups.map((group, index) => {
         const folded = group.key === "done" && doneFolded;

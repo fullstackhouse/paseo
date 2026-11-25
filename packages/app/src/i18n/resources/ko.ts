@@ -2401,9 +2401,20 @@ export const ko: TranslationResources = {
       prMergedTitle: "PR #{{number}} 병합됨",
       outdated: "{{time}}에 답장했지만 에이전트가 그 후로 업데이트하지 않았습니다.",
       readyToArchive: "보관 준비됨",
-      archiveHeldTitle: "보관은 백그라운드 작업을 기다리는 중",
-      archiveHeldFacts:
-        "셸, 모니터 또는 하위 에이전트가 아직 실행 중입니다. 헤더에서 보관하면 중지됩니다.",
+      inProgress: "진행 중",
+      nothingMoving: "진행 없음",
+      updatedAgo: "{{time}} 업데이트됨",
+      nothingRunning: "이 워크스페이스에서 실행 중인 것이 없습니다.",
+      jobRunning: "{{time}}째 실행 중",
+      subagents: {
+        one: "하위 에이전트 {{count}}개",
+        other: "하위 에이전트 {{count}}개",
+      },
+      backgroundKind: {
+        shell: "백그라운드 셸",
+        monitor: "모니터",
+        other: "백그라운드 작업",
+      },
       pullRequests: "풀 리퀘스트",
       noPrYet: "아직 PR 없음",
       notRefreshed: "새로 고침 안 됨",

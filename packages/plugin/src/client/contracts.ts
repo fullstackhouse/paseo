@@ -232,6 +232,12 @@ export interface PluginWorkspaceSummaryItemState {
    */
   entries?: PluginWorkspaceSummaryEntry[];
   /**
+   * Things this plugin's agents have taken on but not finished, one Overview In progress row each.
+   * FSH-only. An empty list says there are none. Like `entries`, the host renders an open row with
+   * `EntryComponent`.
+   */
+  inProgress?: PluginWorkspaceInProgressEntry[];
+  /**
    * The pull requests the workspace's work lives in, listed at the end of the Overview for
    * information. Replaces the host's own branch PR there; an empty list says there are none.
    * FSH-only. Publish it on its own item, without `status`, and set `entries: []` beside it:
@@ -305,6 +311,22 @@ export interface PluginWorkspaceSummaryEntry {
   detail?: string;
 }
 
+/** One thing an agent has taken on but not finished, as an Overview In progress row. FSH-only. */
+export interface PluginWorkspaceInProgressEntry {
+  id: string; // "A158"
+  title: string; // "PR #2104 — invoices list"
+  /** What it waits on: "CI running", "review requested", "next release". Age only when omitted. */
+  waitingOn?: string;
+  /** Colors `waitingOn`. */
+  tone?: "success" | "warning" | "danger" | "muted";
+  /** The agent that holds it; its running turn counts as movement. */
+  agentId?: string;
+  /** True while something outside the agent will report back, such as a watched open PR. */
+  watched?: boolean;
+  /** When it last changed, epoch ms: the row's age and its sort key. */
+  updatedAt: number;
+}
+
 /**
  * One fact about a workspace, set per workspace. The host uses `needsYou` to decide whether entering
  * the workspace opens Explorer, and on which panel.
@@ -324,7 +346,7 @@ export interface PluginWorkspaceSummaryItemContribution<
 
 export interface PluginWorkspaceSummaryEntryProps extends PluginNavigableHostProps {
   workspaceId: string;
-  /** An `entries[].id` of this item. */
+  /** An `entries[].id` or `inProgress[].id` of this item. */
   entryId: string;
   /** True for the Overview's first move: show it open, with its actions. */
   defaultExpanded: boolean;
@@ -334,6 +356,11 @@ export interface PluginWorkspaceSummaryEntryProps extends PluginNavigableHostPro
    */
   expanded?: boolean;
   onExpandedChange?(expanded: boolean): void;
+  /**
+   * For an `inProgress` entry: nothing moves it (no running turn of its agent, no live background
+   * work, not watched, unchanged for 10 minutes), as its In progress row says. FSH-only.
+   */
+  nothingMoving?: boolean;
 }
 
 export interface PluginWorkspaceSummaryItemRegistration {

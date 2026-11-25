@@ -234,6 +234,45 @@ describe("WorkspaceSummaryStore", () => {
     ]);
   });
 
+  it("keeps valid in-progress entries and drops malformed ones", () => {
+    const store = new WorkspaceSummaryStore();
+    const item = store.add(owner, {
+      id: "asks",
+      workspaceId: "w",
+      title: "Asks",
+      inProgress: [
+        {
+          id: "A158",
+          title: " PR #2104 ",
+          waitingOn: " CI running ",
+          tone: "success",
+          agentId: "agent-1",
+          watched: true,
+          updatedAt: 100,
+        },
+        { id: "A159", title: "No time", updatedAt: Number.NaN },
+        { id: "A160", title: " ", updatedAt: 1 },
+        { id: "A158", title: "Repeat", updatedAt: 2 },
+        // @ts-expect-error a plugin can send any tone
+        { id: "A161", title: "Odd tone", tone: "loud", waitingOn: " ", updatedAt: 3 },
+      ],
+    });
+    expect(store.forWorkspace("s", "w")[0]?.inProgress).toEqual([
+      {
+        id: "A158",
+        title: "PR #2104",
+        waitingOn: "CI running",
+        tone: "success",
+        agentId: "agent-1",
+        watched: true,
+        updatedAt: 100,
+      },
+      { id: "A161", title: "Odd tone", updatedAt: 3 },
+    ]);
+    item.update({ inProgress: [] });
+    expect(store.forWorkspace("s", "w")[0]?.inProgress).toEqual([]);
+  });
+
   it("keeps the entry component across updates", () => {
     const store = new WorkspaceSummaryStore();
     const EntryComponent = () => null;

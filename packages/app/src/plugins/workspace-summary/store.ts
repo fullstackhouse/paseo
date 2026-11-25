@@ -7,6 +7,7 @@ import type {
   PluginWorkspaceStatus,
   PluginWorkspaceBlocker,
   PluginWorkspaceSummaryEntry,
+  PluginWorkspaceInProgressEntry,
   PluginWorkspacePullRequest,
   PluginWorkspaceWorkState,
   PluginWorkspaceSummaryEntryProps,
@@ -60,6 +61,7 @@ function cleanState(patch: PluginWorkspaceSummaryItemState): PluginWorkspaceSumm
   }
   if (patch.status !== undefined) state.status = cleanStatus(patch.status);
   if (patch.entries !== undefined) state.entries = cleanEntries(patch.entries);
+  if (patch.inProgress !== undefined) state.inProgress = cleanInProgress(patch.inProgress);
   if (patch.pullRequests !== undefined) state.pullRequests = cleanPullRequests(patch.pullRequests);
   if (patch.pullRequestsStale !== undefined)
     state.pullRequestsStale = patch.pullRequestsStale === true;
@@ -154,6 +156,33 @@ function cleanEntries(
     seen.add(id);
     const detail = typeof entry.detail === "string" ? entry.detail.trim() : "";
     clean.push(detail ? { id, title, detail } : { id, title });
+  }
+  return clean;
+}
+
+/** A list longer than this is a plugin bug; the section isn't virtualized. */
+const MAX_IN_PROGRESS = 50;
+
+/** Drops malformed in-progress entries one by one. Ids key the Overview rows. */
+function cleanInProgress(entries: unknown): PluginWorkspaceInProgressEntry[] {
+  if (!Array.isArray(entries)) return [];
+  const clean: PluginWorkspaceInProgressEntry[] = [];
+  const seen = new Set<string>();
+  for (const entry of entries as Partial<PluginWorkspaceInProgressEntry>[]) {
+    if (clean.length >= MAX_IN_PROGRESS) break;
+    const id = optionalText(entry?.id);
+    const title = optionalText(entry?.title);
+    if (!id || !title || seen.has(id)) continue;
+    if (typeof entry.updatedAt !== "number" || !Number.isFinite(entry.updatedAt)) continue;
+    seen.add(id);
+    const item: PluginWorkspaceInProgressEntry = { id, title, updatedAt: entry.updatedAt };
+    const waitingOn = optionalText(entry.waitingOn);
+    if (waitingOn) item.waitingOn = waitingOn;
+    if (entry.tone && BLOCKER_TONES.has(entry.tone)) item.tone = entry.tone;
+    const agentId = optionalText(entry.agentId);
+    if (agentId) item.agentId = agentId;
+    if (entry.watched === true) item.watched = true;
+    clean.push(item);
   }
   return clean;
 }
