@@ -4,14 +4,32 @@ import { openExternalUrl } from "@/utils/open-external-url";
 import { parsePaseoAppLink, type PaseoAppLink } from "@/utils/paseo-app-link";
 import { requestWorkspaceRecoveryFromLink } from "@/workspace-recovery/link-requests";
 
-/** Opens a parsed `paseo://` link inside the app instead of handing it to the OS. */
-export function openPaseoAppLink(link: PaseoAppLink): void {
+export interface AppLinkNavigation {
+  requestWorkspaceRecovery: (input: { serverId: string; workspaceId: string }) => void;
+  navigateToWorkspace: (input: { serverId: string; workspaceId: string }) => void;
+  navigateToAgent: (input: { serverId: string; agentId: string }) => void;
+}
+
+const DEFAULT_APP_LINK_NAVIGATION: AppLinkNavigation = {
+  requestWorkspaceRecovery: requestWorkspaceRecoveryFromLink,
+  navigateToWorkspace,
+  navigateToAgent,
+};
+
+/** Opens a parsed `paseo://` link through `navigation`. */
+export function openPaseoAppLinkWith(link: PaseoAppLink, navigation: AppLinkNavigation): void {
   if (link.kind === "workspace") {
-    requestWorkspaceRecoveryFromLink(link);
-    navigateToWorkspace({ serverId: link.serverId, workspaceId: link.workspaceId });
+    const target = { serverId: link.serverId, workspaceId: link.workspaceId };
+    navigation.requestWorkspaceRecovery(target);
+    navigation.navigateToWorkspace(target);
     return;
   }
-  navigateToAgent({ serverId: link.serverId, agentId: link.agentId });
+  navigation.navigateToAgent({ serverId: link.serverId, agentId: link.agentId });
+}
+
+/** Opens a parsed `paseo://` link inside the app instead of handing it to the OS. */
+export function openPaseoAppLink(link: PaseoAppLink): void {
+  openPaseoAppLinkWith(link, DEFAULT_APP_LINK_NAVIGATION);
 }
 
 export interface LinkOpeners {

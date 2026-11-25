@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { PaseoAppLink } from "@/utils/paseo-app-link";
-import { openLinkWith, type LinkOpeners } from "./open-paseo-app-link";
+import {
+  openLinkWith,
+  openPaseoAppLinkWith,
+  type AppLinkNavigation,
+  type LinkOpeners,
+} from "./open-paseo-app-link";
 
 function recordingOpeners(): LinkOpeners & { appLinks: PaseoAppLink[]; externalUrls: string[] } {
   const appLinks: PaseoAppLink[] = [];
@@ -46,5 +51,38 @@ describe("openLinkWith", () => {
     await openLinkWith("paseo://h/srv_1/settings/general", openers);
     expect(openers.appLinks).toEqual([]);
     expect(openers.externalUrls).toEqual(["paseo://h/srv_1/settings/general"]);
+  });
+});
+
+function recordingNavigation(): AppLinkNavigation & { calls: string[] } {
+  const calls: string[] = [];
+  return {
+    calls,
+    requestWorkspaceRecovery: ({ serverId, workspaceId }) => {
+      calls.push(`recovery ${serverId}/${workspaceId}`);
+    },
+    navigateToWorkspace: ({ serverId, workspaceId }) => {
+      calls.push(`workspace ${serverId}/${workspaceId}`);
+    },
+    navigateToAgent: ({ serverId, agentId }) => {
+      calls.push(`agent ${serverId}/${agentId}`);
+    },
+  };
+}
+
+describe("openPaseoAppLinkWith", () => {
+  it("requests the recovery state, then navigates to the workspace", () => {
+    const navigation = recordingNavigation();
+    openPaseoAppLinkWith(
+      { kind: "workspace", serverId: "srv_1", workspaceId: "wks_1" },
+      navigation,
+    );
+    expect(navigation.calls).toEqual(["recovery srv_1/wks_1", "workspace srv_1/wks_1"]);
+  });
+
+  it("navigates to the agent", () => {
+    const navigation = recordingNavigation();
+    openPaseoAppLinkWith({ kind: "agent", serverId: "srv_1", agentId: "agent-1" }, navigation);
+    expect(navigation.calls).toEqual(["agent srv_1/agent-1"]);
   });
 });
