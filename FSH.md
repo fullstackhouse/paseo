@@ -131,6 +131,7 @@ temporary by design: every patch is meant to go upstream and then drop out of `f
 - FSH-only (upstreamable): a plugin's `navigation.openAgent` takes an optional `timelinePosition: { epoch, seq }` and opens the chat scrolled to that timeline entry, opening its collapsed turn, on web and desktop. paseo-asks uses it for **Show in chat**, which jumps to the ask in its agent's chat
 - FSH-only (upstreamable): when the workspace you have open is archived from outside the app (a plugin's **Post & archive**, the `paseo` CLI, an agent's `archive_workspace`), the app opens **New workspace** for its project, as its own Archive button does. Before, the screen stayed on **Workspace unavailable**. Links and reloaded URLs to a workspace that was already archived still show that screen
 - FSH-only (upstreamable): a plugin start, stop or update no longer stops an agent's running subagents, background shells and monitors. The next prompt used to reopen the agent's session, which killed them; now the session reopens at the first prompt after they end. Explicit reloads are unchanged
+- FSH-only (upstreamable): the plugin compiler no longer rejects a plugin whose dependency declarations reference type packages that are not installed, such as `@anthropic-ai/sdk` probing several `undici-types` paths. TypeScript tolerates those; only a plugin's own missing type imports still fail the build.
 
 Keep this list in sync with what's merged into `fsh`.
 
