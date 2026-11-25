@@ -28,8 +28,9 @@ Map: [spec-overview-in-progress-ui-map.md](./spec-overview-in-progress-ui-map.md
   its title, what it waits on and its age; PR asks take the word from the PR ("CI running", "review
   requested", "merged"), other asks the agent's own "waits on" line, otherwise only the age (A7). An ask
   that nothing moves (no running turn of its agent, no live background job, no watched open PR) shows
-  "nothing moving" in the warning tone (A8). Order: oldest first across all kinds, by when the agent
-  started the turn or took the ask (A13). Five rows show, then "Show all (N)".
+  "nothing moving" in the warning tone (A8). Every time on a row means "since it last changed", as in Your move, Status and the sidebar: an ask since
+  its last update, an agent since its last activity, a background job since it started (A21). Order: oldest
+  first by that time, across all kinds, so what moved least recently comes first (A13, A21). Five rows show, then "Show all (N)".
 - **Get here.** Overview tab, after Your move.
 - **Shows.** Section label "In progress" with the row count; agent rows ("Billing track lead · working ·
   3m"), indented subagent and background lines, ask rows ("PR #2104 — invoices list · CI running · 20m").
@@ -103,3 +104,5 @@ Map: [spec-overview-in-progress-ui-map.md](./spec-overview-in-progress-ui-map.md
 6. The "Nothing is running" warning covers Working cards only (A18).
 7. An ask whose PR merged while in progress reads "merged · waiting on the agent", muted; it turns into "nothing moving" in the warning tone after 10 minutes with no turn running (A19).
 8. Stage 2 approved (A20).
+9. Times on In progress rows mean "since it last changed", as everywhere else on Overview: ask since its last
+   update, agent since its last activity, background job since it started; rows sort by that time (A21).

@@ -12,35 +12,38 @@ export function overviewStates(kit) {
   const top = (...parts) => desktop([...parts, cut()])
 
   // ── in-progress fixtures ───────────────────────────────────────────────
-  // ago: minutes since the agent took the ask or started its current turn. The section sorts on it,
-  // oldest first across all kinds (A13); an ask's age word is derived from it.
-  const age = (m) => (m >= 60 ? `${Math.round(m / 60)}h` : `${m}m`)
-  const ask = (name, waits, tone, ago) => ({ name, ago, facts: [[waits, tone], [age(ago), 'dim']] })
+  // lastMovedAt: minutes since the item last changed (A21) — an ask since its last update, an agent
+  // since its last activity. The row's time word and the section's order (oldest first, A13) both come
+  // from it. A background job line shows how long it has run. takenAt: when the agent took the ask (O5).
+  const age = (m) => (m === 0 ? 'now' : m >= 60 ? `${Math.round(m / 60)}h` : `${m}m`)
+  const ask = (name, waits, tone, lastMovedAt, takenAt = lastMovedAt) => ({ name, lastMovedAt, takenAt, facts: [[waits, tone], [age(lastMovedAt), 'dim']] })
   const A = {
-    REL: ask('Release with the cache fix', 'nothing moving', 'warn', 540),
-    KEYS_STUCK: ask('Org-scoped API keys refused', 'nothing moving', 'warn', 360),
-    KEYS_BUSY: ask('Org-scoped API keys refused', 'fix PR #2111 open', 'muted', 240),
-    SEED: ask('Seed demo invoices', 'waits on the staging reset', 'muted', 120),
-    PAY_REVIEW: ask('PR #2098 — payments list', 'review requested', 'muted', 60),
-    CRED: ask('PR #2091 — credit notes', 'CI running', 'run', 50),
-    PAY_CI: ask('PR #2098 — payments list', 'CI running', 'run', 35),
-    INV: ask('PR #2104 — invoices list', 'CI running', 'run', 20),
-    REFUND: ask('PR #2112 — refunds list', 'CI running', 'run', 10),
-    // merged PRs: the warning tone starts 10 minutes after the merge, not after the ask was taken
-    CRED_MERGED_OLD: ask('PR #2091 — credit notes', 'merged · waiting on the agent', 'warn', 60),
-    PAY_MERGED_NEW: ask('PR #2098 — payments list', 'merged · waiting on the agent', 'muted', 35),
+    REL: ask('Release with the cache fix', 'nothing moving', 'warn', 540, 660),
+    KEYS_STUCK: ask('Org-scoped API keys refused', 'nothing moving', 'warn', 360, 420),
+    KEYS_BUSY: ask('Org-scoped API keys refused', 'fix PR #2111 open', 'muted', 240, 420),
+    SEED: ask('Seed demo invoices', 'waits on the staging reset', 'muted', 120, 180),
+    PAY_REVIEW: ask('PR #2098 — payments list', 'review requested', 'muted', 60, 150),
+    CRED: ask('PR #2091 — credit notes', 'CI running', 'run', 50, 90),
+    PAY_CI: ask('PR #2098 — payments list', 'CI running', 'run', 35, 150),
+    INV: ask('PR #2104 — invoices list', 'CI running', 'run', 5, 20),
+    REFUND: ask('PR #2112 — refunds list', 'CI running', 'run', 10, 10),
+    // the merge is the last change: warning tone once 10 minutes pass with nothing moving
+    CRED_MERGED_OLD: ask('PR #2091 — credit notes', 'merged · waiting on the agent', 'warn', 12, 90),
+    PAY_MERGED_NEW: ask('PR #2098 — payments list', 'merged · waiting on the agent', 'muted', 4, 150),
   }
-  // Agent groups: the agent row carries its folded subagent and job lines. A working agent sorts by
-  // its turn ("working · 3m"); an idle one by the turn that started its job (running 2h).
-  const agentWorking = { ago: 3, html: [irow({ icon: 'agent', ...F.AGENT }), irow({ ...F.SUBAGENTS, fold: true }), irow({ ...F.SHELL, fold: true })].join('') }
-  const agentIdleJob = { ago: 125, html: [irow({ icon: 'agent', name: 'Billing track lead', facts: [['idle', 'muted']] }), irow({ ...F.SHELL, fold: true })].join('') }
-  const agentArchivedJob = { ago: 125, html: [irow({ icon: 'archive', name: 'Archived agent', facts: [], off: true }), irow({ ...F.SHELL, facts: [['running 2h', 'muted']], fold: true, off: true })].join('') }
+  // Agent groups: the agent row sorts by its own last activity; its folded lines stay under it.
+  const job = (startedAt, tone = 'run') => irow({ name: 'merge-queue.sh', mono: true, facts: [[`running ${age(startedAt)}`, tone]], fold: true, off: tone !== 'run' })
+  const agentGroup = ({ icon = 'agent', name = 'Billing track lead', state, tone, lastMovedAt, folds, off }) =>
+    ({ lastMovedAt, html: [irow({ icon, name, facts: state ? [[state, tone], [age(lastMovedAt), 'dim']] : [], off }), ...folds].join('') })
+  const agentWorking = agentGroup({ state: 'working', tone: 'run', lastMovedAt: 1, folds: [irow({ ...F.SUBAGENTS, fold: true }), job(120)] })
+  const agentIdleJob = agentGroup({ state: 'idle', tone: 'muted', lastMovedAt: 25, folds: [job(120)] })
+  const agentArchivedJob = agentGroup({ icon: 'archive', name: 'Archived agent', lastMovedAt: 40, off: true, folds: [job(120, 'muted')] })
   const STUCK = [A.REL, A.KEYS_STUCK, A.CRED, A.PAY_CI, A.INV]
 
-  // items: ask fixtures or { ago, html } (agent groups, an expanded ask). Oldest first; five show,
+  // items: ask fixtures or { lastMovedAt, html } (agent groups, an expanded ask). Oldest first; five show,
   // then Show all (N).
   const inProgress = (items) => {
-    const rows = [...items].sort((a, b) => b.ago - a.ago).map((it) => it.html ?? askRow(it))
+    const rows = [...items].sort((a, b) => b.lastMovedAt - a.lastMovedAt).map((it) => it.html ?? askRow(it))
     const more = rows.length > 5 ? `<div class="ip-row ip-more"><span class="ip-name">Show all (${rows.length})</span><span class="ip-chev">${ic('chevron-right')}</span></div>` : ''
     return sec('In progress', `<div class="ip-grp">${rows.slice(0, 5).join('')}${more}</div>`, { count: rows.length })
   }
@@ -54,18 +57,19 @@ export function overviewStates(kit) {
   const ST_DONE = { word: 'Done', tone: 'ok', age: '30m', summary: 'PR #2104 is merged. Two follow-ups are with the agent.' }
 
   // ── O5: an ask expanded in place ───────────────────────────────────────
-  const openAsk = (a, { body, line, lineTone = 'muted', links, reminded, archived }) => ({ ago: a.ago, html: `<div class="ip-open">
+  // The facts line's last-moved time is the collapsed row's time word.
+  const openAsk = (a, { body, line, lineTone = 'muted', links, reminded, archived }) => ({ lastMovedAt: a.lastMovedAt, html: `<div class="ip-open">
     <div class="ip-row is-open-head"><span class="ip-ricon">${ic('ask')}</span><span class="ip-name">${esc(a.name)}</span><span class="ip-word">${a.facts.map(([t, tn]) => `<span class="${tn === 'dim' ? 'ip-dim' : `ip-t-${tn}`}">${esc(t)}</span>`).join('<span class="ip-dim"> · </span>')}</span><span class="ip-chev">${ic('chevron-down')}</span></div>
     <div class="ip-open-body">
       <p class="ip-body">${esc(body)} <span class="ip-more">More</span></p>
-      <p class="ip-factsline ip-t-${lineTone}">${esc(line)}</p>
+      <p class="ip-factsline ip-t-${lineTone}">${esc(`${line} · taken ${age(a.takenAt)} ago · last moved ${age(a.lastMovedAt)} ago`)}</p>
       <div class="ip-links">${links.map(([i, t]) => `<span class="ip-linkchip">${ic(i)}${esc(t)}</span>`).join('')}</div>
       <div class="ip-open-actions"><button type="button" class="ip-btn is-quiet">Take it back</button>${archived ? '' : reminded ? `<span class="ip-reminded">${ic('check')}Reminded just now</span>` : '<button type="button" class="ip-btn is-quiet">Remind agent</button>'}<button type="button" class="ip-btn is-quiet">Show in chat</button></div>
     </div>
   </div>` })
   const REL_OPEN = {
     body: 'Cut release 4.12 once the cache fix is merged, then post the release notes in #billing-release.',
-    line: 'Nothing moving · taken 9h ago · last moved 9h ago',
+    line: 'Nothing moving',
     lineTone: 'warn',
     links: [['pr', '#2087 fix(cache): stale invoice totals'], ['link', 'Release checklist']],
   }
@@ -123,7 +127,7 @@ export function overviewStates(kit) {
         caption: 'PR ask waiting on CI',
         html: crop(inProgress([A.REL, A.KEYS_STUCK, A.CRED, A.PAY_CI, openAsk(A.INV, {
           body: 'Merge #2104 once CI passes. The merge queue rebases it onto #2098 first, so expect one more CI run.',
-          line: 'Waits on CI for #2104 · taken 20m ago · last moved 5m ago',
+          line: 'Waits on CI for #2104',
           links: [['pr', '#2104 invoices on the record page'], ['link', 'CI run']],
         })])),
       },
@@ -135,7 +139,7 @@ export function overviewStates(kit) {
         caption: 'Owner agent archived — no Remind agent',
         html: crop(inProgress([A.REL, openAsk(A.KEYS_STUCK, {
           body: 'Org-scoped API keys get 403 on /billing/export. Fix in #2111; confirm with the customer once it ships.',
-          line: 'Agent archived · taken 6h ago · last moved 6h ago',
+          line: 'Agent archived',
           lineTone: 'warn',
           links: [['pr', '#2111 fix(api): accept org-scoped keys']],
           archived: true,
