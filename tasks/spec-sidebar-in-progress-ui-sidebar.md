@@ -10,7 +10,8 @@ Map: [spec-sidebar-in-progress-ui-map.md](./spec-sidebar-in-progress-ui-map.md).
   runs, or it watches an open PR; otherwise, after 10 minutes, it is "not moving" (Overview A8, A19).
 - **Precedence**, first match wins, for an idle workspace: a permission (Needs input) or a failure (Failed),
   as today → an open ask, or in-progress work where stuck items are at least as many as moving ones (Ready
-  to review) → moving work on machines (Working) → work waiting only on a reviewer (Blocked) → the status card's report → the finished turn.
+  to review) → moving work on machines, or a fresh Working status card (Working) → work waiting only on a reviewer
+  (Blocked) → the rest of the status card's report (Done) → the finished turn.
 - **Permissions.** None.
 
 ## S1 Sidebar groups (P1)
