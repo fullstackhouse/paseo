@@ -10,7 +10,11 @@ import type {
 import { useCommandCenterActions } from "@/command-center/provider";
 import { useSidebarCallouts } from "@/contexts/sidebar-callout-context";
 import { useStableEvent } from "@/hooks/use-stable-event";
-import { failedAgentsDismissalKey, selectRetryableFailedAgents } from "@/failed-agents/select";
+import {
+  failedAgentsDismissalKey,
+  selectFailedAgents,
+  selectRetryableFailedAgents,
+} from "@/failed-agents/select";
 import { formatInterruptedAgentNames } from "@/interrupted-agents/select";
 import { useSessionStore } from "@/stores/session-store";
 import { resumeAgents } from "@/utils/resume-agents";
@@ -23,7 +27,10 @@ function RetryIcon({ size }: CommandCenterIconProps) {
   return <ThemedRotateCcw size={size} strokeWidth={2.2} />;
 }
 
-/** After a network or provider outage, offers to retry every agent whose turn it failed. */
+/**
+ * After a network or provider outage, the callout offers to retry every agent whose turn it failed.
+ * The palette retries every failed agent, usage limits included, since the user asks for it.
+ */
 export function FailedAgentsCalloutSource() {
   const { t } = useTranslation();
   const callouts = useSidebarCallouts();
@@ -31,9 +38,16 @@ export function FailedAgentsCalloutSource() {
     useShallow((state) => selectRetryableFailedAgents(state.sessions)),
   );
 
+  const failedAgents = useSessionStore(useShallow((state) => selectFailedAgents(state.sessions)));
+
   const retryAll = useStableEvent(() => {
     callouts.dismiss(CALLOUT_ID);
     resumeAgents(agents);
+  });
+
+  const retryAllFailed = useStableEvent(() => {
+    callouts.dismiss(CALLOUT_ID);
+    resumeAgents(failedAgents);
   });
 
   const descriptor = useMemo(() => {
@@ -73,20 +87,33 @@ export function FailedAgentsCalloutSource() {
         group: "actions",
         groupRank: 0,
         rank: 11,
-        keywords: ["retry", "continue", "resume", "failed", "network", "offline", "agents"],
+        keywords: [
+          "retry",
+          "continue",
+          "resume",
+          "failed",
+          "network",
+          "offline",
+          "limit",
+          "agents",
+        ],
         visibility: "query",
-        run: retryAll,
+        run: retryAllFailed,
         presentation: {
           kind: "action",
-          title: t("failedAgents.retryAllAction", { count: agents.length }),
+          title: t("failedAgents.retryAllAction", { count: failedAgents.length }),
           sectionTitle: t("shell.commandCenter.actions"),
           icon: RetryIcon,
         },
       },
     ],
-    [agents.length, retryAll, t],
+    [failedAgents.length, retryAllFailed, t],
   );
-  useCommandCenterActions({ sourceId: "failed-agents", enabled: agents.length > 0, actions });
+  useCommandCenterActions({
+    sourceId: "failed-agents",
+    enabled: failedAgents.length > 0,
+    actions,
+  });
 
   return null;
 }

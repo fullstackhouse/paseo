@@ -7,6 +7,7 @@ import {
   expectRetryFailedAgentsInCommandCenter,
   failedAgentsCallout,
   failedTurnPill,
+  retryFailedAgentsFromCommandCenter,
   retryFailedTurnFromPill,
   seedFailedAgent,
   waitForAgentIdle,
@@ -50,7 +51,8 @@ test.describe("Retrying failed agents", () => {
     await expect(callout).toContainText("Outage agent one");
     await expect(callout).toContainText("Outage agent two");
     await expect(callout).not.toContainText("Usage limit agent");
-    await expectRetryFailedAgentsInCommandCenter(page, 2);
+    // The palette retries every failed agent, the usage limit included.
+    await expectRetryFailedAgentsInCommandCenter(page, 3);
 
     await callout.getByText("Retry all", { exact: true }).click();
     await Promise.all([waitForAgentIdle(first), waitForAgentIdle(second)]);
@@ -58,5 +60,22 @@ test.describe("Retrying failed agents", () => {
 
     await openAgentRoute(page, limited);
     await expect(failedTurnPill(page)).toBeVisible({ timeout: 30_000 });
+  });
+
+  test("Retry failed agents in the palette also restarts usage limits", async ({ page }) => {
+    const outage = await seedFailedAgent({ title: "Palette outage agent", error: NETWORK_ERROR });
+    seeded.push(outage);
+    const limited = await seedFailedAgent({
+      title: "Palette usage limit agent",
+      error: USAGE_LIMIT_ERROR,
+    });
+    seeded.push(limited);
+
+    await gotoAppShell(page);
+    await expect(failedAgentsCallout(page)).toContainText("1 agent failed", { timeout: 30_000 });
+    await retryFailedAgentsFromCommandCenter(page, 2);
+
+    await Promise.all([waitForAgentIdle(outage), waitForAgentIdle(limited)]);
+    await expect(failedAgentsCallout(page)).toHaveCount(0);
   });
 });
