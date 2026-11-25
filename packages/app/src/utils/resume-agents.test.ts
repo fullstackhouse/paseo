@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { resumeAgentsWith, type ResumeClient } from "./resume-agents";
+import { formatUnreachedMessage, resumeAgentsWith, type ResumeClient } from "./resume-agents";
 
 interface Sent {
   agentId: string;
@@ -64,5 +64,24 @@ describe("resumeAgentsWith", () => {
 
     expect(unreached.map((agent) => agent.id).sort()).toEqual(["away", "refused"]);
     expect(connected.sent.map((sent) => sent.agentId)).toEqual(["ok"]);
+  });
+});
+
+describe("formatUnreachedMessage", () => {
+  it("says nothing when every agent was reached", () => {
+    expect(formatUnreachedMessage([])).toBeNull();
+  });
+
+  it("names the agents a resume couldn't reach", () => {
+    expect(formatUnreachedMessage(["Fix login"])).toBe("1 agent wasn't restarted: Fix login");
+    expect(formatUnreachedMessage(["Fix login", null])).toBe(
+      "2 agents weren't restarted: Fix login, Untitled agent",
+    );
+  });
+
+  it("names the first three and counts the rest", () => {
+    expect(formatUnreachedMessage(["a", "b", "c", "d", "e"])).toBe(
+      "5 agents weren't restarted: a, b, c, +2 more",
+    );
   });
 });

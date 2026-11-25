@@ -1,8 +1,8 @@
 // FSH fork: one way to nudge stopped agents back to work, shared by the restart and failure callouts.
 import { useCallback } from "react";
-import { useTranslation } from "react-i18next";
 import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
 import { useToast } from "@/contexts/toast-api-context";
+import { i18n } from "@/i18n/i18next";
 import { formatInterruptedAgentNames } from "@/interrupted-agents/select";
 import { DEFAULT_RESUME_PROMPT } from "@/screens/settings/restart-recovery-card";
 import { useSessionStore } from "@/stores/session-store";
@@ -65,23 +65,28 @@ function getAgentTitle(agent: AgentRef): string | null {
   return useSessionStore.getState().sessions[agent.serverId]?.agents.get(agent.id)?.title ?? null;
 }
 
+/** The error toast naming agents a resume couldn't reach, given their titles; null when it reached all. */
+export function formatUnreachedMessage(titles: readonly (string | null)[]): string | null {
+  if (titles.length === 0) return null;
+  const names = formatInterruptedAgentNames(titles, {
+    untitled: i18n.t("interruptedAgents.untitled"),
+    more: (count) => i18n.t("interruptedAgents.more", { count }),
+  });
+  return i18n.t("resumeAgents.unreached", { count: titles.length, names });
+}
+
 /** Resumes agents and names the ones it couldn't reach in an error toast. */
 export function useResumeAgents(): (agents: readonly AgentRef[]) => void {
-  const { t } = useTranslation();
   const toast = useToast();
   return useCallback(
     (agents) => {
       const report = async () => {
         const unreached = await resumeAgentsWith(agents, getSessionClient);
-        if (unreached.length === 0) return;
-        const names = formatInterruptedAgentNames(unreached.map(getAgentTitle), {
-          untitled: t("interruptedAgents.untitled"),
-          more: (count) => t("interruptedAgents.more", { count }),
-        });
-        toast.error(t("resumeAgents.unreached", { count: unreached.length, names }));
+        const message = formatUnreachedMessage(unreached.map(getAgentTitle));
+        if (message) toast.error(message);
       };
       void report();
     },
-    [t, toast],
+    [toast],
   );
 }
