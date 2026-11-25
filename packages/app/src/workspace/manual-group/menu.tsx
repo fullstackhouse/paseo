@@ -72,7 +72,11 @@ export function useWorkspaceMoveMenuPages(
       if (!target) return;
       const client = getHostRuntimeStore().getClient(target.serverId);
       if (!client) throw new Error(t("sidebar.workspace.toasts.hostDisconnected"));
-      await client.setWorkspaceGroup(target.workspaceId, group);
+      const manualGroup = await client.setWorkspaceGroup(target.workspaceId, group);
+      // Show the move now: the daemon's workspace update can lag behind its reply by seconds.
+      getHostRuntimeStore().patchWorkspaceSnapshot(target.serverId, target.workspaceId, {
+        manualGroup,
+      });
       // The move already landed; a read-state hiccup must not report it as failed.
       try {
         if (group === "done" && (rawStatus === "attention" || rawStatus === "failed")) {

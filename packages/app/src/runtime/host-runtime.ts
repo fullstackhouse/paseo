@@ -2720,6 +2720,14 @@ export class HostRuntimeStore {
     this.requireDirectory(serverId).acceptWorkspaces(workspaces);
   }
 
+  patchWorkspaceSnapshot(
+    serverId: string,
+    workspaceId: string,
+    patch: Partial<WorkspaceDescriptor>,
+  ): void {
+    this.requireDirectory(serverId).patchWorkspace(workspaceId, patch);
+  }
+
   acceptProjectSnapshot(serverId: string, project: ProjectDescriptor): void {
     this.requireDirectory(serverId).acceptProject(project);
   }
