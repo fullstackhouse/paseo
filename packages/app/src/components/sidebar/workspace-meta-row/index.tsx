@@ -1,9 +1,8 @@
-import { PressHighlight as Pressable } from "@/components/ui/press-highlight";
-import { Fragment, useCallback, useState, type ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { Text, View, type GestureResponderEvent } from "react-native";
+import { Text, View } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
-import { ExternalLink, Folder, GitBranch, Globe } from "lucide-react-native";
+import { Folder, GitBranch, Globe } from "lucide-react-native";
 import {
   workspaceLabelKey,
   type WorkspaceLabelDefinition,
@@ -13,7 +12,6 @@ import { HostBadge, HOST_BADGE_ICON_SIZE } from "@/hosts/host-badge";
 import { WorkspaceLabelChip, WORKSPACE_LABEL_CHIP_INSET } from "@/workspace-labels/chip";
 import type { PrHint } from "@/git/pr-hint";
 import { getForgePresentation, normalizeForge } from "@/git/forge";
-import { openExternalUrl } from "@/utils/open-external-url";
 import { useSidebarMetaPreferences } from "@/components/sidebar/display-preferences/model";
 import type { Theme } from "@/styles/theme";
 import type { SidebarSurfaceBackdrop } from "@/styles/surface-backdrop";
@@ -40,7 +38,6 @@ export {
  */
 const META_ICON_SIZE = HOST_BADGE_ICON_SIZE;
 
-const ThemedExternalLink = withUnistyles(ExternalLink);
 const ThemedFolder = withUnistyles(Folder);
 const ThemedGitBranch = withUnistyles(GitBranch);
 const ThemedGlobe = withUnistyles(Globe);
@@ -48,7 +45,6 @@ const ThemedGlobe = withUnistyles(Globe);
 /** Stable identity so a row without labels doesn't re-select its items on every render. */
 const EMPTY_LABELS: readonly WorkspaceLabelDefinition[] = [];
 
-const foregroundMapping = (theme: Theme) => ({ color: theme.colors.foreground });
 const mutedMapping = (theme: Theme) => ({ color: theme.colors.foregroundMuted });
 const dangerMapping = (theme: Theme) => ({ color: theme.colors.statusDanger });
 
@@ -204,57 +200,31 @@ function LabelsItem({
 }
 
 /**
- * The only thing on the line that navigates, so it is the only thing that answers the
- * pointer: it brightens to full foreground and its icon becomes an external-link arrow,
- * saying where the click goes before you spend it.
- *
- * `onHoverIn`/`onHoverOut` with local state is safe here despite the usual rule in
- * docs/hover.md — the state never leaves this Pressable, and nothing pressable is nested
- * inside it, so there is no second hover state machine to fight. Both icons are the same
- * size, so the swap can't move the target out from under the cursor.
+ * Information, not a link. The row is a big target for selecting the workspace, and a link this
+ * small inside it caught clicks meant for the row and opened the pull request in another app.
+ * The hover card and the workspace's own pull request controls open it on purpose.
  */
 function PullRequestItem({ hint }: { hint: PrHint }) {
   const { t } = useTranslation();
-  const [isHovered, setIsHovered] = useState(false);
   const presentation = getForgePresentation(normalizeForge(hint.forge));
 
-  const handlePress = useCallback(
-    (event: GestureResponderEvent) => {
-      event.stopPropagation();
-      void openExternalUrl(hint.url);
-    },
-    [hint.url],
-  );
-  const handlePressIn = useCallback((event: GestureResponderEvent) => event.stopPropagation(), []);
-  const handleHoverIn = useCallback(() => setIsHovered(true), []);
-  const handleHoverOut = useCallback(() => setIsHovered(false), []);
-
   return (
-    <Pressable
-      accessibilityRole="link"
+    <View
+      style={styles.item}
       accessibilityLabel={t("workspace.git.pr.accessibility.pullRequest", {
         number: hint.number,
         context: presentation.changeRequestContext,
       })}
-      hitSlop={4}
-      onPressIn={handlePressIn}
-      onPress={handlePress}
-      onHoverIn={handleHoverIn}
-      onHoverOut={handleHoverOut}
-      style={pressableItemStyle}
+      testID="sidebar-workspace-pr"
     >
-      {isHovered ? (
-        <ThemedExternalLink size={META_ICON_SIZE} uniProps={foregroundMapping} />
-      ) : (
-        <PullRequestStateIcon state={hint.state} size={META_ICON_SIZE} />
-      )}
-      <Text style={isHovered ? styles.prTextHovered : styles.prText} numberOfLines={1}>
+      <PullRequestStateIcon state={hint.state} size={META_ICON_SIZE} />
+      <Text style={styles.prText} numberOfLines={1}>
         {hint.number}
         {/* An open change request is the unremarkable case and says nothing extra; a merged
             or closed one is why the row still looks like it has work in it. */}
         {hint.state === "open" ? "" : ` ${t(PR_STATE_LABEL_KEYS[hint.state])}`}
       </Text>
-    </Pressable>
+    </View>
   );
 }
 
@@ -333,10 +303,6 @@ const PR_STATE_LABEL_KEYS = {
   closed: "workspace.git.pr.states.closed",
 } as const;
 
-function pressableItemStyle({ pressed }: { pressed: boolean }) {
-  return [styles.item, pressed && styles.itemPressed];
-}
-
 const styles = StyleSheet.create((theme) => ({
   row: {
     flexDirection: "row",
@@ -366,9 +332,6 @@ const styles = StyleSheet.create((theme) => ({
     fontSize: theme.fontSize.sm,
     lineHeight: 16,
     flexShrink: 1,
-  },
-  itemPressed: {
-    opacity: 0.82,
   },
   separator: {
     color: theme.colors.foregroundExtraMuted,
@@ -414,12 +377,6 @@ const styles = StyleSheet.create((theme) => ({
   },
   prText: {
     color: theme.colors.foregroundMuted,
-    fontSize: theme.fontSize.sm,
-    lineHeight: 16,
-    flexShrink: 0,
-  },
-  prTextHovered: {
-    color: theme.colors.foreground,
     fontSize: theme.fontSize.sm,
     lineHeight: 16,
     flexShrink: 0,
