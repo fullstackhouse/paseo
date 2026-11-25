@@ -3,9 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { useStableEvent } from "@/hooks/use-stable-event";
 import type { OpenFileDisposition } from "@/workspace/file-open";
-import { openExternalUrl } from "@/utils/open-external-url";
-import { openPaseoAppLink } from "@/utils/open-paseo-app-link";
-import { parsePaseoAppLink } from "@/utils/paseo-app-link";
+import { openUrlOrPaseoAppLink } from "@/utils/open-paseo-app-link";
 import { formatFileLinkTooltipPath } from "./tooltip-path";
 import type { InlinePathTarget } from "./parse";
 import {
@@ -392,12 +390,7 @@ async function dispatchExternalUrl(input: {
   ) {
     return;
   }
-  const appLink = parsePaseoAppLink(input.url);
-  if (appLink) {
-    openPaseoAppLink(appLink);
-    return;
-  }
-  await openExternalUrl(input.url);
+  await openUrlOrPaseoAppLink(input.url);
 }
 
 async function dispatchUnresolvedError(input: {
