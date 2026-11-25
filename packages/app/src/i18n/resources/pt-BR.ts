@@ -2468,6 +2468,9 @@ export const ptBR: TranslationResources = {
     used: "{{percentage}}% usado",
     tokens: "{{used}} / {{max}} tokens",
     sessionCost: "Custo da sessão {{cost}}",
+    externalSession: "Sessão {{id}}",
+    copyExternalSession: "Copiar ID da sessão",
+    openExternalSession: "Abrir no console",
     accessibility: "Janela de contexto {{percentage}}% usada",
   },
   review: {

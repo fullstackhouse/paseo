@@ -2428,6 +2428,9 @@ export const ar: TranslationResources = {
     used: "تم استخدام{{percentage}}%",
     tokens: "رموز{{used}}/{{max}}",
     sessionCost: "تكلفة الجلسة{{cost}}",
+    externalSession: "الجلسة {{id}}",
+    copyExternalSession: "نسخ معرّف الجلسة",
+    openExternalSession: "فتح في وحدة التحكم",
     accessibility: "تم استخدام نافذة السياق{{percentage}}%",
   },
   review: {

@@ -873,6 +873,10 @@ const AgentRuntimeInfoSchema: z.ZodType<AgentRuntimeInfo> = z.object({
   thinkingOptionId: z.string().nullable().optional(),
   modeId: z.string().nullable().optional(),
   extra: z.record(z.string(), z.unknown()).optional(),
+  externalSession: z
+    .object({ id: z.string(), url: z.string().nullable().optional() })
+    .nullable()
+    .optional(),
 });
 
 const AgentActiveTurnPayloadSchema = z.object({

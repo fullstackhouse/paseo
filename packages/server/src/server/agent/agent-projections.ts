@@ -589,5 +589,11 @@ function sanitizeRuntimeInfo(
   if (extra !== undefined) {
     sanitized.extra = extra;
   }
+  if (runtimeInfo.externalSession) {
+    sanitized.externalSession = {
+      id: runtimeInfo.externalSession.id,
+      ...(runtimeInfo.externalSession.url ? { url: runtimeInfo.externalSession.url } : {}),
+    };
+  }
   return sanitized;
 }

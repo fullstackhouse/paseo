@@ -20,6 +20,7 @@ import {
   type ProviderError,
   type ProviderEvent,
   type ProviderInput,
+  type ProviderExternalSession,
   type ProviderPersistence,
   type ProviderPrompt,
   type ProviderRegistration,
@@ -607,6 +608,7 @@ class ProviderRuntimeSession {
   config: ProviderConfigState = { models: [], modes: [], thinkingOptions: [], settings: [] };
   commands: Array<{ name: string; description: string; argumentHint?: string }> = [];
   persistence: ProviderPersistence | null = null;
+  externalSession: ProviderExternalSession | null = null;
 
   constructor(
     private readonly runtime: ProviderRuntime,
@@ -767,6 +769,7 @@ class ProviderRuntimeSession {
     if (event.type === "session.opened") {
       this.capabilities = [...event.capabilities];
       this.persistence = this.restoration === "core" ? (event.persistence ?? null) : null;
+      this.externalSession = event.externalSession ?? null;
       return;
     }
     const openRequest = this.openRequest;
@@ -1343,6 +1346,7 @@ class PluginAgentSession implements AgentSession {
       model: this.bridge.config.model ?? null,
       modeId: this.bridge.config.mode ?? null,
       thinkingOptionId: this.bridge.config.thinkingOption ?? null,
+      ...(this.bridge.externalSession ? { externalSession: this.bridge.externalSession } : {}),
     };
   }
 

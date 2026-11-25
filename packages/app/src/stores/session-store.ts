@@ -70,6 +70,7 @@ export interface AgentRuntimeInfo {
   modeId?: string | null;
   thinkingOptionId?: string | null;
   extra?: Record<string, unknown>;
+  externalSession?: { id: string; url?: string | null } | null;
 }
 
 export interface Agent {
