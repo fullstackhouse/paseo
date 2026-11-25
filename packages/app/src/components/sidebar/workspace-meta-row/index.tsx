@@ -1,4 +1,4 @@
-import { Fragment, type ReactNode } from "react";
+import { Fragment, useCallback, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Text, View } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
@@ -17,6 +17,8 @@ import type { Theme } from "@/styles/theme";
 import { PullRequestStateIcon } from "@/git/pull-request-state-icon";
 import { PluginWorkspaceRowItems, usePluginWorkspaceRowItems } from "@/plugins/workspace-row-items";
 import { CheckIndicator } from "./check-indicator";
+import { InProgressBadges } from "./in-progress-badges";
+import { selectInProgressBadges } from "./in-progress-items";
 import type { CheckSummary, CheckSummaryState } from "./check-summary";
 import { selectMetaRowItems, type MetaRowItem } from "./meta-items";
 import { workspaceServiceLabelKey, type WorkspaceServiceSummary } from "./service-summary";
@@ -37,6 +39,8 @@ const META_ICON_SIZE = HOST_BADGE_ICON_SIZE;
 const ThemedFolder = withUnistyles(Folder);
 const ThemedGitBranch = withUnistyles(GitBranch);
 const ThemedGlobe = withUnistyles(Globe);
+
+const NO_KEYS: ReadonlySet<string> = new Set();
 
 /** Stable identity so a row without labels doesn't re-select its items on every render. */
 const EMPTY_LABELS: readonly WorkspaceLabelDefinition[] = [];
@@ -59,7 +63,8 @@ const dangerMapping = (theme: Theme) => ({ color: theme.colors.statusDanger });
  * read first, and it stays the same height as the rest of the line.
  *
  * Plugin items follow everything the row knows itself. They draw their own separators, since only
- * a plugin knows whether it has anything to say about this workspace.
+ * a plugin knows whether it has anything to say about this workspace. The in-progress badges close
+ * the line: they say why in-progress work put the row in its group.
  */
 export function WorkspaceMetaRow({
   currentBranch,
@@ -77,7 +82,13 @@ export function WorkspaceMetaRow({
   serviceSummary: WorkspaceServiceSummary | null;
   labels?: readonly WorkspaceLabelDefinition[];
   /** The real workspace behind the row; previews leave it out and get no plugin items. */
-  workspace?: { serverId: string; workspaceId: string } | null;
+  workspace?: {
+    serverId: string;
+    workspaceId: string;
+    inProgressNotMoving?: number;
+    inProgressReason?: "working" | "blocked" | null;
+    inProgressReasonCount?: number;
+  } | null;
 }) {
   const { rowItems, checksDisplay } = useSidebarMetaPreferences();
   const items = selectMetaRowItems({
@@ -91,8 +102,26 @@ export function WorkspaceMetaRow({
     checksDisplay,
   });
   const pluginItems = usePluginWorkspaceRowItems(workspace?.serverId ?? null);
+  const inProgressBadges = selectInProgressBadges({
+    notMoving: workspace?.inProgressNotMoving,
+    reason: workspace?.inProgressReason,
+    reasonCount: workspace?.inProgressReasonCount,
+  });
+  const hasPluginItems = workspace !== null && pluginItems.length > 0;
+  // Only a plugin's badge knows whether it drew anything; the badges after it need to know to lead
+  // with a separator.
+  const [drawnPluginItems, setDrawnPluginItems] = useState<ReadonlySet<string>>(NO_KEYS);
+  const handlePluginDrawnChange = useCallback((key: string, drawn: boolean) => {
+    setDrawnPluginItems((current) => {
+      if (current.has(key) === drawn) return current;
+      const next = new Set(current);
+      if (drawn) next.add(key);
+      else next.delete(key);
+      return next;
+    });
+  }, []);
 
-  if (items.length === 0 && (!workspace || pluginItems.length === 0)) return null;
+  if (items.length === 0 && !hasPluginItems && inProgressBadges.length === 0) return null;
 
   return (
     <View style={styles.row}>
@@ -107,8 +136,13 @@ export function WorkspaceMetaRow({
           targets={pluginItems}
           workspaceId={workspace.workspaceId}
           separated={items.length > 0}
+          onDrawnChange={handlePluginDrawnChange}
         />
       ) : null}
+      <InProgressBadges
+        badges={inProgressBadges}
+        separated={items.length > 0 || drawnPluginItems.size > 0}
+      />
     </View>
   );
 }

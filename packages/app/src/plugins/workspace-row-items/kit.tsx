@@ -1,5 +1,5 @@
 import type { WorkspaceRowBadgeProps, WorkspaceRowBadgeTone } from "@getpaseo/plugin/client/ui";
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { Text, View } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { HOST_BADGE_ICON_SIZE } from "@/hosts/host-badge";
@@ -42,7 +42,14 @@ export function WorkspaceRowBadge({
     () => (icon === undefined ? null : parsePluginIcon("Workspace row badge", icon)),
     [icon],
   );
-  if (!parsedIcon && !label) return null;
+  const drawn = Boolean(parsedIcon || label);
+  const { onDrawnChange } = frame;
+  useEffect(() => {
+    if (!onDrawnChange) return undefined;
+    onDrawnChange(drawn);
+    return () => onDrawnChange(false);
+  }, [drawn, onDrawnChange]);
+  if (!drawn) return null;
   return (
     <>
       {frame.separated ? <Text style={styles.separator}>·</Text> : null}

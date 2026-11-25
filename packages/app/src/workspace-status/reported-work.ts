@@ -1,20 +1,37 @@
-import { useMemo, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import {
   workspaceSummaryStore,
   type WorkspaceSummaryItem,
 } from "@/plugins/workspace-summary/store";
 import type { SidebarStateBucket } from "@/utils/sidebar-agent-state";
 import type { WorkspaceManualGroup } from "@getpaseo/protocol/messages";
+import { isEntryMoving, nextNothingMovingAt, type MovementContext } from "./moving";
 
 /** What plugins say about an idle workspace's work, folded across their summary items. */
 export type ReportedWork = "needs_you" | "blocked" | "working" | "done";
 
+/** A workspace's in-progress entries, counted, and the group they ask for. */
+export interface InProgressTally {
+  moving: number;
+  stuck: number;
+  /** Moving entries that wait on a person's review rather than on machines. */
+  awaitingReview: number;
+  /** needs_you when nothing moves most of them, working when machines move any, else blocked. */
+  work: ReportedWork;
+}
+
 export type ReportedWorkLookup = ((
   serverId: string,
   workspaceId: string,
+  /** The workspace's turn status; a running workspace counts as live work for its entries. */
+  turn?: TurnStatus,
 ) => ReportedWork | null) & {
   /** When the newest agent status among the workspace's items was written (epoch ms), if any. */
   updatedAt?: (serverId: string, workspaceId: string) => number | null;
+  /** The workspace's in-progress entries, counted; null when it has none. */
+  inProgress?: (serverId: string, workspaceId: string, turn?: TurnStatus) => InProgressTally | null;
+  /** What the items report on their own, without their in-progress entries. */
+  items?: (serverId: string, workspaceId: string) => ReportedWork | null;
 };
 
 /** Most to least telling: done only when nothing else is reported. */
@@ -25,22 +42,49 @@ function reportedWorkOf(item: WorkspaceSummaryItem): ReportedWork | null {
   return item.workState ?? null;
 }
 
+function moreTelling(a: ReportedWork | null, b: ReportedWork | null): ReportedWork | null {
+  if (a === null) return b;
+  if (b === null) return a;
+  return REPORTED_WORK_RANK.indexOf(b) < REPORTED_WORK_RANK.indexOf(a) ? b : a;
+}
+
 /**
  * Something waiting on the human wins, then any work still going, then work waiting on something
  * else (other workspaces, a reviewer, CI); done only when nothing else is reported.
  */
 export function foldReportedWork(items: readonly WorkspaceSummaryItem[]): ReportedWork | null {
   let result: ReportedWork | null = null;
+  for (const item of items) result = moreTelling(result, reportedWorkOf(item));
+  return result;
+}
+
+/**
+ * Counts every item's in-progress entries by `isEntryMoving` and picks the group they ask for: as
+ * many stuck as moving (and any stuck) needs the human; otherwise machines moving any entry (one not
+ * waiting on a review, or live work) keep it working; otherwise every moving entry waits on a
+ * reviewer, so it is blocked. Null without entries.
+ */
+export function foldInProgress(
+  items: readonly WorkspaceSummaryItem[],
+  movement: MovementContext,
+): InProgressTally | null {
+  let moving = 0;
+  let stuck = 0;
+  let awaitingReview = 0;
   for (const item of items) {
-    const reported = reportedWorkOf(item);
-    if (
-      reported !== null &&
-      (result === null || REPORTED_WORK_RANK.indexOf(reported) < REPORTED_WORK_RANK.indexOf(result))
-    ) {
-      result = reported;
+    for (const entry of item.inProgress ?? []) {
+      if (!isEntryMoving(entry, movement)) stuck += 1;
+      else {
+        moving += 1;
+        if (entry.watched && entry.waitingOnReview) awaitingReview += 1;
+      }
     }
   }
-  return result;
+  if (moving + stuck === 0) return null;
+  let work: ReportedWork = "blocked";
+  if (stuck > 0 && stuck >= moving) work = "needs_you";
+  else if (movement.liveWork || awaitingReview < moving) work = "working";
+  return { moving, stuck, awaitingReview, work };
 }
 
 interface TurnStatus {
@@ -113,9 +157,21 @@ export function applyManualGroup(
   return status === current.status ? current : { status, enteredAt: current.enteredAt };
 }
 
-/** Folds every summary item once, keyed by host and workspace. */
+/**
+ * The movement context the sidebar can see for a workspace. Every source that makes Overview call an
+ * entry moving (its agent's turn, a background shell, a monitor) also holds the workspace's status
+ * at running, so an idle workspace has none and a running one counts as live work throughout.
+ */
+function sidebarMovement(turn: TurnStatus | undefined, now: number): MovementContext {
+  return { runningAgentIds: NO_AGENTS, liveWork: turn?.status === "running", now };
+}
+
+const NO_AGENTS: ReadonlySet<string> = new Set();
+
+/** Folds every summary item once, keyed by host and workspace; `now` ages in-progress entries. */
 export function createReportedWorkLookup(
   entries: readonly WorkspaceSummaryItem[],
+  now: number = Date.now(),
 ): ReportedWorkLookup {
   const grouped = new Map<string, WorkspaceSummaryItem[]>();
   for (const entry of entries) {
@@ -134,18 +190,46 @@ export function createReportedWorkLookup(
         newest.set(key, at);
     }
   }
-  const lookup: ReportedWorkLookup = (serverId, workspaceId) =>
+  const inProgress = (serverId: string, workspaceId: string, turn?: TurnStatus) => {
+    const items = grouped.get(`${serverId}:${workspaceId}`);
+    return items ? foldInProgress(items, sidebarMovement(turn, now)) : null;
+  };
+  const items = (serverId: string, workspaceId: string) =>
     folded.get(`${serverId}:${workspaceId}`) ?? null;
+  const lookup: ReportedWorkLookup = (serverId, workspaceId, turn) =>
+    moreTelling(
+      items(serverId, workspaceId),
+      inProgress(serverId, workspaceId, turn)?.work ?? null,
+    );
   lookup.updatedAt = (serverId, workspaceId) => newest.get(`${serverId}:${workspaceId}`) ?? null;
+  lookup.inProgress = inProgress;
+  lookup.items = items;
   return lookup;
 }
 
-/** The lookup status derivation takes; a new one whenever a plugin updates a summary item. */
+/**
+ * The lookup status derivation takes; a new one whenever a plugin updates a summary item, and when
+ * an in-progress entry stops moving by age, so its workspace regroups without a fixed tick.
+ */
 export function useReportedWorkLookup(): ReportedWorkLookup {
   const entries = useSyncExternalStore(
     workspaceSummaryStore.subscribe,
     workspaceSummaryStore.getSnapshot,
     workspaceSummaryStore.getSnapshot,
   );
-  return useMemo(() => createReportedWorkLookup(entries), [entries]);
+  const [now, setNow] = useState(() => Date.now());
+  const nextAt = useMemo(
+    () => nextNothingMovingAt(inProgressEntries(entries), now),
+    [entries, now],
+  );
+  useEffect(() => {
+    if (nextAt === null) return undefined;
+    const id = setTimeout(() => setNow(Date.now()), Math.max(0, nextAt - Date.now()));
+    return () => clearTimeout(id);
+  }, [nextAt]);
+  return useMemo(() => createReportedWorkLookup(entries, now), [entries, now]);
+}
+
+function* inProgressEntries(items: readonly WorkspaceSummaryItem[]) {
+  for (const item of items) yield* item.inProgress ?? [];
 }

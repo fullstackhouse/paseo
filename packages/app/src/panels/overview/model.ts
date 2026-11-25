@@ -15,6 +15,7 @@ import type { WorkspaceSummaryItem } from "@/plugins/workspace-summary/store";
 import type { Agent } from "@/stores/session-store";
 import type { AttentionItem } from "@/workspace-attention/model";
 import type { ReportedWork } from "@/workspace-status/reported-work";
+import { isEntryMoving, type MovementContext } from "@/workspace-status/moving";
 
 const ARCHIVE_ACTION_ID: GitActionId = "archive-workspace";
 
@@ -195,9 +196,6 @@ export function pinOpenMove(
 /** In progress rows listed before "Show all". */
 export const VISIBLE_IN_PROGRESS = 5;
 
-/** An entry unchanged this long, with nothing else moving it, shows "nothing moving". */
-export const NOTHING_MOVING_AFTER_MS = 10 * 60_000;
-
 /** One background job of an agent: a shell, a monitor, or other work it left running. */
 export interface InProgressJob {
   id: string;
@@ -256,8 +254,11 @@ export function deriveInProgress(input: {
   liveBackgroundWork: boolean;
   now: number;
 }): InProgressRow[] {
-  const running = new Set(input.agents.filter((a) => a.running).map((a) => a.agentId));
-  const liveWork = input.liveBackgroundWork || input.agents.some((a) => a.jobs.length > 0);
+  const movement: MovementContext = {
+    runningAgentIds: new Set(input.agents.filter((a) => a.running).map((a) => a.agentId)),
+    liveWork: input.liveBackgroundWork || input.agents.some((a) => a.jobs.length > 0),
+    now: input.now,
+  };
   const rows: InProgressRow[] = [];
   for (const item of input.items) {
     for (const entry of item.inProgress ?? []) {
@@ -267,7 +268,7 @@ export function deriveInProgress(input: {
         at: entry.updatedAt,
         item,
         entry,
-        nothingMoving: isNothingMoving({ entry, running, liveWork, now: input.now }),
+        nothingMoving: !isEntryMoving(entry, movement),
       });
     }
   }
@@ -284,22 +285,6 @@ export function deriveInProgress(input: {
     });
   }
   return rows.sort((a, b) => a.at - b.at || a.key.localeCompare(b.key));
-}
-
-/**
- * Nothing will move this entry: its agent runs no turn, no background work could report back, nothing
- * outside watches it, and it hasn't changed for `NOTHING_MOVING_AFTER_MS`.
- */
-function isNothingMoving(input: {
-  entry: PluginWorkspaceInProgressEntry;
-  running: ReadonlySet<string>;
-  liveWork: boolean;
-  now: number;
-}): boolean {
-  const { entry } = input;
-  if (entry.agentId && input.running.has(entry.agentId)) return false;
-  if (input.liveWork || entry.watched) return false;
-  return input.now - entry.updatedAt > NOTHING_MOVING_AFTER_MS;
 }
 
 /** Whether a plugin lists anything in progress for the workspace. */

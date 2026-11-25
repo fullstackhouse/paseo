@@ -1366,6 +1366,12 @@ export const ptBR: TranslationResources = {
     schedules: {
       needsYou: "Execuções agendadas precisam de você: {{count}}",
     },
+    inProgress: {
+      notMoving: "{{count}} parados",
+      inProgress: "{{count}} em andamento",
+      awaitingReview: "aguardando revisão",
+      awaitingReviewCount: "{{count}} aguardando revisão",
+    },
     drafts: {
       title: "Rascunhos",
       discard: "Descartar rascunho",

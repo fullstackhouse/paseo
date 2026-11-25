@@ -210,6 +210,8 @@ function WorkspaceLeadingVisual({
   reserveIdleStatusIndicatorSpace: boolean;
 }) {
   const kind = workspaceLeadingVisualKind({ avatarDataUri, leadingProjectName });
+  // Under Working only because of in-progress work: nothing of its own runs, so nothing spins.
+  const still = workspace.inProgressReason === "working";
   if (kind === "avatar" && avatarDataUri !== null) {
     return (
       <ProjectStatusIndicator
@@ -220,6 +222,7 @@ function WorkspaceLeadingVisual({
         statusBucket={workspace.statusBucket}
         backdrop={backdrop}
         loading={isLoading}
+        still={still}
         testID={`sidebar-row-avatar-${workspace.workspaceKey}`}
       />
     );
@@ -233,6 +236,7 @@ function WorkspaceLeadingVisual({
         statusBucket={workspace.statusBucket}
         backdrop={backdrop}
         loading={isLoading}
+        still={still}
         testID={`sidebar-row-project-icon-${workspace.workspaceKey}`}
       />
     );
@@ -242,6 +246,7 @@ function WorkspaceLeadingVisual({
       bucket={workspace.statusBucket}
       workspaceKind={workspace.workspaceKind}
       loading={isLoading}
+      still={still}
       reserveIdleSpace={reserveIdleStatusIndicatorSpace}
     />
   );
@@ -251,11 +256,14 @@ function WorkspaceStatusIndicator({
   bucket,
   workspaceKind,
   loading = false,
+  still = false,
   reserveIdleSpace = true,
 }: {
   bucket: SidebarWorkspaceEntry["statusBucket"];
   workspaceKind: SidebarWorkspaceEntry["workspaceKind"];
   loading?: boolean;
+  /** Running, but nothing of the workspace's own runs a turn: the kind icon with a still dot. */
+  still?: boolean;
   reserveIdleSpace?: boolean;
 }) {
   // Busy is the only status that moves, and it is the ring rather than a dot for the same
@@ -270,7 +278,7 @@ function WorkspaceStatusIndicator({
     );
   }
 
-  if (shouldRenderSyncedStatusLoader({ bucket })) {
+  if (shouldRenderSyncedStatusLoader({ bucket }) && !still) {
     return (
       <View style={styles.workspaceStatusDot} testID="workspace-status-indicator-running">
         <StatusRing />

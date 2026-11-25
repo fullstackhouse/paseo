@@ -1345,6 +1345,12 @@ export const ko: TranslationResources = {
     schedules: {
       needsYou: "확인이 필요한 예약 실행: {{count}}",
     },
+    inProgress: {
+      notMoving: "정체 {{count}}건",
+      inProgress: "진행 중 {{count}}건",
+      awaitingReview: "리뷰 대기",
+      awaitingReviewCount: "리뷰 대기 {{count}}건",
+    },
     drafts: {
       title: "초안",
       discard: "초안 삭제",

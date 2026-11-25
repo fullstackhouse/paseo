@@ -1338,6 +1338,12 @@ export const ar: TranslationResources = {
     schedules: {
       needsYou: "عمليات مجدولة تحتاجك: {{count}}",
     },
+    inProgress: {
+      notMoving: "متوقفة: {{count}}",
+      inProgress: "قيد التنفيذ: {{count}}",
+      awaitingReview: "بانتظار المراجعة",
+      awaitingReviewCount: "بانتظار المراجعة: {{count}}",
+    },
     drafts: {
       title: "المسودات",
       discard: "تجاهل المسودة",

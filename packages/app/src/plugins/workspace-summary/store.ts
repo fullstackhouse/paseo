@@ -181,7 +181,11 @@ function cleanInProgress(entries: unknown): PluginWorkspaceInProgressEntry[] {
     if (entry.tone && BLOCKER_TONES.has(entry.tone)) item.tone = entry.tone;
     const agentId = optionalText(entry.agentId);
     if (agentId) item.agentId = agentId;
-    if (entry.watched === true) item.watched = true;
+    if (entry.watched === true) {
+      item.watched = true;
+      // Only a watched entry waits on anyone; on its own the flag means nothing.
+      if (entry.waitingOnReview === true) item.waitingOnReview = true;
+    }
     clean.push(item);
   }
   return clean;
