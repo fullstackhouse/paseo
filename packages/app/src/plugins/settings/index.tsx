@@ -57,7 +57,6 @@ export function usePluginSettingsEntry(
   return { title: plugin.i18n.resolve(screen.title, plugin.locale), open };
 }
 
-/** Lists every settings screen once there is more than the one the plugin row opens. */
 export function PluginSettingsMenuItems({
   serverId,
   pluginId,
@@ -65,7 +64,7 @@ export function PluginSettingsMenuItems({
 }: Omit<SettingsIdentity, "screenId"> & { disabled?: boolean }) {
   const plugin = useInstalledPlugin(serverId, pluginId);
   const supported = useHostFeature(serverId, "pluginSettings");
-  if (!supported || !plugin || plugin.settingsScreens.length < 2) return null;
+  if (!supported || !plugin) return null;
   return (
     <>
       {plugin.settingsScreens.map((screen) => (

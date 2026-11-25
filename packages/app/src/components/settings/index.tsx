@@ -50,8 +50,6 @@ interface AppRowExtras {
    * the trailing slot must stop their press from reaching the row; `Switch` already does.
    */
   onPress?: () => void;
-  /** Read for the row when `onPress` is set, saying where it leads. */
-  pressLabel?: string;
   /** Keeps the row from opening while its controls are disabled, such as during a pending action. */
   pressDisabled?: boolean;
 }
@@ -83,7 +81,6 @@ export function SettingsRow({
   children,
   testID,
   onPress,
-  pressLabel,
   pressDisabled,
 }: AppSettingsRowProps) {
   const compact = useIsCompactFormFactor();
@@ -97,6 +94,12 @@ export function SettingsRow({
     ],
     [pressDisabled, rowStyle],
   );
+  const handlePress = useCallback(() => {
+    // A clicked row keeps focus, and the list behind the pushed detail screen then gets
+    // aria-hidden around a focused element, which the browser blocks and logs.
+    if (isWeb) (document.activeElement as HTMLElement | null)?.blur?.();
+    onPress?.();
+  }, [onPress]);
   const accessoryTitleStyle = useMemo(() => [layout.title, styles.accessoryLabel], [layout]);
   const content = (hovered: boolean) => (
     <>
@@ -138,12 +141,14 @@ export function SettingsRow({
   }
   return (
     <PressHighlight
-      // React Native Web renders a "button" role as <button>, which cannot hold the row's own
-      // switch and menu buttons. Same as the sidebar workspace rows.
-      accessibilityRole={isWeb ? undefined : "button"}
-      accessibilityLabel={pressLabel ?? label}
+      // The row press is a pointer shortcut, so it stays out of the accessibility tree and the tab
+      // order: an accessible row would merge its switch and menu into one VoiceOver element, and
+      // a "button" role renders a <button> on web that cannot hold them. Whatever the row opens
+      // must also be reachable from a control inside it, such as the row's menu.
+      accessible={false}
+      tabIndex={-1}
       disabled={pressDisabled}
-      onPress={onPress}
+      onPress={handlePress}
       style={pressableRowStyle}
       highlightStyle={styles.pressed}
       testID={testID}

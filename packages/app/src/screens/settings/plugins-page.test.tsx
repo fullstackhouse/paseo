@@ -268,13 +268,29 @@ describe("HostPluginsPage", () => {
     fireEvent.click(await screen.findByRole("switch", { name: "example: Disable" }));
     await waitFor(() => expect(client.disablePlugin).toHaveBeenCalledTimes(1));
     fireEvent.click(screen.getByRole("button", { name: "Actions for example" }));
-    fireEvent.click(screen.getByLabelText("example: Preferences"));
+    fireEvent.click(screen.getByTestId("plugin-row-example"));
     expect(open).not.toHaveBeenCalled();
 
     finishDisable();
     expect(await screen.findByText("Disabled example")).toBeDefined();
-    fireEvent.click(screen.getByLabelText("example: Preferences"));
+    fireEvent.click(screen.getByTestId("plugin-row-example"));
     expect(open).toHaveBeenCalledTimes(1);
+  });
+
+  it("opens the actions menu without opening the plugin's settings", async () => {
+    const open = vi.fn();
+    pluginSettings.entry = { title: "Preferences", open };
+    const client = createClient();
+    client.listPlugins.mockResolvedValue([plugin()]);
+    renderPage(client);
+
+    const trigger = await screen.findByRole("button", { name: "Actions for example" });
+    fireEvent.pointerDown(trigger);
+    fireEvent.pointerUp(trigger);
+    fireEvent.click(trigger);
+
+    expect(await screen.findByRole("menuitem", { name: "Reload" })).toBeDefined();
+    expect(open).not.toHaveBeenCalled();
   });
 
   it("turns a plugin's notifications off and back on through the daemon config", async () => {

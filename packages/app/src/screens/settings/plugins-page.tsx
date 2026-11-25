@@ -2,7 +2,7 @@ import { formatPluginInstallation } from "@getpaseo/protocol/plugin-source-refer
 import { PluginSettingsMenuItems, usePluginSettingsEntry } from "@/plugins/settings";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useTranslation } from "react-i18next";
-import { Text, View, type GestureResponderEvent } from "react-native";
+import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { useMutation } from "@tanstack/react-query";
 import type { PluginListItem, PluginLogEntry } from "@getpaseo/protocol/messages";
@@ -35,6 +35,7 @@ import {
   type PluginUpdateClient,
 } from "@/plugins/updates/check-plugin-updates";
 import { settingsStyles } from "@/styles/settings";
+import { ICON_SIZE } from "@/styles/theme";
 import { confirmDialog } from "@/utils/confirm-dialog";
 import { SettingsRevealText } from "@/components/settings/reveal-text";
 
@@ -42,10 +43,6 @@ const pluginQueryKey = (serverId: string) => ["plugins", serverId] as const;
 const PLUGIN_SOURCE_DOCS_URL = "https://paseo.sh/docs/plugins/reference#plugin-sources";
 type PluginRowAction = "reload" | "enable" | "disable" | "remove";
 type PluginNotificationsToggle = (plugin: PluginListItem, enabled: boolean) => void;
-
-function stopPressInPropagation(event: GestureResponderEvent) {
-  event.stopPropagation();
-}
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -98,7 +95,6 @@ function PluginActionsMenu({
         accessibilityLabel={menuLabel}
         disabled={pending}
         hitSlop={8}
-        onPressIn={stopPressInPropagation}
         style={styles.menuButton}
       >
         <MoreHorizontal size={18} color={styles.menuIcon.color} />
@@ -205,7 +201,6 @@ function PluginRow({
       error={clientError ?? plugin.error}
       testID={`plugin-row-${plugin.id}`}
       onPress={settings?.open}
-      pressLabel={settings ? `${plugin.id}: ${settings.title}` : undefined}
       pressDisabled={pending}
     >
       <View style={styles.pluginControls} accessibilityLabel={`${plugin.id} ${statusLabel}`}>
@@ -226,6 +221,8 @@ function PluginRow({
           notificationsEnabled={notificationsEnabled}
           onToggleNotifications={onToggleNotifications}
         />
+        {/* Rows that open settings end with a chevron; keep the controls of the others aligned. */}
+        {settings ? null : <View style={styles.chevronSpace} />}
       </View>
     </SettingsRow>
   );
@@ -688,6 +685,7 @@ const styles = StyleSheet.create((theme) => ({
   },
   install: { padding: theme.spacing[4], gap: theme.spacing[3] },
   pluginControls: { flexDirection: "row", alignItems: "center", gap: theme.spacing[2] },
+  chevronSpace: { width: ICON_SIZE.sm },
   menuButton: { padding: theme.spacing[1], borderRadius: theme.borderRadius.sm },
   menuIcon: { color: theme.colors.foregroundMuted },
   dangerIcon: { color: theme.colors.statusDanger },

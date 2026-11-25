@@ -42,9 +42,9 @@ export async function openCompactDisplaySettings(page: Page) {
   await openCompactSettings(page, new URL(page.url()).pathname);
   await openPluginScreen(page);
 }
-// On web the row has no button role (it holds the switch and menu buttons), so find it by label.
+// The row press is a pointer shortcut with no accessible role, so find the row by its test id.
 function pluginRow(page: Page) {
-  return page.getByLabel("settings-example: Display", { exact: true });
+  return page.getByTestId("plugin-row-settings-example");
 }
 async function openPluginScreen(page: Page) {
   await openHostSection(page, getServerId(), "plugins");
