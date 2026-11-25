@@ -1,4 +1,4 @@
-// FSH fork: agents whose turn failed on a network or provider outage, offered for retry together.
+// FSH fork: failed agents, offered for retry together. Outage failures alone back the sidebar callout.
 import { classifyAgentError } from "@getpaseo/protocol/agent-error-kind";
 import type { Agent } from "@/stores/session-store";
 
