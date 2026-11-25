@@ -2489,6 +2489,9 @@ export const es: TranslationResources = {
     used: "{{percentage}}% utilizado",
     tokens: "Fichas{{used}}/{{max}}",
     sessionCost: "Costo de la sesión{{cost}}",
+    externalSession: "Sesión {{id}}",
+    copyExternalSession: "Copiar ID de sesión",
+    openExternalSession: "Abrir en la consola",
     accessibility: "Ventana de contexto{{percentage}}% utilizada",
   },
   review: {

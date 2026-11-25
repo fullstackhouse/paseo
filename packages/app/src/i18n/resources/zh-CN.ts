@@ -2409,6 +2409,9 @@ export const zhCN: TranslationResources = {
     used: "已使用 {{percentage}}%",
     tokens: "{{used}} / {{max}} tokens",
     sessionCost: "会话费用 {{cost}}",
+    externalSession: "会话 {{id}}",
+    copyExternalSession: "复制会话 ID",
+    openExternalSession: "在控制台中打开",
     accessibility: "上下文窗口已使用 {{percentage}}%",
   },
   review: {

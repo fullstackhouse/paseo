@@ -546,6 +546,12 @@ export interface AgentSessionConfig {
   internal?: boolean;
 }
 
+/** The vendor's own record of an agent's session, such as a cloud session in the vendor's console. */
+export interface AgentExternalSession {
+  id: string;
+  url?: string | null;
+}
+
 export interface AgentRuntimeInfo {
   provider: AgentProvider;
   sessionId: string | null;
@@ -553,4 +559,5 @@ export interface AgentRuntimeInfo {
   thinkingOptionId?: string | null;
   modeId?: string | null;
   extra?: AgentMetadata;
+  externalSession?: AgentExternalSession | null;
 }

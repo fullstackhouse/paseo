@@ -2447,6 +2447,9 @@ export const ko: TranslationResources = {
     used: "{{percentage}}% 사용됨",
     tokens: "{{used}} / {{max}} 토큰",
     sessionCost: "세션 비용 {{cost}}",
+    externalSession: "세션 {{id}}",
+    copyExternalSession: "세션 ID 복사",
+    openExternalSession: "콘솔에서 열기",
     accessibility: "컨텍스트 윈도우 {{percentage}}% 사용됨",
   },
   review: {

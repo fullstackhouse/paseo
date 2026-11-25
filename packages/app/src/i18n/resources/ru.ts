@@ -2473,6 +2473,9 @@ export const ru: TranslationResources = {
     used: "Использовано: {{percentage}}%",
     tokens: "Токены: {{used}} / {{max}}",
     sessionCost: "Стоимость сессии: {{cost}}",
+    externalSession: "Сессия {{id}}",
+    copyExternalSession: "Скопировать ID сессии",
+    openExternalSession: "Открыть в консоли",
     accessibility: "Использовано {{percentage}}% контекстного окна",
   },
   review: {

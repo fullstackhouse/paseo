@@ -17,11 +17,12 @@ import { setImmediate as nextTurn } from "node:timers/promises";
 import { describe, expect, test } from "vitest";
 import { createTestLogger } from "../../test-utils/test-logger.js";
 import type { AgentClient, AgentStreamEvent } from "./agent-sdk-types.js";
-import { toStoredAgentRecord } from "./agent-projections.js";
+import { toAgentPayload, toStoredAgentRecord } from "./agent-projections.js";
 import { AgentManager } from "./agent-manager.js";
 import { buildProviderRegistry } from "./provider-registry.js";
 import { ProviderOverrideSchema } from "@getpaseo/protocol/provider-config";
 import { PluginAgentClientRegistry } from "./plugin-provider.js";
+import { ProviderEventSchema } from "@getpaseo/plugin/server/provider";
 import {
   isStaleProviderSessionError,
   StaleProviderSessionError,
@@ -56,6 +57,7 @@ interface ProviderHarnessOptions {
   closeAcknowledgementOnly?: boolean;
   openChildren?: (rootSessionId: string, emit: (event: ProviderEvent) => void) => void;
   handleInput?: (input: ProviderInput, emit: (event: ProviderEvent) => void) => Promise<boolean>;
+  externalSession?: { id: string; url?: string };
 }
 
 function createProviderHarness(options: ProviderHarnessOptions = {}) {
@@ -99,6 +101,7 @@ function createProviderHarness(options: ProviderHarnessOptions = {}) {
           restoration: "core",
           persistence: { version: 1, data: { token: "root" } },
           cwd: input.config.cwd,
+          ...(options.externalSession ? { externalSession: options.externalSession } : {}),
         });
         emit({
           type: "session.config",
@@ -1294,6 +1297,43 @@ describe("PluginAgentClientRegistry", () => {
       }
     },
   );
+
+  test("reports the provider's external session in the agent's runtime info", async () => {
+    const externalSession = {
+      id: "sesn_123",
+      url: "https://platform.claude.com/sessions/sesn_123",
+    };
+    const logger = createTestLogger();
+    const harness = createProviderHarness({ externalSession });
+    const plugins = new PluginAgentClientRegistry(logger);
+    plugins.replace([harness.registration]);
+    const registry = buildProviderRegistry(logger, { pluginProviders: plugins.definitions() });
+    const manager = new AgentManager({
+      logger,
+      clients: { "plugin-direct": registry["plugin-direct"].createClient(logger) },
+      providerDefinitions: { "plugin-direct": registry["plugin-direct"] },
+    });
+    const agent = await manager.createAgent(
+      { provider: "plugin-direct", cwd: tmpdir() },
+      undefined,
+      { workspaceId: undefined },
+    );
+    expect(agent.runtimeInfo?.externalSession).toEqual(externalSession);
+    expect(toAgentPayload(agent).runtimeInfo?.externalSession).toEqual(externalSession);
+    await agent.session?.close();
+  });
+
+  test("rejects an external session link that is not http(s)", () => {
+    const parsed = ProviderEventSchema.safeParse({
+      type: "session.opened",
+      sessionId: "root",
+      capabilities: [],
+      restoration: "core",
+      cwd: "/tmp",
+      externalSession: { id: "sesn_123", url: "javascript:alert(1)" },
+    });
+    expect(parsed.success).toBe(false);
+  });
 
   test("gates persistence operations on negotiated provider capabilities", async () => {
     const harness = createProviderHarness({ capabilities: ["session.persistence"] });

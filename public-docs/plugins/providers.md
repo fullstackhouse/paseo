@@ -189,6 +189,10 @@ emit({ type: "session.ready", requestId: input.requestId, sessionId: input.sessi
 `session.config` contains the committed values. Publish what the native agent selected after
 normalization, not a copy of the request.
 
+When the vendor keeps its own record of the session, such as a cloud session with a console page,
+add `externalSession: { id, url? }` to `session.opened`. The context window popover shows the ID
+with Copy, and Open when `url` is an http(s) link. Older hosts ignore it.
+
 ## Complete the first prompt
 
 Start with message prompts. Advertise `prompt.message`, pass the content to the native agent, and

@@ -2,6 +2,7 @@ import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { useTranslation } from "react-i18next";
 import { AgentUsage } from "@/usage";
+import { ContextWindowExternalSession } from "./context-window-external-session";
 import { formatTokenCount } from "./context-window-meter.utils";
 
 interface ContextWindowDetailsProps {
@@ -15,7 +16,7 @@ interface ContextWindowDetailsProps {
   sessionCost: string | null;
   /** The hover card and tooltip title themselves; the sheet's header carries the title instead. */
   showTitle: boolean;
-  /** Whether the usage cards have a Refresh button; without one they show their freshness. */
+  /** Whether the surface takes presses: usage cards get Refresh, the external session Copy and Open. */
   refreshable: boolean;
 }
 
@@ -54,6 +55,11 @@ export function ContextWindowDetails({
         {sessionCost ? (
           <Text style={styles.detail}>{t("contextWindow.sessionCost", { cost: sessionCost })}</Text>
         ) : null}
+        <ContextWindowExternalSession
+          serverId={serverId}
+          agentId={agentId}
+          interactive={refreshable}
+        />
       </View>
       <AgentUsage serverId={serverId} agentId={agentId} refreshable={refreshable} />
     </>
