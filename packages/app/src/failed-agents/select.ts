@@ -4,12 +4,12 @@ import type { Agent } from "@/stores/session-store";
 
 type FailedCandidate = Pick<
   Agent,
-  "serverId" | "id" | "status" | "lastError" | "archivedAt" | "updatedAt"
+  "serverId" | "id" | "title" | "status" | "lastError" | "archivedAt" | "updatedAt"
 >;
 
-type Sessions<T> = Record<string, { agents: ReadonlyMap<string, T> }>;
+type Sessions = Record<string, { agents: ReadonlyMap<string, FailedCandidate> }>;
 
-export function isFailedAgent(agent: FailedCandidate): boolean {
+function isFailedAgent(agent: FailedCandidate): boolean {
   return agent.status === "error" && !agent.archivedAt;
 }
 
@@ -18,26 +18,42 @@ export function isRetryableFailure(agent: FailedCandidate): boolean {
   return isFailedAgent(agent) && classifyAgentError(agent.lastError) === "transient";
 }
 
-function selectAgents<T extends FailedCandidate>(
-  sessions: Sessions<T>,
-  matches: (agent: T) => boolean,
-): T[] {
-  const result: T[] = [];
-  for (const session of Object.values(sessions)) {
-    for (const agent of session.agents.values()) {
-      if (matches(agent)) result.push(agent);
-    }
+const failedByAgents = new WeakMap<
+  ReadonlyMap<string, FailedCandidate>,
+  readonly FailedCandidate[]
+>();
+
+/**
+ * A host's failed agents. Session selectors run on every store write (stream chunks included),
+ * and the store replaces a host's agents map whenever an agent changes, so the list is built
+ * once per map.
+ */
+function failedAgentsOf(agents: ReadonlyMap<string, FailedCandidate>): readonly FailedCandidate[] {
+  let failed = failedByAgents.get(agents);
+  if (!failed) {
+    failed = [...agents.values()].filter(isFailedAgent);
+    failedByAgents.set(agents, failed);
   }
-  return result;
+  return failed;
 }
 
-export function selectRetryableFailedAgents<T extends FailedCandidate>(sessions: Sessions<T>): T[] {
-  return selectAgents(sessions, isRetryableFailure);
-}
+let lastLists: readonly (readonly FailedCandidate[])[] = [];
+let lastFailed: readonly FailedCandidate[] = [];
 
-/** Every failed agent, whatever the error: the palette retries them on request, e.g. after a usage limit resets. */
-export function selectFailedAgents<T extends FailedCandidate>(sessions: Sessions<T>): T[] {
-  return selectAgents(sessions, isFailedAgent);
+/**
+ * Every failed agent, whatever the error: the palette retries them on request, e.g. after a usage
+ * limit resets. Returns the same array until a host's list changes, so a store write that touches
+ * no agent costs one lookup per host.
+ */
+export function selectFailedAgents(sessions: Sessions): readonly FailedCandidate[] {
+  const lists = Object.values(sessions).map((session) => failedAgentsOf(session.agents));
+  const unchanged =
+    lists.length === lastLists.length && lists.every((list, index) => list === lastLists[index]);
+  if (!unchanged) {
+    lastLists = lists;
+    lastFailed = lists.flat();
+  }
+  return lastFailed;
 }
 
 /** Changes when any of them fails again, so dismissing one outage's callout doesn't hide the next. */

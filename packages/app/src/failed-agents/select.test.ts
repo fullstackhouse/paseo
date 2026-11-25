@@ -1,10 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  failedAgentsDismissalKey,
-  isRetryableFailure,
-  selectFailedAgents,
-  selectRetryableFailedAgents,
-} from "./select";
+import { failedAgentsDismissalKey, isRetryableFailure, selectFailedAgents } from "./select";
 
 const NETWORK_ERROR =
   "API Error: Can't reach the API server — check your internet or DNS (ENOTFOUND)";
@@ -21,6 +16,7 @@ function agent(
   return {
     serverId: "host",
     id,
+    title: null,
     status: overrides.status ?? "error",
     lastError: "lastError" in overrides ? overrides.lastError : NETWORK_ERROR,
     archivedAt: overrides.archivedAt ?? null,
@@ -42,21 +38,6 @@ describe("isRetryableFailure", () => {
   });
 });
 
-describe("selectRetryableFailedAgents", () => {
-  it("collects retryable agents across hosts", () => {
-    const selected = selectRetryableFailedAgents({
-      one: {
-        agents: new Map([
-          ["a", agent("a")],
-          ["b", agent("b", { status: "idle" })],
-        ]),
-      },
-      two: { agents: new Map([["c", { ...agent("c"), serverId: "two" }]]) },
-    });
-    expect(selected.map((a) => a.id)).toEqual(["a", "c"]);
-  });
-});
-
 describe("selectFailedAgents", () => {
   it("collects every failed agent across hosts, usage limits included", () => {
     const selected = selectFailedAgents({
@@ -73,6 +54,31 @@ describe("selectFailedAgents", () => {
       },
     });
     expect(selected.map((a) => a.id)).toEqual(["outage", "limit", "other"]);
+  });
+
+  it("walks a host's agents once per agents map, and again when the map is replaced", () => {
+    const agents = new Map([["a", agent("a")]]);
+    const sessions = { host: { agents } };
+    expect(selectFailedAgents(sessions).map((a) => a.id)).toEqual(["a"]);
+
+    // The store never edits a map in place; doing it here shows the walk isn't repeated.
+    agents.set("b", agent("b"));
+    expect(selectFailedAgents(sessions).map((a) => a.id)).toEqual(["a"]);
+
+    const replaced = { host: { agents: new Map(agents) } };
+    expect(selectFailedAgents(replaced).map((a) => a.id)).toEqual(["a", "b"]);
+  });
+
+  it("returns the same list until a host's agents map changes", () => {
+    const one = new Map([["a", agent("a")]]);
+    const two = new Map([["b", { ...agent("b"), serverId: "two" }]]);
+    const first = selectFailedAgents({ one: { agents: one }, two: { agents: two } });
+    expect(selectFailedAgents({ one: { agents: one }, two: { agents: two } })).toBe(first);
+
+    const replaced = selectFailedAgents({ one: { agents: new Map(one) }, two: { agents: two } });
+    expect(replaced).not.toBe(first);
+    expect(replaced.map((a) => a.id)).toEqual(["a", "b"]);
+    expect(selectFailedAgents({ one: { agents: one } }).map((a) => a.id)).toEqual(["a"]);
   });
 });
 
