@@ -1,6 +1,6 @@
 # Spec: sidebar groups a workspace by its work in progress
 
-Status: design approved (atlas `.ai/prototypes/sidebar-in-progress/`) · 2026-11-25
+Status: design approved (atlas `.ai/prototypes/sidebar-in-progress/`); implementing · 2026-11-25
 
 Follows [spec-overview-in-progress.md](spec-overview-in-progress.md) (shipped in fullstackhouse/paseo#237 and
 fullstackhouse/paseo-asks#91). UI map: [spec-sidebar-in-progress-ui-map.md](spec-sidebar-in-progress-ui-map.md).
@@ -36,9 +36,47 @@ workspaces, then a manual group. paseo-asks reports `needsYou` only for open ask
 
 ## Mechanism
 
-To be written once the UI map and cards are agreed.
+Two PRs: paseo-asks first (older hosts ignore the new field), then the host.
+
+### Contract (`packages/plugin/src/client/contracts.ts`, FSH-only)
+
+`PluginWorkspaceInProgressEntry` gains one optional field:
+
+```ts
+/** True while a watched entry waits on a person's review rather than on machines (checks, a merge). */
+waitingOnReview?: boolean;
+```
+
+Only meaningful with `watched: true`. Absent or false means a watched entry waits on machines.
+
+### paseo-asks
+
+`client/summary.ts` sets `waitingOnReview: true` on a watched PR ask whose PR waits on a requested review
+(review required, no checks running); false otherwise. Its derived `waitingOn` word already says "review
+requested" in that case (#91).
+
+### Host (fsh)
+
+- **Moving.** Reuse #237's per-entry rule (`panels/overview/model.ts`): an entry moves while its agent's turn
+  runs, the workspace has live background work, or it is `watched`; otherwise, after 10 minutes, it is not
+  moving. Move the rule somewhere both Overview and `workspace-status` import, so the two never disagree.
+- **Fold (S1).** `reported-work.ts` gains an in-progress contribution per workspace, from every summary
+  item's `inProgress`:
+  - stuck ≥ moving (and at least one stuck) → `needs_you` (Ready to review);
+  - otherwise any moving entry not waiting on review, or live background work, or a running turn → `working`;
+  - otherwise all moving entries wait on review → `blocked`;
+  - no entries → nothing.
+    It folds with the other items under the existing rank (needs_you > working > blocked > done), so an open
+    ask still wins and moving work beats a Done card (A30). Read/unread stays hidden while a report decides
+    the group, as today.
+- **Row (S2).** `sidebar-workspace-row-content.tsx` adds badges after "needs you (N)": "N not moving"
+  (warning, alert icon) whenever stuck entries exist; "N in progress" (muted, dashed circle) when the
+  in-progress contribution decided the group as `working`; "awaiting review" / "N awaiting review" (muted,
+  eye icon) when it decided `blocked`. The avatar's state mark is a still dot, not the spinning ring, when
+  the row is under Working only because of in-progress work.
 
 ## Changelog
 
 - 2026-11-25 — stage 1 UI map drafted; placement options drawn (V1–V3); A27–A30 decided; stage 1 approved (A31).
 - 2026-11-25 — stage 2 cards and mockups approved (A33–A36).
+- 2026-11-25 — mechanism and contract written (A37).
