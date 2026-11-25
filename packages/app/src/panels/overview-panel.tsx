@@ -30,6 +30,7 @@ import { Button } from "@/components/ui/button";
 import { StatusBadge, type StatusBadgeVariant } from "@/components/ui/status-badge";
 import { PressHighlight } from "@/components/ui/press-highlight";
 import { ScrollView } from "@/components/ui/scroll-view";
+import { StatusRing } from "@/components/status-ring";
 import { GIT_ACTION_ICONS } from "@/git/action-icons";
 import {
   type GitAction,
@@ -1211,7 +1212,13 @@ function InProgressAgentGroup({
         highlightStyle={styles.pressed}
         testID={`overview-in-progress-agent-${row.agentId}`}
       >
-        <ThemedBot size={SMALL_ICON_SIZE} uniProps={mutedColorMapping} />
+        {row.running ? (
+          <View style={styles.ringSlot}>
+            <StatusRing />
+          </View>
+        ) : (
+          <ThemedBot size={SMALL_ICON_SIZE} uniProps={mutedColorMapping} />
+        )}
         <Text style={styles.contextValue} numberOfLines={1}>
           {agent.label}
         </Text>
@@ -2193,7 +2200,14 @@ const styles = StyleSheet.create((theme) => {
       fontSize: theme.fontSize.sm,
       color: theme.colors.foreground,
     },
-    wordRun: { ...word, color: theme.colors.accentBright },
+    // The working ring in an icon-sized slot, so the agent's name stays on the icon rail.
+    ringSlot: {
+      width: SMALL_ICON_SIZE,
+      height: SMALL_ICON_SIZE,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    wordRun: { ...word, color: theme.colors.statusRunning },
     wordWarn: { ...word, color: theme.colors.statusWarning },
     wordDanger: { ...word, color: theme.colors.statusDanger },
     wordOk: { ...word, color: theme.colors.statusSuccess },
