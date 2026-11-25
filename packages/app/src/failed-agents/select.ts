@@ -37,9 +37,23 @@ function failedAgentsOf(agents: ReadonlyMap<string, FailedCandidate>): readonly 
   return failed;
 }
 
-/** Every failed agent, whatever the error: the palette retries them on request, e.g. after a usage limit resets. */
-export function selectFailedAgents(sessions: Sessions): FailedCandidate[] {
-  return Object.values(sessions).flatMap((session) => failedAgentsOf(session.agents));
+let lastLists: readonly (readonly FailedCandidate[])[] = [];
+let lastFailed: readonly FailedCandidate[] = [];
+
+/**
+ * Every failed agent, whatever the error: the palette retries them on request, e.g. after a usage
+ * limit resets. Returns the same array until a host's list changes, so a store write that touches
+ * no agent costs one lookup per host.
+ */
+export function selectFailedAgents(sessions: Sessions): readonly FailedCandidate[] {
+  const lists = Object.values(sessions).map((session) => failedAgentsOf(session.agents));
+  const unchanged =
+    lists.length === lastLists.length && lists.every((list, index) => list === lastLists[index]);
+  if (!unchanged) {
+    lastLists = lists;
+    lastFailed = lists.flat();
+  }
+  return lastFailed;
 }
 
 /** Changes when any of them fails again, so dismissing one outage's callout doesn't hide the next. */

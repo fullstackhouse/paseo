@@ -68,6 +68,18 @@ describe("selectFailedAgents", () => {
     const replaced = { host: { agents: new Map(agents) } };
     expect(selectFailedAgents(replaced).map((a) => a.id)).toEqual(["a", "b"]);
   });
+
+  it("returns the same list until a host's agents map changes", () => {
+    const one = new Map([["a", agent("a")]]);
+    const two = new Map([["b", { ...agent("b"), serverId: "two" }]]);
+    const first = selectFailedAgents({ one: { agents: one }, two: { agents: two } });
+    expect(selectFailedAgents({ one: { agents: one }, two: { agents: two } })).toBe(first);
+
+    const replaced = selectFailedAgents({ one: { agents: new Map(one) }, two: { agents: two } });
+    expect(replaced).not.toBe(first);
+    expect(replaced.map((a) => a.id)).toEqual(["a", "b"]);
+    expect(selectFailedAgents({ one: { agents: one } }).map((a) => a.id)).toEqual(["a"]);
+  });
 });
 
 describe("failedAgentsDismissalKey", () => {
