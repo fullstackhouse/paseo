@@ -158,15 +158,18 @@ content also requests timeline data. Inactive consumers read cached data without
 Discovery uses ordinary PR tabs and their existing once-per-workspace close opt-out.
 
 Overview is an Explorer-only singleton tab that summarizes the workspace on desktop
-(`packages/app/src/panels/overview-panel.tsx`). It answers four questions in order, and shows each fact once. The design
-is the storyboard in `.ai/prototypes/overview-v3/`.
+(`packages/app/src/panels/overview-panel.tsx`). It answers five questions in order, and shows each fact once. The design
+is the storyboard in `.ai/prototypes/overview-v3/`; In progress and the Status age come from
+`.ai/prototypes/overview-in-progress/`.
 
 - **What is this?** The workspace name, then the status card's goal as its subtitle (the project name without one).
   No ⋯ menu: archive, editor and branch actions live in the workspace header and the sidebar.
 - **Where does it stand?** The summary item that carries `status` (paseo-status), as one line: a dot and state word,
-  then the agent's summary. "Now" stays in the Status tab; next to the summary it repeated the same progress. When
-  someone prompted an agent after the card's last update and no agent runs now, the line dims and says so. Without a
-  card, nothing.
+  then "· updated 8h ago" and the agent's summary. "Now" stays in the Status tab; next to the summary it repeated the
+  same progress. When someone prompted an agent after the card's last update and no agent runs now, the line dims and
+  says so. A Working card in a workspace that runs nothing (no agent turn, subagent or background work: the workspace
+  isn't `running`) adds "Nothing is running in this workspace." in the warning tone: the agent forgot the card, or its
+  work died. Without a card, nothing.
 - **What do I do?** Your move: what waits on you, in the attention ladder's order (permission prompts, one row per
   plugin `entries` item such as an ask, failed agents), then Archive. Git steps and failing checks are not moves: the
   agent handles git, and the Pull requests section shows the facts. The first item is a card with its actions; the rest
@@ -175,7 +178,17 @@ is the storyboard in `.ai/prototypes/overview-v3/`.
   so an ask is answered in place too. Archive is its own row, only once the work shipped: the branch PR merged, or a
   current status card says done (its PRs may live in other repos). It never shows while an agent runs, and only in a
   worktree or after a merge. It shows when the header's primary git action is Archive or a leftover pull, push or
-  update from base; a commit or PR step means work that isn't in the PR yet, so Archive waits. A merged PR ends one agent's job, not the workspace's: while the host still counts the workspace running (an idle agent's background shell, monitor or subagent), the newest status card says working or blocked, or the plugins' report is working, blocked or needs you, Archive stays in the header (`isWorkStillOpen`). The report is the plugin's verdict, the same one that groups the sidebar, so it includes your open asks and the merged agent's own card. Live work holds Archive even when the report says done: paseo-status counts only agents with a card. The card holds it even after paseo-status stops believing it (a Working card with nothing live for 5 minutes). Archive also waits while a permission prompt or a failed agent is listed: their workspace status outranks running, so another agent's live work would no longer show. When live background work is what holds a shipped workspace's Archive, Your move says so in its place, with no button: a dev server a finished agent left running would otherwise hide Archive with nothing on screen to say why, while the sidebar shows the workspace as Done. With nothing to do, nothing: no section and no "nothing needs you" line.
+  update from base; a commit or PR step means work that isn't in the PR yet, so Archive waits. A merged PR ends one agent's job, not the workspace's: while the host still counts the workspace running (an idle agent's background shell, monitor or subagent), the newest status card says working or blocked, the plugins' report is working, blocked or needs you, or a plugin lists anything in progress, Archive stays in the header (`isWorkStillOpen`, `deriveYourMove`). The report is the plugin's verdict, the same one that groups the sidebar, so it includes your open asks and the merged agent's own card. Live work holds Archive even when the report says done: paseo-status counts only agents with a card. The card holds it even after paseo-status stops believing it (a Working card with nothing live for 5 minutes). Archive also waits while a permission prompt or a failed agent is listed: their workspace status outranks running, so another agent's live work would no longer show. Your move shows no placeholder while Archive waits: In progress, below it, lists what it waits for. With nothing to do, nothing: no section and no "nothing needs you" line.
+- **What moves without me?** In progress: what plugins' agents have taken on (`inProgress` entries, such as asks the
+  agent works on) and the root agents with a running turn, working subagents or live background work
+  (`agent.background_work.*`, gated on `features.agentBackgroundWork`). Under an agent, its subagents fold into one line
+  worded like its track pill, and each background job gets its own line. Every time is "since it last changed": an
+  entry's `updatedAt`, an agent's last activity, a job's start. Rows go oldest first across kinds (`deriveInProgress`),
+  five, then Show all. An entry reads "nothing moving" in the warning tone when its agent runs no turn, the workspace
+  has no live background work, it isn't `watched`, and it hasn't changed for 10 minutes. Pressing an agent or job line
+  opens the agent; the subagents line opens the agent and its subagents list (`requestSubagentsTrackOpen`); an entry
+  opens in place with the item's `EntryComponent`, which gets `nothingMoving`. One row is open across Your move and In
+  progress (`openMoveKey`, `pinOpenMove`); an In progress row never opens by itself. Hidden when nothing moves.
 - **Context**: one-line facts the blocks above don't say, under a rule, and nothing when there are none: From (the
   nearest ancestor's workspace), Started (the workspaces the focused agent started), the PR or a branch with something
   to report, Agents when several root agents share the workspace, and plugin
@@ -183,7 +196,7 @@ is the storyboard in `.ai/prototypes/overview-v3/`.
   (`overview/model.ts`).
 
 Summary items route by shape (`partitionSummaryItems`): `status` → Status, `needsYou` or `entries` → Your move,
-anything else → More. Entering a workspace adds the tab once, first in the rail. Like Files and Changes it has no inline
+`inProgress` → In progress, anything else → More. Entering a workspace adds the tab once, first in the rail. Like Files and Changes it has no inline
 close; closing it from the tab menu opts that workspace out, as with Lineage. **Always** shows Explorer on it when nothing
 needs you.
 

@@ -1,6 +1,6 @@
 # Spec: Overview shows work in progress
 
-Status: design approved (atlas `.ai/prototypes/overview-in-progress/`) · 2026-11-25 · 2026-11-25
+Status: host implementation in review (fsh PR); paseo-asks side in fullstackhouse/paseo-asks#91 · 2026-11-25 · 2026-11-25
 
 Follows [spec-overview-tree.md](spec-overview-tree.md). UI map: [spec-overview-in-progress-ui-map.md](spec-overview-in-progress-ui-map.md).
 
@@ -102,3 +102,4 @@ agrees with the row.
 
 - 2026-11-25 — stage 1 UI map drafted; placement options drawn (V1–V3); A4–A11 decided; stage 1 approved (A12).
 - 2026-11-25 — stage 2 cards and mockups approved (A13–A20); A21 times since last change; mechanism and contract written (A22).
+- 2026-11-25 — host half implemented: contract, store validation, In progress section, Archive waits for in-progress entries, Status age and "Nothing is running" warning.
