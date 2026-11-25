@@ -98,7 +98,6 @@ class ObservedWorkspaceRegistry extends FileBackedWorkspaceRegistry {
 interface TestTimer extends ReconciliationTimer {
   callback: () => void | Promise<void>;
   dueAt: number;
-  intervalMs: number | null;
 }
 
 class TestClock implements ReconciliationClock {
@@ -110,18 +109,12 @@ class TestClock implements ReconciliationClock {
   }
 
   setTimeout(callback: () => void | Promise<void>, delayMs: number): TestTimer {
-    return this.add(callback, delayMs, null);
+    const timer = { callback, dueAt: this.now + delayMs, unref: () => undefined };
+    this.timers.add(timer);
+    return timer;
   }
 
   clearTimeout(timer: TestTimer): void {
-    this.timers.delete(timer);
-  }
-
-  setInterval(callback: () => void | Promise<void>, delayMs: number): TestTimer {
-    return this.add(callback, delayMs, delayMs);
-  }
-
-  clearInterval(timer: TestTimer): void {
     this.timers.delete(timer);
   }
 
@@ -133,21 +126,10 @@ class TestClock implements ReconciliationClock {
         .sort((left, right) => left.dueAt - right.dueAt)[0];
       if (!next) break;
       this.now = next.dueAt;
-      if (next.intervalMs === null) this.timers.delete(next);
-      else next.dueAt += next.intervalMs;
+      this.timers.delete(next);
       await next.callback();
     }
     this.now = target;
-  }
-
-  private add(
-    callback: () => void | Promise<void>,
-    delayMs: number,
-    intervalMs: number | null,
-  ): TestTimer {
-    const timer = { callback, dueAt: this.now + delayMs, intervalMs, unref: () => undefined };
-    this.timers.add(timer);
-    return timer;
   }
 }
 
@@ -525,6 +507,33 @@ describe("observed workspace placement", () => {
 
     expect((await observed.placement("workspace-one"))?.archivedAt).toEqual(expect.any(String));
     expect(observed.workspaceBatches).toEqual([["workspace-one"]]);
+    observed.dispose();
+  });
+
+  test("waits a full interval after a slow periodic pass before starting the next", async () => {
+    const observed = new ObservedPlacements([
+      {
+        id: "project-one",
+        root: "repo",
+        workspaces: [{ id: "workspace-one", cwd: "repo/worktree-one" }],
+      },
+    ]);
+    await observed.start();
+    await observed.advanceBy(RESCAN_INTERVAL_MS);
+    const readsPerPass = observed.gitReads;
+    expect(readsPerPass).toBeGreaterThan(0);
+
+    const slowPassRead = observed.holdNextReconciliation();
+    const slowPass = observed.advanceBy(RESCAN_INTERVAL_MS);
+    await slowPassRead.started;
+    // Several intervals elapse while the pass is still reading.
+    await observed.advanceBy(RESCAN_INTERVAL_MS * 3);
+    slowPassRead.release();
+    await slowPass;
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    expect(observed.gitReads).toBe(readsPerPass * 2);
+    expect(observed.pendingTimers).toBe(1);
     observed.dispose();
   });
 

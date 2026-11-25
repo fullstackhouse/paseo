@@ -29,6 +29,7 @@ import {
   getCheckoutDiff,
   getCheckoutShortstat,
   getPullRequestStatus,
+  getCheckoutPlacement,
   getCheckoutStatus,
   checkoutResolvedBranch,
   listBranchSuggestions,
@@ -519,6 +520,41 @@ describe("checkout git utilities", () => {
       .toString()
       .trim();
     expect(message).toBe("update file");
+  });
+
+  it("reads checkout placement like status without scanning the working tree", async () => {
+    setupRemoteTrackingMain(repoDir, tempDir);
+    const worktree = await createLegacyWorktreeForTest({
+      branchName: "feature/placement",
+      cwd: repoDir,
+      baseBranch: "main",
+      worktreeSlug: "placement",
+      paseoHome,
+    });
+    writeFileSync(join(worktree.worktreePath, "untracked.txt"), "untracked\n");
+
+    for (const cwd of [repoDir, worktree.worktreePath]) {
+      const status = await getCheckoutStatus(cwd, { paseoHome });
+      if (!status.isGit) throw new Error("Expected a git checkout");
+      startGitCommandMetrics();
+      const placement = await getCheckoutPlacement(cwd, { paseoHome });
+      const operations = stopGitCommandMetrics().commands.map((command) => command.args[0]);
+
+      expect(placement).toEqual({
+        isGit: true,
+        repoRoot: status.repoRoot,
+        mainRepoRoot: status.mainRepoRoot,
+        currentBranch: status.currentBranch,
+        remoteUrl: status.remoteUrl,
+        isPaseoOwnedWorktree: status.isPaseoOwnedWorktree,
+      });
+      expect(operations).not.toContain("status");
+      expect(operations).not.toContain("ls-files");
+      expect(operations).not.toContain("rev-list");
+    }
+    await expect(getCheckoutPlacement(worktree.worktreePath, { paseoHome })).resolves.toMatchObject(
+      { isPaseoOwnedWorktree: true, mainRepoRoot: repoDir },
+    );
   });
 
   it("honors commit signing configuration", async () => {
