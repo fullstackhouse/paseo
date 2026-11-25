@@ -144,13 +144,14 @@ const darkDiffColors = {
 // Regenerate with the same rule rather than nudging one value.
 //
 // Hues are fixed per family across both themes: success 150, danger 27, warning 70.5,
-// merged 300.
+// merged 300, running 250 (the statusDotRunning hue, so working text and the working dot match).
 const lightStatusColors = {
   // L=0.50, chroma 60% of gamut max
   statusSuccess: "#3e704a",
   statusDanger: "#9d433b",
   statusWarning: "#7b5d39",
   statusMerged: "#7347af",
+  statusRunning: "#3b6692",
 };
 
 const darkStatusColors = {
@@ -159,6 +160,7 @@ const darkStatusColors = {
   statusDanger: "#d8847b",
   statusWarning: "#c09664",
   statusMerged: "#a890d5",
+  statusRunning: "#73a3d5",
 };
 
 // Status tints — the fill of a status badge. The status color itself at low opacity, so a
