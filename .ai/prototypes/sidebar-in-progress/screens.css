@@ -528,3 +528,9 @@
 .sb-row-meta svg { width: 12px; height: 12px; }
 .sb-sep { color: var(--app-fg-xmuted); padding: 0 1px; }
 .sb-chip { display: inline-flex; align-items: center; gap: 3px; }
+/* cropped frames (S2) and the narrow-sidebar rule: the project name and title shrink, badges never do */
+.sb-win.is-crop { padding: 4px 0 6px; }
+.sb-cut { text-align: center; color: var(--app-fg-xmuted); letter-spacing: 0.3em; font-size: 13px; line-height: 1; padding: 4px 0; }
+.sb-row-meta > span:not(.sb-chip):not(.sb-sep) { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.sb-chip, .sb-sep { flex-shrink: 0; }
+.sb-row-meta { overflow: hidden; }

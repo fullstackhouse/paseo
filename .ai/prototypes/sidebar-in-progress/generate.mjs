@@ -12,7 +12,9 @@
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { runAtlas } from './atlas.mjs'
-import { SB_ICONS, placementStates } from './mockups-placement.mjs'
+import { SB_ICONS } from './mockups-shared.mjs'
+import { placementStates } from './mockups-placement.mjs'
+import { sidebarStates } from './mockups-sidebar.mjs'
 
 const OUT = path.dirname(fileURLToPath(import.meta.url))
 
@@ -27,13 +29,14 @@ runAtlas({
   // renders the cards with "mockups pending"; `overview: true` (one file at most) puts that
   // file's area-wide rules and decisions on the overview page instead of an area page.
   areaFiles: [
+    { file: 'spec-sidebar-in-progress-ui-sidebar.md', areas: ['S'], title: 'Sidebar', mockups: true },
     { file: 'spec-sidebar-in-progress-ui-placement.md', areas: ['V'], title: 'Placement options', mockups: true },
   ],
   // Stage 3: areas whose every card needs states (and every state a card).
-  mockupAreas: ['V'],
+  mockupAreas: ['S', 'V'],
   frameLabel: 'Desktop sidebar · 300',
   // CSS variable → frame width it must fit; the atlas sets it to scale frames to the column.
   frameScales: { '--sb-scale': 320 },
   icons: SB_ICONS,
-  states: [placementStates],
+  states: [sidebarStates, placementStates],
 })

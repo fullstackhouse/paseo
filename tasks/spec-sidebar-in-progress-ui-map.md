@@ -36,12 +36,7 @@ flowchart TD
 
 ## S — Sidebar
 
-- **S1 Sidebar groups** (P1) — changed: an idle workspace whose open work is all in progress and moving
-  leaves Ready to review for the group chosen in V; one with in-progress work that nothing moves stays in Ready
-  to review. Get here: the sidebar. Permission: none.
-- **S2 Workspace row** (P1) — changed: the badge line says "3 in progress" where that work is why the row
-  sits under Working or Blocked, and "2 not moving" in the warning tone wherever some is stuck. Get here: any workspace row.
-  Permission: none.
+Views: S1 Sidebar groups, S2 Workspace row.
 
 ## V — Placement options
 
