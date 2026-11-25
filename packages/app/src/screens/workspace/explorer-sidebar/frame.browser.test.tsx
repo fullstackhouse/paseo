@@ -41,7 +41,8 @@ it("measures dock allocation independently of the workspace owner", async () => 
         </MobilePanelsProvider>,
       );
     });
-    await expect.poll(dockWidth).toBe(320);
+    // FSH: the Explorer sidebar opens at 420px (#190).
+    await expect.poll(dockWidth).toBe(420);
     const initialRenderCount = workspaceRenders;
     const dock = host.querySelector('[role="complementary"]');
     host.style.width = "620px";
