@@ -21,6 +21,8 @@ import {
   usePluginWorkspaceRowBadgeItems,
 } from "@/plugins/workspace-row-badge-items";
 import { CheckIndicator } from "./check-indicator";
+import { InProgressBadges } from "./in-progress-badges";
+import { selectInProgressBadges } from "./in-progress-items";
 import type { CheckSummary, CheckSummaryState } from "./check-summary";
 import { selectMetaRowItems, type MetaRowItem } from "./meta-items";
 import { workspaceServiceLabelKey, type WorkspaceServiceSummary } from "./service-summary";
@@ -64,6 +66,8 @@ const dangerMapping = (theme: Theme) => ({ color: theme.colors.statusDanger });
  *
  * Plugin items follow everything the row knows itself. A plugin renders its slot as it likes:
  * the row adds no separator, since only the plugin knows whether it has anything to say.
+ * The in-progress badges are the row's own facts, so they come before the plugin items: they say
+ * why in-progress work put the row in its group.
  */
 export function WorkspaceMetaRow({
   currentBranch,
@@ -82,7 +86,13 @@ export function WorkspaceMetaRow({
   serviceSummary: WorkspaceServiceSummary | null;
   labels?: readonly WorkspaceLabelDefinition[];
   /** The real workspace behind the row; previews leave it out and get no plugin items. */
-  workspace?: { serverId: string; workspaceId: string } | null;
+  workspace?: {
+    serverId: string;
+    workspaceId: string;
+    inProgressNotMoving?: number;
+    inProgressReason?: "working" | "blocked" | null;
+    inProgressReasonCount?: number;
+  } | null;
   backdrop: SidebarSurfaceBackdrop;
 }) {
   const { rowItems, checksDisplay } = useSidebarMetaPreferences();
@@ -97,27 +107,33 @@ export function WorkspaceMetaRow({
     checksDisplay,
   });
   const pluginItems = usePluginWorkspaceRowBadgeItems(workspace?.serverId ?? null);
+  const inProgressBadges = selectInProgressBadges({
+    notMoving: workspace?.inProgressNotMoving,
+    reason: workspace?.inProgressReason,
+    reasonCount: workspace?.inProgressReasonCount,
+  });
+  const hasPluginItems = Boolean(workspace) && pluginItems.length > 0;
+  const separatorStyle = [
+    styles.separator,
+    backdrop === "surfaceSidebarHover" && styles.separatorHovered,
+    backdrop === "surfaceSidebarSelected" && styles.separatorSelected,
+  ];
 
-  if (items.length === 0 && (!workspace || pluginItems.length === 0)) return null;
+  if (items.length === 0 && !hasPluginItems && inProgressBadges.length === 0) return null;
 
   return (
     <View style={styles.row}>
       {items.map((item, index) => (
         <Fragment key={item.kind}>
-          {index > 0 ? (
-            <Text
-              style={[
-                styles.separator,
-                backdrop === "surfaceSidebarHover" && styles.separatorHovered,
-                backdrop === "surfaceSidebarSelected" && styles.separatorSelected,
-              ]}
-            >
-              ·
-            </Text>
-          ) : null}
+          {index > 0 ? <Text style={separatorStyle}>·</Text> : null}
           <MetaItemNode item={item} hostBadge={hostBadge} leading={index === 0} />
         </Fragment>
       ))}
+      <InProgressBadges
+        badges={inProgressBadges}
+        separated={items.length > 0}
+        separatorStyle={separatorStyle}
+      />
       {workspace ? (
         <PluginWorkspaceRowBadgeItems targets={pluginItems} workspaceId={workspace.workspaceId} />
       ) : null}

@@ -1420,6 +1420,12 @@ export const fr: TranslationResources = {
     schedules: {
       needsYou: "Exécutions planifiées qui vous attendent : {{count}}",
     },
+    inProgress: {
+      notMoving: "{{count}} sans avancée",
+      inProgress: "{{count}} en cours",
+      awaitingReview: "en attente de relecture",
+      awaitingReviewCount: "{{count}} en attente de relecture",
+    },
     drafts: {
       title: "Brouillons",
       discard: "Supprimer le brouillon",

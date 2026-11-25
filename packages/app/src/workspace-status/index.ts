@@ -8,14 +8,31 @@ import {
   applyManualGroup,
   applyReportedWork,
   useReportedWorkLookup,
+  type InProgressTally,
+  type ReportedWork,
   type ReportedWorkLookup,
 } from "./reported-work";
+
+/** What a workspace's in-progress entries say on its row. */
+export interface WorkspaceInProgress {
+  /** Entries nothing has moved for a while. */
+  notMoving: number;
+  /**
+   * The group in-progress work put the workspace in, when it is the reason (without it the
+   * workspace would sit elsewhere): working on machines, or blocked on a review.
+   */
+  reason: "working" | "blocked" | null;
+  /** The entries behind `reason`: moving ones for working, awaiting review for blocked. */
+  reasonCount: number;
+}
 
 interface EffectiveWorkspaceStatus {
   status: SidebarStateBucket;
   /** Running only because an idle agent's background shells or monitors are live. */
   runningFromBackgroundWork?: boolean;
   enteredAt: Date | null;
+  /** Present while a plugin lists in-progress entries for the workspace. */
+  inProgress?: WorkspaceInProgress;
 }
 
 export function deriveEffectiveWorkspaceStatus(input: {
@@ -26,17 +43,35 @@ export function deriveEffectiveWorkspaceStatus(input: {
   /** Experimental: plugin-reported work regroups idle workspaces. */
   reportedWork?: ReportedWorkLookup;
 }): EffectiveWorkspaceStatus {
+  const { serverId, workspace, reportedWork } = input;
   const turn = deriveTurnWorkspaceStatus(input);
-  const reported = applyReportedWork(
-    turn,
-    input.reportedWork?.(input.serverId, input.workspace.id),
-  );
-  return applyManualGroup(
-    turn,
-    reported,
-    input.workspace.manualGroup,
-    input.reportedWork?.updatedAt?.(input.serverId, input.workspace.id),
-  );
+  const reportedAt = reportedWork?.updatedAt?.(serverId, workspace.id);
+  const group = (reported: ReportedWork | null | undefined) =>
+    applyManualGroup(turn, applyReportedWork(turn, reported), workspace.manualGroup, reportedAt);
+  const status = group(reportedWork?.(serverId, workspace.id, turn));
+  const tally = reportedWork?.inProgress?.(serverId, workspace.id, turn);
+  if (!tally) return status;
+  const statusWithout = () => group(reportedWork?.items?.(serverId, workspace.id)).status;
+  return { ...status, inProgress: describeInProgress(tally, status.status, statusWithout) };
+}
+
+/** The row's view of in-progress work; `reason` only where it decided the group. */
+function describeInProgress(
+  tally: InProgressTally,
+  status: SidebarStateBucket,
+  statusWithout: () => SidebarStateBucket,
+): WorkspaceInProgress {
+  const asked = tally.work === "working" || tally.work === "blocked" ? tally.work : null;
+  const decided =
+    asked !== null &&
+    status === (asked === "working" ? "running" : "blocked") &&
+    statusWithout() !== status;
+  const reason = decided ? asked : null;
+  return {
+    notMoving: tally.stuck,
+    reason,
+    reasonCount: reason === "blocked" ? tally.awaitingReview : tally.moving,
+  };
 }
 
 function deriveTurnWorkspaceStatus(input: {

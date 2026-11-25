@@ -24,7 +24,6 @@ import {
   deriveYourMove,
   deriveInProgress,
   hasInProgressEntries,
-  NOTHING_MOVING_AFTER_MS,
   type InProgressAgent,
   isStatusDone,
   isStatusOutdated,
@@ -36,6 +35,7 @@ import {
   partitionSummaryItems,
   type YourMoveRow,
 } from "./model";
+import { NOTHING_MOVING_AFTER_MS } from "@/workspace-status/moving";
 
 function summaryItem(patch: Partial<WorkspaceSummaryItem>): WorkspaceSummaryItem {
   return {

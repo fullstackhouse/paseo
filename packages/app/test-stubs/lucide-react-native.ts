@@ -31,6 +31,7 @@ export const ChevronRight = StubIcon;
 export const CircleAlert = StubIcon;
 export const CircleCheck = StubIcon;
 export const CirclePause = StubIcon;
+export const CircleDashed = StubIcon;
 export const CircleDot = StubIcon;
 export const CircleSlash = StubIcon;
 export const CircleX = StubIcon;

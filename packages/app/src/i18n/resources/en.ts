@@ -1399,6 +1399,12 @@ export const en = {
     schedules: {
       needsYou: "Scheduled runs need you: {{count}}",
     },
+    inProgress: {
+      notMoving: "{{count}} not moving",
+      inProgress: "{{count}} in progress",
+      awaitingReview: "awaiting review",
+      awaitingReviewCount: "{{count}} awaiting review",
+    },
     drafts: {
       title: "Drafts",
       discard: "Discard draft",

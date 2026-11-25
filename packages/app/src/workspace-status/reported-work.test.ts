@@ -4,6 +4,7 @@ import {
   applyManualGroup,
   applyReportedWork,
   createReportedWorkLookup,
+  foldInProgress,
   foldReportedWork,
   isStatusDecidedByReport,
 } from "./reported-work";
@@ -194,5 +195,136 @@ describe("createReportedWorkLookup updatedAt", () => {
     ]);
     expect(lookup.updatedAt?.("s", "a")).toBe(30);
     expect(lookup.updatedAt?.("s", "b")).toBeNull();
+  });
+});
+
+describe("foldInProgress", () => {
+  const now = 1_000_000_000;
+  const idle = { runningAgentIds: new Set<string>(), liveWork: false, now };
+  const stale = { title: "t", updatedAt: now - 11 * 60_000 };
+  const ci = { title: "t", watched: true, updatedAt: now };
+  const review = { title: "t", watched: true, waitingOnReview: true, updatedAt: now };
+  const asks = (
+    ...entries: Array<Partial<NonNullable<WorkspaceSummaryItem["inProgress"]>[number]>>
+  ) =>
+    item({
+      pluginId: "paseo-asks",
+      itemId: "asks",
+      inProgress: entries.map((entry, index) =>
+        Object.assign({ id: `A${index}`, title: "t", updatedAt: now }, entry),
+      ),
+    });
+
+  it("is null without entries", () => {
+    expect(foldInProgress([item({ workState: "working" })], idle)).toBeNull();
+    expect(foldInProgress([asks()], idle)).toBeNull();
+  });
+
+  it("works while CI watches an entry", () => {
+    expect(foldInProgress([asks(ci, ci)], idle)).toEqual({
+      moving: 2,
+      stuck: 0,
+      awaitingReview: 0,
+      work: "working",
+    });
+  });
+
+  it("is blocked when every moving entry waits on a review", () => {
+    expect(foldInProgress([asks(review, review)], idle)).toEqual({
+      moving: 2,
+      stuck: 0,
+      awaitingReview: 2,
+      work: "blocked",
+    });
+  });
+
+  it("works when CI and review are mixed", () => {
+    expect(foldInProgress([asks(ci, review)], idle)?.work).toBe("working");
+  });
+
+  it("keeps the moving majority's group over a stuck entry", () => {
+    expect(foldInProgress([asks(ci, ci, ci, stale)], idle)).toEqual({
+      moving: 3,
+      stuck: 1,
+      awaitingReview: 0,
+      work: "working",
+    });
+    expect(foldInProgress([asks(review, review, stale)], idle)?.work).toBe("blocked");
+  });
+
+  it("needs the human once stuck entries are at least as many as moving ones", () => {
+    expect(foldInProgress([asks(ci, stale)], idle)?.work).toBe("needs_you");
+    expect(foldInProgress([asks(stale)], idle)).toEqual({
+      moving: 0,
+      stuck: 1,
+      awaitingReview: 0,
+      work: "needs_you",
+    });
+  });
+
+  it("counts live work and a running agent as machines moving", () => {
+    const live = { ...idle, liveWork: true };
+    expect(foldInProgress([asks(review, stale)], live)).toEqual({
+      moving: 2,
+      stuck: 0,
+      awaitingReview: 1,
+      work: "working",
+    });
+    const running = { ...idle, runningAgentIds: new Set(["agent-1"]) };
+    expect(foldInProgress([asks({ ...stale, agentId: "agent-1" })], running)?.work).toBe("working");
+  });
+
+  it("ignores waitingOnReview on an entry nothing watches", () => {
+    const fresh = { title: "t", waitingOnReview: true, updatedAt: now };
+    expect(foldInProgress([asks(fresh)], idle)?.work).toBe("working");
+  });
+});
+
+describe("createReportedWorkLookup in-progress work", () => {
+  const now = 1_000_000_000;
+  const watched = (id: string, waitingOnReview = false) => ({
+    id,
+    title: id,
+    watched: true,
+    waitingOnReview,
+    updatedAt: now,
+  });
+
+  it("folds in-progress work with the items under the existing rank", () => {
+    const lookup = createReportedWorkLookup(
+      [
+        item({ workspaceId: "done-card", workState: "done" }),
+        item({ workspaceId: "done-card", pluginId: "paseo-asks", inProgress: [watched("A1")] }),
+        item({ workspaceId: "ask", needsYou: true }),
+        item({ workspaceId: "ask", pluginId: "paseo-asks", inProgress: [watched("A1")] }),
+        item({ workspaceId: "review", pluginId: "paseo-asks", inProgress: [watched("A1", true)] }),
+        item({ workspaceId: "review", workState: "working" }),
+      ],
+      now,
+    );
+    expect(lookup("s", "done-card")).toBe("working");
+    expect(lookup.items?.("s", "done-card")).toBe("done");
+    expect(lookup("s", "ask")).toBe("needs_you");
+    expect(lookup("s", "review")).toBe("working");
+    expect(lookup.inProgress?.("s", "review")?.work).toBe("blocked");
+    expect(lookup.inProgress?.("s", "nothing")).toBeNull();
+  });
+
+  it("ages entries by the time it was built, and counts a running workspace as live work", () => {
+    const entry = { id: "A1", title: "t", updatedAt: now - 11 * 60_000 };
+    const lookup = createReportedWorkLookup(
+      [item({ pluginId: "paseo-asks", inProgress: [entry] })],
+      now,
+    );
+    expect(lookup("s", "w", { status: "attention" })).toBe("needs_you");
+    expect(lookup("s", "w", { status: "running", runningFromBackgroundWork: true })).toBe(
+      "working",
+    );
+    expect(
+      createReportedWorkLookup(
+        [item({ pluginId: "paseo-asks", inProgress: [entry] })],
+        now - 60_000,
+      )("s", "w"),
+    ).toBe("working");
   });
 });

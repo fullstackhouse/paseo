@@ -1426,6 +1426,12 @@ export const es: TranslationResources = {
     schedules: {
       needsYou: "Ejecuciones programadas que te necesitan: {{count}}",
     },
+    inProgress: {
+      notMoving: "{{count}} sin avance",
+      inProgress: "{{count}} en curso",
+      awaitingReview: "pendiente de revisión",
+      awaitingReviewCount: "{{count}} pendientes de revisión",
+    },
     drafts: {
       title: "Borradores",
       discard: "Descartar borrador",
