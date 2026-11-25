@@ -146,6 +146,7 @@ export const AgentTracks = memo(function AgentTracks({
         onArchiveFinished={onArchiveFinished}
         archiveFinishedStatus={archiveFinishedStatus}
         onDetachSubagent={canDetachSubagents ? detachSubagent : undefined}
+        ownerAgentId={agentId}
       />
       <PluginComposerPills
         serverId={serverId}

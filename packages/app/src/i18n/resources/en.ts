@@ -2328,9 +2328,20 @@ export const en = {
       prMergedTitle: "PR #{{number}} merged",
       outdated: "You replied {{time}}; the agent hasn't updated this since.",
       readyToArchive: "Ready to archive",
-      archiveHeldTitle: "Archive waits for background work",
-      archiveHeldFacts:
-        "A shell, monitor or subagent is still running. Archiving from the header stops it.",
+      inProgress: "In progress",
+      nothingMoving: "nothing moving",
+      updatedAgo: "updated {{time}}",
+      nothingRunning: "Nothing is running in this workspace.",
+      jobRunning: "running {{time}}",
+      subagents: {
+        one: "{{count}} subagent",
+        other: "{{count}} subagents",
+      },
+      backgroundKind: {
+        shell: "Background shell",
+        monitor: "Monitor",
+        other: "Background job",
+      },
       pullRequests: "Pull requests",
       noPrYet: "No PR yet",
       notRefreshed: "not refreshed",

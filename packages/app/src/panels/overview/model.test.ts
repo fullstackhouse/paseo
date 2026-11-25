@@ -22,6 +22,10 @@ import {
   orderChildren,
   deriveWorkspaceStateWord,
   deriveYourMove,
+  deriveInProgress,
+  hasInProgressEntries,
+  NOTHING_MOVING_AFTER_MS,
+  type InProgressAgent,
   isStatusDone,
   isStatusOutdated,
   isWorkStillOpen,
@@ -109,7 +113,7 @@ describe("deriveYourMove", () => {
       prMerged: false,
       statusDone: false,
       workOpen: false,
-      liveWork: false,
+      inProgress: false,
     });
     expect(rows.map((row) => row.kind)).toEqual([
       "permission",
@@ -139,7 +143,7 @@ describe("deriveYourMove", () => {
         prMerged: false,
         statusDone: false,
         workOpen: false,
-        liveWork: false,
+        inProgress: false,
       });
     const [answering] = rowsFor("plugin:p:i:A1", ["A1"]);
     const after = rowsFor("plugin:p:i:A2", ["A2", "A1"]);
@@ -156,7 +160,7 @@ describe("deriveYourMove", () => {
       prMerged: false,
       statusDone: false,
       workOpen: false,
-      liveWork: false,
+      inProgress: false,
     });
     expect(rows).toEqual([{ kind: "plugin", key: "x", item: expect.anything() }]);
   });
@@ -171,7 +175,7 @@ describe("deriveYourMove", () => {
       prMerged: false,
       statusDone: true,
       workOpen: false,
-      liveWork: false,
+      inProgress: false,
     };
     const archive = [{ kind: "archive", key: "git:archive-workspace" }];
 
@@ -224,28 +228,21 @@ describe("deriveYourMove", () => {
       };
       expect(rowKinds(deriveYourMove({ ...base, items: [plugin] }))).toEqual(["plugin"]);
       expect(rowKinds(deriveYourMove({ ...base, items: [ask] }))).toEqual(["entry"]);
-      // Nor the held hint: Archive isn't the next move while the human owes an answer.
+      // Nor while an ask is in progress on top of that.
       expect(
-        rowKinds(deriveYourMove({ ...base, items: [ask], workOpen: true, liveWork: true })),
+        rowKinds(deriveYourMove({ ...base, items: [ask], workOpen: true, inProgress: true })),
       ).toEqual(["entry"]);
     });
 
-    it("says Archive waits when live background work holds it", () => {
-      // A dev server a finished agent left running: the card says done, the shell still runs.
-      const held = [{ kind: "archive-held", key: "held:archive-workspace" }];
-      expect(deriveYourMove({ ...base, workOpen: true, liveWork: true })).toEqual(held);
-      // Held by a card or the report only: the status card above already says why.
-      expect(deriveYourMove({ ...base, workOpen: true, liveWork: false })).toEqual([]);
-      // No hint where Archive wouldn't be offered anyway.
+    it("waits, with no placeholder row, while an ask is in progress", () => {
+      expect(deriveYourMove({ ...base, inProgress: true })).toEqual([]);
       expect(
-        deriveYourMove({ ...base, workOpen: true, liveWork: true, statusDone: false }),
-      ).toEqual([]);
-      expect(
-        deriveYourMove({ ...base, workOpen: true, liveWork: true, agentRunning: true }),
+        deriveYourMove({ ...base, statusDone: false, prMerged: true, inProgress: true }),
       ).toEqual([]);
     });
 
     it("waits while other work in the workspace is open", () => {
+      // A dev server a finished agent left running: In progress lists it, Your move stays empty.
       expect(deriveYourMove({ ...base, workOpen: true })).toEqual([]);
       expect(
         deriveYourMove({ ...base, statusDone: false, prMerged: true, workOpen: true }),
@@ -320,7 +317,8 @@ describe("partitionSummaryItems", () => {
     const waiting = summaryItem({ itemId: "w", needsYou: true });
     const limits = summaryItem({ itemId: "limits", label: "62%" });
     const prs = summaryItem({ itemId: "prs", pullRequests: [] });
-    expect(partitionSummaryItems([limits, status, asks, waiting, prs])).toEqual({
+    const taken = summaryItem({ itemId: "taken", inProgress: [] });
+    expect(partitionSummaryItems([limits, status, asks, waiting, prs, taken])).toEqual({
       status,
       pullRequests: prs,
       more: [limits],
@@ -623,6 +621,13 @@ describe("openMoveKey", () => {
   it("has nothing to open without rows", () => {
     expect(openMoveKey([], undefined)).toBeNull();
   });
+
+  it("keeps an In progress row open instead of the lead, but never opens one by itself", () => {
+    expect(openMoveKey(rows, "progress:x", ["progress:x"])).toBe("progress:x");
+    expect(openMoveKey([], undefined, ["progress:x"])).toBeNull();
+    // The ask left In progress: back to the lead move.
+    expect(openMoveKey(rows, "progress:x", [])).toBe("a");
+  });
 });
 
 describe("pinOpenMove", () => {
@@ -654,6 +659,12 @@ describe("pinOpenMove", () => {
 
   it("keeps every row closed after the human closes the open one", () => {
     expect(pinOpenMove([ask("a")], null)).toBeNull();
+  });
+
+  it("keeps one row open across Your move and In progress", () => {
+    // Opening an In progress row closes the ask; a new move arriving doesn't take it back.
+    expect(pinOpenMove([ask("a")], "progress:x", ["progress:x"])).toBe("progress:x");
+    expect(openMoveKey([permission, ask("a")], "progress:x", ["progress:x"])).toBe("progress:x");
   });
 
   it("pins the next lead ask once the pinned one is answered", () => {
@@ -747,5 +758,99 @@ describe("Tree", () => {
       { serverId: "s", workspaceId: "w-docs" },
       { serverId: "s", workspaceId: "w-fix" },
     ]);
+  });
+});
+
+describe("deriveInProgress", () => {
+  const now = 10 * 60 * 60_000;
+  const minutes = (count: number) => now - count * 60_000;
+  const agent = (patch: Partial<InProgressAgent>): InProgressAgent => ({
+    agentId: "lead",
+    running: false,
+    lastActivityAt: minutes(1),
+    subagentsRunning: false,
+    subagentsActive: false,
+    jobs: [],
+    ...patch,
+  });
+  const asks = (inProgress: WorkspaceSummaryItem["inProgress"]) =>
+    summaryItem({ pluginId: "asks", itemId: "asks", inProgress });
+  const derive = (input: Partial<Parameters<typeof deriveInProgress>[0]>) =>
+    deriveInProgress({ items: [], agents: [], liveBackgroundWork: false, now, ...input });
+
+  it("lists entries and moving agents oldest first, across kinds", () => {
+    const rows = derive({
+      items: [
+        asks([
+          { id: "A1", title: "PR #2104", updatedAt: minutes(5), watched: true },
+          { id: "A2", title: "Org keys", updatedAt: minutes(240), watched: true },
+        ]),
+      ],
+      agents: [agent({ running: true, lastActivityAt: minutes(60) })],
+    });
+    expect(rows.map((row) => row.key)).toEqual([
+      "progress:asks:asks:A2",
+      "agent:lead",
+      "progress:asks:asks:A1",
+    ]);
+  });
+
+  it("lists an agent only while it runs a turn, its subagents work or a job is live", () => {
+    expect(derive({ agents: [agent({})] })).toEqual([]);
+    // Failed subagents alone are no movement; the track pill still reports them.
+    expect(derive({ agents: [agent({ subagentsActive: true })] })).toEqual([]);
+    expect(derive({ agents: [agent({ subagentsRunning: true, subagentsActive: true })] })).toEqual([
+      expect.objectContaining({ kind: "agent", running: false, subagents: true }),
+    ]);
+    const job = { id: "j", kind: "shell", description: "merge-queue.sh", startedAt: minutes(120) };
+    expect(derive({ agents: [agent({ jobs: [job] })] })).toEqual([
+      expect.objectContaining({ kind: "agent", subagents: false, jobs: [job] }),
+    ]);
+  });
+
+  it("puts an agent's jobs under it, oldest first", () => {
+    const jobs = [
+      { id: "b", kind: "monitor", description: null, startedAt: minutes(5) },
+      { id: "a", kind: "shell", description: "dev", startedAt: minutes(50) },
+    ];
+    const [row] = derive({ agents: [agent({ running: true, jobs })] });
+    expect(row?.kind === "agent" && row.jobs.map((job) => job.id)).toEqual(["a", "b"]);
+  });
+
+  describe("nothing moving", () => {
+    const stale = { id: "A1", title: "Release", agentId: "lead", updatedAt: minutes(11) };
+    const flag = (input: Partial<Parameters<typeof deriveInProgress>[0]>) => {
+      const [row] = derive(input);
+      return row?.kind === "entry" ? row.nothingMoving : null;
+    };
+
+    it("flags an entry nothing has moved for over ten minutes", () => {
+      expect(flag({ items: [asks([stale])] })).toBe(true);
+      expect(flag({ items: [asks([{ ...stale, agentId: undefined }])] })).toBe(true);
+      expect(
+        flag({ items: [asks([{ ...stale, updatedAt: now - NOTHING_MOVING_AFTER_MS }])] }),
+      ).toBe(false);
+    });
+
+    it("doesn't flag it while its agent runs a turn", () => {
+      const agents = [agent({ running: true })];
+      expect(flag({ items: [asks([stale])], agents })).toBe(false);
+      // Another agent's turn moves nothing here.
+      expect(flag({ items: [asks([{ ...stale, agentId: "other" }])], agents })).toBe(true);
+    });
+
+    it("doesn't flag it while background work is live or something outside watches it", () => {
+      expect(flag({ items: [asks([stale])], liveBackgroundWork: true })).toBe(false);
+      const job = { id: "j", kind: "shell", description: null, startedAt: minutes(2) };
+      expect(flag({ items: [asks([stale])], agents: [agent({ agentId: "x", jobs: [job] })] })).toBe(
+        false,
+      );
+      expect(flag({ items: [asks([{ ...stale, watched: true }])] })).toBe(false);
+    });
+  });
+
+  it("knows whether any plugin lists work in progress", () => {
+    expect(hasInProgressEntries([asks([])])).toBe(false);
+    expect(hasInProgressEntries([asks([{ id: "A1", title: "x", updatedAt: 1 }])])).toBe(true);
   });
 });

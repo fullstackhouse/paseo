@@ -60,6 +60,8 @@ import { useLineageFocus } from "@/subagents/lineage-focus";
 import { navigateToAgent } from "@/utils/navigate-to-agent";
 import { openExternalUrl } from "@/utils/open-external-url";
 import { formatTimeAgo } from "@/utils/time";
+import { useCompactTimeAgo, useTimeAgo } from "@/hooks/use-time-ago";
+import { requestSubagentsTrackOpen } from "@/subagents/track-open-request";
 import { normalizeWorkspaceOpaqueId } from "@/utils/workspace-identity";
 import { useWorkspaceAttention } from "@/workspace-attention/attention";
 import { hasRunningAgent } from "@/workspace-attention/model";
@@ -81,6 +83,9 @@ import {
   orderChildren,
   deriveWorkspaceStateWord,
   deriveYourMove,
+  deriveInProgress,
+  hasInProgressEntries,
+  VISIBLE_IN_PROGRESS,
   openMoveKey,
   pinOpenMove,
   isStatusDone,
@@ -93,10 +98,17 @@ import {
   permissionFacts,
   permissionResponse,
   statusBlockers,
+  type InProgressJob,
+  type InProgressRow,
   type PullRequestRow,
   type WorkspaceStateWord,
   type YourMoveRow,
 } from "./overview/model";
+import {
+  useMinuteClock,
+  useWorkspaceMovement,
+  type SubagentLine,
+} from "./overview/use-in-progress";
 
 const ThemedLayoutDashboard = withUnistyles(LayoutDashboard);
 const ThemedChevronRight = withUnistyles(ChevronRight);
@@ -142,6 +154,7 @@ function selectWorkspaceFacts(workspace: WorkspaceDescriptor) {
     isWorktree: workspace.workspaceKind === "worktree",
     // Monitors and subagents hold it running without runningFromBackgroundWork; any of them is live work.
     isRunning: workspace.status === "running",
+    runningFromBackgroundWork: workspace.runningFromBackgroundWork === true,
     branch: workspace.gitRuntime?.currentBranch ?? null,
     ahead: workspace.gitRuntime?.aheadOfOrigin ?? null,
     aheadOfBase: workspace.gitRuntime?.aheadBehind?.ahead ?? null,
@@ -186,6 +199,13 @@ function OverviewPanel(): ReactElement {
     status: status?.status ?? null,
     summaryItems,
   });
+  const { progress, subagentLines, openKey, setChosen } = useInProgress({
+    serverId,
+    workspaceId,
+    facts,
+    summaryItems,
+    moves,
+  });
   const statusCard = status?.status ?? null;
   const name = facts?.name ?? null;
   const showPullRequests = isGitWorkspace && (gitStatusLoaded || pullRequests !== null);
@@ -207,15 +227,26 @@ function OverviewPanel(): ReactElement {
           serverId={serverId}
           workspaceId={workspaceId}
           agentRunning={agentRunning}
+          facts={facts}
           workspaceKey={workspaceKey}
         />
         <WaitingOn item={status} serverId={serverId} />
         <YourMove
           rows={moves}
+          openKey={openKey}
+          onOpenChange={setChosen}
           serverId={serverId}
           workspaceKey={workspaceKey}
           facts={facts}
           gitActions={git}
+        />
+        <InProgress
+          rows={progress}
+          subagentLines={subagentLines}
+          openKey={openKey}
+          onOpenChange={setChosen}
+          serverId={serverId}
+          workspaceKey={workspaceKey}
         />
         <Tree
           serverId={serverId}
@@ -231,6 +262,47 @@ function OverviewPanel(): ReactElement {
       </View>
     </ScrollView>
   );
+}
+
+/**
+ * The In progress rows, and the one row open across Your move and In progress: opening one closes
+ * the other (`pinOpenMove`).
+ */
+function useInProgress(input: {
+  serverId: string;
+  workspaceId: string;
+  facts: WorkspaceFacts | null;
+  summaryItems: readonly WorkspaceSummaryItem[];
+  moves: readonly YourMoveRow[];
+}) {
+  const { summaryItems, moves } = input;
+  const runningFromBackgroundWork = Boolean(input.facts?.runningFromBackgroundWork);
+  const now = useMinuteClock();
+  const movement = useWorkspaceMovement(input.serverId, input.workspaceId);
+  const progress = useMemo(
+    () =>
+      deriveInProgress({
+        items: summaryItems,
+        agents: movement.agents,
+        liveBackgroundWork: runningFromBackgroundWork,
+        now,
+      }),
+    [movement.agents, now, runningFromBackgroundWork, summaryItems],
+  );
+  const progressKeys = useMemo(
+    () =>
+      progress.flatMap((row) => (row.kind === "entry" && row.item.EntryComponent ? [row.key] : [])),
+    [progress],
+  );
+  const [chosen, setChosen] = useState<string | null | undefined>(undefined);
+  const pinned = pinOpenMove(moves, chosen, progressKeys);
+  if (pinned !== chosen) setChosen(pinned);
+  return {
+    progress,
+    subagentLines: movement.subagentLines,
+    openKey: openMoveKey(moves, pinned, progressKeys),
+    setChosen,
+  };
 }
 
 function useYourMove(input: {
@@ -265,7 +337,7 @@ function useYourMove(input: {
       workspaceRunning: Boolean(input.facts?.isRunning),
       cardState: input.status?.state ?? null,
     }),
-    liveWork: Boolean(input.facts?.isRunning),
+    inProgress: hasInProgressEntries(input.summaryItems),
   });
 }
 
@@ -324,12 +396,14 @@ function StatusBlock({
   serverId,
   workspaceId,
   agentRunning,
+  facts,
   workspaceKey,
 }: {
   item: WorkspaceSummaryItem | null;
   serverId: string;
   workspaceId: string;
   agentRunning: boolean;
+  facts: WorkspaceFacts | null;
   workspaceKey: string | null;
 }): ReactElement | null {
   const { t } = useTranslation();
@@ -346,12 +420,16 @@ function StatusBlock({
   if (!status) return null;
   const state: StatusTone = status.answered ? "answered" : status.state;
   const outdated = isStatusOutdated({ updatedAt: status.updatedAt, agentRunning, lastPromptAt });
+  // A Working card with nothing behind it: the agent forgot to update it, or its work died.
+  // Running covers an agent turn, a subagent and background work.
+  const nothingRunning = state === "working" && facts !== null && !facts.isRunning;
   // A card so the agent's own account reads as one object: the state as a pill, then its summary.
   // "Now" stays in the Status tab; next to the summary it described the same progress twice.
   const content = (
     <>
       <View style={styles.stateLine}>
         <StatePill state={state} />
+        <StatusAge updatedAt={status.updatedAt} />
         <View style={styles.fill} />
         {item?.panelId ? (
           <ThemedChevronRight size={SMALL_ICON_SIZE} uniProps={extraMutedColorMapping} />
@@ -364,6 +442,12 @@ function StatusBlock({
         <Text style={styles.outdated} testID="overview-status-outdated">
           {t("panels.overview.outdated", { time: formatTimeAgo(new Date(lastPromptAt)) })}
         </Text>
+      ) : null}
+      {nothingRunning ? (
+        <View style={styles.warningLine} testID="overview-status-nothing-running">
+          <ThemedAlert size={SMALL_ICON_SIZE} uniProps={warningColorMapping} />
+          <Text style={styles.warningText}>{t("panels.overview.nothingRunning")}</Text>
+        </View>
       ) : null}
     </>
   );
@@ -385,6 +469,18 @@ function StatusBlock({
     <View style={styles.story} testID="overview-status">
       {content}
     </View>
+  );
+}
+
+/** "· updated 8h ago" after the state word, ticking on its own so the card doesn't re-render. */
+function StatusAge({ updatedAt }: { updatedAt: number }): ReactElement {
+  const { t } = useTranslation();
+  const date = useMemo(() => new Date(updatedAt), [updatedAt]);
+  const time = useTimeAgo(date);
+  return (
+    <Text style={styles.statusAge} numberOfLines={1} testID="overview-status-age">
+      {`· ${t("panels.overview.updatedAgo", { time })}`}
+    </Text>
   );
 }
 
@@ -553,23 +649,23 @@ function Section({
 
 function YourMove({
   rows,
+  openKey,
+  onOpenChange,
   serverId,
   workspaceKey,
   facts,
   gitActions,
 }: {
   rows: YourMoveRow[];
+  /** The one row open across Your move and In progress (`openMoveKey`). */
+  openKey: string | null;
+  onOpenChange: (key: string | null) => void;
   serverId: string;
   workspaceKey: string | null;
   facts: WorkspaceFacts | null;
   gitActions: GitActions | null;
 }): ReactElement | null {
-  // One row open at a time: opening an ask closes the one that was open.
-  const [chosen, setChosen] = useState<string | null | undefined>(undefined);
   if (rows.length === 0) return null;
-  const pinned = pinOpenMove(rows, chosen);
-  if (pinned !== chosen) setChosen(pinned);
-  const openKey = openMoveKey(rows, pinned);
   return (
     <Section title="panels.overview.yourMove" count={rows.length > 1 ? rows.length : undefined}>
       {rows.map((row, index) => {
@@ -593,7 +689,7 @@ function YourMove({
             row={row}
             lead={lead}
             open={row.key === openKey}
-            onOpenChange={setChosen}
+            onOpenChange={onOpenChange}
           >
             {move}
           </EntryMove>
@@ -638,8 +734,7 @@ interface MoveView {
   tone: Tone;
   title: string;
   facts?: string;
-  /** Omitted for a row that only explains (Archive held back): no button, not pressable. */
-  press?: { action: string; run: () => void };
+  press: { action: string; run: () => void };
 }
 
 function MoveRow({
@@ -660,17 +755,7 @@ function MoveRow({
   const view = useMoveView(row, { serverId, workspaceKey, facts, gitActions });
   if (!view) return null;
   const { press } = view;
-  if (!lead && !press) {
-    return (
-      <View style={styles.next} testID={`overview-move-${row.kind}`}>
-        {view.icon}
-        <Text style={styles.nextTitleMuted} numberOfLines={1}>
-          {view.title}
-        </Text>
-      </View>
-    );
-  }
-  if (!lead && press) {
+  if (!lead) {
     return (
       <PressHighlight
         accessibilityRole="button"
@@ -702,7 +787,7 @@ function MoveRow({
   );
 }
 
-/** A permission is answered in place; other rows press their action; an explaining row has none. */
+/** A permission is answered in place; other rows press their action. */
 function LeadActions({
   row,
   view,
@@ -719,7 +804,6 @@ function LeadActions({
       </View>
     );
   }
-  if (!view.press) return null;
   return (
     <View style={styles.leadActions}>
       <Button variant="default" onPress={view.press.run} testID="overview-next-step-button">
@@ -771,8 +855,8 @@ function PermissionActions({
   );
   if (!request || !canAnswerPermissionInPlace(request)) {
     return (
-      <Button variant="default" onPress={fallback.press?.run} testID="overview-next-step-button">
-        {fallback.press?.action}
+      <Button variant="default" onPress={fallback.press.run} testID="overview-next-step-button">
+        {fallback.press.action}
       </Button>
     );
   }
@@ -856,8 +940,6 @@ function useMoveView(
         const action = gitActions && findGitAction(gitActions, "archive-workspace");
         return action ? archiveMoveView(action, runGitAction, input) : null;
       }
-      case "archive-held":
-        return archiveHeldMoveView(input);
     }
   }, [agent.label, facts, gitActions, permission, row, runGitAction, serverId, t, workspaceKey]);
 }
@@ -930,19 +1012,6 @@ function findGitAction(gitActions: GitActions, id: GitActionId): GitAction | nul
   return gitActions.secondary.find((action) => action.id === id) ?? null;
 }
 
-/**
- * In Archive's place while live background work holds it (deriveYourMove): says why, offers nothing.
- * Archiving from the header stays possible and stops that work.
- */
-function archiveHeldMoveView({ t }: MoveViewInput): MoveView {
-  return {
-    icon: <ThemedArchive size={ICON_SIZE} uniProps={mutedColorMapping} />,
-    tone: "muted",
-    title: t("panels.overview.archiveHeldTitle"),
-    facts: t("panels.overview.archiveHeldFacts"),
-  };
-}
-
 /** Archive is only a move once the work shipped: a merged PR, or a done status card (deriveYourMove). */
 function archiveMoveView(
   action: GitAction,
@@ -960,6 +1029,274 @@ function archiveMoveView(
         : branchFacts(facts, t) || undefined,
     press: { action: action.label, run: () => runGitAction(action) },
   };
+}
+
+// ── 3b. What moves without me ────────────────────────────────────────────
+
+const ENTRY_TONES: Record<NonNullable<InProgressEntryTone>, Tone> = {
+  success: "ok",
+  warning: "warn",
+  danger: "danger",
+  muted: "muted",
+};
+type InProgressEntryTone = Extract<InProgressRow, { kind: "entry" }>["entry"]["tone"];
+
+/**
+ * What moves in the workspace without the human: agents with their subagents and background jobs,
+ * and what plugins' agents have taken on. Oldest first, five, then Show all. Hidden when empty.
+ */
+function InProgress({
+  rows,
+  subagentLines,
+  openKey,
+  onOpenChange,
+  serverId,
+  workspaceKey,
+}: {
+  rows: InProgressRow[];
+  subagentLines: ReadonlyMap<string, SubagentLine>;
+  openKey: string | null;
+  onOpenChange: (key: string | null) => void;
+  serverId: string;
+  workspaceKey: string | null;
+}): ReactElement | null {
+  const { t } = useTranslation();
+  const [showAll, setShowAll] = useState(false);
+  const expand = useCallback(() => setShowAll(true), []);
+  if (rows.length === 0) return null;
+  const visible = showAll ? rows : rows.slice(0, VISIBLE_IN_PROGRESS);
+  return (
+    <Section title="panels.overview.inProgress" count={rows.length} testID="overview-in-progress">
+      <View style={styles.context}>
+        {visible.map((row) =>
+          row.kind === "entry" ? (
+            <InProgressEntry
+              key={row.key}
+              row={row}
+              open={row.key === openKey}
+              onOpenChange={onOpenChange}
+              workspaceKey={workspaceKey}
+            />
+          ) : (
+            <InProgressAgentGroup
+              key={row.key}
+              row={row}
+              subagents={row.subagents ? (subagentLines.get(row.agentId) ?? null) : null}
+              serverId={serverId}
+            />
+          ),
+        )}
+        {visible.length < rows.length ? (
+          <PressHighlight
+            accessibilityRole="button"
+            onPress={expand}
+            style={styles.contextRow}
+            highlightStyle={styles.pressed}
+            testID="overview-in-progress-show-all"
+          >
+            <Text style={styles.showAllText}>
+              {t("panels.overview.showAll", { count: rows.length })}
+            </Text>
+          </PressHighlight>
+        ) : null}
+      </View>
+    </Section>
+  );
+}
+
+/** "5m", ticking on its own: the time since the row last changed. */
+function RowAge({ at }: { at: number }): ReactElement {
+  const date = useMemo(() => new Date(at), [at]);
+  return <>{useCompactTimeAgo(date)}</>;
+}
+
+/** "running 2h": how long a background job has run. */
+function JobAge({ startedAt }: { startedAt: number }): ReactElement {
+  const { t } = useTranslation();
+  const date = useMemo(() => new Date(startedAt), [startedAt]);
+  const time = useCompactTimeAgo(date);
+  return <>{t("panels.overview.jobRunning", { time })}</>;
+}
+
+/** An in-progress entry: its row, or, once pressed, the plugin's own card in its place. */
+function InProgressEntry({
+  row,
+  open,
+  onOpenChange,
+  workspaceKey,
+}: {
+  row: Extract<InProgressRow, { kind: "entry" }>;
+  open: boolean;
+  onOpenChange: (key: string | null) => void;
+  workspaceKey: string | null;
+}): ReactElement {
+  const { t } = useTranslation();
+  const { item, entry } = row;
+  const onExpandedChange = useCallback(
+    (expanded: boolean) => onOpenChange(expanded ? row.key : null),
+    [onOpenChange, row.key],
+  );
+  const press = useCallback(() => {
+    if (item.EntryComponent) onOpenChange(row.key);
+    else if (workspaceKey) {
+      showExplorerForAttention(workspaceKey, { kind: "plugin", key: item.key ?? "", item });
+    }
+  }, [item, onOpenChange, row.key, workspaceKey]);
+  const word = row.nothingMoving ? t("panels.overview.nothingMoving") : entry.waitingOn;
+  const tone: Tone = row.nothingMoving ? "warn" : ENTRY_TONES[entry.tone ?? "muted"];
+  const collapsed = (
+    <PressHighlight
+      accessibilityRole="button"
+      accessibilityLabel={[entry.title, word].filter(Boolean).join(", ")}
+      onPress={press}
+      style={styles.contextRow}
+      highlightStyle={styles.pressed}
+      testID={`overview-in-progress-entry-${entry.id}`}
+    >
+      <ThemedAsk size={SMALL_ICON_SIZE} uniProps={mutedColorMapping} />
+      <Text style={styles.contextValue} numberOfLines={1}>
+        {entry.title}
+      </Text>
+      <Text style={styles.ageWord} numberOfLines={1}>
+        {word ? <Text style={wordStyle(tone)}>{word}</Text> : null}
+        {word ? " · " : null}
+        <RowAge at={entry.updatedAt} />
+      </Text>
+      <ThemedChevronRight size={SMALL_ICON_SIZE} uniProps={extraMutedColorMapping} />
+    </PressHighlight>
+  );
+  if (!open || !item.EntryComponent) return collapsed;
+  return (
+    <WorkspaceSummaryEntryView
+      item={item}
+      entryId={entry.id}
+      defaultExpanded={false}
+      expanded
+      onExpandedChange={onExpandedChange}
+      nothingMoving={row.nothingMoving}
+    >
+      {collapsed}
+    </WorkspaceSummaryEntryView>
+  );
+}
+
+/** An agent that moves, then its subagents folded into one line and a line per background job. */
+function InProgressAgentGroup({
+  row,
+  subagents,
+  serverId,
+}: {
+  row: Extract<InProgressRow, { kind: "agent" }>;
+  subagents: SubagentLine | null;
+  serverId: string;
+}): ReactElement {
+  const { t } = useTranslation();
+  const agent = useAgentDescriptor({ kind: "agent", agentId: row.agentId }, { serverId });
+  const openAgent = useCallback(
+    () => navigateToAgent({ serverId, agentId: row.agentId }),
+    [row.agentId, serverId],
+  );
+  const openSubagents = useCallback(() => {
+    navigateToAgent({ serverId, agentId: row.agentId });
+    requestSubagentsTrackOpen(serverId, row.agentId);
+  }, [row.agentId, serverId]);
+  const word = t(`panels.overview.word.${row.running ? "working" : "idle"}`);
+  return (
+    <>
+      <PressHighlight
+        accessibilityRole="button"
+        accessibilityLabel={`${agent.label}, ${word}`}
+        onPress={openAgent}
+        style={styles.contextRow}
+        highlightStyle={styles.pressed}
+        testID={`overview-in-progress-agent-${row.agentId}`}
+      >
+        <ThemedBot size={SMALL_ICON_SIZE} uniProps={mutedColorMapping} />
+        <Text style={styles.contextValue} numberOfLines={1}>
+          {agent.label}
+        </Text>
+        <Text style={styles.ageWord} numberOfLines={1}>
+          <Text style={wordStyle(row.running ? "run" : "muted")}>{word}</Text>
+          {" · "}
+          <RowAge at={row.at} />
+        </Text>
+        <ThemedChevronRight size={SMALL_ICON_SIZE} uniProps={extraMutedColorMapping} />
+      </PressHighlight>
+      {subagents ? (
+        <PressHighlight
+          accessibilityRole="button"
+          accessibilityLabel={`${countLabel(t, "panels.overview.subagents", subagents.total)}, ${subagents.pill.accessibilityLabel}`}
+          onPress={openSubagents}
+          style={styles.contextRow}
+          highlightStyle={styles.pressed}
+          testID={`overview-in-progress-subagents-${row.agentId}`}
+        >
+          <Indent level={1} />
+          <Text style={styles.contextValue} numberOfLines={1}>
+            {countLabel(t, "panels.overview.subagents", subagents.total)}
+          </Text>
+          <Text style={wordStyle(subagentTone(subagents))} numberOfLines={1}>
+            {subagents.pill.segments.map((segment) => segment.text).join(" · ")}
+          </Text>
+          <ThemedChevronRight size={SMALL_ICON_SIZE} uniProps={extraMutedColorMapping} />
+        </PressHighlight>
+      ) : null}
+      {row.jobs.map((job) => (
+        <InProgressJobLine key={job.id} job={job} onPress={openAgent} />
+      ))}
+    </>
+  );
+}
+
+/** The track pill's leading state, in the row tones. */
+function subagentTone(line: SubagentLine): Tone {
+  switch (line.pill.segments[0]?.bucket) {
+    case "running":
+      return "run";
+    case "failed":
+      return "danger";
+    case "needs_input":
+      return "warn";
+    case "attention":
+      return "ok";
+    default:
+      return "muted";
+  }
+}
+
+function InProgressJobLine({
+  job,
+  onPress,
+}: {
+  job: InProgressJob;
+  onPress: () => void;
+}): ReactElement {
+  const { t } = useTranslation();
+  const label = job.description ?? t(`panels.overview.backgroundKind.${backgroundKind(job.kind)}`);
+  return (
+    <PressHighlight
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      onPress={onPress}
+      style={styles.contextRow}
+      highlightStyle={styles.pressed}
+      testID={`overview-in-progress-job-${job.id}`}
+    >
+      <Indent level={1} />
+      <Text style={job.description ? styles.jobName : styles.contextValue} numberOfLines={1}>
+        {label}
+      </Text>
+      <Text style={styles.wordRun} numberOfLines={1}>
+        <JobAge startedAt={job.startedAt} />
+      </Text>
+      <ThemedChevronRight size={SMALL_ICON_SIZE} uniProps={extraMutedColorMapping} />
+    </PressHighlight>
+  );
+}
+
+/** Kinds this client words; a newer daemon's kind reads as a plain background job. */
+function backgroundKind(kind: string): "shell" | "monitor" | "other" {
+  return kind === "shell" || kind === "monitor" ? kind : "other";
 }
 
 // ── 4. Context ───────────────────────────────────────────────────────────
@@ -1697,6 +2034,22 @@ const styles = StyleSheet.create((theme) => {
       fontSize: theme.fontSize.sm,
       color: theme.colors.statusWarning,
     },
+    statusAge: {
+      flexShrink: 1,
+      fontSize: theme.fontSize.sm,
+      color: theme.colors.foregroundMuted,
+    },
+    warningLine: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: theme.spacing[1.5],
+    },
+    warningText: {
+      flex: 1,
+      minWidth: 0,
+      fontSize: theme.fontSize.sm,
+      color: theme.colors.statusWarning,
+    },
     summary,
     summaryStale: { ...summary, opacity: 0.55 },
     section: {
@@ -1752,12 +2105,6 @@ const styles = StyleSheet.create((theme) => {
       minWidth: 0,
       fontSize: theme.fontSize.sm,
       color: theme.colors.foreground,
-    },
-    nextTitleMuted: {
-      flex: 1,
-      minWidth: 0,
-      fontSize: theme.fontSize.sm,
-      color: theme.colors.foregroundMuted,
     },
     blocker: {
       flexDirection: "row",
@@ -1828,6 +2175,14 @@ const styles = StyleSheet.create((theme) => {
       color: theme.colors.foreground,
     },
     word: { ...word, color: theme.colors.foregroundMuted },
+    ageWord: { ...word, color: theme.colors.foregroundExtraMuted },
+    jobName: {
+      flex: 1,
+      minWidth: 0,
+      fontFamily: theme.fontFamily.mono,
+      fontSize: theme.fontSize.sm,
+      color: theme.colors.foreground,
+    },
     wordRun: { ...word, color: theme.colors.accentBright },
     wordWarn: { ...word, color: theme.colors.statusWarning },
     wordDanger: { ...word, color: theme.colors.statusDanger },

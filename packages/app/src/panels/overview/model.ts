@@ -5,6 +5,7 @@ import type {
 } from "@getpaseo/protocol/agent-types";
 import type {
   PluginWorkspaceBlocker,
+  PluginWorkspaceInProgressEntry,
   PluginWorkspacePullRequest,
   PluginWorkspaceStatus,
   PluginWorkspaceSummaryEntry,
@@ -63,8 +64,7 @@ export type YourMoveRow =
   | { kind: "entry"; key: string; item: WorkspaceSummaryItem; entry: PluginWorkspaceSummaryEntry }
   | { kind: "plugin"; key: string; item: WorkspaceSummaryItem }
   | { kind: "failed"; key: string; agentId: string }
-  | { kind: "archive"; key: string }
-  | { kind: "archive-held"; key: string };
+  | { kind: "archive"; key: string };
 
 /**
  * Everything that waits on the human, in the attention ladder's order, then Archive. Git steps and
@@ -73,13 +73,12 @@ export type YourMoveRow =
  * PRs live in other repos has no branch PR to merge), and never while an agent runs. Not over a commit
  * or PR step, which means work not in the PR yet. Only in a worktree, or after a merge: a regular
  * checkout doesn't offer Archive just because an agent finished, as in the header (git/policy.ts).
- * Never while other work in the workspace is still open (`isWorkStillOpen`): a merged PR finishes one
- * agent's job, and archiving would stop the rest. Nor while anything else waits on the human: an open
- * ask means the work isn't settled (a "merge or request review" ask outlives a done card), and a
- * permission prompt or failed agent outranks `running` in the workspace status, which would hide
- * another agent's live work from `isWorkStillOpen`. When live background work is what holds it, an `archive-held` row says
- * so in its place: a dev server a finished agent left running would otherwise hide Archive with
- * nothing on screen to say why, while the sidebar already shows the workspace as Done.
+ * Never while other work in the workspace is still open (`isWorkStillOpen`) or an agent holds an ask
+ * in progress: a merged PR finishes one agent's job, and archiving would stop the rest. In progress,
+ * below Your move, says what Archive waits for, so no row here does. Nor while anything else waits on
+ * the human: an open ask means the work isn't settled (a "merge or request review" ask outlives a done
+ * card), and a permission prompt or failed agent outranks `running` in the workspace status, which
+ * would hide another agent's live work from `isWorkStillOpen`.
  */
 export function deriveYourMove(
   input: ArchiveInput & { items: readonly AttentionItem[] },
@@ -107,9 +106,8 @@ export function deriveYourMove(
       }
     }
   }
-  if (input.agentRunning || rows.length > 0 || !archiveFits(input)) return rows;
-  if (!input.workOpen) rows.push({ kind: "archive", key: `git:${ARCHIVE_ACTION_ID}` });
-  else if (input.liveWork) rows.push({ kind: "archive-held", key: `held:${ARCHIVE_ACTION_ID}` });
+  if (input.agentRunning || rows.length > 0 || input.workOpen || input.inProgress) return rows;
+  if (archiveFits(input)) rows.push({ kind: "archive", key: `git:${ARCHIVE_ACTION_ID}` });
   return rows;
 }
 
@@ -123,8 +121,8 @@ interface ArchiveInput {
   statusDone: boolean;
   /** Work in the workspace is still under way although no agent runs a turn (`isWorkStillOpen`). */
   workOpen: boolean;
-  /** The host still counts the workspace running: a background shell, monitor or subagent. */
-  liveWork: boolean;
+  /** A plugin lists something an agent has taken on and not finished (`inProgress` entries). */
+  inProgress: boolean;
 }
 
 /** Whether the work shipped and Archive fits the branch, before anything holds it back. */
@@ -160,37 +158,159 @@ export function isWorkStillOpen(input: {
 }
 
 /**
- * The one Your move row shown open. `chosen` is the row last shown open (the host pins it), or null
- * after the human closed it. With nothing pinned, and once that row is gone (answered), the lead row
- * is open.
+ * The one row shown open across Your move and In progress. `chosen` is the row last shown open (the
+ * host pins it), or null after the human closed it. `progressKeys` are the In progress rows that can
+ * open; they never open by themselves. With nothing pinned, and once the pinned row is gone
+ * (answered, or the ask left In progress), the lead Your move row is open.
  */
 export function openMoveKey(
   rows: readonly YourMoveRow[],
   chosen: string | null | undefined,
+  progressKeys: readonly string[] = [],
 ): string | null {
   if (chosen === null) return null;
-  if (chosen !== undefined && rows.some((row) => row.key === chosen)) return chosen;
+  if (chosen !== undefined) {
+    if (rows.some((row) => row.key === chosen) || progressKeys.includes(chosen)) return chosen;
+  }
   return rows[0]?.key ?? null;
 }
 
 /**
- * What the host remembers as `chosen` after rendering `rows`. Once an ask is shown open it is pinned,
- * so a move arriving above it doesn't collapse the ask the human is answering (and drop their
- * half-written reply). Rows that can't expand are never pinned: an ask arriving above one still opens.
+ * What the host remembers as `chosen` after rendering. Once an ask is shown open it is pinned, so a
+ * move arriving above it doesn't collapse the ask the human is answering (and drop their half-written
+ * reply). An In progress row is open only because the human opened it, so it stays pinned. Rows that
+ * can't expand are never pinned: an ask arriving above one still opens.
  */
 export function pinOpenMove(
   rows: readonly YourMoveRow[],
   chosen: string | null | undefined,
+  progressKeys: readonly string[] = [],
 ): string | null | undefined {
-  const key = openMoveKey(rows, chosen);
+  const key = openMoveKey(rows, chosen, progressKeys);
+  if (key !== null && progressKeys.includes(key)) return key;
   const open = rows.find((row) => row.key === key);
   return open?.kind === "entry" && open.item.EntryComponent ? key : chosen;
+}
+
+/** In progress rows listed before "Show all". */
+export const VISIBLE_IN_PROGRESS = 5;
+
+/** An entry unchanged this long, with nothing else moving it, shows "nothing moving". */
+export const NOTHING_MOVING_AFTER_MS = 10 * 60_000;
+
+/** One background job of an agent: a shell, a monitor, or other work it left running. */
+export interface InProgressJob {
+  id: string;
+  /** "shell", "monitor", "other", or a newer kind this client doesn't know. */
+  kind: string;
+  description: string | null;
+  /** Epoch ms. */
+  startedAt: number;
+}
+
+export interface InProgressAgent {
+  agentId: string;
+  /** The agent runs a turn. */
+  running: boolean;
+  /** Epoch ms of the agent's last activity. */
+  lastActivityAt: number;
+  /** Any of its subagents is working. */
+  subagentsRunning: boolean;
+  /** Its subagents have something to report (working, failed, waiting), as the track pill does. */
+  subagentsActive: boolean;
+  jobs: readonly InProgressJob[];
+}
+
+export type InProgressRow =
+  | {
+      kind: "entry";
+      key: string;
+      /** When it last changed, epoch ms: the row's time and its sort key. */
+      at: number;
+      item: WorkspaceSummaryItem;
+      entry: PluginWorkspaceInProgressEntry;
+      nothingMoving: boolean;
+    }
+  | {
+      kind: "agent";
+      key: string;
+      at: number;
+      agentId: string;
+      running: boolean;
+      /** Show the folded subagents line under the agent. */
+      subagents: boolean;
+      /** One indented line each, oldest first. */
+      jobs: InProgressJob[];
+    };
+
+/**
+ * What moves in the workspace without the human: plugins' in-progress entries, and agents with a
+ * running turn, working subagents or live background work. Each row's time is when it last changed
+ * (an entry's update, an agent's last activity), and rows go oldest first, so what moved least
+ * recently leads. Subagents and jobs fold under their agent and don't count as rows.
+ */
+export function deriveInProgress(input: {
+  items: readonly WorkspaceSummaryItem[];
+  agents: readonly InProgressAgent[];
+  /** Live background work anywhere in the workspace, including what `agents` doesn't list. */
+  liveBackgroundWork: boolean;
+  now: number;
+}): InProgressRow[] {
+  const running = new Set(input.agents.filter((a) => a.running).map((a) => a.agentId));
+  const liveWork = input.liveBackgroundWork || input.agents.some((a) => a.jobs.length > 0);
+  const rows: InProgressRow[] = [];
+  for (const item of input.items) {
+    for (const entry of item.inProgress ?? []) {
+      rows.push({
+        kind: "entry",
+        key: `progress:${item.pluginId}:${item.itemId}:${entry.id}`,
+        at: entry.updatedAt,
+        item,
+        entry,
+        nothingMoving: isNothingMoving({ entry, running, liveWork, now: input.now }),
+      });
+    }
+  }
+  for (const agent of input.agents) {
+    if (!agent.running && !agent.subagentsRunning && agent.jobs.length === 0) continue;
+    rows.push({
+      kind: "agent",
+      key: `agent:${agent.agentId}`,
+      at: agent.lastActivityAt,
+      agentId: agent.agentId,
+      running: agent.running,
+      subagents: agent.subagentsActive,
+      jobs: agent.jobs.toSorted((a, b) => a.startedAt - b.startedAt || a.id.localeCompare(b.id)),
+    });
+  }
+  return rows.sort((a, b) => a.at - b.at || a.key.localeCompare(b.key));
+}
+
+/**
+ * Nothing will move this entry: its agent runs no turn, no background work could report back, nothing
+ * outside watches it, and it hasn't changed for `NOTHING_MOVING_AFTER_MS`.
+ */
+function isNothingMoving(input: {
+  entry: PluginWorkspaceInProgressEntry;
+  running: ReadonlySet<string>;
+  liveWork: boolean;
+  now: number;
+}): boolean {
+  const { entry } = input;
+  if (entry.agentId && input.running.has(entry.agentId)) return false;
+  if (input.liveWork || entry.watched) return false;
+  return input.now - entry.updatedAt > NOTHING_MOVING_AFTER_MS;
+}
+
+/** Whether a plugin lists anything in progress for the workspace. */
+export function hasInProgressEntries(items: readonly WorkspaceSummaryItem[]): boolean {
+  return items.some((item) => (item.inProgress?.length ?? 0) > 0);
 }
 
 /**
  * Where each plugin summary item renders: an item with a status is the Status card; one with
  * `pullRequests` feeds the Pull requests section; one that can need the human (`needsYou`, `entries`)
- * belongs to Your move; anything else is a context footer fact.
+ * belongs to Your move, one with `inProgress` to In progress; anything else is a context footer fact.
  */
 export function partitionSummaryItems(items: readonly WorkspaceSummaryItem[]): {
   status: WorkspaceSummaryItem | null;
@@ -209,7 +329,7 @@ export function partitionSummaryItems(items: readonly WorkspaceSummaryItem[]): {
       pullRequests ??= item;
       continue;
     }
-    if (item.needsYou || item.entries !== undefined) continue;
+    if (item.needsYou || item.entries !== undefined || item.inProgress !== undefined) continue;
     more.push(item);
   }
   return { status, pullRequests, more };

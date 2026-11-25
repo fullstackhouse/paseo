@@ -23,6 +23,8 @@ interface EntryViewProps {
   defaultExpanded: boolean;
   expanded: boolean;
   onExpandedChange: (expanded: boolean) => void;
+  /** For an `inProgress` entry: its In progress row says nothing moves it. */
+  nothingMoving?: boolean;
   /** Shown instead when the plugin is gone or its component throws. */
   children: ReactElement;
 }
@@ -33,6 +35,7 @@ function EntryBody({
   defaultExpanded,
   expanded,
   onExpandedChange,
+  nothingMoving,
   children: fallback,
   theme,
 }: EntryViewProps & { theme: PluginTheme }) {
@@ -53,6 +56,7 @@ function EntryBody({
       defaultExpanded,
       expanded,
       onExpandedChange,
+      ...(nothingMoving === undefined ? {} : { nothingMoving }),
     }),
     [
       compact,
@@ -63,6 +67,7 @@ function EntryBody({
       item.serverId,
       item.workspaceId,
       navigation,
+      nothingMoving,
       onExpandedChange,
       theme,
     ],
