@@ -3,7 +3,6 @@ import type { ComposerTrackPillSegment } from "@/composer/tracks";
 import type { SidebarStateBucket } from "@/utils/sidebar-agent-state";
 import { deriveSidebarStateBucket, STATUS_BUCKET_ORDER } from "@/utils/sidebar-agent-state";
 import type { SubagentRow } from "./select";
-import { isFinishedSubagent } from "./archive-finished";
 import { providerSubagentLifecycleStatus } from "./provider-store";
 
 function presentationStatus(row: SubagentRow) {
@@ -142,10 +141,6 @@ function summarizeSubagentStatus(rows: readonly SubagentRow[]): SubagentStatusCo
     const count = buckets.filter((candidate) => candidate === bucket).length;
     return count > 0 ? [{ bucket, count }] : [];
   });
-}
-
-export function countFinishedSubagents(rows: readonly SubagentRow[]): number {
-  return rows.filter(isFinishedSubagent).length;
 }
 
 export function resolveRowLabel(title: string | null | undefined): string | null {

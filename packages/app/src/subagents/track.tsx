@@ -555,7 +555,7 @@ const styles = StyleSheet.create((theme) => ({
     fontVariant: ["tabular-nums"],
     color: theme.colors.foregroundMuted,
   },
-  // Progress on archive and clear rows. It shrinks before the heading, so the count gives way first.
+  // Clear's progress. It shrinks before the heading does, so the count gives way first.
   rowTrailing: {
     flexShrink: 2,
     minWidth: 0,

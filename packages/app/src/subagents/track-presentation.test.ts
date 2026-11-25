@@ -5,7 +5,6 @@ import {
   buildSubagentPillPresentation,
   buildSubagentRowPresentationData,
   buildSubagentRunTime,
-  countFinishedSubagents,
   distinctSubagentSubtitles,
   groupSubagentRows,
   resolveRowLabel,
@@ -115,38 +114,11 @@ function nativeRow(
     description: overrides.description ?? `Task ${overrides.id}`,
     subtitle: overrides.subtitle ?? null,
     status: overrides.status ?? "completed",
-    work: overrides.work ?? null,
-    requiresAttention: overrides.requiresAttention ?? false,
+    work: null,
+    requiresAttention: false,
     createdAt: new Date("2026-04-20T00:00:00.000Z"),
   };
 }
-
-describe("countFinishedSubagents", () => {
-  it("counts eligible managed and terminal provider-owned children", () => {
-    const providerRows: SubagentRow[] = [
-      nativeRow({ id: "native-running", status: "running" }),
-      nativeRow({ id: "native-failed", status: "failed", requiresAttention: true }),
-    ];
-
-    expect(
-      countFinishedSubagents([
-        row({ id: "managed-running", status: "running" }),
-        row({ id: "managed-idle", status: "idle" }),
-        ...providerRows,
-      ]),
-    ).toBe(2);
-  });
-
-  it("excludes running and initializing managed children", () => {
-    expect(
-      countFinishedSubagents([
-        row({ id: "running", status: "running" }),
-        row({ id: "initializing", status: "initializing" }),
-        row({ id: "finished", status: "idle" }),
-      ]),
-    ).toBe(1);
-  });
-});
 
 describe("groupSubagentRows", () => {
   const ids = (rows: SubagentRow[]) => rows.map((candidate) => candidate.id);
