@@ -63,6 +63,7 @@ temporary by design: every patch is meant to go upstream and then drop out of `f
 - FSH-only (upstreamable, getpaseo/paseo#8373): Linux desktop notifications play a sound when **Play sound** is on. Electron sends them without a sound hint, so GNOME and KDE stayed silent; they now go through `notify-send` with `sound-name:message-new-instant`, and the notification server plays it (Do Not Disturb and per-app sound settings apply). Without `notify-send` the silent Electron banner shows as before. getpaseo/paseo#8370 proposes the same idea upstream
 - FSH-only: macOS builds are signed with a self-signed FSH certificate instead of ad hoc, so folder-access answers survive updates (see Install below)
 - FSH-only: the desktop app's update callout installs new FSH builds through `scripts/install-fsh.sh`, on macOS (DMG) and Fedora (RPM) (see Install below)
+- FSH-only: the desktop app installs test builds (prereleases of PRs and of the weekly rebase branch) from Settings → About → **Test builds** or the command palette (**Install test build**), and goes back with **Back to stable**. Update prompts stay quiet while a test build runs (see Build below)
 - FSH-only: Settings → About has no **Release channel** picker. FSH builds update from GitHub's latest release, which has no beta channel
 - FSH-only (upstreamable): the desktop update callout offers **Install when idle**: the update installs once no workspace on the local host has been running or waiting on a permission prompt for 15 seconds. Settings → About → **Install updates when idle** does this for every update
 - FSH-only (upstreamable): while a desktop update is ready, the command palette lists **Update Paseo**. It asks for confirmation, then installs and restarts. Otherwise the palette lists **Check for Paseo updates**, which runs the check and reports the result in a toast
@@ -155,6 +156,7 @@ When a newer build is out, the script quits Paseo and stops the daemon before sw
 is mid-turn. It asks first; `--yes` skips the question. Every FSH build reports the same `0.13.0-beta.1`, so neither
 the app nor the daemon notices a swap underneath it — that's why the script stops both. It records the installed
 release tag in `~/.paseo/fsh-release` and does nothing when that matches the latest (`--force` reinstalls).
+`--tag <tag>` installs that release instead, test builds included (`--tag fsh-test-4d2a5d0`).
 
 macOS builds are signed with the self-signed FSH certificate "Paseo FSH" (not notarized, not a Developer ID), so macOS
 remembers your answers to its folder-access prompts (Documents, Downloads, network volumes) across updates. Ad-hoc
@@ -267,8 +269,17 @@ Agents that already existed when a plugin was installed don't get its MCP tools.
 - **Servers**: the same pushes build the Linux CLI and daemon bundle (`fsh-cli-*`, `.github/workflows/fsh-cli.yml`). The FSH agent box pins one by tag and sha256.
   The build runs upstream's packaged-app smoke test first. You can also start it by hand:
   Actions → FSH desktop build → Run workflow.
-  To test a PR's desktop build, add the `deploy` label: every push then publishes a prerelease `fsh-pr<N>-<sha>`
-  with the DMG and RPM (a manual run on another branch publishes `fsh-test-<sha>`). `install-fsh.sh` and the in-app updater
-  only install the latest release, which never points at a prerelease. Closing the PR deletes its prereleases.
+- **Test builds**: prereleases with the DMG and RPM, which the latest release never points at.
+  - A PR with the `deploy` label publishes `fsh-pr<N>-<sha>` on every push.
+  - Every push to an `fsh-rebase-*` branch publishes `fsh-test-<sha>` (seven-character sha). Their PRs always conflict
+    with `fsh`, and GitHub runs no `pull_request` workflow for a conflicting PR, so the label can't work there.
+  - A manual run on any other branch publishes `fsh-test-<sha>`.
+
+  Install one from Settings → About → **Test builds**, the command palette (type "test build"), or
+  `install-fsh.sh --tag <tag>`. A test build stamps `fshBuild` as `pr<N>-<sha>` / `test-<sha>`, so the app knows it runs
+  one: the update check stays quiet, and **Back to stable** (Settings, or **Back to stable build** in the palette)
+  reinstalls the latest release. Closing a PR deletes its `fsh-pr<N>-*` builds and the `fsh-test-*` builds of its
+  branch (`pull_request_target`, which runs for conflicting PRs too).
+
 - **Upstream workflows**: they trigger on pushes to `main` and on `v*` tags, and need upstream's
   secrets. Don't push `main` or `v*` tags here. Our release tags are `fsh-*`.
