@@ -60,13 +60,7 @@ flowchart TD
 
 ## O — Overview tab
 
-- **O4 In progress** (P1) — new section after Your move: one row per thing moving without the human.
-  Running agents (title, "working · 3m"), subagents grouped under their agent ("3 subagents working"),
-  background work an idle agent left running (shell or monitor name, "running · 2h"), asks in progress
-  (title, what it waits on, age). Hidden when nothing is in progress. Get here: Overview tab. Permission:
-  none.
-- **O5 In-progress ask** (P1, expanded row on O4) — the ask's title and body, with what it waits on, when
-  the agent took it and when it last moved; "Take it back" and "Remind agent". Get here: an ask row on O4. Permission: none.
+Views: O4 In progress, O5 In-progress ask.
 
 ## V — Placement options (A4)
 
@@ -77,10 +71,7 @@ Views: V1 Own section, V2 Inside Status, V3 Under Your move.
 
 ## E — Existing screens
 
-- **E1 Your move** (P1) — changed: "Archive waits for background work" leaves (O4 shows that work);
-  Archive also waits while asks are in progress. Get here: Overview tab. Permission: none.
-- **E2 Status** (P1) — changed: the card's age ("updated 8h ago"); when it says Working and nothing runs
-  in the workspace, a warning line "Nothing is running". Get here: Overview tab. Permission: none.
+Views: E1 Your move, E2 Status.
 
 ## Later phases (scope only)
 
