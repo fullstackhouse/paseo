@@ -319,7 +319,7 @@ describe("skills controller", () => {
         const snapshot = await fresh.controller.autoUpdate();
 
         expect(snapshot.state).toBe("not-installed");
-        expect(await installedEverywhere(fresh.targets)).toEqual([[], [], []]);
+        expect(await installedEverywhere(fresh.targets)).toEqual([[], [], [], []]);
       } finally {
         await rm(fresh.root, { recursive: true, force: true });
       }

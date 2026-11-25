@@ -38,7 +38,7 @@ const WorkspaceDraftTabSetupSchema = z.object({
   modeId: z.string().nullable(),
   model: z.string().nullable(),
   thinkingOptionId: z.string().nullable(),
-  featureValues: z.record(z.string(), z.unknown()),
+  providerOptions: z.record(z.string(), z.unknown()),
 }) as z.ZodType<WorkspaceDraftTabSetup>;
 
 const NewWorkspaceDraftEntrySchema = z.object({

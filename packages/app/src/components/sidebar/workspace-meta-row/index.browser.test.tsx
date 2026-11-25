@@ -20,9 +20,9 @@ vi.mock("@/components/sidebar/display-preferences/model", () => ({
 
 // Plugin row items pull in the app's toast host, which imports native-only modules. A row with
 // no `workspace` renders none of them anyway.
-vi.mock("@/plugins/workspace-row-items", () => ({
-  usePluginWorkspaceRowItems: () => [],
-  PluginWorkspaceRowItems: () => null,
+vi.mock("@/plugins/workspace-row-badge-items", () => ({
+  usePluginWorkspaceRowBadgeItems: () => [],
+  PluginWorkspaceRowBadgeItems: () => null,
 }));
 
 // App sources compile against the classic JSX runtime, which expects React on the global.
@@ -60,6 +60,7 @@ describe("WorkspaceMetaRow", () => {
             hostBadge={null}
             prHint={OPEN_PR}
             serviceSummary={null}
+            backdrop="surfaceSidebar"
           />
         </Pressable>,
       ),

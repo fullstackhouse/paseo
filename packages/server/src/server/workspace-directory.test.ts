@@ -1158,7 +1158,7 @@ test("lists archived workspaces newest first, without active or hidden ones", as
   const directory = new WorkspaceDirectory({
     logger: createTestLogger(),
     projectRegistry: { list: async () => [project] },
-    workspaceRegistry: { list: async () => workspaces },
+    workspaceRegistry: { listAll: async () => workspaces },
     listAgentPayloads: unused,
     workspaceLastUserMessageTimes: unused,
     listProviderSubagentActivity: unused,
@@ -1239,7 +1239,7 @@ test("caps an archived listing at 500 however many are asked for", async () => {
   const directory = new WorkspaceDirectory({
     logger: createTestLogger(),
     projectRegistry: { list: async () => [project] },
-    workspaceRegistry: { list: async () => workspaces },
+    workspaceRegistry: { listAll: async () => workspaces },
     listAgentPayloads: unused,
     workspaceLastUserMessageTimes: unused,
     listProviderSubagentActivity: unused,

@@ -10751,7 +10751,8 @@ test("workspace.appearance.set.request marks a workspace, rejects a bad avatar a
     updatedAt: "2026-03-01T12:00:00.000Z",
   });
   const workspaces = new Map([[workspace.workspaceId, workspace]]);
-  session.workspaceRegistry.list = async () => Array.from(workspaces.values());
+  session.workspaceRegistry.listActive = async () => Array.from(workspaces.values());
+  session.workspaceRegistry.get = async (id) => workspaces.get(id) ?? null;
   session.workspaceRegistry.update = async (id, updater) => {
     const existing = workspaces.get(id);
     if (!existing) return null;

@@ -315,10 +315,10 @@ test.describe("Worktree restore", () => {
   });
 
   test("restores the workspace and all agents closed by its archive", async ({ page }) => {
-    const { agents, worktree } = await createArchivedMissingWorktree("restore-agents", {
-      agentCount: 2,
-      keepAgentsArchived: true,
-    });
+    const { agents, closedBefore, worktree } = await createArchivedMissingWorktree(
+      "restore-agents",
+      { agentCount: 2, keepAgentsArchived: true, closedBeforeCount: 1 },
+    );
     const [firstAgent, secondAgent] = agents;
     const [closedAgent] = closedBefore;
     if (!firstAgent || !secondAgent || !closedAgent) {
@@ -345,6 +345,8 @@ test.describe("Worktree restore", () => {
     ).toHaveAttribute("aria-selected", "true");
     await expect.poll(() => fetchAgentArchivedAt(client, firstAgent.id)).toBeNull();
     await expect.poll(() => fetchAgentArchivedAt(client, secondAgent.id)).toBeNull();
+    // An agent closed before the workspace was archived stays closed.
+    expect(await fetchAgentArchivedAt(client, closedAgent.id)).not.toBeNull();
     await expect(
       page.getByTestId(`workspace-tab-agent_${secondAgent.id}`).filter({ visible: true }).first(),
     ).toBeVisible();

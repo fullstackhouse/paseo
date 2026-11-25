@@ -1,5 +1,4 @@
 import { seedSessionHosts } from "@/test/seed-session";
-import { queryClient } from "@/data/query-client";
 import { ARCHIVED_WORKSPACES_QUERY_ROOT } from "@/hooks/archived-workspaces-query";
 import { getHostRuntimeStore } from "@/runtime/host-runtime";
 import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";

@@ -14,7 +14,7 @@ import {
   type WorkspaceStateBucket,
 } from "@getpaseo/protocol/agent-state-bucket";
 import { getParentAgentIdFromLabels } from "@getpaseo/protocol/agent-labels";
-import { RECALL_MATCH_OPTIONS, scoreTextFields } from "@getpaseo/protocol/search/text-match";
+import { scoreTextFields } from "@getpaseo/protocol/search/text-match";
 import { SortablePager } from "./pagination/sortable-pager.js";
 import type { PersistedProjectRecord, PersistedWorkspaceRecord } from "./workspace-registry.js";
 import { resolveProjectDisplayName, resolveWorkspaceDisplayName } from "./workspace-registry.js";
@@ -80,6 +80,7 @@ export interface WorkspaceDirectoryDeps {
     list(): Promise<PersistedProjectRecord[]>;
   };
   workspaceRegistry: {
+    listAll(): Promise<PersistedWorkspaceRecord[]>;
     listActive(): Promise<PersistedWorkspaceRecord[]>;
     get(id: string): Promise<PersistedWorkspaceRecord | null>;
   };
@@ -641,7 +642,7 @@ export class WorkspaceDirectory {
     truncated: boolean;
   }> {
     const [workspaces, projects] = await Promise.all([
-      this.deps.workspaceRegistry.list(),
+      this.deps.workspaceRegistry.listAll(),
       this.deps.projectRegistry.list(),
     ]);
     const projectsById = new Map(projects.map((project) => [project.projectId, project]));
@@ -669,7 +670,8 @@ export class WorkspaceDirectory {
         scoreTextFields(
           query,
           [entry.name, entry.projectDisplayName, entry.branch ?? ""],
-          RECALL_MATCH_OPTIONS,
+          // Typo tolerant like agent History search: people recall these names from memory.
+          { typoTolerant: true },
         ) === null
       ) {
         continue;

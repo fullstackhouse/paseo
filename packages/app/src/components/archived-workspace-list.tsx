@@ -11,7 +11,6 @@ import {
 } from "react-native";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
-import { RECALL_MATCH_OPTIONS } from "@getpaseo/protocol/search/text-match";
 import {
   DATE_SECTION_ORDER,
   deriveDateSectionKey,
@@ -26,6 +25,8 @@ import type { ArchivedWorkspace } from "@/hooks/use-archived-workspaces";
 import { useTimeAgo } from "@/hooks/use-time-ago";
 import { navigateToWorkspace } from "@/stores/navigation-active-workspace-store";
 
+// Matches agent History search (agent-list), so both History views find the same names.
+const HISTORY_MATCH_OPTIONS = { typoTolerant: true } as const;
 const ThemedRefreshControl = withUnistyles(RefreshControl, (theme) => ({
   tintColor: theme.colors.foregroundMuted,
   colors: [theme.colors.foregroundMuted],
@@ -63,13 +64,13 @@ function ArchivedWorkspaceRow({
   const branch = workspace.branch ?? "";
   const ranges = useMemo(
     () => ({
-      name: findHighlightRanges(search ?? "", workspace.name, RECALL_MATCH_OPTIONS),
+      name: findHighlightRanges(search ?? "", workspace.name, HISTORY_MATCH_OPTIONS),
       project: findHighlightRanges(
         search ?? "",
         workspace.projectDisplayName,
-        RECALL_MATCH_OPTIONS,
+        HISTORY_MATCH_OPTIONS,
       ),
-      branch: findHighlightRanges(search ?? "", branch, RECALL_MATCH_OPTIONS),
+      branch: findHighlightRanges(search ?? "", branch, HISTORY_MATCH_OPTIONS),
     }),
     [search, workspace.name, workspace.projectDisplayName, branch],
   );

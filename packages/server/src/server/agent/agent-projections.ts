@@ -269,6 +269,11 @@ function visibleStoredBackgroundWork(
   return record.internal || record.archivedAt ? undefined : summary;
 }
 
+/** How long a stored agent has worked, omitted for records from before the field existed. */
+function storedWorkedMs(record: StoredAgentRecord): { workedMs?: number } {
+  return record.workedMs === undefined ? {} : { workedMs: record.workedMs };
+}
+
 export function buildStoredAgentPayload(
   record: StoredAgentRecord,
   validProviders: Iterable<AgentProvider>,
@@ -315,7 +320,7 @@ export function buildStoredAgentPayload(
     lastUserMessageAt: lastUserMessageAt ? lastUserMessageAt.toISOString() : null,
     status: record.lastStatus,
     backgroundWork: visibleStoredBackgroundWork(record, backgroundWork),
-    ...(record.workedMs === undefined ? {} : { workedMs: record.workedMs }),
+    ...storedWorkedMs(record),
     capabilities: defaultCapabilities,
     currentModeId: record.lastModeId ?? null,
     availableModes: [],
