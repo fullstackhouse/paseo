@@ -1424,6 +1424,8 @@ export class HubRelationshipHarness {
       relayEnabled: false,
       relayEndpoint: "relay.paseo.sh:443",
       appBaseUrl: "https://app.paseo.sh",
+      // Tests opt in to restart recovery explicitly, like test-utils/paseo-daemon.ts.
+      resumeOnStartup: false,
     };
   }
 
