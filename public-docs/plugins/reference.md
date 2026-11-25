@@ -324,6 +324,10 @@ export async function openDocumentation() {
 
 Call the function directly from a user interaction so the browser permits a new tab.
 
+Both also take Paseo app links. `paseo://h/<server>/workspace/<id>` and
+`paseo://h/<server>/agent/<id>` open that workspace or agent inside the app instead of the OS
+opener. An archived workspace shows its recovery state.
+
 | Platform      | External links                     | `navigation.openBrowser`                         |
 | ------------- | ---------------------------------- | ------------------------------------------------ |
 | Electron      | System browser                     | Available; creates a local workspace browser tab |
@@ -386,14 +390,14 @@ for remote workspaces; `localhost` URLs refer to that desktop.
 
 #### Errors and refusal
 
-| Condition                                                             | Result                                                                         |
-| --------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| External URL is malformed or uses a non-HTTP(S) scheme                | Ignored; `openExternalUrl` resolves without opening anything                   |
-| OS opener fails                                                       | `openExternalUrl` rejects; `ExternalLink` calls `onError` or logs the error    |
-| Browser blocks a new external tab                                     | Cannot be distinguished from a successful `noopener` open                      |
-| In-app browser URL is malformed or uses a non-HTTP(S) scheme          | Throws `Only absolute HTTP(S) URLs are supported.` before creating a tab       |
-| In-app browser workspace ID is empty                                  | Throws `workspaceId is required.` before creating a tab                        |
-| Target host/workspace is unknown or its workspace list has not loaded | Throws `Workspace is unavailable on the requested host.` before creating a tab |
+| Condition                                                                          | Result                                                                         |
+| ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| External URL is malformed or uses a non-HTTP(S) scheme other than a Paseo app link | Ignored; `openExternalUrl` resolves without opening anything                   |
+| OS opener fails                                                                    | `openExternalUrl` rejects; `ExternalLink` calls `onError` or logs the error    |
+| Browser blocks a new external tab                                                  | Cannot be distinguished from a successful `noopener` open                      |
+| In-app browser URL is malformed or uses a non-HTTP(S) scheme                       | Throws `Only absolute HTTP(S) URLs are supported.` before creating a tab       |
+| In-app browser workspace ID is empty                                               | Throws `workspaceId is required.` before creating a tab                        |
+| Target host/workspace is unknown or its workspace list has not loaded              | Throws `Workspace is unavailable on the requested host.` before creating a tab |
 
 Use the [settings API](#settings-screens) for typed host-scoped persistence across clients.
 Use `openSettings`, `openScreen`, and `openPanel` for your own registered contributions.
