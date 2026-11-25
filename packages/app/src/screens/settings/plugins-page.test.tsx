@@ -27,6 +27,15 @@ const runtime = vi.hoisted(() => ({
   client: null as DaemonClient | null,
 }));
 
+const pluginSettings = vi.hoisted(() => ({
+  entry: null as { title: string; open: () => void } | null,
+}));
+
+vi.mock("@/plugins/settings", async () => ({
+  ...(await vi.importActual<typeof import("@/plugins/settings")>("@/plugins/settings")),
+  usePluginSettingsEntry: () => pluginSettings.entry,
+}));
+
 vi.mock("@/runtime/host-runtime", () => ({
   useHostRuntimeClient: () => runtime.client,
   useHostRuntimeIsConnected: () => runtime.connected,
@@ -165,6 +174,7 @@ describe("HostPluginsPage", () => {
     runtime.logsSupported = true;
     runtime.notificationsSupported = true;
     runtime.client = null;
+    pluginSettings.entry = null;
     vi.stubGlobal(
       "confirm",
       vi.fn(() => true),
@@ -239,6 +249,48 @@ describe("HostPluginsPage", () => {
     await selectPluginAction(action);
 
     await waitFor(() => expect(client[method]).toHaveBeenCalledTimes(1));
+  });
+
+  it("opens a plugin's settings from its row, but not while an action on it is pending", async () => {
+    const open = vi.fn();
+    pluginSettings.entry = { title: "Preferences", open };
+    let finishDisable = () => {};
+    const client = createClient();
+    client.listPlugins.mockResolvedValue([plugin()]);
+    client.disablePlugin.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finishDisable = () => resolve(plugin(false));
+        }),
+    );
+    renderPage(client);
+
+    fireEvent.click(await screen.findByRole("switch", { name: "example: Disable" }));
+    await waitFor(() => expect(client.disablePlugin).toHaveBeenCalledTimes(1));
+    fireEvent.click(screen.getByRole("button", { name: "Actions for example" }));
+    fireEvent.click(screen.getByTestId("plugin-row-example"));
+    expect(open).not.toHaveBeenCalled();
+
+    finishDisable();
+    expect(await screen.findByText("Disabled example")).toBeDefined();
+    fireEvent.click(screen.getByTestId("plugin-row-example"));
+    expect(open).toHaveBeenCalledTimes(1);
+  });
+
+  it("opens the actions menu without opening the plugin's settings", async () => {
+    const open = vi.fn();
+    pluginSettings.entry = { title: "Preferences", open };
+    const client = createClient();
+    client.listPlugins.mockResolvedValue([plugin()]);
+    renderPage(client);
+
+    const trigger = await screen.findByRole("button", { name: "Actions for example" });
+    fireEvent.pointerDown(trigger);
+    fireEvent.pointerUp(trigger);
+    fireEvent.click(trigger);
+
+    expect(await screen.findByRole("menuitem", { name: "Reload" })).toBeDefined();
+    expect(open).not.toHaveBeenCalled();
   });
 
   it("turns a plugin's notifications off and back on through the daemon config", async () => {

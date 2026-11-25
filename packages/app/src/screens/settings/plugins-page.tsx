@@ -1,5 +1,5 @@
 import { formatPluginInstallation } from "@getpaseo/protocol/plugin-source-reference";
-import { PluginSettingsMenuItems } from "@/plugins/settings";
+import { PluginSettingsMenuItems, usePluginSettingsEntry } from "@/plugins/settings";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useTranslation } from "react-i18next";
 import { Text, View } from "react-native";
@@ -35,6 +35,7 @@ import {
   type PluginUpdateClient,
 } from "@/plugins/updates/check-plugin-updates";
 import { settingsStyles } from "@/styles/settings";
+import { ICON_SIZE } from "@/styles/theme";
 import { confirmDialog } from "@/utils/confirm-dialog";
 import { SettingsRevealText } from "@/components/settings/reveal-text";
 
@@ -161,6 +162,7 @@ function PluginRow({
   onToggleNotifications: PluginNotificationsToggle;
 }) {
   const { t } = useTranslation();
+  const settings = usePluginSettingsEntry(serverId, plugin.id);
   const toggle = useCallback(
     (enabled: boolean) => onAction(enabled ? "enable" : "disable", plugin),
     [onAction, plugin],
@@ -198,6 +200,8 @@ function PluginRow({
       hint={hint}
       error={clientError ?? plugin.error}
       testID={`plugin-row-${plugin.id}`}
+      onPress={settings?.open}
+      pressDisabled={pending}
     >
       <View style={styles.pluginControls} accessibilityLabel={`${plugin.id} ${statusLabel}`}>
         <Switch
@@ -217,6 +221,8 @@ function PluginRow({
           notificationsEnabled={notificationsEnabled}
           onToggleNotifications={onToggleNotifications}
         />
+        {/* Rows that open settings end with a chevron; keep the controls of the others aligned. */}
+        {settings ? null : <View style={styles.chevronSpace} />}
       </View>
     </SettingsRow>
   );
@@ -679,6 +685,7 @@ const styles = StyleSheet.create((theme) => ({
   },
   install: { padding: theme.spacing[4], gap: theme.spacing[3] },
   pluginControls: { flexDirection: "row", alignItems: "center", gap: theme.spacing[2] },
+  chevronSpace: { width: ICON_SIZE.sm },
   menuButton: { padding: theme.spacing[1], borderRadius: theme.borderRadius.sm },
   menuIcon: { color: theme.colors.foregroundMuted },
   dangerIcon: { color: theme.colors.statusDanger },

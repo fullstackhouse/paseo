@@ -7,8 +7,9 @@ import {
   useRef,
   type ReactNode,
 } from "react";
-import { Text, View } from "react-native";
-import { StyleSheet } from "react-native-unistyles";
+import { ChevronRight } from "lucide-react-native";
+import { Text, View, type PressableStateCallbackType } from "react-native";
+import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import type {
   SettingsRowProps,
   SettingsSwitchProps,
@@ -25,8 +26,15 @@ import { DropdownTrigger } from "@/components/ui/dropdown-trigger";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { settingsStyles } from "@/styles/settings";
 import { ControlSizeProvider } from "@/components/ui/control-size";
+import { isWeb } from "@/constants/platform";
+import { mutedIconColorMapping } from "@/components/ui/icon-color";
+import { PressHighlight } from "@/components/ui/press-highlight";
+import { ICON_SIZE, type Theme } from "@/styles/theme";
 import { useSettingsRowLayout } from "./row-density";
 import { SettingsRevealText } from "./reveal-text";
+const ThemedChevron = withUnistyles(ChevronRight);
+const hoveredIconColorMapping = (theme: Theme) => ({ color: theme.colors.foreground });
+
 export { SettingsGroup } from "./headings/settings-group";
 export { SettingsSection } from "./headings/settings-section";
 export { SettingsCollapsibleRow } from "./collapsible-row";
@@ -37,6 +45,13 @@ export { SettingsRevealText } from "./reveal-text";
 /** What app screens can add to a plugin-facing row: an accessory beside the label, such as an info tip. */
 interface AppRowExtras {
   labelAccessory?: ReactNode;
+  /**
+   * Makes the whole row open a detail: it highlights on hover and ends with a chevron. Controls in
+   * the trailing slot must stop their press from reaching the row; `Switch` already does.
+   */
+  onPress?: () => void;
+  /** Keeps the row from opening while its controls are disabled, such as during a pending action. */
+  pressDisabled?: boolean;
 }
 
 interface AppSettingsRowProps extends Omit<SettingsRowProps, "hint">, AppRowExtras {
@@ -65,13 +80,29 @@ export function SettingsRow({
   error,
   children,
   testID,
+  onPress,
+  pressDisabled,
 }: AppSettingsRowProps) {
   const compact = useIsCompactFormFactor();
   const layout = useSettingsRowLayout();
   const rowStyle = useMemo(() => [layout.row, compact && styles.compactRow], [compact, layout]);
+  const pressableRowStyle = useCallback(
+    ({ hovered, pressed }: PressableStateCallbackType & { hovered?: boolean }) => [
+      rowStyle,
+      !pressDisabled && hovered && styles.hovered,
+      !pressDisabled && pressed && styles.pressed,
+    ],
+    [pressDisabled, rowStyle],
+  );
+  const handlePress = useCallback(() => {
+    // A clicked row keeps focus, and the list behind the pushed detail screen then gets
+    // aria-hidden around a focused element, which the browser blocks and logs.
+    if (isWeb) (document.activeElement as HTMLElement | null)?.blur?.();
+    onPress?.();
+  }, [onPress]);
   const accessoryTitleStyle = useMemo(() => [layout.title, styles.accessoryLabel], [layout]);
-  return (
-    <View style={rowStyle} testID={testID}>
+  const content = (hovered: boolean) => (
+    <>
       <View style={styles.label}>
         {labelAccessory ? (
           <View style={styles.labelRow}>
@@ -88,12 +119,44 @@ export function SettingsRow({
           </Text>
         ) : null}
       </View>
-      {children ? (
-        <View style={styles.control}>
+      {children || onPress ? (
+        <View style={onPress ? [styles.control, styles.pressableControl] : styles.control}>
           <ControlSizeProvider size={layout.controlSize}>{children}</ControlSizeProvider>
+          {onPress ? (
+            <ThemedChevron
+              size={ICON_SIZE.sm}
+              uniProps={hovered ? hoveredIconColorMapping : mutedIconColorMapping}
+            />
+          ) : null}
         </View>
       ) : null}
-    </View>
+    </>
+  );
+  if (!onPress) {
+    return (
+      <View style={rowStyle} testID={testID}>
+        {content(false)}
+      </View>
+    );
+  }
+  return (
+    <PressHighlight
+      // The row press is a pointer shortcut, so it stays out of the accessibility tree and the tab
+      // order: an accessible row would merge its switch and menu into one VoiceOver element, and
+      // a "button" role renders a <button> on web that cannot hold them. Whatever the row opens
+      // must also be reachable from a control inside it, such as the row's menu.
+      accessible={false}
+      tabIndex={-1}
+      disabled={pressDisabled}
+      onPress={handlePress}
+      style={pressableRowStyle}
+      highlightStyle={styles.pressed}
+      testID={testID}
+    >
+      {({ hovered }: PressableStateCallbackType & { hovered?: boolean }) =>
+        content(!pressDisabled && !!hovered)
+      }
+    </PressHighlight>
   );
 }
 
@@ -219,5 +282,8 @@ const styles = StyleSheet.create((theme) => ({
   },
   accessoryLabel: { flexShrink: 1, minWidth: 0 },
   control: { flexShrink: 1, maxWidth: "100%" },
+  pressableControl: { flexDirection: "row", alignItems: "center", gap: theme.spacing[2] },
+  hovered: { backgroundColor: theme.colors.surface2 },
+  pressed: { backgroundColor: theme.colors.surface3 },
   input: { minWidth: 180 },
 }));

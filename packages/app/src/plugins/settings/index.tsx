@@ -41,6 +41,22 @@ function PluginSettingsMenuItem({
   );
 }
 
+/** The plugin's first settings screen and a way to open it, or null when it has none on this host. */
+export function usePluginSettingsEntry(
+  serverId: string,
+  pluginId: string,
+): { title: string; open: () => void } | null {
+  const plugin = useInstalledPlugin(serverId, pluginId);
+  const supported = useHostFeature(serverId, "pluginSettings");
+  const screen = supported ? plugin?.settingsScreens[0] : undefined;
+  const screenId = screen?.id;
+  const open = useCallback(() => {
+    if (screenId) router.push(buildPluginSettingsRoute(serverId, pluginId, screenId));
+  }, [serverId, pluginId, screenId]);
+  if (!plugin || !screen) return null;
+  return { title: plugin.i18n.resolve(screen.title, plugin.locale), open };
+}
+
 export function PluginSettingsMenuItems({
   serverId,
   pluginId,

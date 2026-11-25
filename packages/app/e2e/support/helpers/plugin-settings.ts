@@ -42,10 +42,13 @@ export async function openCompactDisplaySettings(page: Page) {
   await openCompactSettings(page, new URL(page.url()).pathname);
   await openPluginScreen(page);
 }
+// The row press is a pointer shortcut with no accessible role, so find the row by its test id.
+function pluginRow(page: Page) {
+  return page.getByTestId("plugin-row-settings-example");
+}
 async function openPluginScreen(page: Page) {
   await openHostSection(page, getServerId(), "plugins");
-  await page.getByRole("button", { name: "Actions for settings-example", exact: true }).click();
-  await page.getByRole("menuitem", { name: "Display", exact: true }).click();
+  await pluginRow(page).click();
   await expect(page.getByRole("switch", { name: "Show metadata" })).toBeVisible();
 }
 export async function groupByWorkspace(page: Page) {
@@ -101,10 +104,8 @@ export async function discardTitle(page: Page) {
 }
 export async function returnAndReopenSettings(page: Page) {
   await goBackInSettings(page);
-  const actions = page.getByRole("button", { name: "Actions for settings-example", exact: true });
-  await expect(actions).toBeVisible();
-  await actions.click();
-  await page.getByRole("menuitem", { name: "Display", exact: true }).click();
+  await expect(pluginRow(page)).toBeVisible();
+  await pluginRow(page).click();
   await expect(page.getByRole("switch", { name: "Show metadata" })).toBeVisible();
 }
 export async function returnToPluginsPage(page: Page) {
