@@ -27,6 +27,7 @@ export type {
   PluginWorkspaceStatus,
   PluginWorkspaceBlocker,
   PluginWorkspaceSummaryEntry,
+  PluginWorkspaceInProgressEntry,
   PluginWorkspacePullRequest,
   PluginWorkspaceSummaryEntryProps,
   PluginIcon,
