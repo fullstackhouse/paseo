@@ -123,6 +123,7 @@ export function ProjectStatusIndicator({
   statusBucket,
   backdrop,
   loading = false,
+  still = false,
   testID,
 }: {
   iconDataUri: string | null;
@@ -134,6 +135,8 @@ export function ProjectStatusIndicator({
   /** The row's current background, so the status badge can knock out of it. */
   backdrop: SidebarSurfaceBackdrop;
   loading?: boolean;
+  /** Running, but nothing of the workspace's own runs a turn: a still dot instead of the ring. */
+  still?: boolean;
   testID?: string;
 }) {
   const placeholderInitial = projectIconPlaceholderLabelFromDisplayName(displayName)
@@ -170,6 +173,7 @@ export function ProjectStatusIndicator({
             content={badgeContent}
             statusBucket={badgeBucket}
             backdrop={backdrop}
+            still={still && !loading}
           />
         )}
       </View>
@@ -186,16 +190,18 @@ function ProjectStatusBadge({
   content,
   statusBucket,
   backdrop,
+  still,
 }: {
   content: ProjectStatusBadgeContent;
   statusBucket: SidebarStateBucket;
   backdrop: SidebarSurfaceBackdrop;
+  still: boolean;
 }) {
   const { t } = useTranslation();
   // Running skips the shell. The ring is wider than the 12pt shell and carries its own knockout,
   // so nesting it inside would clip it against the very thing that was meant to separate it from
   // the icon. It anchors to the same corner instead, growing around the centre the dot had.
-  if (content.kind === "dot" && content.bucket === "running") {
+  if (content.kind === "dot" && content.bucket === "running" && !still) {
     return (
       <View
         role="status"

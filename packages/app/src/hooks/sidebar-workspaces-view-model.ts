@@ -1,4 +1,4 @@
-import { deriveEffectiveWorkspaceStatus } from "@/workspace-status";
+import { deriveEffectiveWorkspaceStatus, type WorkspaceInProgress } from "@/workspace-status";
 import type { ReportedWorkLookup } from "@/workspace-status/reported-work";
 import equal from "fast-deep-equal";
 import type { PrHint } from "@/git/pr-hint";
@@ -61,6 +61,11 @@ export interface SidebarWorkspaceEntry extends SidebarStatusWorkspacePlacement {
   archiveUnpushedCommitCount: number | null;
   scripts: WorkspaceDescriptor["scripts"];
   hasRunningScripts: boolean;
+  /** In-progress entries nothing has moved for a while (`WorkspaceInProgress`). */
+  inProgressNotMoving?: number;
+  /** The group in-progress work put the row in, when it is the reason. */
+  inProgressReason?: WorkspaceInProgress["reason"];
+  inProgressReasonCount?: number;
 }
 
 export interface SidebarProjectEntry {
@@ -190,6 +195,9 @@ export function createSidebarWorkspaceEntry(input: {
     archiveUnpushedCommitCount: input.workspace.gitRuntime?.aheadOfOrigin ?? null,
     scripts: input.workspace.scripts,
     hasRunningScripts: input.workspace.scripts.some((script) => script.lifecycle === "running"),
+    inProgressNotMoving: effectiveStatus.inProgress?.notMoving ?? 0,
+    inProgressReason: effectiveStatus.inProgress?.reason ?? null,
+    inProgressReasonCount: effectiveStatus.inProgress?.reasonCount ?? 0,
   };
 }
 

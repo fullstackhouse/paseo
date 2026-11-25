@@ -947,6 +947,15 @@ or `workState: "waiting"` puts it in Ready to review, otherwise any `workState: 
 running agent, a failure or a permission prompt still wins. Workspaces with no `needsYou` and no
 `workState` keep the usual grouping.
 
+On FSH hosts, `inProgress` entries count too, ranked with the items above. An entry moves while its
+agent runs a turn, the workspace has live background work, it is `watched`, or it changed in the last
+10 minutes (the rule Overview uses for "nothing moving"). As many entries not moving as moving puts the
+workspace in Ready to review with "N not moving" on its row; otherwise an entry that waits on machines (not
+`waitingOnReview`) or live work puts it in Working ("N in progress", a still dot), otherwise every moving
+entry waits on a review and it goes to Blocked ("awaiting review"). So moving work beats a `"done"` card
+and an open ask beats moving work. The row's "N in progress" and "awaiting review" show only when the
+entries are why the workspace sits in that group; "N not moving" shows wherever some are stuck.
+
 Use `"blocked"` when the work waits on something other than the human: another workspace or agent, a
 reviewer, CI. Blocked sits at the bottom of the sidebar with no needs-you mark. Hosts without the
 Blocked group drop the value and group the workspace by its turn.

@@ -1355,6 +1355,12 @@ export const ja: TranslationResources = {
     schedules: {
       needsYou: "対応が必要なスケジュール実行: {{count}}",
     },
+    inProgress: {
+      notMoving: "停滞 {{count}}件",
+      inProgress: "進行中 {{count}}件",
+      awaitingReview: "レビュー待ち",
+      awaitingReviewCount: "レビュー待ち {{count}}件",
+    },
     drafts: {
       title: "下書き",
       discard: "下書きを破棄",

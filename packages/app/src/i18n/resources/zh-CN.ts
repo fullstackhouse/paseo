@@ -1329,6 +1329,12 @@ export const zhCN: TranslationResources = {
     schedules: {
       needsYou: "需要你处理的计划运行：{{count}}",
     },
+    inProgress: {
+      notMoving: "{{count}} 项停滞",
+      inProgress: "{{count}} 项进行中",
+      awaitingReview: "等待审核",
+      awaitingReviewCount: "{{count}} 项等待审核",
+    },
     drafts: {
       title: "草稿",
       discard: "丢弃草稿",

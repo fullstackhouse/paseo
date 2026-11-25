@@ -17,6 +17,8 @@ import type { Theme } from "@/styles/theme";
 import { PullRequestStateIcon } from "@/git/pull-request-state-icon";
 import { PluginWorkspaceRowItems, usePluginWorkspaceRowItems } from "@/plugins/workspace-row-items";
 import { CheckIndicator } from "./check-indicator";
+import { InProgressBadges } from "./in-progress-badges";
+import { selectInProgressBadges } from "./in-progress-items";
 import type { CheckSummary, CheckSummaryState } from "./check-summary";
 import { selectMetaRowItems, type MetaRowItem } from "./meta-items";
 import { workspaceServiceLabelKey, type WorkspaceServiceSummary } from "./service-summary";
@@ -59,7 +61,8 @@ const dangerMapping = (theme: Theme) => ({ color: theme.colors.statusDanger });
  * read first, and it stays the same height as the rest of the line.
  *
  * Plugin items follow everything the row knows itself. They draw their own separators, since only
- * a plugin knows whether it has anything to say about this workspace.
+ * a plugin knows whether it has anything to say about this workspace. The in-progress badges close
+ * the line: they say why in-progress work put the row in its group.
  */
 export function WorkspaceMetaRow({
   currentBranch,
@@ -77,7 +80,13 @@ export function WorkspaceMetaRow({
   serviceSummary: WorkspaceServiceSummary | null;
   labels?: readonly WorkspaceLabelDefinition[];
   /** The real workspace behind the row; previews leave it out and get no plugin items. */
-  workspace?: { serverId: string; workspaceId: string } | null;
+  workspace?: {
+    serverId: string;
+    workspaceId: string;
+    inProgressNotMoving?: number;
+    inProgressReason?: "working" | "blocked" | null;
+    inProgressReasonCount?: number;
+  } | null;
 }) {
   const { rowItems, checksDisplay } = useSidebarMetaPreferences();
   const items = selectMetaRowItems({
@@ -91,8 +100,14 @@ export function WorkspaceMetaRow({
     checksDisplay,
   });
   const pluginItems = usePluginWorkspaceRowItems(workspace?.serverId ?? null);
+  const inProgressBadges = selectInProgressBadges({
+    notMoving: workspace?.inProgressNotMoving,
+    reason: workspace?.inProgressReason,
+    reasonCount: workspace?.inProgressReasonCount,
+  });
+  const hasPluginItems = workspace !== null && pluginItems.length > 0;
 
-  if (items.length === 0 && (!workspace || pluginItems.length === 0)) return null;
+  if (items.length === 0 && !hasPluginItems && inProgressBadges.length === 0) return null;
 
   return (
     <View style={styles.row}>
@@ -109,6 +124,7 @@ export function WorkspaceMetaRow({
           separated={items.length > 0}
         />
       ) : null}
+      <InProgressBadges badges={inProgressBadges} separated={items.length > 0 || hasPluginItems} />
     </View>
   );
 }

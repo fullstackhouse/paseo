@@ -1357,6 +1357,12 @@ export const ru: TranslationResources = {
     schedules: {
       needsYou: "Запланированные запуски ждут вас: {{count}}",
     },
+    inProgress: {
+      notMoving: "Без движения: {{count}}",
+      inProgress: "В работе: {{count}}",
+      awaitingReview: "ждёт ревью",
+      awaitingReviewCount: "Ждут ревью: {{count}}",
+    },
     drafts: {
       title: "Черновики",
       discard: "Удалить черновик",

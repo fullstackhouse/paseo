@@ -185,7 +185,9 @@ is the storyboard in `.ai/prototypes/overview-v3/`; In progress and the Status a
   worded like its track pill, and each background job gets its own line. Every time is "since it last changed": an
   entry's `updatedAt`, an agent's last activity, a job's start. Rows go oldest first across kinds (`deriveInProgress`),
   five, then Show all. An entry reads "nothing moving" in the warning tone when its agent runs no turn, the workspace
-  has no live background work, it isn't `watched`, and it hasn't changed for 10 minutes. Pressing an agent or job line
+  has no live background work, it isn't `watched`, and it hasn't changed for 10 minutes. The workspace sidebar groups
+  by the same rule (`workspace-status/moving.ts`; grouping in `public-docs/plugins/reference.md`). It sees no
+  per-agent turns, so it counts a running workspace as live work: on such a row it never says "not moving". Pressing an agent or job line
   opens the agent; the subagents line opens the agent and its subagents list (`requestSubagentsTrackOpen`); an entry
   opens in place with the item's `EntryComponent`, which gets `nothingMoving`. One row is open across Your move and In
   progress (`openMoveKey`, `pinOpenMove`); an In progress row never opens by itself. Hidden when nothing moves.

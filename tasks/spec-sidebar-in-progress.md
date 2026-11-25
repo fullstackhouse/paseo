@@ -80,3 +80,4 @@ requested" in that case (#91).
 - 2026-11-25 — stage 1 UI map drafted; placement options drawn (V1–V3); A27–A30 decided; stage 1 approved (A31).
 - 2026-11-25 — stage 2 cards and mockups approved (A33–A36).
 - 2026-11-25 — mechanism and contract written (A37).
+- 2026-11-25 — host implemented (contract, shared moving rule, S1 fold, S2 badges); PR to `fsh`.
