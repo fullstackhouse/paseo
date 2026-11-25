@@ -15,6 +15,10 @@ export const ar: TranslationResources = {
     more: "+{{count}} آخرين",
     resumeAll: "استئناف الكل",
   },
+  resumeAgents: {
+    unreached_one: "تعذّر إعادة تشغيل {{count}} وكيل: {{names}}",
+    unreached_other: "تعذّر إعادة تشغيل {{count}} وكلاء: {{names}}",
+  },
   failedAgents: {
     title_one: "فشل {{count}} وكيل",
     title_other: "فشل {{count}} وكلاء",

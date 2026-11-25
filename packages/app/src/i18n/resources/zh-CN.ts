@@ -15,6 +15,10 @@ export const zhCN: TranslationResources = {
     more: "另外 {{count}} 个",
     resumeAll: "全部继续",
   },
+  resumeAgents: {
+    unreached_one: "{{count}} 个代理未能重新启动：{{names}}",
+    unreached_other: "{{count}} 个代理未能重新启动：{{names}}",
+  },
   failedAgents: {
     title_one: "{{count}} 个代理失败",
     title_other: "{{count}} 个代理失败",

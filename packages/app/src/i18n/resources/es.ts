@@ -15,6 +15,10 @@ export const es: TranslationResources = {
     more: "+{{count}} más",
     resumeAll: "Reanudar todos",
   },
+  resumeAgents: {
+    unreached_one: "No se reinició {{count}} agente: {{names}}",
+    unreached_other: "No se reiniciaron {{count}} agentes: {{names}}",
+  },
   failedAgents: {
     title_one: "Falló {{count}} agente",
     title_other: "Fallaron {{count}} agentes",

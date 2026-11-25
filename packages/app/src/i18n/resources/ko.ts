@@ -15,6 +15,10 @@ export const ko: TranslationResources = {
     more: "외 {{count}}개",
     resumeAll: "모두 재개",
   },
+  resumeAgents: {
+    unreached_one: "에이전트 {{count}}개를 다시 시작하지 못했습니다: {{names}}",
+    unreached_other: "에이전트 {{count}}개를 다시 시작하지 못했습니다: {{names}}",
+  },
   failedAgents: {
     title_one: "에이전트 {{count}}개가 실패했습니다",
     title_other: "에이전트 {{count}}개가 실패했습니다",

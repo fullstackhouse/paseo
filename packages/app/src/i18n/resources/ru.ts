@@ -15,6 +15,10 @@ export const ru: TranslationResources = {
     more: "ещё {{count}}",
     resumeAll: "Возобновить все",
   },
+  resumeAgents: {
+    unreached_one: "Не удалось перезапустить агентов: {{count}} ({{names}})",
+    unreached_other: "Не удалось перезапустить агентов: {{count}} ({{names}})",
+  },
   failedAgents: {
     title_one: "Сбой агента: {{count}}",
     title_other: "Сбой агентов: {{count}}",
