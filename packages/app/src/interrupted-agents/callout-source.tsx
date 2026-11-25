@@ -9,7 +9,7 @@ import {
   selectInterruptedAgents,
 } from "@/interrupted-agents/select";
 import { useSessionStore } from "@/stores/session-store";
-import { resumeAgents } from "@/utils/resume-agents";
+import { useResumeAgents } from "@/utils/resume-agents";
 
 const CALLOUT_ID = "interrupted-agents";
 
@@ -17,6 +17,7 @@ const CALLOUT_ID = "interrupted-agents";
 export function InterruptedAgentsCalloutSource() {
   const { t } = useTranslation();
   const callouts = useSidebarCallouts();
+  const resumeAgents = useResumeAgents();
   const agents = useSessionStore(useShallow((state) => selectInterruptedAgents(state.sessions)));
 
   const resumeAll = useStableEvent(() => {

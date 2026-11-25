@@ -10,6 +10,10 @@ export const ptBR: TranslationResources = {
     more: "+{{count}} outros",
     resumeAll: "Retomar todos",
   },
+  resumeAgents: {
+    unreached_one: "{{count}} agente não foi reiniciado: {{names}}",
+    unreached_other: "{{count}} agentes não foram reiniciados: {{names}}",
+  },
   failedAgents: {
     title_one: "{{count}} agente falhou",
     title_other: "{{count}} agentes falharam",

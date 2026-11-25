@@ -11,7 +11,7 @@ import { useProviderIcon } from "@/components/provider-icons";
 import { ComposerTrackGroupHeader, ComposerTrackPill, ComposerTrackRow } from "@/composer/tracks";
 import { Button } from "@/components/ui/button";
 import { MenuSeparator } from "@/components/ui/menu";
-import { sendResumePrompt } from "@/utils/resume-agents";
+import { useResumeAgents, type AgentRef } from "@/utils/resume-agents";
 import { mutedIconColorMapping } from "@/components/ui/icon-button-chrome";
 import { ToolbarButton, paneContentToolbarIconSize } from "@/components/ui/pane-content-toolbar";
 import { useIsCompactFormFactor } from "@/constants/layout";
@@ -81,18 +81,15 @@ function archiveStatusScope(status: ArchiveFinishedStatus): ArchiveScope | null 
   return status.kind === "idle" ? null : (status.scope ?? "done");
 }
 
-/** Failed managed children, by host: a retry resumes each one on the daemon that runs it. */
-function retryFailedSubagents(rows: readonly SubagentRow[]): void {
-  const idsByServer = new Map<string, string[]>();
+/** Failed managed children: a retry resumes each one on the daemon that runs it. */
+function failedSubagentRefs(rows: readonly SubagentRow[]): AgentRef[] {
+  const refs: AgentRef[] = [];
   for (const row of rows) {
-    if (row.kind !== "paseo" || row.status !== "error") continue;
-    const ids = idsByServer.get(row.address.serverId) ?? [];
-    ids.push(row.id);
-    idsByServer.set(row.address.serverId, ids);
+    if (row.kind === "paseo" && row.status === "error") {
+      refs.push({ serverId: row.address.serverId, id: row.id });
+    }
   }
-  for (const [rowServerId, ids] of idsByServer) {
-    void sendResumePrompt(rowServerId, ids);
-  }
+  return refs;
 }
 
 export function SubagentsTrack({
@@ -217,7 +214,11 @@ function SubagentGroupHeader({
   const scope: ArchiveScope | null =
     group.key === "failed" || group.key === "done" ? group.key : null;
   const canRetry = group.key === "failed" && group.rows.some((row) => row.kind === "paseo");
-  const handleRetry = useCallback(() => retryFailedSubagents(group.rows), [group.rows]);
+  const resumeAgents = useResumeAgents();
+  const handleRetry = useCallback(
+    () => resumeAgents(failedSubagentRefs(group.rows)),
+    [group.rows, resumeAgents],
+  );
   const handleClear = useCallback(() => {
     if (scope) onArchiveFinished?.(scope);
   }, [onArchiveFinished, scope]);
@@ -310,7 +311,11 @@ function SubagentsTrackRow({
   const handleDetachPress = useCallback(() => {
     if (row.kind === "paseo") onDetachSubagent?.(row.address);
   }, [onDetachSubagent, row]);
-  const handleRetryPress = useCallback(() => retryFailedSubagents([row]), [row]);
+  const resumeAgents = useResumeAgents();
+  const handleRetryPress = useCallback(
+    () => resumeAgents(failedSubagentRefs([row])),
+    [resumeAgents, row],
+  );
   const canRetry = row.kind === "paseo" && row.status === "error";
   const actionsAlwaysVisible = isNative || isCompact;
 

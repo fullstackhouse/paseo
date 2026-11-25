@@ -10,6 +10,10 @@ export const ja: TranslationResources = {
     more: "他 {{count}} 件",
     resumeAll: "すべて再開",
   },
+  resumeAgents: {
+    unreached_one: "{{count}} 件のエージェントを再開できませんでした: {{names}}",
+    unreached_other: "{{count}} 件のエージェントを再開できませんでした: {{names}}",
+  },
   failedAgents: {
     title_one: "{{count}} 件のエージェントが失敗しました",
     title_other: "{{count}} 件のエージェントが失敗しました",

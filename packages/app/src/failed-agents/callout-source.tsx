@@ -17,7 +17,7 @@ import {
 } from "@/failed-agents/select";
 import { formatInterruptedAgentNames } from "@/interrupted-agents/select";
 import { useSessionStore } from "@/stores/session-store";
-import { resumeAgents } from "@/utils/resume-agents";
+import { useResumeAgents } from "@/utils/resume-agents";
 
 const CALLOUT_ID = "failed-agents";
 
@@ -34,6 +34,7 @@ function RetryIcon({ size }: CommandCenterIconProps) {
 export function FailedAgentsCalloutSource() {
   const { t } = useTranslation();
   const callouts = useSidebarCallouts();
+  const resumeAgents = useResumeAgents();
   const agents = useSessionStore(
     useShallow((state) => selectRetryableFailedAgents(state.sessions)),
   );

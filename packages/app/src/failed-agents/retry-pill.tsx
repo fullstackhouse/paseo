@@ -7,7 +7,7 @@ import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { ComposerTrackActions, ComposerTrackPill, ComposerTrackRow } from "@/composer/tracks";
 import { useSessionStore } from "@/stores/session-store";
 import type { Theme } from "@/styles/theme";
-import { sendResumePrompt } from "@/utils/resume-agents";
+import { useResumeAgents } from "@/utils/resume-agents";
 
 const ThemedRotateCcw = withUnistyles(RotateCcw);
 const foregroundColorMapping = (theme: Theme) => ({ color: theme.colors.foreground });
@@ -33,9 +33,10 @@ export const RetryFailedTurnPill = memo(function RetryFailedTurnPill({
   const lastError = useSessionStore(
     (state) => state.sessions[serverId]?.agents.get(agentId)?.lastError ?? null,
   );
+  const resumeAgents = useResumeAgents();
   const handleRetry = useCallback(() => {
-    void sendResumePrompt(serverId, [agentId]);
-  }, [agentId, serverId]);
+    resumeAgents([{ serverId, id: agentId }]);
+  }, [agentId, resumeAgents, serverId]);
   const renderRetryRow = useCallback(
     ({ active }: { active: boolean }) => (
       <>
