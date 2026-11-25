@@ -101,3 +101,5 @@ Map: [spec-overview-in-progress-ui-map.md](./spec-overview-in-progress-ui-map.md
 4. Take it back acts at once, with no confirmation; the row moving into Your move is the feedback (A16).
 5. No placeholder row in Your move while Archive waits; In progress below is the explanation (A17).
 6. The "Nothing is running" warning covers Working cards only (A18).
+7. An ask whose PR merged while in progress reads "merged · waiting on the agent", muted; it turns into "nothing moving" in the warning tone after 10 minutes with no turn running (A19).
+8. Stage 2 approved (A20).

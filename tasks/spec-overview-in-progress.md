@@ -1,6 +1,6 @@
 # Spec: Overview shows work in progress
 
-Status: stage 2 (cards) in progress · 2026-11-25
+Status: design approved (atlas `.ai/prototypes/overview-in-progress/`) · 2026-11-25 · 2026-11-25
 
 Follows [spec-overview-tree.md](spec-overview-tree.md). UI map: [spec-overview-in-progress-ui-map.md](spec-overview-in-progress-ui-map.md).
 
@@ -58,3 +58,4 @@ To be written once the UI map and cards are agreed. Known gaps:
 ## Changelog
 
 - 2026-11-25 — stage 1 UI map drafted; placement options drawn (V1–V3); A4–A11 decided; stage 1 approved (A12).
+- 2026-11-25 — stage 2 cards and mockups approved (A13–A20).
