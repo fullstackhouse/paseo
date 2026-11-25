@@ -247,6 +247,7 @@ paseo plugin ls   # should show "running"
 - [paseo-limits](https://github.com/fullstackhouse/paseo-limits): Retry and Log in buttons on usage-limit, login and connection errors
 - [paseo-prs](https://github.com/fullstackhouse/paseo-prs): composer pills for an agent's PRs, with Create PR when there is none
 - [paseo-inbox](https://github.com/fullstackhouse/paseo-inbox): drafts reviews of the PRs you're asked to review, read and posted from a review screen; idle until you add sources and rules in Settings → Plugins → paseo-inbox
+- [paseo-claude-cloud](https://github.com/fullstackhouse/paseo-claude-cloud): a **Claude (cloud)** provider that runs agents in Anthropic's cloud sandboxes (Managed Agents API), billed at API rates rather than your Claude subscription, with a dollar cap per session; unavailable until you add an Anthropic API key in Settings → Providers → Claude (cloud) → Configure
 
 Agents that already existed when a plugin was installed don't get its MCP tools. Start a new agent.
 
