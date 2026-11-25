@@ -12,8 +12,8 @@ import { useSidebarCallouts } from "@/contexts/sidebar-callout-context";
 import { useStableEvent } from "@/hooks/use-stable-event";
 import {
   failedAgentsDismissalKey,
+  isRetryableFailure,
   selectFailedAgents,
-  selectRetryableFailedAgents,
 } from "@/failed-agents/select";
 import { formatInterruptedAgentNames } from "@/interrupted-agents/select";
 import { useSessionStore } from "@/stores/session-store";
@@ -35,11 +35,8 @@ export function FailedAgentsCalloutSource() {
   const { t } = useTranslation();
   const callouts = useSidebarCallouts();
   const resumeAgents = useResumeAgents();
-  const agents = useSessionStore(
-    useShallow((state) => selectRetryableFailedAgents(state.sessions)),
-  );
-
   const failedAgents = useSessionStore(useShallow((state) => selectFailedAgents(state.sessions)));
+  const agents = useMemo(() => failedAgents.filter(isRetryableFailure), [failedAgents]);
 
   const retryAll = useStableEvent(() => {
     callouts.dismiss(CALLOUT_ID);
