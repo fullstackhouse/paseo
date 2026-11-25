@@ -28,8 +28,8 @@ Map: [spec-overview-in-progress-ui-map.md](./spec-overview-in-progress-ui-map.md
   its title, what it waits on and its age; PR asks take the word from the PR ("CI running", "review
   requested", "merged"), other asks the agent's own "waits on" line, otherwise only the age (A7). An ask
   that nothing moves (no running turn of its agent, no live background job, no watched open PR) shows
-  "nothing moving" in the warning tone (A8). Order: asks with nothing moving them, then agents, then the
-  other asks oldest first. Five rows show, then "Show all (N)".
+  "nothing moving" in the warning tone (A8). Order: oldest first across all kinds, by when the agent
+  started the turn or took the ask (A13). Five rows show, then "Show all (N)".
 - **Get here.** Overview tab, after Your move.
 - **Shows.** Section label "In progress" with the row count; agent rows ("Billing track lead · working ·
   3m"), indented subagent and background lines, ask rows ("PR #2104 — invoices list · CI running · 20m").
@@ -92,3 +92,7 @@ Map: [spec-overview-in-progress-ui-map.md](./spec-overview-in-progress-ui-map.md
   card with only a background job live (age only, no warning); done card (age only).
 - **Edge cases.** No status card → nothing changes: the state word comes from the agents, with no age. A
   card updated under a minute ago reads "updated just now".
+
+## Decisions (cards, 2026-11-25)
+
+1. In progress rows go oldest first across all kinds (A13).
