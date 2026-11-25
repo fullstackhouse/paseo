@@ -11,15 +11,10 @@ import { AssistantFileLinkResolverProvider } from "./provider";
 import type { DirectorySuggestionResult } from "./resolver";
 import { useFileLink } from "./use-file-link";
 import type { OpenFileDisposition } from "@/workspace/file-open";
-import { openExternalUrl } from "@/utils/open-external-url";
-import { openPaseoAppLink } from "@/utils/open-paseo-app-link";
-
-vi.mock("@/utils/open-external-url", () => ({
-  openExternalUrl: vi.fn(async () => {}),
-}));
+import { openUrlOrPaseoAppLink } from "@/utils/open-paseo-app-link";
 
 vi.mock("@/utils/open-paseo-app-link", () => ({
-  openPaseoAppLink: vi.fn(),
+  openUrlOrPaseoAppLink: vi.fn(async () => {}),
 }));
 
 const SOURCE = {
@@ -341,13 +336,8 @@ describe("useFileLink", () => {
       result.current.onPress();
     });
     await waitFor(() => {
-      expect(openPaseoAppLink).toHaveBeenCalledWith({
-        kind: "workspace",
-        serverId: "srv_1",
-        workspaceId: "wks_abc",
-      });
+      expect(openUrlOrPaseoAppLink).toHaveBeenCalledWith("paseo://h/srv_1/workspace/wks_abc");
     });
-    expect(openExternalUrl).not.toHaveBeenCalled();
     expect(getDirectorySuggestions).not.toHaveBeenCalled();
   });
 
