@@ -286,6 +286,8 @@ export interface PluginWorkspaceInProgressEntry {
   agentId?: string;
   /** True while something outside the agent will report back, such as a watched open PR. */
   watched?: boolean;
+  /** True while a watched entry waits on a person's review rather than on machines (checks, a merge). */
+  waitingOnReview?: boolean;
   /** When it last changed, epoch ms: the row's age and its sort key. */
   updatedAt: number;
 }

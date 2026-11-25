@@ -273,6 +273,28 @@ describe("WorkspaceSummaryStore", () => {
     expect(store.forWorkspace("s", "w")[0]?.inProgress).toEqual([]);
   });
 
+  it("keeps waitingOnReview only on a watched entry", () => {
+    const store = new WorkspaceSummaryStore();
+    store.add(owner, {
+      id: "asks",
+      workspaceId: "w",
+      title: "Asks",
+      inProgress: [
+        { id: "A1", title: "Review", watched: true, waitingOnReview: true, updatedAt: 1 },
+        { id: "A2", title: "Checks", watched: true, waitingOnReview: false, updatedAt: 1 },
+        { id: "A3", title: "Unwatched", waitingOnReview: true, updatedAt: 1 },
+        // @ts-expect-error a plugin can send anything
+        { id: "A4", title: "Odd", watched: true, waitingOnReview: "yes", updatedAt: 1 },
+      ],
+    });
+    expect(store.forWorkspace("s", "w")[0]?.inProgress).toEqual([
+      { id: "A1", title: "Review", watched: true, waitingOnReview: true, updatedAt: 1 },
+      { id: "A2", title: "Checks", watched: true, updatedAt: 1 },
+      { id: "A3", title: "Unwatched", updatedAt: 1 },
+      { id: "A4", title: "Odd", watched: true, updatedAt: 1 },
+    ]);
+  });
+
   it("keeps the entry component across updates", () => {
     const store = new WorkspaceSummaryStore();
     const EntryComponent = () => null;
