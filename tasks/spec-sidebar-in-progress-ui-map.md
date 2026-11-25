@@ -55,6 +55,13 @@ Views: V1 Working, V2 Blocked, V3 Stays in Ready to review.
 - The row's hover card names what each in-progress item waits on.
 - Automatic hand-back of stuck asks (its own spec).
 
+## Decisions (stage 1, 2026-11-25)
+
+1. Group by what the in-progress work waits on (A27): on machines (CI checks running, a live background job,
+   a running turn) → **Working**; only on a person other than you (a requested review) → **Blocked**. Mixed
+   → Working, as the existing fold ranks working work above blocked. V1 and V2 are both kept, each for its
+   case; V3 is dropped.
+
 ## Open questions
 
-See the stage 1 asks.
+See the stage 1 asks (A28–A30).
