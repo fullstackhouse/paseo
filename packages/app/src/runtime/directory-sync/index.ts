@@ -676,6 +676,11 @@ export class DirectorySync {
     this.checkpoints?.commitDirectoryMutations(this.serverId, mutations);
   }
 
+  patchWorkspace(workspaceId: string, patch: Partial<WorkspaceDescriptor>): void {
+    const mutations = this.workspaces.patchWorkspace(workspaceId, patch);
+    this.checkpoints?.commitDirectoryMutations(this.serverId, mutations);
+  }
+
   archiveAgent(agentId: string, archivedAt: string): void {
     this.agents.archive(agentId, archivedAt);
   }

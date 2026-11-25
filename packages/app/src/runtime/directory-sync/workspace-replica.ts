@@ -90,6 +90,19 @@ export class WorkspaceDirectoryReplica {
     });
   }
 
+  /**
+   * Applies a mutation's response to a row the directory already holds, so the change shows before
+   * the daemon's workspace update lands. That update still wins when it arrives.
+   */
+  patchWorkspace(
+    workspaceId: string,
+    patch: Partial<WorkspaceDescriptor>,
+  ): DirectoryReplicaMutation[] {
+    const existing = this.workspaces.get(workspaceId);
+    if (!existing) return [];
+    return this.upsertWorkspace({ ...existing, ...patch });
+  }
+
   acceptProject(project: ProjectDescriptor): DirectoryReplicaMutation[] {
     this.setProject(project);
     return [{ kind: "project", type: "upsert", id: project.projectId, value: project }];

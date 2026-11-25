@@ -418,3 +418,21 @@ it("restores a missing workspace after an archive failure without replacing a li
     store.clearSession(serverId);
   }
 });
+
+it("patches a known workspace in place and ignores unknown ones", () => {
+  const serverId = "workspace-replica-patch";
+  useSessionStore.getState().initializeSession(serverId, null as unknown as DaemonClient);
+  const replica = new WorkspaceDirectoryReplica(serverId);
+  replica.applyDelta({ kind: "upsert", workspace: workspace("moved") });
+
+  const manualGroup = { group: "blocked" as const, setAt: "2026-11-25T09:55:53.000Z" };
+  const mutations = replica.patchWorkspace("moved", { manualGroup });
+
+  expect(mutations).toHaveLength(1);
+  expect(
+    useSessionStore.getState().sessions[serverId]?.workspaces.get("moved")?.manualGroup,
+  ).toEqual(manualGroup);
+  expect(replica.snapshot().workspaces.get("moved")?.manualGroup).toEqual(manualGroup);
+  expect(replica.patchWorkspace("missing", { manualGroup })).toEqual([]);
+  expect(useSessionStore.getState().sessions[serverId]?.workspaces.has("missing")).toBe(false);
+});
