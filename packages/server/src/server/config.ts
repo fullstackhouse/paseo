@@ -843,7 +843,7 @@ function resolveSpeechOverrideControlledPaths(
 
 function resolveRestartRecoveryConfig(agents: PersistedConfig["agents"]) {
   return {
-    resumeOnStartup: agents?.resumeOnStartup ?? false,
+    resumeOnStartup: agents?.resumeOnStartup ?? true,
     resumePrompt: agents?.resumePrompt ?? "Resume working.",
   };
 }
