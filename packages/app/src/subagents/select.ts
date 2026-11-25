@@ -9,6 +9,13 @@ import { refreshProviderSubagents, useProviderSubagentStore } from "./provider-s
 import type { ProviderSubagentDescriptorPayload } from "@getpaseo/protocol/messages";
 import { isFinishedSubagent } from "./archive-finished";
 
+export interface SubagentWork {
+  /** Time in finished runs. */
+  workedMs: number;
+  /** When the open run started, or null while the child is not running. */
+  runStartedAt: Date | null;
+}
+
 export interface PaseoSubagentRow {
   kind: "paseo";
   address: AgentAddress;
@@ -21,6 +28,8 @@ export interface PaseoSubagentRow {
   status: Agent["status"];
   backgroundWork?: Agent["backgroundWork"];
   turn: Agent["turn"];
+  /** Null when the host doesn't record it. */
+  work: SubagentWork | null;
   requiresAttention: Agent["requiresAttention"];
   createdAt: Agent["createdAt"];
 }
@@ -38,6 +47,8 @@ export interface ProviderSubagentRow {
   /** Compact provider-owned context. The app displays it without interpreting its contents. */
   subtitle: string | null;
   status: ProviderSubagentDescriptorPayload["status"];
+  /** Null when the host doesn't record it. */
+  work: SubagentWork | null;
   requiresAttention: boolean;
   createdAt: Date;
 }
@@ -66,6 +77,19 @@ interface SelectSubagentsParams {
 const EMPTY_SUBAGENT_ROWS: SubagentRow[] = [];
 const EMPTY_PROVIDER_SUBAGENT_ROWS: ProviderSubagentRow[] = [];
 
+function paseoSubagentWork({ workedMs, turn }: Agent): SubagentWork | null {
+  if (workedMs === undefined) return null;
+  return { workedMs, runStartedAt: turn.phase === "open" ? turn.startedAt : null };
+}
+
+function providerSubagentWork({
+  workedMs,
+  runStartedAt,
+}: ProviderSubagentDescriptorPayload): SubagentWork | null {
+  if (workedMs === undefined) return null;
+  return { workedMs, runStartedAt: runStartedAt ? new Date(runStartedAt) : null };
+}
+
 function toSubagentRow(agent: Agent): SubagentRow {
   return {
     kind: "paseo",
@@ -78,6 +102,7 @@ function toSubagentRow(agent: Agent): SubagentRow {
     status: agent.status,
     backgroundWork: agent.backgroundWork,
     turn: agent.turn,
+    work: paseoSubagentWork(agent),
     requiresAttention: agent.requiresAttention,
     createdAt: agent.createdAt,
   };
@@ -173,6 +198,7 @@ export function selectProviderSubagentsForParent(
       description: subagent.description,
       subtitle: subagent.subtitle ?? null,
       status: subagent.status,
+      work: providerSubagentWork(subagent),
       requiresAttention: subagent.status === "failed",
       createdAt: new Date(subagent.createdAt),
     });

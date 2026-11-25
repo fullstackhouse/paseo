@@ -84,6 +84,8 @@ export interface Agent {
   status: AgentLifecycleStatus;
   backgroundWork?: AgentBackgroundWorkSummary;
   turn: TurnLiveness;
+  /** Time in finished turns; absent from hosts that don't record it. */
+  workedMs?: number;
   createdAt: Date;
   updatedAt: Date;
   lastUserMessageAt: Date | null;

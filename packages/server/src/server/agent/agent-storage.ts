@@ -55,6 +55,7 @@ const RAW_STORED_AGENT_SCHEMA = z.object({
   updatedAt: z.string(),
   lastActivityAt: z.string().optional(),
   lastUserMessageAt: z.string().nullable().optional(),
+  workedMs: z.number().optional(),
   title: z.string().nullable().optional(),
   labels: z.record(z.string(), z.string()).default({}),
   metadata: z.record(z.string(), z.custom<JsonValue>()).default({}),

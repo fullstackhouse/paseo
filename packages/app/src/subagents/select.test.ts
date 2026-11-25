@@ -420,6 +420,54 @@ describe("selectSubagentsForParent", () => {
     expect(rows.map((row) => row.id)).toEqual(["lane-b", "lane-a", "lane-c"]);
   });
 
+  it("carries the work a host records, and none from a host that doesn't", () => {
+    const startedAt = new Date("2026-03-08T10:07:00.000Z");
+    setAgents([
+      makeAgent({ id: "parent" }),
+      makeAgent({ id: "old-host", parentAgentId: "parent" }),
+      makeAgent({
+        id: "running",
+        parentAgentId: "parent",
+        status: "running",
+        turn: { phase: "open", turnId: "turn-1", startedAt, cancellationRequestId: null },
+        workedMs: 60_000,
+      }),
+    ]);
+    useProviderSubagentStore.getState().applyUpdate(SERVER_ID, {
+      kind: "upsert",
+      subagent: {
+        id: "provider-child",
+        parentAgentId: "parent",
+        provider: "claude",
+        title: "general-purpose",
+        description: null,
+        status: "running",
+        createdAt: "2026-03-08T10:00:00.000Z",
+        updatedAt: "2026-03-08T10:07:00.000Z",
+        toolCallId: null,
+        workedMs: 120_000,
+        runStartedAt: startedAt.toISOString(),
+      },
+    });
+
+    const managed = selectSubagentsForParent(
+      useSessionStore.getState(),
+      { serverId: SERVER_ID, parentAgentId: "parent" },
+      EMPTY_PENDING_ARCHIVE_IDS,
+    );
+    const provider = selectProviderSubagentsForParent(
+      useProviderSubagentStore.getState(),
+      { serverId: SERVER_ID, parentAgentId: "parent" },
+      true,
+    );
+
+    expect(Object.fromEntries([...managed, ...provider].map((row) => [row.id, row.work]))).toEqual({
+      "old-host": null,
+      running: { workedMs: 60_000, runStartedAt: startedAt },
+      "provider-child": { workedMs: 120_000, runStartedAt: startedAt },
+    });
+  });
+
   it("maps only row-rendered fields and does not expose onOpen", () => {
     const createdAt = new Date("2026-03-08T10:01:00.000Z");
     setAgents([
@@ -459,6 +507,7 @@ describe("selectSubagentsForParent", () => {
         status: "running",
         backgroundWork: { count: 1 },
         turn: { phase: "idle", cancellationRequestId: null },
+        work: null,
         requiresAttention: true,
         createdAt,
       },
@@ -476,6 +525,7 @@ describe("selectSubagentsForParent", () => {
       "subtitle",
       "title",
       "turn",
+      "work",
     ]);
     expect(rows[0]).not.toHaveProperty("onOpen");
     expect(rows[0]).not.toHaveProperty("model");
