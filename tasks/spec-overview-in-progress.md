@@ -38,10 +38,13 @@ elsewhere: [UI map → Baseline](spec-overview-in-progress-ui-map.md#baseline).
 
 To be written once the UI map and cards are agreed. Known gaps:
 
-- In-progress asks carry no "waits on" field; paseo-asks has the PR state for PR asks only.
+- **Waits on (A7).** paseo-asks gains an optional `waitingOn` string on an ask, set by the agent with
+  `ask_update(status: "in_progress", waitingOn: "…")` and cleared when the ask leaves in progress; the
+  agent instructions get one line asking for it. PR asks derive the word from the PR state the plugin
+  already polls. The workspace summary item carries in-progress entries with that word.
 - Provider subagents and background shells are visible to the host as `isRunning` without a list of
   what runs (`workspace-attention/model.ts`, `subagents/track.tsx`).
 
 ## Changelog
 
-- 2026-11-25 — stage 1 UI map drafted.
+- 2026-11-25 — stage 1 UI map drafted; placement options drawn (V1–V3); A4–A7 decided.

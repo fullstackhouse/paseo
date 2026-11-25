@@ -97,7 +97,10 @@ Views: V1 Own section, V2 Inside Status, V3 Under Your move.
    counted lines (A6).
 3. Placement: its own "In progress" section directly after Your move (V1). V2 and V3 are dropped; O4
    takes V1's anatomy (A4).
+4. An in-progress ask says what it waits on: PR facts from paseo-asks for PR asks ("CI running",
+   "review requested"), a one-line "waits on" the agent sets when it takes any other ask; with neither,
+   its age only (A7).
 
 ## Open questions
 
-See the stage 1 asks (A7–A11).
+See the stage 1 asks (A8–A11).
