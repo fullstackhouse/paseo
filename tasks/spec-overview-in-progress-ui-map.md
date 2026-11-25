@@ -47,6 +47,9 @@ flowchart TD
   O1[O1 Overview tab] --> E2[E2 Status]
   O1 --> E1[E1 Your move]
   O1 --> O4[O4 In progress]
+  O4 -.placement options.-> V1[V1 Own section]
+  O4 -.-> V2[V2 Inside Status]
+  O4 -.-> V3[V3 Under Your move]
   O4 -->|agent row| AG[Agent tab]
   O4 -->|subagent row| SUB[Subagent sheet or tab]
   O4 -->|background row| AGB[Owning agent tab]
@@ -65,6 +68,13 @@ flowchart TD
 - **O5 In-progress ask** (P1, expanded row on O4) — the ask's title and body, read-only, with what it
   waits on, when the agent took it and when it last moved. Get here: an ask row on O4. Permission: none.
 
+## V — Placement options (A4)
+
+Three ways to place in-progress work on Overview, drawn on the same workspaces so they compare
+directly. One is chosen in A4; the others are dropped, and O4 takes the winner's anatomy.
+
+Views: V1 Own section, V2 Inside Status, V3 Under Your move.
+
 ## E — Existing screens
 
 - **E1 Your move** (P1) — changed: "Archive waits for background work" leaves (O4 shows that work);
@@ -79,6 +89,13 @@ flowchart TD
 - Sidebar grouping: a workspace whose only open items are in progress and backed shows as Working, not
   Ready to review.
 
+## Decisions (stage 1, 2026-11-25)
+
+1. In progress lists all four kinds: agents with a running turn, their subagents, background work an
+   idle agent left running, and asks in progress (A5).
+2. Grouped: one row per agent and per ask; each agent's subagents and background work fold under it as
+   counted lines (A6).
+
 ## Open questions
 
-See the stage 1 asks.
+See the stage 1 asks (A4, A7–A11).
