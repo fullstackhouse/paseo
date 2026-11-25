@@ -1,3 +1,4 @@
+import { useCallback } from "react";
 import { useFetchQuery } from "@/data/query";
 import { getFshTestBuilds, type FshTestBuildsInfo } from "@/desktop/updates/fsh-test-builds";
 import { shouldShowDesktopUpdateSection } from "@/desktop/updates/desktop-updates";
@@ -22,9 +23,8 @@ export function useFshTestBuilds(): {
     refetchOnMount: true,
     refetchInterval: REFETCH_MS,
   });
-  return {
-    info: query.data ?? null,
-    isLoading: query.isFetching,
-    refetch: () => void query.refetch(),
-  };
+  const { refetch: refetchQuery } = query;
+  // Stable, so a focus effect that depends on it runs once per focus, not on every render.
+  const refetch = useCallback(() => void refetchQuery(), [refetchQuery]);
+  return { info: query.data ?? null, isLoading: query.isFetching, refetch };
 }
