@@ -65,3 +65,12 @@ export async function expectRetryFailedAgentsInCommandCenter(
   await expect(panel.getByText(`Retry failed agents (${count})`)).toBeVisible();
   await closeCommandCenter(page);
 }
+
+/** Runs Retry failed agents from the command palette, checking its count first. */
+export async function retryFailedAgentsFromCommandCenter(page: Page, count: number): Promise<void> {
+  const panel = await openCommandCenter(page);
+  await page.keyboard.type("retry failed");
+  const entry = panel.getByText(`Retry failed agents (${count})`);
+  await expect(entry).toBeVisible();
+  await entry.click();
+}

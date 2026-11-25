@@ -1,4 +1,4 @@
-// FSH fork: agents whose turn failed on a network or provider outage, offered for retry together.
+// FSH fork: failed agents, offered for retry together. Outage failures alone back the sidebar callout.
 import { classifyAgentError } from "@getpaseo/protocol/agent-error-kind";
 import type { Agent } from "@/stores/session-store";
 
@@ -7,22 +7,37 @@ type FailedCandidate = Pick<
   "serverId" | "id" | "status" | "lastError" | "archivedAt" | "updatedAt"
 >;
 
-/** A usage limit or a broken prompt fails again on retry, so only outages count. */
-export function isRetryableFailure(agent: FailedCandidate): boolean {
-  if (agent.status !== "error" || agent.archivedAt) return false;
-  return classifyAgentError(agent.lastError) === "transient";
+type Sessions<T> = Record<string, { agents: ReadonlyMap<string, T> }>;
+
+export function isFailedAgent(agent: FailedCandidate): boolean {
+  return agent.status === "error" && !agent.archivedAt;
 }
 
-export function selectRetryableFailedAgents<T extends FailedCandidate>(
-  sessions: Record<string, { agents: ReadonlyMap<string, T> }>,
+/** A usage limit or a broken prompt fails again on retry, so the callout offers only outages. */
+export function isRetryableFailure(agent: FailedCandidate): boolean {
+  return isFailedAgent(agent) && classifyAgentError(agent.lastError) === "transient";
+}
+
+function selectAgents<T extends FailedCandidate>(
+  sessions: Sessions<T>,
+  matches: (agent: T) => boolean,
 ): T[] {
   const result: T[] = [];
   for (const session of Object.values(sessions)) {
     for (const agent of session.agents.values()) {
-      if (isRetryableFailure(agent)) result.push(agent);
+      if (matches(agent)) result.push(agent);
     }
   }
   return result;
+}
+
+export function selectRetryableFailedAgents<T extends FailedCandidate>(sessions: Sessions<T>): T[] {
+  return selectAgents(sessions, isRetryableFailure);
+}
+
+/** Every failed agent, whatever the error: the palette retries them on request, e.g. after a usage limit resets. */
+export function selectFailedAgents<T extends FailedCandidate>(sessions: Sessions<T>): T[] {
+  return selectAgents(sessions, isFailedAgent);
 }
 
 /** Changes when any of them fails again, so dismissing one outage's callout doesn't hide the next. */

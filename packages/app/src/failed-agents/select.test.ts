@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   failedAgentsDismissalKey,
   isRetryableFailure,
+  selectFailedAgents,
   selectRetryableFailedAgents,
 } from "./select";
 
@@ -53,6 +54,25 @@ describe("selectRetryableFailedAgents", () => {
       two: { agents: new Map([["c", { ...agent("c"), serverId: "two" }]]) },
     });
     expect(selected.map((a) => a.id)).toEqual(["a", "c"]);
+  });
+});
+
+describe("selectFailedAgents", () => {
+  it("collects every failed agent across hosts, usage limits included", () => {
+    const selected = selectFailedAgents({
+      one: {
+        agents: new Map([
+          ["outage", agent("outage")],
+          ["limit", agent("limit", { lastError: "You've hit your limit" })],
+          ["idle", agent("idle", { status: "idle" })],
+          ["archived", agent("archived", { archivedAt: new Date(2000) })],
+        ]),
+      },
+      two: {
+        agents: new Map([["other", { ...agent("other", { lastError: null }), serverId: "two" }]]),
+      },
+    });
+    expect(selected.map((a) => a.id)).toEqual(["outage", "limit", "other"]);
   });
 });
 
