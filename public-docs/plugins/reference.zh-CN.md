@@ -277,7 +277,7 @@ export async function openDocumentation() {
 
 请直接在用户交互中调用该函数，以便浏览器允许打开新标签页。
 
-两者也接受 Paseo 应用链接。`paseo://h/<server>/workspace/<id>` 和 `paseo://h/<server>/agent/<id>` 会在应用内打开对应的工作区或 agent，而不是交给操作系统打开。已归档的工作区会显示其恢复状态。
+两者也接受 Paseo 应用链接。`paseo://h/<server>/workspace/<id>` 和 `paseo://h/<server>/agent/<id>` 会在应用内打开对应的工作区或 Agent，而不是交给操作系统打开。已归档的工作区会显示其恢复状态。
 
 | 平台          | 外部链接                            | `navigation.openBrowser`             |
 | ------------- | ----------------------------------- | ------------------------------------ |

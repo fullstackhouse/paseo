@@ -6,8 +6,11 @@ import { ExternalLink } from "./external-link";
 
 const mounted: { root: Root; container: HTMLDivElement }[] = [];
 
-// Navigation itself needs the app router, which this test does not mount.
-function ignoreNavigationError() {}
+const openErrors: unknown[] = [];
+
+function recordOpenError(error: unknown) {
+  openErrors.push(error);
+}
 
 function RecoveryRequested({ serverId, workspaceId }: { serverId: string; workspaceId: string }) {
   const requested = useWorkspaceRecoveryRequestedFromLink(serverId, workspaceId);
@@ -24,6 +27,7 @@ function mount(node: React.ReactNode): HTMLDivElement {
 }
 
 afterEach(() => {
+  openErrors.length = 0;
   for (const { root, container } of mounted.splice(0)) {
     act(() => root.unmount());
     container.remove();
@@ -37,7 +41,7 @@ describe("ExternalLink", () => {
         <ExternalLink
           href="paseo://h/srv_link/workspace/wks_link"
           label="Workspace"
-          onError={ignoreNavigationError}
+          onError={recordOpenError}
         />
         <RecoveryRequested serverId="srv_link" workspaceId="wks_link" />
       </>,
@@ -48,5 +52,6 @@ describe("ExternalLink", () => {
     await act(async () => link.click());
 
     expect(container.querySelector('[data-testid="requested"]')?.textContent).toBe("true");
+    expect(openErrors).toEqual([]);
   });
 });
