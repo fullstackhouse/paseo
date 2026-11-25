@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 import type { ProviderSnapshotEntry } from "@getpaseo/protocol/agent-types";
 import type { ProviderInstallationState } from "@/components/provider-installation-section";
-import { readDetailPresence, readDetailSections, readShownInstallation } from "./detail-sections";
+import {
+  readDetailPresence,
+  readDetailSections,
+  readPluginSettingsScreen,
+  readShownInstallation,
+} from "./detail-sections";
 
 function entry(overrides: Partial<ProviderSnapshotEntry> = {}): ProviderSnapshotEntry {
   return {
@@ -245,5 +250,31 @@ describe("provider detail presence", () => {
         removing: null,
       }),
     ).toEqual({ kind: "failed", message: "Request timed out" });
+  });
+});
+
+describe("plugin provider settings link", () => {
+  const screen = { pluginId: "cloud-plugin", screenId: "cloud-settings" };
+
+  it("links to the screen once the plugin has registered it", () => {
+    expect(
+      readPluginSettingsScreen(
+        { settingsScreen: screen },
+        { settingsScreens: [{ id: "cloud-settings" }] },
+      ),
+    ).toEqual(screen);
+  });
+
+  it("hides the link until the plugin registers the named screen", () => {
+    expect(
+      readPluginSettingsScreen({ settingsScreen: screen }, { settingsScreens: [] }),
+    ).toBeNull();
+    expect(readPluginSettingsScreen({ settingsScreen: screen }, null)).toBeNull();
+  });
+
+  it("has no link for a provider that names no screen", () => {
+    expect(
+      readPluginSettingsScreen({}, { settingsScreens: [{ id: "cloud-settings" }] }),
+    ).toBeNull();
   });
 });

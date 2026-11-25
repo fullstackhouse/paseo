@@ -1,4 +1,5 @@
 import { useCallback, useState } from "react";
+import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { View } from "react-native";
 import { ProviderInstallationSection } from "@/components/provider-installation-section";
@@ -15,11 +16,14 @@ import { Button } from "@/components/ui/button";
 import { readAcpProviderInstallGuide } from "@/hooks/use-acp-provider-catalog";
 import { useProvidersSnapshot } from "@/hooks/use-providers-snapshot";
 import { useTimeAgo } from "@/hooks/use-time-ago";
+import { useInstalledPlugin } from "@/plugins/registry";
+import { buildPluginSettingsRoute } from "@/plugins/settings/routes";
 import { useHostRuntimeIsConnected } from "@/runtime/host-runtime";
 import { settingsStyles } from "@/styles/settings";
 import {
   readDetailPresence,
   readDetailSections,
+  readPluginSettingsScreen,
   readShownInstallation,
   type DetailPresence,
 } from "./detail-sections";
@@ -111,6 +115,7 @@ export function ProviderDetail({
     <View testID="provider-detail">
       {sections.error !== null ? <ProviderErrorAlert label={label} error={sections.error} /> : null}
       <EnabledCard serverId={serverId} entry={entry} />
+      <PluginSettingsCard serverId={serverId} entry={entry} label={label} />
       <ProviderInstallationSection
         state={shownInstallation}
         updates={installation.updates}
@@ -173,6 +178,36 @@ function EnabledCard({ serverId, entry }: { serverId: string; entry: ProviderEnt
           value={entry.enabled}
           onValueChange={handleChange}
           disabled={togglingProviderId === entry.provider}
+        />
+      </SettingsCard>
+    </View>
+  );
+}
+
+/** FSH: a plugin provider's own settings screen, named by its registration's `settingsScreen`. */
+function PluginSettingsCard({
+  serverId,
+  entry,
+  label,
+}: {
+  serverId: string;
+  entry: ProviderEntry;
+  label: string;
+}) {
+  const { t } = useTranslation();
+  const plugin = useInstalledPlugin(serverId, entry.settingsScreen?.pluginId ?? "");
+  const screen = readPluginSettingsScreen(entry, plugin);
+  const open = useCallback(() => {
+    if (screen) router.push(buildPluginSettingsRoute(serverId, screen.pluginId, screen.screenId));
+  }, [screen, serverId]);
+  if (!screen) return null;
+  return (
+    <View style={settingsStyles.section}>
+      <SettingsCard>
+        <SettingsDetailRow
+          label={t("settings.providers.actions.configureProvider", { name: label })}
+          onPress={open}
+          testID={`provider-configure-${entry.provider}`}
         />
       </SettingsCard>
     </View>

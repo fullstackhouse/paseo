@@ -6,6 +6,7 @@ import type {
   AgentTaskItem,
   JsonValue,
   ProviderOptions,
+  ProviderSettingsScreen,
   ToolPolicy,
 } from "@getpaseo/protocol/agent-types";
 import type { AgentMessage } from "@getpaseo/protocol/agent-message";
@@ -150,6 +151,8 @@ export interface ProviderSnapshotEntry {
   iconSvg?: string;
   defaultModeId?: string | null;
   supportsPlanApproval?: boolean;
+  /** Plugin settings screen that configures this provider. */
+  settingsScreen?: ProviderSettingsScreen;
 }
 
 export interface AgentCreateConfigParent {

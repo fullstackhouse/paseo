@@ -3470,6 +3470,8 @@ export const es: TranslationResources = {
       updateErrorTitle: "No se puede actualizar el proveedor",
       actions: {
         menu: "{{name}} actions",
+        configure: "Configurar",
+        configureProvider: "Configurar {{name}}",
         remove: "Remove provider",
         removing: "Removing...",
       },

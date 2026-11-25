@@ -3362,6 +3362,8 @@ export const zhCN: TranslationResources = {
       updateErrorTitle: "无法更新 Provider",
       actions: {
         menu: "{{name}} actions",
+        configure: "配置",
+        configureProvider: "配置 {{name}}",
         remove: "Remove provider",
         removing: "Removing...",
       },

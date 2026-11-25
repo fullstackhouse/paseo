@@ -3452,6 +3452,8 @@ export const ptBR: TranslationResources = {
       updateErrorTitle: "Não foi possível atualizar provedor",
       actions: {
         menu: "{{name}} actions",
+        configure: "Configurar",
+        configureProvider: "Configurar {{name}}",
         remove: "Remove provider",
         removing: "Removing...",
       },

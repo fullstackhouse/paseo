@@ -49,8 +49,7 @@ import {
   type AgentConfigurationValidationInput,
   validateAgentConfigurationAgainstProvider,
 } from "./agent-configuration-validator.js";
-import type { ProviderRegistration } from "@getpaseo/plugin/server/provider";
-import { PluginAgentClientRegistry } from "./plugin-provider.js";
+import { PluginAgentClientRegistry, type PluginProviderRegistration } from "./plugin-provider.js";
 import { convertLegacyClaudeUltracode, resolveAdapter } from "./option-controls.js";
 import { ProviderInstallations } from "./provider-installation/provider-installations.js";
 
@@ -413,7 +412,7 @@ export class ProviderSnapshotManager {
   }
 
   replacePluginProviders(
-    registrations: readonly ProviderRegistration[],
+    registrations: readonly PluginProviderRegistration[],
   ): AgentManagerProviderState {
     for (const registration of registrations) {
       if (BUILTIN_PROVIDER_IDS.includes(registration.id) || this.extraClients[registration.id]) {
@@ -889,6 +888,7 @@ export class ProviderSnapshotManager {
           iconSvg: definition.iconSvg,
           defaultModeId: definition.defaultModeId ?? null,
           ...(definition.supportsPlanApproval ? { supportsPlanApproval: true } : {}),
+          ...(definition.settingsScreen ? { settingsScreen: definition.settingsScreen } : {}),
         }),
       });
     }

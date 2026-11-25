@@ -517,6 +517,11 @@ reuses a `current` or `available` answer for up to an hour while `inspect` repor
 shapes is an error. **Update** appears once `inspect` reports the CLI installed and you declare
 `update`, whatever `checkForUpdates` answers and whether you declare it; without `update`, Paseo
 offers `updateUrl` on the same terms.
+`ProviderRegistration.settingsScreen` is the `id` of one of your own
+[settings screens](#settings-screens). The provider's row in **Settings → Providers** then shows a
+**Configure** button that opens it, so a provider that needs an API key or a limit sends users to
+where they set it. The button appears once the client has registered that screen; hosts released
+before this field ignore it.
 
 ### Usage sources
 

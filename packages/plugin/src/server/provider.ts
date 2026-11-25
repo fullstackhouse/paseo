@@ -41,6 +41,8 @@ export interface ProviderRegistration {
   icon?: string;
   /** How users install the provider's CLI and which version they run. Every member is optional. */
   installation?: ProviderInstallation;
+  /** ID of this plugin's settings screen that configures the provider; Settings → Providers links to it. */
+  settingsScreen?: string;
   connect(request: ProviderConnectRequest): Promise<ProviderConnection>;
 }
 

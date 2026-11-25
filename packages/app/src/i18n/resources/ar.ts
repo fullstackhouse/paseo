@@ -3435,6 +3435,8 @@ export const ar: TranslationResources = {
       updateErrorTitle: "غير قادر على تحديث الموفر",
       actions: {
         menu: "{{name}} actions",
+        configure: "إعداد",
+        configureProvider: "إعداد {{name}}",
         remove: "Remove provider",
         removing: "Removing...",
       },

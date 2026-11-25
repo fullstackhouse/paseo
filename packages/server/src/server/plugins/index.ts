@@ -3,7 +3,8 @@ import type { PluginLifecycle } from "./lifecycle/index.js";
 import path from "node:path";
 import { stat, rm } from "node:fs/promises";
 import type pino from "pino";
-import type { ProviderInstallation, ProviderRegistration } from "@getpaseo/plugin/server/provider";
+import type { ProviderInstallation } from "@getpaseo/plugin/server/provider";
+import type { PluginProviderRegistration } from "../agent/plugin-provider.js";
 import {
   PluginIdSchema,
   type PluginLogEntry,
@@ -103,7 +104,7 @@ export class PluginService {
   private readonly logger: pino.Logger;
   private readonly errors = new Map<string, string>();
   private readonly listeners = new Set<(pluginId: string) => void>();
-  private readonly providers = new Map<string, ProviderRegistration>();
+  private readonly providers = new Map<string, PluginProviderRegistration>();
   private readonly usageSources: UsageSourceRegistry;
   private readonly usageSourceIdsByPlugin = new Map<string, string[]>();
   private readonly providerIdsByPlugin = new Map<string, readonly string[]>();
@@ -235,7 +236,7 @@ export class PluginService {
     this.runtime.bindPaseoSessionHost(sessionHost);
   }
 
-  getProviderRegistrations(): readonly ProviderRegistration[] {
+  getProviderRegistrations(): readonly PluginProviderRegistration[] {
     return [...this.providers.values()].sort((left, right) => left.id.localeCompare(right.id));
   }
 
@@ -769,10 +770,12 @@ export class PluginService {
     }
     const registrations = await Promise.all(
       metadata.map(
-        async (provider): Promise<ProviderRegistration> => ({
+        async (provider): Promise<PluginProviderRegistration> => ({
           id: provider.id,
+          pluginId,
           label: provider.label,
           description: provider.description,
+          settingsScreen: provider.settingsScreen,
           command: provider.command,
           requiresConfiguration: provider.requiresConfiguration,
           status: provider.hasStatus

@@ -3439,6 +3439,8 @@ export const ja: TranslationResources = {
       updateErrorTitle: "プロバイダーを更新できません",
       actions: {
         menu: "{{name}} actions",
+        configure: "設定",
+        configureProvider: "{{name}} を設定",
         remove: "Remove provider",
         removing: "Removing...",
       },

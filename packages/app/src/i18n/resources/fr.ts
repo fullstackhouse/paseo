@@ -3476,6 +3476,8 @@ export const fr: TranslationResources = {
       updateErrorTitle: "Impossible de mettre à jour le fournisseur",
       actions: {
         menu: "Actions de {{name}}",
+        configure: "Configurer",
+        configureProvider: "Configurer {{name}}",
         remove: "Supprimer le fournisseur",
         removing: "Suppression…",
       },

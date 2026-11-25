@@ -95,3 +95,18 @@ export function readDetailPresence(input: {
   if (input.error) return { kind: "failed", message: input.error };
   return { kind: "loading" };
 }
+
+/**
+ * FSH: the plugin settings screen a plugin provider names, once its plugin has registered that
+ * screen on the host; null otherwise, so the link never opens a missing screen.
+ */
+export function readPluginSettingsScreen(
+  entry: Pick<ProviderSnapshotEntry, "settingsScreen">,
+  plugin: { settingsScreens: readonly { id: string }[] } | null,
+): { pluginId: string; screenId: string } | null {
+  const screen = entry.settingsScreen;
+  if (!screen || !plugin) return null;
+  return plugin.settingsScreens.some((candidate) => candidate.id === screen.screenId)
+    ? screen
+    : null;
+}

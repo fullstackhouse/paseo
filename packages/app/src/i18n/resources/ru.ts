@@ -3461,6 +3461,8 @@ export const ru: TranslationResources = {
       updateErrorTitle: "Не удалось обновить провайдера",
       actions: {
         menu: "Действия с {{name}}",
+        configure: "Настроить",
+        configureProvider: "Настроить {{name}}",
         remove: "Удалить провайдера",
         removing: "Удаление...",
       },

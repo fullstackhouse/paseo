@@ -421,6 +421,7 @@ Provider 设置中的 **刷新** 会跳过保留的结果，并清除失败的�
 | `ProviderUpdateResult` | `{ status: "succeeded", message?: string }` 或 `{ status: "failed", message: string }`                                                 |
 
 Paseo 按原样显示 `version`、`versions` 和 `message`，不解析或排序它们。只要 `inspect` 报告的 `version` 不变，Paseo 会在最长一小时内复用 `current` 或 `available` 的结果。它保留 `report` 输出的最后 65,536 个字符。不符合这些结构的结果是错误。只要 `inspect` 报告 CLI 已安装且你声明了 `update`，就会出现 **更新**，与 `checkForUpdates` 的回答以及是否声明它无关；没有 `update` 时，Paseo 在同样条件下提供 `updateUrl`。
+`ProviderRegistration.settingsScreen` 是你自己的某个[设置界面](#settings-screens)的 `id`。这样 **设置 → Providers** 中该 Provider 的那一行会显示一个 **Configure** 按钮来打开它，需要 API key 或限额的 Provider 就能把用户带到设置它们的地方。客户端注册该界面后按钮才会出现；早于此字段的主机会忽略它。
 
 ### 用量来源 {#usage-sources}
 

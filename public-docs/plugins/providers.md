@@ -144,7 +144,10 @@ preference.
 For persisted host-scoped plugin settings, use the handle returned by `server.registerSettings()`.
 Read it in catalog and session callbacks, and subscribe when the provider keeps in-memory
 configuration. See [settings](./reference.md#persisted-values) for the `read()` and `subscribe()`
-contract.
+contract. When users must set something before the provider works, such as an API key, edit it on a
+plugin settings screen and name that screen in `settingsScreen` on the registration; **Settings →
+Providers** links to it with a **Configure** button. See
+[`ProviderRegistration.settingsScreen`](./reference.md#providers).
 
 Create the native session with the selected catalog values, then publish its effective state:
 

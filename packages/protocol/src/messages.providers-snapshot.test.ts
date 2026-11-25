@@ -50,6 +50,21 @@ describe("provider snapshot message schemas", () => {
     expect(parsed.source).toBe("custom");
   });
 
+  test("preserves the plugin settings screen that configures a provider", () => {
+    const parsed = ProviderSnapshotEntrySchema.parse({
+      provider: "claude-cloud",
+      status: "ready",
+      source: "custom",
+      label: "Claude (cloud)",
+      settingsScreen: { pluginId: "paseo-managed-agents", screenId: "managed-agents" },
+    });
+
+    expect(parsed.settingsScreen).toEqual({
+      pluginId: "paseo-managed-agents",
+      screenId: "managed-agents",
+    });
+  });
+
   test("defaults missing enabled state in providers snapshot response entries", () => {
     const parsed = GetProvidersSnapshotResponseMessageSchema.parse({
       type: "get_providers_snapshot_response",

@@ -127,7 +127,7 @@ if (input.type === "catalog") {
 
 `session.open` 包含完整的启动配置：工作目录、环境变量、系统提示词、MCP 服务器、工具策略、模型、模式、`providerOptions` 以及持久化偏好。
 
-对于持久化的、作用于主机的插件设置，请使用 `server.registerSettings()` 返回的句柄。在目录和会话回调中读取它；当 Provider 在内存中保留配置时，订阅它。`read()` 和 `subscribe()` 的契约见[设置](./reference.md#persisted-values)。
+对于持久化的、作用于主机的插件设置，请使用 `server.registerSettings()` 返回的句柄。在目录和会话回调中读取它；当 Provider 在内存中保留配置时，订阅它。`read()` 和 `subscribe()` 的契约见[设置](./reference.md#persisted-values)。当用户必须先设置某些内容（例如 API key）Provider 才能工作时，请在插件设置界面中编辑它，并在注册信息的 `settingsScreen` 中写上该界面；**设置 → Providers** 会用一个 **Configure** 按钮链接到它。见 [`ProviderRegistration.settingsScreen`](./reference.md#providers)。
 
 用选中的目录值创建原生会话，然后发布它实际生效的状态：
 

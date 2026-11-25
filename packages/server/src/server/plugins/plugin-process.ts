@@ -214,6 +214,11 @@ export function createPluginWorker(options: {
         provider.command.some((part) => typeof part !== "string" || !part.trim()))
     )
       throw new Error(`Invalid command for plugin provider ${id}`);
+    if (
+      provider.settingsScreen !== undefined &&
+      (typeof provider.settingsScreen !== "string" || !provider.settingsScreen.trim())
+    )
+      throw new Error(`Invalid settings screen for plugin provider ${id}`);
     if (providers.has(id)) throw new Error(`Duplicate plugin provider ID: ${id}`);
     providers.set(id, { ...provider, id });
   }
@@ -270,6 +275,7 @@ export function createPluginWorker(options: {
       label: provider.label,
       description: provider.description,
       iconPath: provider.icon,
+      settingsScreen: provider.settingsScreen?.trim(),
       requiresConfiguration: provider.requiresConfiguration,
       hasCatalogCacheKey: provider.getCatalogCacheKey !== undefined,
       hasStatus: provider.status !== undefined,

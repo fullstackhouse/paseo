@@ -521,6 +521,7 @@ describe("PluginService", () => {
   server.registerProvider({
     id: "plugin-agent",
     label: "Plugin agent",
+    settingsScreen: "agent-settings",
     async connect() { throw new Error("not opened by this test"); },
   });
   return () => {};
@@ -531,7 +532,12 @@ describe("PluginService", () => {
     await service.start();
     await service.installDirectory({ path: directory });
     expect(service.getProviderRegistrations()).toMatchObject([
-      { id: "plugin-agent", label: "Plugin agent" },
+      {
+        id: "plugin-agent",
+        label: "Plugin agent",
+        pluginId: "provider-lifecycle",
+        settingsScreen: "agent-settings",
+      },
     ]);
 
     await service.disablePlugin("provider-lifecycle");

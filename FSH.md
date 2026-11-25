@@ -122,6 +122,7 @@ temporary by design: every patch is meant to go upstream and then drop out of `f
 - FSH-only (upstreamable): when the workspace you have open is archived from outside the app (a plugin's **Post & archive**, the `paseo` CLI, an agent's `archive_workspace`), the app opens **New workspace** for its project, as its own Archive button does. Before, the screen stayed on **Workspace unavailable**. Links and reloaded URLs to a workspace that was already archived still show that screen
 - FSH-only (upstreamable): a plugin start, stop or update no longer stops an agent's running subagents, background shells and monitors. The next prompt used to reopen the agent's session, which killed them; now the session reopens at the first prompt after they end. Explicit reloads are unchanged
 - FSH-only (upstreamable): the plugin compiler no longer rejects a plugin whose dependency declarations reference type packages that are not installed, such as `@anthropic-ai/sdk` probing several `undici-types` paths. TypeScript tolerates those; only a plugin's own missing type imports still fail the build.
+- FSH-only (upstreamable): a plugin provider can name one of its plugin's settings screens (`settingsScreen` on `registerProvider`), and its row in Settings → Providers then shows **Configure**, which opens that screen. Provider snapshot entries carry an optional `settingsScreen: { pluginId, screenId }`; older hosts send none and the row looks as before
 
 Keep this list in sync with what's merged into `fsh`.
 
