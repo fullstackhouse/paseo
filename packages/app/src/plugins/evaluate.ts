@@ -1,6 +1,6 @@
 import { requirePluginText } from "@getpaseo/plugin/client/host";
 import type { createPluginHosts } from "./hosts";
-import { openExternalUrl } from "@/utils/open-external-url";
+import { openUrlOrPaseoAppLink } from "@/utils/open-paseo-app-link";
 import * as pluginUiRuntime from "./react-native/ui";
 import { useRevealedText } from "@/hooks/use-revealed-text";
 import { useSettings } from "./settings/use-settings";
@@ -544,7 +544,7 @@ export function runPluginClientBundle(
       return {
         ...pluginClientRuntime,
         useSettings,
-        openExternalUrl,
+        openExternalUrl: openUrlOrPaseoAppLink,
         getPaseoClient: (serverId: string) => runtime.hosts.getPaseoClient(serverId),
         useHosts: () =>
           React.useSyncExternalStore(

@@ -4,7 +4,7 @@ import { ArrowUpRight } from "lucide-react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { Theme } from "@/styles/theme";
-import { openExternalUrl } from "@/utils/open-external-url";
+import { openUrlOrPaseoAppLink } from "@/utils/open-paseo-app-link";
 
 export interface ExternalLinkProps {
   href: string;
@@ -18,7 +18,7 @@ export interface ExternalLinkProps {
 
 /**
  * Inline "Docs ↗" affordance — muted text + arrow-top-right icon, opens the
- * URL via the platform's external opener. Wrap in a Tooltip when there's a
+ * URL via the platform's external opener, or a `paseo://` workspace or agent link in the app. Wrap in a Tooltip when there's a
  * one-line hint worth surfacing on hover. A native tap opens the URL.
  */
 export function ExternalLink({
@@ -31,7 +31,7 @@ export function ExternalLink({
   accessibilityLabel,
 }: ExternalLinkProps) {
   const handlePress = useCallback(() => {
-    void openExternalUrl(href).catch(onError ?? console.error);
+    void openUrlOrPaseoAppLink(href).catch(onError ?? console.error);
   }, [href, onError]);
 
   const trigger = (
