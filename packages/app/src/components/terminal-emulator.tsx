@@ -57,11 +57,9 @@ const HOST_DIV_STYLE: CSSProperties = {
   height: "100%",
   overflow: "hidden",
   overscrollBehavior: "none",
-  paddingTop: 0,
-  paddingBottom: 0,
-  paddingLeft: 0,
-  paddingRight: 0,
 };
+
+const TERMINAL_PADDING_PX = 8;
 
 function buildXtermThemeKey(theme: ITheme): string {
   const values: Array<string> = [
@@ -570,6 +568,9 @@ export default function TerminalEmulator({
     () => ({
       position: "relative",
       display: "flex",
+      // Pad the root, not the host: xterm's fit addon counts the host's padding as usable space.
+      boxSizing: "border-box",
+      padding: TERMINAL_PADDING_PX,
       width: "100%",
       height: "100%",
       minHeight: 0,
