@@ -52,3 +52,7 @@ Map: [spec-sidebar-in-progress-ui-map.md](./spec-sidebar-in-progress-ui-map.md).
   progress"); Ready to review with "needs you (1)" and "2 not moving"; Working because the agent runs (no
   in-progress badge, spinning ring).
 - **Edge cases.** A narrow sidebar truncates the title before any badge; badges never wrap to a third line.
+
+## Decisions (cards, 2026-11-25)
+
+1. A row under Blocked because of a requested review says "awaiting review" ("2 awaiting review" for several); rows under Working keep "N in progress" (A33).
