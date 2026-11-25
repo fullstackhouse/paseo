@@ -2551,6 +2551,9 @@ export const ja: TranslationResources = {
     used: "{{percentage}}%使用",
     tokens: "{{used}} / {{max}}トークン",
     sessionCost: "セッションコスト: {{cost}}",
+    externalSession: "セッション {{id}}",
+    copyExternalSession: "セッションIDをコピー",
+    openExternalSession: "コンソールで開く",
     accessibility: "コンテキストウィンドウ{{percentage}}%使用",
   },
   review: {

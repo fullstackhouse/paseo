@@ -542,6 +542,13 @@ export type ProviderPermissionResponse =
       interrupt?: boolean;
     };
 
+/** The vendor's own record of a session, such as a cloud session the user can open in the vendor's console. */
+export interface ProviderExternalSession {
+  id: string;
+  /** http(s) page for this session in the vendor's console. */
+  url?: string;
+}
+
 export interface ProviderUsage {
   inputTokens?: number;
   cachedInputTokens?: number;
@@ -705,6 +712,7 @@ export type ProviderEvent =
       title?: string;
       description?: string;
       cwd: string;
+      externalSession?: ProviderExternalSession;
     }
   | { type: "session.ready"; requestId?: string; sessionId: string }
   | { type: "session.closed"; sessionId: string; error?: ProviderError }
@@ -813,6 +821,12 @@ const idSchema = z.string().min(1);
 const jsonObjectSchema = z.record(z.string(), z.json());
 const providerErrorSchema = z
   .object({ message: z.string(), code: z.string().optional(), diagnostic: z.string().optional() })
+  .strip();
+const externalSessionSchema = z
+  .object({
+    id: idSchema,
+    url: z.url({ protocol: /^https?$/ }).optional(),
+  })
   .strip();
 const persistenceSchema = z
   .object({ version: z.number().int().nonnegative(), data: z.json() })
@@ -1496,6 +1510,7 @@ export const ProviderEventSchema: z.ZodType<ProviderEvent> = z.discriminatedUnio
       title: z.string().optional(),
       description: z.string().optional(),
       cwd: z.string(),
+      externalSession: externalSessionSchema.optional(),
     })
     .strip(),
   z

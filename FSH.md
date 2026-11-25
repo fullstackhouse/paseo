@@ -28,6 +28,8 @@ temporary by design: every patch is meant to go upstream and then drop out of `f
 
 - FSH-only (upstreamable): agent snapshots carry `capabilities.supportsSteering` (Claude, Codex, OpenCode, Pi, OMP, and provider plugins that negotiate `prompt.steer`), so plugins steer a running agent when it joins the turn and wait for the turn to end when a steer would interrupt it.
 
+- FSH-only (upstreamable): provider plugins can report the vendor's session in `session.opened` (`externalSession: { id, url? }`). It reaches the app as `runtimeInfo.externalSession`, and the context window popover shows the ID with Copy and an Open link. Claude (cloud) uses it for its Managed Agents session
+
 - FSH-only: don't automatically show the worktree scripts setup callout; configure scripts in project settings.
 
 - FSH-only (upstreamable): `paseo://h/<server>/workspace/<id>` and `…/agent/<id>` links in chat and in plugins (Asks links and buttons, through `openExternalUrl` and `ExternalLink`) open inside the app on every platform; before, the app dropped them. An archived workspace's link shows **Workspace archived · Unarchive**. MCP `create_workspace`, `list_workspaces` and `create_agent` return the link as `url`, and the Paseo skill tells agents to link the workspaces they point you at.

@@ -2554,6 +2554,9 @@ export const en = {
     used: "{{percentage}}% used",
     tokens: "{{used}} / {{max}} tokens",
     sessionCost: "Session cost {{cost}}",
+    externalSession: "Session {{id}}",
+    copyExternalSession: "Copy session ID",
+    openExternalSession: "Open in console",
     accessibility: "Context window {{percentage}}% used",
   },
   review: {

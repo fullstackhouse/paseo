@@ -2,6 +2,7 @@ import type {
   AgentOptionControl,
   AgentOptionSelectControl,
   AgentOptionToggleControl,
+  AgentExternalSession,
   AgentProviderNotice,
   AgentTaskItem,
   JsonValue,
@@ -570,6 +571,7 @@ export interface AgentRuntimeInfo {
   thinkingOptionId?: string | null;
   modeId?: string | null;
   extra?: AgentMetadata;
+  externalSession?: AgentExternalSession | null;
 }
 
 export type AgentSlashCommandKind = "command" | "skill";
