@@ -8,7 +8,7 @@
 set -euo pipefail
 
 REPO="fullstackhouse/paseo"
-PLUGINS=(paseo-asks paseo-status paseo-limits paseo-prs paseo-inbox)
+PLUGINS=(paseo-asks paseo-status paseo-limits paseo-prs paseo-inbox paseo-claude-cloud)
 MARKER="$HOME/.paseo/fsh-release"
 
 yes=0 plugins=1 force=0
