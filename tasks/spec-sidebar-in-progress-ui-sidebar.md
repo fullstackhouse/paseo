@@ -48,11 +48,12 @@ Map: [spec-sidebar-in-progress-ui-map.md](./spec-sidebar-in-progress-ui-map.md).
   nothing of its own runs a turn.
 - **Get here.** Any workspace row.
 - **Shows.** Avatar with state dot, title, project, badges, time since last activity.
-- **Variants.** Working via in-progress work ("3 in progress", still dot); Blocked on a review ("1 in
-  progress"); Ready to review with "needs you (1)" and "2 not moving"; Working because the agent runs (no
+- **Variants.** Working via in-progress work ("3 in progress", still dot); Blocked on a review ("awaiting
+  review"); Ready to review with "needs you (1)" and "2 not moving"; Working because the agent runs (no
   in-progress badge, spinning ring).
 - **Edge cases.** A narrow sidebar truncates the title before any badge; badges never wrap to a third line.
 
 ## Decisions (cards, 2026-11-25)
 
 1. A row under Blocked because of a requested review says "awaiting review" ("2 awaiting review" for several); rows under Working keep "N in progress" (A33).
+2. A row under Working because of in-progress work shows a still dot, not the spinning ring (A34).
