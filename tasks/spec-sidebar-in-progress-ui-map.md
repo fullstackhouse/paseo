@@ -39,8 +39,8 @@ flowchart TD
 - **S1 Sidebar groups** (P1) — changed: an idle workspace whose open work is all in progress and moving
   leaves Ready to review for the group chosen in V; one with in-progress work that nothing moves stays in Ready
   to review. Get here: the sidebar. Permission: none.
-- **S2 Workspace row** (P1) — changed: the badge line says what the in-progress work is doing ("3 in
-  progress", "2 not moving" in the warning tone) next to "needs you (N)". Get here: any workspace row.
+- **S2 Workspace row** (P1) — changed: the badge line says "3 in progress" where that work is why the row
+  sits under Working or Blocked, and "2 not moving" in the warning tone wherever some is stuck. Get here: any workspace row.
   Permission: none.
 
 ## V — Placement options
@@ -63,7 +63,8 @@ Views: V1 Working, V2 Blocked, V3 Stays in Ready to review.
    case; V3 is dropped.
 2. A workspace with in-progress work that nothing moves stays in Ready to review, with a warning badge
    "N not moving" (A28).
-
-## Open questions
-
-See the stage 1 asks (A29, A30).
+3. The "N in progress" badge shows only where in-progress work explains the row's group (under Working or
+   Blocked because of it); "N not moving" shows wherever it applies (A29).
+4. Moving in-progress work wins over a Done status card: the row stays under Working or Blocked until the
+   work finishes or is handed back (A30).
+5. Stage 1 approved (A31).
