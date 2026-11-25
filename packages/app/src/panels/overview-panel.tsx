@@ -1231,7 +1231,7 @@ function InProgressAgentGroup({
           highlightStyle={styles.pressed}
           testID={`overview-in-progress-subagents-${row.agentId}`}
         >
-          <Indent level={1} />
+          <FoldIndent />
           <Text style={styles.contextValue} numberOfLines={1}>
             {countLabel(t, "panels.overview.subagents", subagents.total)}
           </Text>
@@ -1244,6 +1244,16 @@ function InProgressAgentGroup({
       {row.jobs.map((job) => (
         <InProgressJobLine key={job.id} job={job} onPress={openAgent} />
       ))}
+    </>
+  );
+}
+
+/** A line folded under its agent row: the ↳ lines up with the agent's name, past its icon. */
+function FoldIndent(): ReactElement {
+  return (
+    <>
+      <Spacer width={SMALL_ICON_SIZE} />
+      <Indent level={1} />
     </>
   );
 }
@@ -1282,7 +1292,7 @@ function InProgressJobLine({
       highlightStyle={styles.pressed}
       testID={`overview-in-progress-job-${job.id}`}
     >
-      <Indent level={1} />
+      <FoldIndent />
       <Text style={job.description ? styles.jobName : styles.contextValue} numberOfLines={1}>
         {label}
       </Text>

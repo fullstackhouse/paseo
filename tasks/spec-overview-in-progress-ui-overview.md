@@ -41,8 +41,8 @@ Map: [spec-overview-in-progress-ui-map.md](./spec-overview-in-progress-ui-map.md
   with a background job only; more than five rows (Show all); nothing in progress (section absent);
   mobile sheet of stuck.
 - **Edge cases.** An agent row opens its tab; a subagent line opens that agent's subagents popover; a
-  background line opens the owning agent's tab. An agent archived while its job still runs → the job line
-  shows under "Archived agent", muted, not pressable. An ask whose PR merged while in progress →
+  background line opens the owning agent's tab. Archiving an agent ends its background jobs (the daemon
+  closes its session), so its rows leave the section with it. An ask whose PR merged while in progress →
   "merged · waiting on the agent", in the warning tone once 10 minutes pass with nothing moving.
 
 ## O5 In-progress ask (P1, expanded row on O4)

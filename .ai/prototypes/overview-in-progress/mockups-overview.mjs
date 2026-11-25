@@ -37,7 +37,6 @@ export function overviewStates(kit) {
     ({ lastMovedAt, html: [irow({ icon, name, facts: state ? [[state, tone], [age(lastMovedAt), 'dim']] : [], off }), ...folds].join('') })
   const agentWorking = agentGroup({ state: 'working', tone: 'run', lastMovedAt: 1, folds: [irow({ ...F.SUBAGENTS, fold: true }), job(120)] })
   const agentIdleJob = agentGroup({ state: 'idle', tone: 'muted', lastMovedAt: 25, folds: [job(120)] })
-  const agentArchivedJob = agentGroup({ icon: 'archive', name: 'Archived agent', lastMovedAt: 40, off: true, folds: [job(120, 'muted')] })
   const STUCK = [A.REL, A.KEYS_STUCK, A.CRED, A.PAY_CI, A.INV]
 
   // items: ask fixtures or { lastMovedAt, html } (agent groups, an expanded ask). Oldest first; five show,
@@ -109,11 +108,7 @@ export function overviewStates(kit) {
         html: desktop([identity(), status(F.ST_IDLE), move([lead(F.DECISION)]), tree(), prs(F.PR_IDLE)]),
       },
       { id: 's6', caption: 'Mobile sheet — stuck', html: mobile(stuckTab()) },
-      {
-        id: 's7',
-        caption: 'Agent archived while its job runs — muted, not pressable',
-        html: desktop([identity(), status(ST_JOB), inProgress([agentArchivedJob, A.INV]), tree(), prs(F.PR_STUCK)]),
-      },
+      // s7 retired: archiving an agent ends its background jobs, so an orphaned job row can't occur.
       {
         id: 's8',
         caption: 'PR merged while the ask is in progress — warning after 10 minutes',

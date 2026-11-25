@@ -103,3 +103,4 @@ agrees with the row.
 - 2026-11-25 — stage 1 UI map drafted; placement options drawn (V1–V3); A4–A11 decided; stage 1 approved (A12).
 - 2026-11-25 — stage 2 cards and mockups approved (A13–A20); A21 times since last change; mechanism and contract written (A22).
 - 2026-11-25 — host half implemented: contract, store validation, In progress section, Archive waits for in-progress entries, Status age and "Nothing is running" warning.
+- 2026-11-25 — folded subagent and background lines indent under the agent's name (O4-s1). The O4 "Archived agent" edge case (O4-s7) doesn't happen: archiving an agent closes its provider session, which ends its background jobs, and the daemon clears its background work, so there is nothing to list.
