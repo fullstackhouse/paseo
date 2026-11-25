@@ -1,6 +1,6 @@
 # Spec: Overview shows work in progress
 
-Status: stage 1 (UI map) in review · 2026-11-25
+Status: stage 2 (cards) in progress · 2026-11-25
 
 Follows [spec-overview-tree.md](spec-overview-tree.md). UI map: [spec-overview-in-progress-ui-map.md](spec-overview-in-progress-ui-map.md).
 
@@ -47,9 +47,14 @@ To be written once the UI map and cards are agreed. Known gaps:
   (`subscribe` and PR state open, from the summary entry). None of these → "nothing moving".
 - **Status age and warning (A9).** Host-only: the card's `updatedAt`, and the workspace's live state
   from the session store.
+- **Take it back / Remind agent (A10).** Two new human actions in paseo-asks: `reopen` sets an
+  in-progress ask to open with its existing actions and tells the owner "[asks] A174: the human took it
+  back"; `remind` sends the owner "[asks] A174 shows nothing moving: update it or hand it back". Overview
+  renders in-progress entries with the plugin's `EntryComponent`, as it does for waiting ones.
+- **Archive (A11).** `deriveYourMove` treats in-progress asks as open work: no Archive while any exists.
 - Provider subagents and background shells are visible to the host as `isRunning` without a list of
   what runs (`workspace-attention/model.ts`, `subagents/track.tsx`).
 
 ## Changelog
 
-- 2026-11-25 — stage 1 UI map drafted; placement options drawn (V1–V3); A4–A9 decided.
+- 2026-11-25 — stage 1 UI map drafted; placement options drawn (V1–V3); A4–A11 decided; stage 1 approved (A12).

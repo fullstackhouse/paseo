@@ -65,8 +65,8 @@ flowchart TD
   background work an idle agent left running (shell or monitor name, "running · 2h"), asks in progress
   (title, what it waits on, age). Hidden when nothing is in progress. Get here: Overview tab. Permission:
   none.
-- **O5 In-progress ask** (P1, expanded row on O4) — the ask's title and body, read-only, with what it
-  waits on, when the agent took it and when it last moved. Get here: an ask row on O4. Permission: none.
+- **O5 In-progress ask** (P1, expanded row on O4) — the ask's title and body, with what it waits on, when
+  the agent took it and when it last moved; "Take it back" and "Remind agent". Get here: an ask row on O4. Permission: none.
 
 ## V — Placement options (A4)
 
@@ -84,8 +84,8 @@ Views: V1 Own section, V2 Inside Status, V3 Under Your move.
 
 ## Later phases (scope only)
 
-- Handing back in-progress asks nothing is driving (a reminder to the agent, then the ask reopens for the
-  human).
+- Handing back in-progress asks nothing is driving automatically (a reminder to the agent, then the ask
+  reopens for the human). The manual "Take it back" and "Remind agent" are in P1 (A10).
 - Sidebar grouping: a workspace whose only open items are in progress and backed shows as Working, not
   Ready to review.
 
@@ -104,7 +104,9 @@ Views: V1 Own section, V2 Inside Status, V3 Under Your move.
    watched open PR) is flagged on its row in the warning tone, "nothing moving"; Overview only for now (A8).
 6. Status shows the card's age, and a warning line "Nothing is running in this workspace" when the card
    says Working and no agent turn, subagent or background job is live (A9).
-
-## Open questions
-
-See the stage 1 asks (A10, A11).
+7. In-progress ask rows get two actions when expanded (O5): "Take it back" reopens the ask for you with its
+   buttons, "Remind agent" tells the owner to update it. Agent, subagent and background rows only open
+   what they name (A10).
+8. Archive waits while any ask is in progress, as it waits for background work; the "Archive waits for
+   background work" row goes, since In progress names that work (A11).
+9. Stage 1 approved (A12).
