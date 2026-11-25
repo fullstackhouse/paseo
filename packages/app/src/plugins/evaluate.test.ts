@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { useRevealedText } from "@/hooks/use-revealed-text";
+import { openUrlOrPaseoAppLink } from "@/utils/open-paseo-app-link";
 import { runPluginClientBundle, type PluginClientRuntime } from "./evaluate";
 
 const runtime = {
@@ -841,6 +842,17 @@ describe("evaluatePluginClientBundle", () => {
       `),
     );
     expect(plugin.surfaces[0]?.Component).toBe(useRevealedText);
+  });
+
+  it("gives plugins an openExternalUrl that opens paseo:// app links in the app", () => {
+    const plugin = evaluatePluginClientBundle(
+      "app-links",
+      bundle(`
+        const { openExternalUrl } = require("@getpaseo/plugin/client");
+        plugin.addScreen({ id: "links", title: "Links", Component: openExternalUrl });
+      `),
+    );
+    expect(plugin.surfaces[0]?.Component).toBe(openUrlOrPaseoAppLink);
   });
 
   it("keeps shared and client runtime exports separate", () => {

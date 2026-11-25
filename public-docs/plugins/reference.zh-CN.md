@@ -277,6 +277,8 @@ export async function openDocumentation() {
 
 请直接在用户交互中调用该函数，以便浏览器允许打开新标签页。
 
+两者也接受 Paseo 应用链接。`paseo://h/<server>/workspace/<id>` 和 `paseo://h/<server>/agent/<id>` 会在应用内打开对应的工作区或 agent，而不是交给操作系统打开。已归档的工作区会显示其恢复状态。
+
 | 平台          | 外部链接                            | `navigation.openBrowser`             |
 | ------------- | ----------------------------------- | ------------------------------------ |
 | Electron      | 系统浏览器                          | 可用；创建一个本地工作区浏览器标签页 |
@@ -285,13 +287,13 @@ export async function openDocumentation() {
 
 #### ExternalLink 属性 {#externallink-props}
 
-| 属性                            | 是否必填 | 行为 / 默认值                      |
-| ------------------------------- | -------- | ---------------------------------- |
-| `href: string`                  | 是       | 绝对的 HTTP(S) 目标地址            |
-| `children: ReactNode`           | 是       | 链接文本或内联的 React Native 内容 |
-| `accessibilityLabel: string`    | 否       | 覆盖从内容推导出的无障碍名称       |
-| `testID: string`                | 否       | 测试标识符；默认不设置             |
-| `onError(error: unknown): void` | 否       | 接收打开时的错误；默认记录到日志   |
+| 属性                            | 是否必填 | 行为 / 默认值                              |
+| ------------------------------- | -------- | ------------------------------------------ |
+| `href: string`                  | 是       | 绝对的 HTTP(S) 目标地址，或 Paseo 应用链接 |
+| `children: ReactNode`           | 是       | 链接文本或内联的 React Native 内容         |
+| `accessibilityLabel: string`    | 否       | 覆盖从内容推导出的无障碍名称               |
+| `testID: string`                | 否       | 测试标识符；默认不设置                     |
+| `onError(error: unknown): void` | 否       | 接收打开时的错误；默认记录到日志           |
 
 #### 打开工作区浏览器 {#open-a-workspace-browser}
 
@@ -336,14 +338,14 @@ openBrowser({ url, workspaceId: remoteWorkspaceId, serverId: remoteServerId });
 
 #### 错误与拒绝 {#errors-and-refusal}
 
-| 条件                                             | 结果                                                                   |
-| ------------------------------------------------ | ---------------------------------------------------------------------- |
-| 外部 URL 格式错误或使用非 HTTP(S) 协议           | 被忽略；`openExternalUrl` resolve，但不会打开任何内容                  |
-| 操作系统打开失败                                 | `openExternalUrl` reject；`ExternalLink` 调用 `onError` 或记录错误     |
-| 浏览器拦截了新的外部标签页                       | 无法与成功的 `noopener` 打开区分                                       |
-| 应用内浏览器的 URL 格式错误或使用非 HTTP(S) 协议 | 在创建标签页之前抛出 `Only absolute HTTP(S) URLs are supported.`       |
-| 应用内浏览器的工作区 ID 为空                     | 在创建标签页之前抛出 `workspaceId is required.`                        |
-| 目标主机/工作区未知，或其工作区列表尚未加载      | 在创建标签页之前抛出 `Workspace is unavailable on the requested host.` |
+| 条件                                                         | 结果                                                                   |
+| ------------------------------------------------------------ | ---------------------------------------------------------------------- |
+| 外部 URL 格式错误或使用非 HTTP(S) 协议（Paseo 应用链接除外） | 被忽略；`openExternalUrl` resolve，但不会打开任何内容                  |
+| 操作系统打开失败                                             | `openExternalUrl` reject；`ExternalLink` 调用 `onError` 或记录错误     |
+| 浏览器拦截了新的外部标签页                                   | 无法与成功的 `noopener` 打开区分                                       |
+| 应用内浏览器的 URL 格式错误或使用非 HTTP(S) 协议             | 在创建标签页之前抛出 `Only absolute HTTP(S) URLs are supported.`       |
+| 应用内浏览器的工作区 ID 为空                                 | 在创建标签页之前抛出 `workspaceId is required.`                        |
+| 目标主机/工作区未知，或其工作区列表尚未加载                  | 在创建标签页之前抛出 `Workspace is unavailable on the requested host.` |
 
 跨客户端的、带类型的主机范围持久化请使用[设置 API](#settings-screens)。打开你自己注册的贡献请使用 `openSettings`、`openScreen` 和 `openPanel`。
 
