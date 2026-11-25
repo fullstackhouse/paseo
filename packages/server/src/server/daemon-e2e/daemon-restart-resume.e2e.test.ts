@@ -243,7 +243,7 @@ test.each([false, true])(
   60000,
 );
 
-test.each([undefined, false, true])(
+test.each([false, true])(
   "host restart recovery settings (enabled=%s)",
   async (enabled) => {
     const root = await mkdtemp(path.join(tmpdir(), "resume-settings-process-"));

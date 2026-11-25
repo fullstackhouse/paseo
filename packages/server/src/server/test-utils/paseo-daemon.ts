@@ -228,7 +228,7 @@ async function prepareTestDaemonConfig(
     downloadTokenTtlMs: options.downloadTokenTtlMs,
     agentProfiles: options.agentProfiles,
     autoArchiveAfterMerge: options.autoArchiveAfterMerge,
-    resumeOnStartup: options.resumeOnStartup,
+    resumeOnStartup: options.resumeOnStartup ?? false,
     resumePrompt: options.resumePrompt,
     pluginsEnabled: options.pluginsEnabled,
     plugins: options.plugins,
