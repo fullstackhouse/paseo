@@ -61,6 +61,29 @@ const HOST_DIV_STYLE: CSSProperties = {
 
 const TERMINAL_PADDING_PX = 8;
 
+// The padding is outside xterm's element, so xterm doesn't hear events that start there.
+function screenBehindPadding(event: Event): Element | null {
+  const { currentTarget, target } = event;
+  if (!(currentTarget instanceof Element) || !(target instanceof Element)) {
+    return null;
+  }
+  return target.closest(".xterm") ? null : currentTarget.querySelector(".xterm-screen");
+}
+
+function forwardPaddingWheel(event: WheelEvent): void {
+  screenBehindPadding(event)?.dispatchEvent(new WheelEvent(event.type, event));
+}
+
+function forwardPaddingMouseDown(event: MouseEvent): void {
+  const screen = screenBehindPadding(event);
+  if (!screen) {
+    return;
+  }
+  // The default action would move focus out of the terminal.
+  event.preventDefault();
+  screen.dispatchEvent(new MouseEvent(event.type, event));
+}
+
 function buildXtermThemeKey(theme: ITheme): string {
   const values: Array<string> = [
     theme.background,
@@ -437,6 +460,19 @@ export default function TerminalEmulator({
       root.removeEventListener("pointercancel", onPointerCancel);
     };
   }, [onSwipeLeft, onSwipeRight, swipeGesturesEnabled]);
+
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root) {
+      return () => {};
+    }
+    root.addEventListener("wheel", forwardPaddingWheel, { passive: true });
+    root.addEventListener("mousedown", forwardPaddingMouseDown);
+    return () => {
+      root.removeEventListener("wheel", forwardPaddingWheel);
+      root.removeEventListener("mousedown", forwardPaddingMouseDown);
+    };
+  }, []);
 
   useEffect(() => {
     const host = hostRef.current;
