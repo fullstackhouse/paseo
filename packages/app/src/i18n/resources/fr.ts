@@ -2354,9 +2354,20 @@ export const fr: TranslationResources = {
       prMergedTitle: "PR #{{number}} fusionnée",
       outdated: "Vous avez répondu {{time}} ; l'agent ne l'a pas mis à jour depuis.",
       readyToArchive: "Prêt à archiver",
-      archiveHeldTitle: "L'archivage attend le travail en arrière-plan",
-      archiveHeldFacts:
-        "Un shell, un moniteur ou un sous-agent tourne encore. Archiver depuis l'en-tête l'arrête.",
+      inProgress: "En cours",
+      nothingMoving: "rien ne bouge",
+      updatedAgo: "mis à jour {{time}}",
+      nothingRunning: "Rien ne tourne dans cet espace de travail.",
+      jobRunning: "en cours depuis {{time}}",
+      subagents: {
+        one: "{{count}} sous-agent",
+        other: "{{count}} sous-agents",
+      },
+      backgroundKind: {
+        shell: "Shell en arrière-plan",
+        monitor: "Moniteur",
+        other: "Tâche en arrière-plan",
+      },
       pullRequests: "Pull requests",
       noPrYet: "Pas encore de PR",
       notRefreshed: "non actualisé",

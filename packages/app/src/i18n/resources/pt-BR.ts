@@ -2339,9 +2339,20 @@ export const ptBR: TranslationResources = {
       prMergedTitle: "PR #{{number}} mesclado",
       outdated: "Você respondeu {{time}}; o agente não atualizou isto desde então.",
       readyToArchive: "Pronto para arquivar",
-      archiveHeldTitle: "Arquivar aguarda o trabalho em segundo plano",
-      archiveHeldFacts:
-        "Um shell, monitor ou subagente ainda está rodando. Arquivar pelo cabeçalho o interrompe.",
+      inProgress: "Em andamento",
+      nothingMoving: "nada avançando",
+      updatedAgo: "atualizado {{time}}",
+      nothingRunning: "Nada está rodando neste workspace.",
+      jobRunning: "rodando há {{time}}",
+      subagents: {
+        one: "{{count}} subagente",
+        other: "{{count}} subagentes",
+      },
+      backgroundKind: {
+        shell: "Shell em segundo plano",
+        monitor: "Monitor",
+        other: "Tarefa em segundo plano",
+      },
       pullRequests: "Pull requests",
       noPrYet: "Ainda sem PR",
       notRefreshed: "não atualizado",

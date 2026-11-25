@@ -2327,9 +2327,20 @@ export const ja: TranslationResources = {
       prMergedTitle: "PR #{{number}} マージ済み",
       outdated: "{{time}}に返信しました。エージェントはその後これを更新していません。",
       readyToArchive: "アーカイブできます",
-      archiveHeldTitle: "アーカイブはバックグラウンド処理を待っています",
-      archiveHeldFacts:
-        "シェル、モニター、またはサブエージェントがまだ実行中です。ヘッダーからアーカイブすると停止します。",
+      inProgress: "進行中",
+      nothingMoving: "動きなし",
+      updatedAgo: "{{time}}に更新",
+      nothingRunning: "このワークスペースでは何も実行されていません。",
+      jobRunning: "実行中 {{time}}",
+      subagents: {
+        one: "サブエージェント{{count}}件",
+        other: "サブエージェント{{count}}件",
+      },
+      backgroundKind: {
+        shell: "バックグラウンドシェル",
+        monitor: "モニター",
+        other: "バックグラウンドジョブ",
+      },
       pullRequests: "プルリクエスト",
       noPrYet: "PRはまだありません",
       notRefreshed: "未更新",

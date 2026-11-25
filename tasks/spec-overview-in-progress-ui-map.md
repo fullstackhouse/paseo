@@ -1,0 +1,103 @@
+# Overview: work in progress — UI map
+
+Companion to [the spec](./spec-overview-in-progress.md). Every view, every change to an existing screen,
+and how you move between them.
+
+## Baseline
+
+Paseo FSH fork `fsh` at b245e51ae (2026-11-24), Overview as approved in [spec-overview-tree](./spec-overview-tree-ui-map.md).
+
+Where in-progress work shows today, none of it on Overview:
+
+- **Sidebar row**: a spinning ring while the workspace counts as running (an agent turn, subagents,
+  monitors, background shells). No count, no names.
+- **Agent tabs strip**: a ring on an agent's icon while its turn runs.
+- **Composer bar** of one agent: subagents pill ("3 working", "1 failed", "2 ready to review"),
+  status pill ("working · 8h", "· stale" after 2 turns), Asks pill (open asks only, hidden at 0).
+- **Explorer tabs**: Status (cards, "N turns since"), Asks ("Needs you" and "In progress" sections),
+  Lineage (agents with a ring while running).
+- **Overview**: Status shows the card's word ("Working") with no age; Your move shows only what waits on
+  you, plus "Archive waits for background work" once the work shipped; Tree shows child workspaces'
+  state words and "· N agents" on this workspace's row. A running agent, subagents, background shells
+  and in-progress asks appear nowhere.
+
+## Navigation
+
+Overview stays a tab in the Explorer sidebar on desktop and the workspace sheet on mobile
+([docs/explorer-sidebar.md](../docs/explorer-sidebar.md)). Nothing moves in the app's menus. The tab
+reads top to bottom, new and changed parts marked:
+
+1. Identity — title, goal (unchanged).
+2. Status — state word and summary, now with the card's age and a warning when it says Working but
+   nothing runs (E2).
+3. Waiting on — PR, person, other blockers (unchanged).
+4. Your move — what waits on you (E1).
+5. **In progress** — what is moving without you: agents, subagents, background work, asks the agent
+   has taken on (O4, new).
+6. Tree — lineage, blocked by, blocking (unchanged).
+7. Context — plugin facts (unchanged).
+8. Pull requests (unchanged).
+
+No permissions: everything on Overview is visible to whoever can open the workspace.
+
+## Flow
+
+```mermaid
+flowchart TD
+  O1[O1 Overview tab] --> E2[E2 Status]
+  O1 --> E1[E1 Your move]
+  O1 --> O4[O4 In progress]
+  O4 -.placement options.-> V1[V1 Own section]
+  O4 -.-> V2[V2 Inside Status]
+  O4 -.-> V3[V3 Under Your move]
+  O4 -->|agent row| AG[Agent tab]
+  O4 -->|subagent row| SUB[Subagent sheet or tab]
+  O4 -->|background row| AGB[Owning agent tab]
+  O4 -->|ask row| O5[O5 In-progress ask]
+  O5 -.show in chat.-> AG
+  E2 -->|status card| ST[Status tab]
+```
+
+## O — Overview tab
+
+Views: O4 In progress, O5 In-progress ask.
+
+## V — Placement options (A4)
+
+Three ways to place in-progress work on Overview, drawn on the same workspaces so they compare
+directly. One is chosen in A4; the others are dropped, and O4 takes the winner's anatomy.
+
+Views: V1 Own section, V2 Inside Status, V3 Under Your move.
+
+## E — Existing screens
+
+Views: E1 Your move, E2 Status.
+
+## Later phases (scope only)
+
+- Handing back in-progress asks nothing is driving automatically (a reminder to the agent, then the ask
+  reopens for the human). The manual "Take it back" and "Remind agent" are in P1 (A10).
+- Sidebar grouping: a workspace whose only open items are in progress and backed shows as Working, not
+  Ready to review.
+
+## Decisions (stage 1, 2026-11-25)
+
+1. In progress lists all four kinds: agents with a running turn, their subagents, background work an
+   idle agent left running, and asks in progress (A5).
+2. Grouped: one row per agent and per ask; each agent's subagents and background work fold under it as
+   counted lines (A6).
+3. Placement: its own "In progress" section directly after Your move (V1). V2 and V3 are dropped; O4
+   takes V1's anatomy (A4).
+4. An in-progress ask says what it waits on: PR facts from paseo-asks for PR asks ("CI running",
+   "review requested"), a one-line "waits on" the agent sets when it takes any other ask; with neither,
+   its age only (A7).
+5. An in-progress ask with nothing moving it (no running turn of its agent, no live background job, no
+   watched open PR) is flagged on its row in the warning tone, "nothing moving"; Overview only for now (A8).
+6. Status shows the card's age, and a warning line "Nothing is running in this workspace" when the card
+   says Working and no agent turn, subagent or background job is live (A9).
+7. In-progress ask rows get two actions when expanded (O5): "Take it back" reopens the ask for you with its
+   buttons, "Remind agent" tells the owner to update it. Agent, subagent and background rows only open
+   what they name (A10).
+8. Archive waits while any ask is in progress, as it waits for background work; the "Archive waits for
+   background work" row goes, since In progress names that work (A11).
+9. Stage 1 approved (A12).

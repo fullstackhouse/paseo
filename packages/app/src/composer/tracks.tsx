@@ -92,6 +92,9 @@ export interface ComposerTrackPillProps {
   children: ReactNode;
   /** Pages a row can open in place of the list (`ComposerTrackRow` `opensPage`). */
   pages?: readonly MenuPageDefinition[];
+  /** Controlled open state, for a pill something else can open; uncontrolled when omitted. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
 /**
@@ -117,9 +120,11 @@ export function ComposerTrackPill({
   accessibilityLabel,
   children,
   pages,
+  open,
+  onOpenChange,
 }: ComposerTrackPillProps): ReactElement {
   return (
-    <MenuRoot compactMode="sheet">
+    <MenuRoot compactMode="sheet" open={open} onOpenChange={onOpenChange}>
       <ComposerTrackPillTrigger
         segments={segments}
         testID={testID}
