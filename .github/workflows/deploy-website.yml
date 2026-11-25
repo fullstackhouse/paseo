@@ -16,10 +16,15 @@ on:
     types: [published]
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   deploy:
     if: ${{ github.event_name != 'release' || (!github.event.release.prerelease && !github.event.release.draft) }}
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     steps:
       - uses: actions/checkout@v4

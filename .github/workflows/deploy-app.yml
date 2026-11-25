@@ -9,9 +9,14 @@ on:
       - "!app-v*-beta.*"
   workflow_dispatch:
 
+permissions: {}
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
 
     steps:
       - uses: actions/checkout@v4

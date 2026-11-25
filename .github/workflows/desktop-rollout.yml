@@ -19,6 +19,8 @@ concurrency:
 env:
   SOURCE_TAG: ${{ inputs.tag }}
 
+permissions: {}
+
 jobs:
   stamp:
     permissions:

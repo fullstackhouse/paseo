@@ -26,8 +26,7 @@ on:
       - .github/workflows/fsh-cli.yml
   workflow_dispatch:
 
-permissions:
-  contents: write
+permissions: {}
 
 concurrency:
   group: fsh-cli-${{ github.ref }}
@@ -39,6 +38,8 @@ env:
 jobs:
   bundle:
     runs-on: ubuntu-24.04-arm
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
 
