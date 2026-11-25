@@ -5601,8 +5601,13 @@ describe("agent working time", () => {
 
   async function createWorkingAgent() {
     const workdir = mkdtempSync(join(tmpdir(), "agent-manager-work-"));
-    onTestFinished(() => rmSync(workdir, { recursive: true, force: true }));
     const storage = new AgentStorage(join(workdir, "agents"), logger);
+    // Turn events persist asynchronously; deleting the directory under an in-flight write
+    // fails with ENOTEMPTY.
+    onTestFinished(async () => {
+      await storage.flush();
+      rmSync(workdir, { recursive: true, force: true });
+    });
     const sessions: TestAgentSession[] = [];
     class RecordingClient extends TestAgentClient {
       override async createSession(config: AgentSessionConfig): Promise<AgentSession> {
