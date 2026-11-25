@@ -22,6 +22,14 @@ describe("Explorer sidebar layout", () => {
     expect(resolveExplorerSidebarWidth({ containerWidth: 1600 })).toBe(420);
   });
 
+  it("opens narrower by default when 420px would collapse the workspace's tab row", () => {
+    // A 1200px window with the app sidebar open leaves about 880px for the workspace and sidebar.
+    expect(resolveExplorerSidebarWidth({ containerWidth: 880 })).toBe(364);
+    expect(resolveExplorerSidebarWidth({ containerWidth: 700 })).toBe(320);
+    // A width the user chose stays as it is.
+    expect(resolveExplorerSidebarWidth({ requestedWidth: 420, containerWidth: 880 })).toBe(420);
+  });
+
   it("has no fixed maximum while preserving room for the workspace body", () => {
     expect(resolveExplorerSidebarWidth({ requestedWidth: 100, containerWidth: 1200 })).toBe(240);
     expect(resolveExplorerSidebarWidth({ requestedWidth: 900, containerWidth: 1600 })).toBe(900);

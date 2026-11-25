@@ -1,14 +1,30 @@
+import { COMPACT_CONTENT_WIDTH } from "@/constants/layout";
+
 const DEFAULT_EXPLORER_SIDEBAR_WIDTH = 420;
+// FSH (#190): the wider default must not cost the workspace its tab row. Below this many pixels
+// beside the sidebar the header collapses into the compact tab switcher, so the default gives way
+// down to upstream's 320px. The margin covers the divider between the panes.
+const UPSTREAM_DEFAULT_EXPLORER_SIDEBAR_WIDTH = 320;
+const DEFAULT_WORKSPACE_BODY_ROOM = COMPACT_CONTENT_WIDTH + 16;
 const MIN_EXPLORER_SIDEBAR_WIDTH = 240;
 const MIN_WORKSPACE_BODY_WIDTH = 360;
 export const EXPLORER_WORKSPACE_MIN_WIDTH = MIN_EXPLORER_SIDEBAR_WIDTH + MIN_WORKSPACE_BODY_WIDTH;
+
+function defaultExplorerSidebarWidth(containerWidth: number): number {
+  "worklet";
+  if (containerWidth <= 0) return DEFAULT_EXPLORER_SIDEBAR_WIDTH;
+  return Math.max(
+    UPSTREAM_DEFAULT_EXPLORER_SIDEBAR_WIDTH,
+    Math.min(DEFAULT_EXPLORER_SIDEBAR_WIDTH, containerWidth - DEFAULT_WORKSPACE_BODY_ROOM),
+  );
+}
 
 export function resolveExplorerSidebarWidth(input: {
   requestedWidth?: number;
   containerWidth: number;
 }): number {
   "worklet";
-  const requestedWidth = input.requestedWidth ?? DEFAULT_EXPLORER_SIDEBAR_WIDTH;
+  const requestedWidth = input.requestedWidth ?? defaultExplorerSidebarWidth(input.containerWidth);
   const maximumVisibleWidth =
     input.containerWidth > 0
       ? Math.max(MIN_EXPLORER_SIDEBAR_WIDTH, input.containerWidth - MIN_WORKSPACE_BODY_WIDTH)
