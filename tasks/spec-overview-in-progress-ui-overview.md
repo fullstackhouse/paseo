@@ -96,3 +96,5 @@ Map: [spec-overview-in-progress-ui-map.md](./spec-overview-in-progress-ui-map.md
 ## Decisions (cards, 2026-11-25)
 
 1. In progress rows go oldest first across all kinds (A13).
+2. Five rows show, then "Show all (N)" (A14).
+3. One open row for the whole tab across Your move and In progress; a Your move ask you started replying to stays open (A15).
