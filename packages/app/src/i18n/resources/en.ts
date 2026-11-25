@@ -7,6 +7,10 @@ export const en = {
     more: "+{{count}} more",
     resumeAll: "Resume all",
   },
+  resumeAgents: {
+    unreached_one: "{{count}} agent wasn't restarted: {{names}}",
+    unreached_other: "{{count}} agents weren't restarted: {{names}}",
+  },
   failedAgents: {
     title_one: "{{count}} agent failed",
     title_other: "{{count}} agents failed",
