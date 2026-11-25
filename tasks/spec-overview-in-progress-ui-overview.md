@@ -98,3 +98,6 @@ Map: [spec-overview-in-progress-ui-map.md](./spec-overview-in-progress-ui-map.md
 1. In progress rows go oldest first across all kinds (A13).
 2. Five rows show, then "Show all (N)" (A14).
 3. One open row for the whole tab across Your move and In progress; a Your move ask you started replying to stays open (A15).
+4. Take it back acts at once, with no confirmation; the row moving into Your move is the feedback (A16).
+5. No placeholder row in Your move while Archive waits; In progress below is the explanation (A17).
+6. The "Nothing is running" warning covers Working cards only (A18).
