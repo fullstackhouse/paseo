@@ -631,7 +631,7 @@ function createInitialMutableDaemonConfig(config: ResolvedDaemonSettings): Mutab
     snoozedPermission: config.snoozedPermission,
     enableTerminalAgentHooks: config.enableTerminalAgentHooks ?? false,
     idleRuntimeCleanup: config.idleRuntimeCleanup !== false,
-    resumeOnStartup: config.resumeOnStartup === true,
+    resumeOnStartup: config.resumeOnStartup !== false,
     resumePrompt: config.resumePrompt ?? "Resume working.",
     appendSystemPrompt: config.appendSystemPrompt ?? "",
     ...createInitialPluginConfig(config),
@@ -1091,7 +1091,7 @@ export async function createPaseoDaemon(
   const restartRecovery = createRestartRecovery({
     storage: agentStorage,
     settings: () => ({
-      enabled: daemonConfigStore.get().resumeOnStartup === true,
+      enabled: daemonConfigStore.get().resumeOnStartup !== false,
       prompt: daemonConfigStore.get().resumePrompt ?? "Resume working.",
     }),
     eligible: async (record) =>
