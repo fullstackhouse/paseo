@@ -438,6 +438,12 @@ It must resolve inside that directory to a regular file that follows the
 [SVG icon rules](#svg-rules). Paseo reads and validates the file when the plugin starts; the string
 is never inline SVG or a URL.
 
+`ProviderRegistration.settingsScreen` is the `id` of one of your own
+[settings screens](#settings-screens). The provider's row in **Settings → Providers** then shows a
+**Configure** button that opens it, so a provider that needs an API key or a limit sends users to
+where they set it. The button appears once the client has registered that screen; hosts released
+before this field ignore it.
+
 ### Usage sources
 
 **Requires Paseo 0.11.** Register a source from your server entry with

@@ -10,6 +10,7 @@ import {
   type PressableStateCallbackType,
 } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
+import { router } from "expo-router";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { useToast } from "@/contexts/toast-api-context";
 import { settingsStyles } from "@/styles/settings";
@@ -28,6 +29,9 @@ import { useProviderIcon } from "@/components/provider-icons";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { SkeletonPulse, useSkeletonPulse } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
+import { Button } from "@/components/ui/button";
+import { useInstalledPlugin } from "@/plugins/registry";
+import { buildPluginSettingsRoute } from "@/plugins/settings/routes";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -171,6 +175,52 @@ function ProviderActionsMenu({
   );
 }
 
+interface ProviderConfigureButtonProps {
+  serverId: string;
+  providerId: string;
+  providerLabel: string;
+  pluginId: string;
+  screenId: string;
+}
+
+/** Opens the plugin settings screen a plugin provider names; hidden until the plugin has registered it. */
+function ProviderConfigureButton({
+  serverId,
+  providerId,
+  providerLabel,
+  pluginId,
+  screenId,
+}: ProviderConfigureButtonProps) {
+  const { t } = useTranslation();
+  const plugin = useInstalledPlugin(serverId, pluginId);
+  const hasScreen = plugin?.settingsScreens.some((screen) => screen.id === screenId) ?? false;
+  // The button sits inside the row's own pressable; without this the press also opens the row.
+  const handlePressIn = useCallback((event: GestureResponderEvent) => {
+    event.stopPropagation();
+  }, []);
+  const handlePress = useCallback(
+    (event: GestureResponderEvent) => {
+      event.stopPropagation();
+      router.push(buildPluginSettingsRoute(serverId, pluginId, screenId));
+    },
+    [pluginId, screenId, serverId],
+  );
+  if (!hasScreen) return null;
+  return (
+    <Button
+      variant="outline"
+      onPressIn={handlePressIn}
+      onPress={handlePress}
+      accessibilityLabel={t("settings.providers.actions.configureProvider", {
+        name: providerLabel,
+      })}
+      testID={`provider-configure-${providerId}`}
+    >
+      {t("settings.providers.actions.configure")}
+    </Button>
+  );
+}
+
 const SKELETON_ROW_KEYS = [0, 1, 2, 3].map((index) => `provider-skeleton-row-${index}`);
 
 function ProviderRowsSkeleton() {
@@ -278,6 +328,15 @@ function ProviderRow({
           {/* The menu leads the switch, so every switch sits on the row's right edge without
               rows that have no menu reserving room for one. */}
           <View style={styles.trailingControls}>
+            {entry.settingsScreen ? (
+              <ProviderConfigureButton
+                serverId={serverId}
+                providerId={def.id}
+                providerLabel={def.label}
+                pluginId={entry.settingsScreen.pluginId}
+                screenId={entry.settingsScreen.screenId}
+              />
+            ) : null}
             {canRemove ? (
               <ProviderActionsMenu
                 providerId={def.id}

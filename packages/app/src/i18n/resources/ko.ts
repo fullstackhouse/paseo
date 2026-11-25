@@ -3300,6 +3300,8 @@ export const ko: TranslationResources = {
       updateErrorTitle: "프로바이더를 업데이트할 수 없습니다",
       actions: {
         menu: "{{name}} 작업",
+        configure: "구성",
+        configureProvider: "{{name}} 구성",
         remove: "프로바이더 제거",
         removing: "제거 중...",
       },

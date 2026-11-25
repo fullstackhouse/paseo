@@ -1,5 +1,9 @@
 import type { Logger } from "pino";
-import type { ProviderOptions, ToolPolicy } from "@getpaseo/protocol/agent-types";
+import type {
+  ProviderOptions,
+  ProviderSettingsScreen,
+  ToolPolicy,
+} from "@getpaseo/protocol/agent-types";
 
 import type {
   AgentClient,
@@ -69,6 +73,7 @@ export interface ProviderDefinition extends AgentProviderDefinition {
   /** Effective inputs after overrides and inheritance; plugin registrations are owned separately. */
   configuration: Omit<ResolvedProvider, "createBaseClient" | "contract"> | null;
   iconSvg?: string;
+  settingsScreen?: ProviderSettingsScreen;
   enabled: boolean;
   /**
    * The id of another *registered* provider this one extends (e.g. a Z.AI
@@ -101,6 +106,7 @@ export interface ProviderDefinition extends AgentProviderDefinition {
 export interface RegisteredProviderDefinition extends AgentProviderDefinition {
   requiresConfiguration?: boolean;
   iconSvg?: string;
+  settingsScreen?: ProviderSettingsScreen;
   supportsExactMcpPreapproval: boolean;
   createClient: (logger: Logger, runtimeSettings?: ProviderRuntimeSettings) => AgentClient;
 }
