@@ -19,6 +19,7 @@ import type {
   ResolveAgentCreateConfigInput,
 } from "./agent-sdk-types.js";
 import type { ManagedAgent } from "./agent-manager.js";
+import type { PluginProviderRegistration } from "./plugin-provider.js";
 import {
   GLOBAL_PROVIDER_SNAPSHOT_KEY,
   ProviderSnapshotManager,
@@ -232,6 +233,32 @@ describe("ProviderSnapshotManager public surface", () => {
 
       expect(manager.getSnapshot("/tmp/project").records.map(({ entry }) => entry)).toContainEqual(
         expect.objectContaining({ provider: "icon-provider", iconSvg }),
+      );
+    } finally {
+      manager.destroy();
+    }
+  });
+
+  test("carries a plugin provider settings screen in snapshot metadata", () => {
+    const registration: PluginProviderRegistration = {
+      id: "cloud-provider",
+      label: "Cloud Provider",
+      pluginId: "cloud-plugin",
+      settingsScreen: "cloud-settings",
+      async connect() {
+        throw new Error("not opened by this test");
+      },
+    };
+    const manager = new ProviderSnapshotManager({ logger: createTestLogger() });
+
+    try {
+      manager.replacePluginProviders([registration]);
+
+      expect(manager.getSnapshot("/tmp/project").records.map(({ entry }) => entry)).toContainEqual(
+        expect.objectContaining({
+          provider: "cloud-provider",
+          settingsScreen: { pluginId: "cloud-plugin", screenId: "cloud-settings" },
+        }),
       );
     } finally {
       manager.destroy();

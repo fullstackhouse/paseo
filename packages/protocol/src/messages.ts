@@ -405,6 +405,8 @@ export const ProviderSnapshotEntrySchema = z.object({
   iconSvg: z.string().optional(),
   defaultModeId: z.string().nullable().optional(),
   supportsPlanApproval: z.boolean().optional(),
+  /** Plugin settings screen that configures this provider. */
+  settingsScreen: z.object({ pluginId: z.string(), screenId: z.string() }).optional(),
 });
 
 export const CompactProviderSnapshotModelSchema = AgentModelDefinitionSchema.omit({

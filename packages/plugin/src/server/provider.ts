@@ -39,6 +39,8 @@ export interface ProviderRegistration {
   description?: string;
   /** Plugin-directory-relative path to a self-contained SVG file. */
   icon?: string;
+  /** ID of this plugin's settings screen that configures the provider; Settings → Providers links to it. */
+  settingsScreen?: string;
   connect(request: ProviderConnectRequest): Promise<ProviderConnection>;
 }
 

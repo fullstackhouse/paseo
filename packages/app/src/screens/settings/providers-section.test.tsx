@@ -8,41 +8,51 @@ import type { ProviderSnapshotEntry } from "@getpaseo/protocol/agent-types";
 import type { MutableDaemonConfig } from "@getpaseo/protocol/messages";
 import { ToastApiProvider } from "@/contexts/toast-api-context";
 
-const { theme, snapshotState, configState, patchConfigMock, openProviderSettingsMock } = vi.hoisted(
-  () => ({
-    theme: {
-      spacing: { 1: 4, "1.5": 6, 2: 8, 3: 12, 4: 16, 6: 24 },
-      iconSize: { sm: 14, md: 20 },
-      fontSize: { xs: 11, sm: 13, base: 15 },
-      fontWeight: { normal: "400" },
-      borderRadius: { lg: 8 },
-      opacity: { 50: 0.5 },
-      colors: {
-        surface1: "#111",
-        surface2: "#222",
-        surface3: "#333",
-        foreground: "#fff",
-        foregroundMuted: "#aaa",
-        border: "#555",
-        accent: "#0a84ff",
-        statusSuccess: "#00ff00",
-        statusWarning: "#ff9500",
-        statusDanger: "#ff0000",
-        palette: { red: { 300: "#ff6b6b" }, white: "#fff" },
-      },
+const {
+  theme,
+  snapshotState,
+  configState,
+  pluginState,
+  patchConfigMock,
+  openProviderSettingsMock,
+  routerPushMock,
+} = vi.hoisted(() => ({
+  theme: {
+    spacing: { 1: 4, "1.5": 6, 2: 8, 3: 12, 4: 16, 6: 24 },
+    iconSize: { sm: 14, md: 20 },
+    fontSize: { xs: 11, sm: 13, base: 15 },
+    fontWeight: { normal: "400" },
+    borderRadius: { lg: 8 },
+    opacity: { 50: 0.5 },
+    colors: {
+      surface1: "#111",
+      surface2: "#222",
+      surface3: "#333",
+      foreground: "#fff",
+      foregroundMuted: "#aaa",
+      border: "#555",
+      accent: "#0a84ff",
+      statusSuccess: "#00ff00",
+      statusWarning: "#ff9500",
+      statusDanger: "#ff0000",
+      palette: { red: { 300: "#ff6b6b" }, white: "#fff" },
     },
-    snapshotState: {
-      entries: undefined as ProviderSnapshotEntry[] | undefined,
-      isLoading: false,
-      isRefreshing: false,
-    },
-    configState: {
-      config: null as MutableDaemonConfig | null,
-    },
-    patchConfigMock: vi.fn(async () => undefined),
-    openProviderSettingsMock: vi.fn(),
-  }),
-);
+  },
+  snapshotState: {
+    entries: undefined as ProviderSnapshotEntry[] | undefined,
+    isLoading: false,
+    isRefreshing: false,
+  },
+  configState: {
+    config: null as MutableDaemonConfig | null,
+  },
+  pluginState: {
+    settingsScreenIds: [] as string[],
+  },
+  patchConfigMock: vi.fn(async () => undefined),
+  openProviderSettingsMock: vi.fn(),
+  routerPushMock: vi.fn(),
+}));
 
 vi.mock("react-native", () => ({
   Platform: { OS: "web" },
@@ -121,6 +131,8 @@ vi.mock("react-i18next", () => ({
           "settings.providers.addErrorTitle": "Unable to add provider",
           "settings.providers.updateErrorTitle": "Unable to update provider",
           "settings.providers.actions.menu": "{{name}} actions",
+          "settings.providers.actions.configure": "Configure",
+          "settings.providers.actions.configureProvider": "Configure {{name}}",
           "settings.providers.actions.remove": "Remove provider",
           "settings.providers.actions.removing": "Removing...",
           "settings.providers.remove.confirmTitle": "Remove {{name}}?",
@@ -161,6 +173,44 @@ vi.mock("@/components/ui/switch", () => ({
         onValueChange?.(!value);
       },
     }),
+}));
+
+vi.mock("expo-router", () => ({
+  router: { push: routerPushMock },
+}));
+
+vi.mock("@/plugins/registry", () => ({
+  useInstalledPlugin: (serverId: string, pluginId: string) =>
+    serverId === "server-1" && pluginId === "cloud-plugin"
+      ? { settingsScreens: pluginState.settingsScreenIds.map((id) => ({ id })) }
+      : null,
+}));
+
+vi.mock("@/components/ui/button", () => ({
+  Button: ({
+    children,
+    onPress,
+    onPressIn,
+    accessibilityLabel,
+    testID,
+  }: {
+    children?: React.ReactNode;
+    onPress?: (event: { stopPropagation: () => void }) => void;
+    onPressIn?: (event: { stopPropagation: () => void }) => void;
+    accessibilityLabel?: string;
+    testID?: string;
+  }) =>
+    React.createElement(
+      "button",
+      {
+        type: "button",
+        "aria-label": accessibilityLabel,
+        "data-testid": testID,
+        onMouseDown: (event: React.MouseEvent) => onPressIn?.(event),
+        onClick: (event: React.MouseEvent) => onPress?.(event),
+      },
+      children,
+    ),
 }));
 
 vi.mock("@/components/ui/loading-spinner", () => ({
@@ -362,6 +412,8 @@ describe("ProvidersSection", () => {
     patchConfigMock.mockReset();
     patchConfigMock.mockResolvedValue(undefined);
     openProviderSettingsMock.mockReset();
+    routerPushMock.mockReset();
+    pluginState.settingsScreenIds = [];
   });
 
   afterEach(() => {
@@ -478,5 +530,47 @@ describe("ProvidersSection", () => {
     expect(patchConfigMock).toHaveBeenCalledWith({
       providers: { claude: { enabled: false } },
     });
+  });
+
+  const cloudEntry: ProviderSnapshotEntry = {
+    provider: "cloud",
+    status: "ready",
+    enabled: true,
+    source: "custom",
+    label: "Cloud",
+    defaultModeId: null,
+    modes: [],
+    settingsScreen: { pluginId: "cloud-plugin", screenId: "cloud-settings" },
+  };
+
+  it("opens the plugin settings screen from a plugin provider's Configure button", () => {
+    snapshotState.entries = [cloudEntry];
+    configState.config = makeConfig();
+    pluginState.settingsScreenIds = ["cloud-settings"];
+
+    render();
+
+    const button = container?.querySelector<HTMLElement>(
+      '[data-testid="provider-configure-cloud"]',
+    );
+    expect(button?.getAttribute("aria-label")).toBe("Configure Cloud");
+    act(() => {
+      button?.dispatchEvent(new window.MouseEvent("click", { bubbles: true }));
+    });
+
+    expect(routerPushMock).toHaveBeenCalledWith({
+      pathname: "/settings/hosts/[serverId]/plugins/[pluginId]/[screenId]",
+      params: { serverId: "server-1", pluginId: "cloud-plugin", screenId: "cloud-settings" },
+    });
+    expect(openProviderSettingsMock).not.toHaveBeenCalled();
+  });
+
+  it("hides Configure until the plugin registers the named settings screen", () => {
+    snapshotState.entries = [cloudEntry, claudeEntry];
+    configState.config = makeConfig();
+
+    render();
+
+    expect(container?.querySelector('[data-testid^="provider-configure-"]')).toBeNull();
   });
 });

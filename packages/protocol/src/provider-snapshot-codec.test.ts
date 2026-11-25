@@ -19,6 +19,7 @@ function providerEntry(): ProviderSnapshotEntry {
     status: "ready",
     enabled: true,
     iconSvg: '<svg viewBox="0 0 24 24"><path d="M4 4h16v16H4z" /></svg>',
+    settingsScreen: { pluginId: "pi-plugin", screenId: "pi-settings" },
     models: [
       {
         provider: "pi",

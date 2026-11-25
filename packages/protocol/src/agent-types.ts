@@ -128,6 +128,13 @@ export interface ProviderSnapshotEntry {
   iconSvg?: string;
   defaultModeId?: string | null;
   supportsPlanApproval?: boolean;
+  /** Plugin settings screen that configures this provider. */
+  settingsScreen?: ProviderSettingsScreen;
+}
+
+export interface ProviderSettingsScreen {
+  pluginId: string;
+  screenId: string;
 }
 
 export interface AgentFeatureToggle {

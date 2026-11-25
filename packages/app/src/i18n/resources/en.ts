@@ -3433,6 +3433,8 @@ export const en = {
       updateErrorTitle: "Unable to update provider",
       actions: {
         menu: "{{name}} actions",
+        configure: "Configure",
+        configureProvider: "Configure {{name}}",
         remove: "Remove provider",
         removing: "Removing...",
       },

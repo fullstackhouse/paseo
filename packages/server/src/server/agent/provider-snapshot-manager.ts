@@ -49,8 +49,7 @@ import {
   type AgentConfigurationValidationInput,
   validateAgentConfigurationAgainstProvider,
 } from "./agent-configuration-validator.js";
-import type { ProviderRegistration } from "@getpaseo/plugin/server/provider";
-import { PluginAgentClientRegistry } from "./plugin-provider.js";
+import { PluginAgentClientRegistry, type PluginProviderRegistration } from "./plugin-provider.js";
 
 const DEFAULT_REFRESH_TIMEOUT_MS = 120_000;
 const MAX_REFRESH_TIMEOUT_MS = 2_147_483_647;
@@ -401,7 +400,7 @@ export class ProviderSnapshotManager {
   }
 
   replacePluginProviders(
-    registrations: readonly ProviderRegistration[],
+    registrations: readonly PluginProviderRegistration[],
   ): AgentManagerProviderState {
     for (const registration of registrations) {
       if (BUILTIN_PROVIDER_IDS.includes(registration.id) || this.extraClients[registration.id]) {
@@ -858,6 +857,7 @@ export class ProviderSnapshotManager {
           iconSvg: definition.iconSvg,
           defaultModeId: definition.defaultModeId ?? null,
           ...(definition.supportsPlanApproval ? { supportsPlanApproval: true } : {}),
+          ...(definition.settingsScreen ? { settingsScreen: definition.settingsScreen } : {}),
         }),
       });
     }

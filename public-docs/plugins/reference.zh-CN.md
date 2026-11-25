@@ -367,6 +367,8 @@ Paseo 刷新 Agent 的方式是关闭它当前的 Provider 会话，再用当前
 
 `ProviderRegistration.icon` 是相对于插件目录的文件路径，例如 `icon.svg`。它必须解析到该目录内一个遵循 [SVG 图标规则](#svg-rules)的普通文件。Paseo 在插件启动时读取并校验该文件；这个字符串从不是内联 SVG 或 URL。
 
+`ProviderRegistration.settingsScreen` 是你自己的某个[设置界面](#settings-screens)的 `id`。这样 **设置 → Providers** 中该 Provider 的那一行会显示一个 **Configure** 按钮来打开它，需要 API key 或限额的 Provider 就能把用户带到设置它们的地方。客户端注册该界面后按钮才会出现；早于此字段的主机会忽略它。
+
 ### 用量来源 {#usage-sources}
 
 **需要 Paseo 0.11**。在服务端入口中用 `server.registerUsageSource()` 注册一个来源。从 `@getpaseo/plugin/server/usage` 导入它的契约和辅助函数。

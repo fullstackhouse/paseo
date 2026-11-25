@@ -861,8 +861,13 @@ function normalizeConnection(connection: ProviderConnection): ProviderConnection
   };
 }
 
+/** A provider registration as the host holds it: tagged with the plugin that registered it. */
+export interface PluginProviderRegistration extends ProviderRegistration {
+  pluginId?: string;
+}
+
 interface AdaptedPluginProvider {
-  registration: ProviderRegistration;
+  registration: PluginProviderRegistration;
   client: PluginAgentClient;
   definition: RegisteredProviderDefinition;
   clients: Set<PluginAgentClient>;
@@ -874,8 +879,8 @@ export class PluginAgentClientRegistry {
 
   constructor(private readonly logger: Logger) {}
 
-  replace(registrations: readonly ProviderRegistration[]): void {
-    const incoming = new Map<string, ProviderRegistration>();
+  replace(registrations: readonly PluginProviderRegistration[]): void {
+    const incoming = new Map<string, PluginProviderRegistration>();
     for (const registration of registrations) {
       if (incoming.has(registration.id)) {
         throw new Error(`Duplicate plugin provider ID: ${registration.id}`);
@@ -931,7 +936,7 @@ export class PluginAgentClientRegistry {
 }
 
 function createPluginProviderDefinition(
-  registration: ProviderRegistration,
+  registration: PluginProviderRegistration,
   createClient: RegisteredProviderDefinition["createClient"],
 ): RegisteredProviderDefinition {
   return {
@@ -939,6 +944,10 @@ function createPluginProviderDefinition(
     label: registration.label,
     description: registration.description ?? `Plugin provider ${registration.label}`,
     iconSvg: registration.icon,
+    settingsScreen:
+      registration.pluginId && registration.settingsScreen
+        ? { pluginId: registration.pluginId, screenId: registration.settingsScreen }
+        : undefined,
     requiresConfiguration: registration.requiresConfiguration,
     defaultModeId: null,
     modes: [],
