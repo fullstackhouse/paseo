@@ -100,7 +100,11 @@ Views: V1 Own section, V2 Inside Status, V3 Under Your move.
 4. An in-progress ask says what it waits on: PR facts from paseo-asks for PR asks ("CI running",
    "review requested"), a one-line "waits on" the agent sets when it takes any other ask; with neither,
    its age only (A7).
+5. An in-progress ask with nothing moving it (no running turn of its agent, no live background job, no
+   watched open PR) is flagged on its row in the warning tone, "nothing moving"; Overview only for now (A8).
+6. Status shows the card's age, and a warning line "Nothing is running in this workspace" when the card
+   says Working and no agent turn, subagent or background job is live (A9).
 
 ## Open questions
 
-See the stage 1 asks (A8–A11).
+See the stage 1 asks (A10, A11).

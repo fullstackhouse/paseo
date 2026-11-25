@@ -42,9 +42,14 @@ To be written once the UI map and cards are agreed. Known gaps:
   `ask_update(status: "in_progress", waitingOn: "…")` and cleared when the ask leaves in progress; the
   agent instructions get one line asking for it. PR asks derive the word from the PR state the plugin
   already polls. The workspace summary item carries in-progress entries with that word.
+- **Nothing moving (A8).** The host decides, per in-progress ask: its owner agent's turn runs, the
+  workspace has live background work (`isRunning` without `agentRunning`), or the ask watches an open PR
+  (`subscribe` and PR state open, from the summary entry). None of these → "nothing moving".
+- **Status age and warning (A9).** Host-only: the card's `updatedAt`, and the workspace's live state
+  from the session store.
 - Provider subagents and background shells are visible to the host as `isRunning` without a list of
   what runs (`workspace-attention/model.ts`, `subagents/track.tsx`).
 
 ## Changelog
 
-- 2026-11-25 — stage 1 UI map drafted; placement options drawn (V1–V3); A4–A7 decided.
+- 2026-11-25 — stage 1 UI map drafted; placement options drawn (V1–V3); A4–A9 decided.
