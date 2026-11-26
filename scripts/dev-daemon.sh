@@ -20,9 +20,12 @@ echo "════════════════════════�
 echo "  Home:    ${PASEO_HOME}"
 echo "  Models:  ${PASEO_LOCAL_MODELS_DIR}"
 echo "  Listen:  ${PASEO_LISTEN}"
+echo "  Origins: ${PASEO_CORS_ORIGINS}"
+if [ -n "${PASEO_DEV_LAN_URLS:-}" ]; then
+  echo "  LAN:     ${PASEO_DEV_LAN_URLS} (password required)"
+fi
 echo "══════════════════════════════════════════════════════"
 
-export PASEO_CORS_ORIGINS="${PASEO_CORS_ORIGINS:-*}"
 export PASEO_NODE_INSPECT="${PASEO_NODE_INSPECT:---inspect=0}"
 
 if [ "${PASEO_SKIP_DEV_SERVER_BUILD:-0}" = "1" ]; then

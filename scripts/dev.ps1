@@ -42,10 +42,9 @@ Write-Host @"
 ======================================================
 "@
 
-# Allow any origin in dev so Electron on random ports all work.
-# SECURITY: wildcard CORS is unsafe in production — only acceptable here because
-# the daemon binds to localhost and this script is never used for production.
-$env:PASEO_CORS_ORIGINS = "*"
+# Admit only this script's Metro web app. The dev home has no password, so "*" would let
+# any website open in your browser drive the daemon.
+$env:PASEO_CORS_ORIGINS = "http://localhost:8081,http://127.0.0.1:8081"
 
 # Configure the app to auto-connect to this daemon on localhost
 $env:APP_VARIANT = "development"

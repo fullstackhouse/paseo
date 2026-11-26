@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+DEV_HOME_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 default_dev_paseo_root() {
   git rev-parse --show-toplevel 2>/dev/null || pwd
 }
@@ -62,24 +64,24 @@ seed_worktree_paseo_home() {
   echo "  Seed:    copied metadata from ${source_home}"
 }
 
-configure_dev_daemon_config() {
+# Sets PASEO_LISTEN (loopback unless PASEO_DEV_LAN=1), PASEO_CORS_ORIGINS (this checkout's own
+# clients), PASEO_DEV_LAN_URLS and PASEO_DEV_LOCAL_URL (this service's local proxy URL). With
+# --write-config, also writes the loopback listen and the origins into the home's config.json.
+configure_dev_daemon_access() {
   if [ -z "${PASEO_LISTEN:-}" ]; then
     return
   fi
 
-  mkdir -p "$PASEO_HOME"
-  node -e '
-const fs = require("fs");
-const [path, listen] = [process.argv[1], process.argv[2]];
-let cfg = {};
-try { cfg = JSON.parse(fs.readFileSync(path, "utf8")); } catch {}
-cfg.version = cfg.version || 1;
-cfg.daemon = cfg.daemon || {};
-cfg.daemon.listen = listen;
-cfg.daemon.cors = cfg.daemon.cors || {};
-cfg.daemon.cors.allowedOrigins = ["*"];
-fs.writeFileSync(path, JSON.stringify(cfg, null, 2));
-' "$PASEO_HOME/config.json" "$PASEO_LISTEN"
+  local resolved key value
+  resolved="$(node "$DEV_HOME_SCRIPT_DIR/dev-daemon-access.mjs" "$@")" || exit 1
+  while IFS='=' read -r key value; do
+    case "$key" in
+      listen) export PASEO_LISTEN="$value" ;;
+      cors) export PASEO_CORS_ORIGINS="$value" ;;
+      lan) export PASEO_DEV_LAN_URLS="$value" ;;
+      local_url) export PASEO_DEV_LOCAL_URL="$value" ;;
+    esac
+  done <<<"$resolved"
 }
 
 resolve_dev_daemon_endpoint() {
@@ -103,7 +105,9 @@ configure_dev_paseo_home() {
     fi
     mkdir -p "$PASEO_HOME"
     if [ "${PASEO_DEV_MANAGED_HOME:-0}" = "1" ] || [ -n "${PASEO_DEV_SEED_HOME:-}" ]; then
-      configure_dev_daemon_config
+      configure_dev_daemon_access --write-config
+    else
+      configure_dev_daemon_access
     fi
     return
   fi
@@ -119,13 +123,13 @@ configure_dev_paseo_home() {
   fi
 
   mkdir -p "$PASEO_HOME"
-  configure_dev_daemon_config
+  configure_dev_daemon_access --write-config
 }
 
 configure_dev_command_env() {
   if [ -z "${PASEO_LISTEN:-}" ]; then
     if [ -n "${PASEO_SERVICE_DAEMON_PORT:-}" ]; then
-      export PASEO_LISTEN="0.0.0.0:${PASEO_SERVICE_DAEMON_PORT}"
+      export PASEO_LISTEN="127.0.0.1:${PASEO_SERVICE_DAEMON_PORT}"
     else
       export PASEO_LISTEN="127.0.0.1:6768"
     fi

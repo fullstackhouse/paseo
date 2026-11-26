@@ -1,5 +1,14 @@
 #!/usr/bin/env node
-import { cpSync, existsSync, mkdirSync, readdirSync, rmSync, statSync } from "node:fs";
+import {
+  cpSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { dirname, join } from "node:path";
 
 // Worktree setup runs through a stable script shell: bash on macOS/Linux, but PowerShell
@@ -45,7 +54,11 @@ function seedPaseoHome() {
 
   const config = join(source, "config.json");
   if (existsSync(config)) {
-    cpSync(config, join(target, "config.json"));
+    // The dev scripts write this worktree's own loopback listen and origins on start.
+    const seeded = JSON.parse(readFileSync(config, "utf8"));
+    delete seeded.daemon?.listen;
+    delete seeded.daemon?.cors;
+    writeFileSync(join(target, "config.json"), `${JSON.stringify(seeded, null, 2)}\n`);
   }
 
   console.log(`  Seed:    copied metadata from ${source}`);
