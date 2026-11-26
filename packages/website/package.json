@@ -21,7 +21,7 @@
     "@tanstack/react-start": "^1.168.26",
     "framer-motion": "^12.35.2",
     "github-slugger": "^2.0.0",
-    "i18next": "^26.3.0",
+    "i18next": "^26.7.2",
     "lucide-react": "^1.7.0",
     "react": "^19.1.4",
     "react-dom": "^19.1.4",
