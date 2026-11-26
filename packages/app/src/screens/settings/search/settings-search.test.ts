@@ -52,6 +52,12 @@ describe("settings search index", () => {
 });
 
 describe("searchSettings", () => {
+  it("finds the browser live view switch in the host Agents section", () => {
+    const [first] = searchSettings(buildDocs(), "live view");
+    expect(first?.title).toBe("Browser live view (experimental)");
+    expect(first?.target).toEqual({ kind: "host", section: "agents" });
+  });
+
   it("returns nothing for an empty query", () => {
     expect(searchSettings(buildDocs(), "   ")).toEqual([]);
   });

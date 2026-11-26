@@ -28,6 +28,7 @@ interface SupportedMutableConfigPatch {
   removeProviders?: string[];
   metadataGeneration?: MutableDaemonConfig["metadataGeneration"];
   autoArchiveAfterMerge?: boolean;
+  browserLiveView?: boolean;
   snoozedPermission?: MutableDaemonConfig["snoozedPermission"];
   enableTerminalAgentHooks?: boolean;
   idleRuntimeCleanup?: boolean;
@@ -193,6 +194,7 @@ const RELOADABLE_PATHS = [
   "daemon.git.maxProcessesPerSecond",
   "daemon.git.maxProcessConcurrency",
   "daemon.autoArchiveAfterMerge",
+  "daemon.browserLiveView",
   "daemon.snoozedPermission",
   "daemon.enableTerminalAgentHooks",
   "daemon.appendSystemPrompt",
@@ -223,6 +225,7 @@ const PERSISTED_TO_MUTABLE_PATH = new Map<string, string>([
   ["daemon.git.maxProcessesPerSecond", "git.maxProcessesPerSecond"],
   ["daemon.git.maxProcessConcurrency", "git.maxProcessConcurrency"],
   ["daemon.autoArchiveAfterMerge", "autoArchiveAfterMerge"],
+  ["daemon.browserLiveView", "browserLiveView"],
   ["daemon.snoozedPermission", "snoozedPermission"],
   ["daemon.enableTerminalAgentHooks", "enableTerminalAgentHooks"],
   ["daemon.appendSystemPrompt", "appendSystemPrompt"],
@@ -305,6 +308,7 @@ function pickSupportedPatchFields(patch: MutableDaemonConfigPatch): SupportedMut
     ...(patch.autoArchiveAfterMerge !== undefined
       ? { autoArchiveAfterMerge: patch.autoArchiveAfterMerge }
       : {}),
+    ...(patch.browserLiveView !== undefined ? { browserLiveView: patch.browserLiveView } : {}),
     ...(patch.snoozedPermission !== undefined
       ? { snoozedPermission: patch.snoozedPermission }
       : {}),
@@ -805,6 +809,7 @@ function mergeMutableDaemonPatch(
   if (patch.autoArchiveAfterMerge !== undefined) {
     next.autoArchiveAfterMerge = patch.autoArchiveAfterMerge;
   }
+  if (patch.browserLiveView !== undefined) next.browserLiveView = patch.browserLiveView;
   if (patch.snoozedPermission !== undefined) next.snoozedPermission = patch.snoozedPermission;
   if (patch.enableTerminalAgentHooks !== undefined) {
     next.enableTerminalAgentHooks = patch.enableTerminalAgentHooks;

@@ -2,6 +2,12 @@ import { beforeEach, describe, expect, test } from "vitest";
 import type { SessionInboundMessage, SessionOutboundMessage } from "@getpaseo/protocol/messages";
 import { createJSONStorage, type StateStorage } from "zustand/middleware";
 import { mountBrowserAutomationHandler } from "./handler";
+import {
+  BROWSER_LIVE_ENDED_EVENT,
+  BROWSER_LIVE_FRAME_EVENT,
+  createBrowserLiveViewHost,
+} from "./live-view";
+import { decodeBrowserLiveFrame } from "@getpaseo/protocol/binary-frames/browser-live";
 import type { DesktopHostBridge } from "@/desktop/host";
 import { useBrowserStore } from "@/desktop/browser/store";
 import { findPaneById } from "@/stores/workspace-layout-actions";
@@ -614,5 +620,115 @@ describe("mountBrowserAutomationHandler", () => {
 
     expect(browser.browser.executedRequests).toEqual([]);
     expect(browser.client.sentResponses).toEqual([]);
+  });
+});
+
+describe("browser live view host", () => {
+  const browserId = "11111111-1111-4111-8111-111111111111";
+
+  function createLiveHarness() {
+    const listeners = new Map<string, (payload: unknown) => void>();
+    const stopped: string[] = [];
+    const sentMessages: unknown[] = [];
+    const sentFrames: Uint8Array[] = [];
+    const host: DesktopHostBridge = {
+      events: {
+        on: (event, handler) => {
+          listeners.set(event, handler);
+          return () => listeners.delete(event);
+        },
+      },
+      browser: {
+        startLiveView: async (request) => ({
+          requestId: request.requestId,
+          viewport: { width: 800, height: 600 },
+          error: null,
+        }),
+        stopLiveView: async (request) => {
+          stopped.push(request.streamId);
+          return { requestId: request.requestId, error: null };
+        },
+        ackLiveFrame: async () => {},
+      },
+    };
+    const live = createBrowserLiveViewHost({
+      client: {
+        sendBrowserHostLiveMessage: (message) => sentMessages.push(message),
+        sendBrowserLiveFrame: async (frame) => {
+          sentFrames.push(frame);
+        },
+      },
+      getHost: () => host,
+    });
+    const emit = (event: string, payload: unknown) => listeners.get(event)?.(payload);
+    const start = async (streamId: string) => {
+      live.handle({
+        type: "browser.host.live.start.request",
+        requestId: `start-${streamId}`,
+        streamId,
+        browserId,
+      } as { type: string });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    };
+    return { live, emit, start, stopped, sentMessages, sentFrames };
+  }
+
+  const frame = (streamId: string) => ({
+    streamId,
+    frameSeq: 0,
+    metadata: {
+      deviceWidth: 800,
+      deviceHeight: 600,
+      offsetTop: 0,
+      pageScaleFactor: 1,
+      scrollOffsetX: 0,
+      scrollOffsetY: 0,
+    },
+    jpeg: new Uint8Array([0xff, 0xd8, 0xff, 0xd9]),
+  });
+
+  test("relays frames only for streams this daemon client started", async () => {
+    const harness = createLiveHarness();
+    await harness.start("stream-1");
+
+    harness.emit(BROWSER_LIVE_FRAME_EVENT, frame("other-daemon-stream"));
+    harness.emit(BROWSER_LIVE_FRAME_EVENT, frame("stream-1"));
+
+    expect(harness.sentFrames.map((bytes) => decodeBrowserLiveFrame(bytes)?.streamId)).toEqual([
+      "stream-1",
+    ]);
+  });
+
+  test("forwards a desktop-side end to the daemon and forgets the stream", async () => {
+    const harness = createLiveHarness();
+    await harness.start("stream-1");
+    const error = { code: "browser_tab_closed", message: "closed", retryable: false };
+
+    harness.emit(BROWSER_LIVE_ENDED_EVENT, { streamId: "stream-1", error });
+    harness.emit(BROWSER_LIVE_ENDED_EVENT, { streamId: "stream-1", error });
+    harness.emit(BROWSER_LIVE_FRAME_EVENT, frame("stream-1"));
+
+    expect(harness.sentMessages.at(-1)).toEqual({
+      type: "browser.host.live.ended",
+      payload: { streamId: "stream-1", error },
+    });
+    expect(
+      harness.sentMessages.filter(
+        (message) => (message as { type: string }).type === "browser.host.live.ended",
+      ),
+    ).toHaveLength(1);
+    expect(harness.sentFrames).toEqual([]);
+  });
+
+  test("reset stops every stream on the desktop", async () => {
+    const harness = createLiveHarness();
+    await harness.start("stream-1");
+    await harness.start("stream-2");
+
+    harness.live.reset();
+    harness.emit(BROWSER_LIVE_FRAME_EVENT, frame("stream-1"));
+
+    expect(harness.stopped.sort()).toEqual(["stream-1", "stream-2"]);
+    expect(harness.sentFrames).toEqual([]);
   });
 });

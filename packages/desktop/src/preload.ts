@@ -133,6 +133,12 @@ contextBridge.exposeInMainWorld("paseoDesktop", {
       ipcRenderer.invoke("paseo:browser:clear-profile", legacyBrowserIds),
     executeAutomationCommand: (request: Record<string, unknown>) =>
       ipcRenderer.invoke("paseo:browser:execute-automation-command", request),
+    startLiveView: (request: Record<string, unknown>) =>
+      ipcRenderer.invoke("paseo:browser:live-start", request),
+    stopLiveView: (request: Record<string, unknown>) =>
+      ipcRenderer.invoke("paseo:browser:live-stop", request),
+    ackLiveFrame: (ack: Record<string, unknown>) =>
+      ipcRenderer.invoke("paseo:browser:live-frame-ack", ack),
     captureElement: (
       browserId: string,
       rect: { x: number; y: number; width: number; height: number },

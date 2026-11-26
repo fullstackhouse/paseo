@@ -820,8 +820,15 @@ export class VoiceAssistantWebSocketServer {
       providerSnapshotManager: this.providerSnapshotManager,
       updateProviderRegistry: (state) => this.agentManager.updateProviderRegistry(state),
     });
+    let browserLiveView = this.daemonConfigStore.get().browserLiveView === true;
     const unsubscribeChange = this.daemonConfigStore.onChange((config) => {
       this.broadcastDaemonConfigChanged(config);
+      // COMPAT(browserLiveViewFlag): experimental opt-in added after v0.15.4, remove once live view ships on by default.
+      const nextBrowserLiveView = config.browserLiveView === true;
+      if (nextBrowserLiveView === browserLiveView) return;
+      browserLiveView = nextBrowserLiveView;
+      if (!browserLiveView) this.browserToolsBroker?.stopAllLiveViews();
+      this.broadcastCapabilitiesUpdate();
     });
     this.unsubscribeDaemonConfigChange = () => {
       unsubscribeProviderConfig();
@@ -2117,6 +2124,9 @@ export class VoiceAssistantWebSocketServer {
         workspaceAppearance: true,
         // COMPAT(scheduleRunAttention): FSH-only, added after v0.15.4, remove gate after 2027-05-16.
         scheduleRunAttention: true,
+        // COMPAT(browserLiveView): FSH-only, added after v0.15.4, remove gate after 2027-05-22.
+        // COMPAT(browserLiveViewFlag): experimental opt-in added after v0.15.4, remove once live view ships on by default.
+        ...(this.daemonConfigStore.get().browserLiveView === true ? { browserLiveView: true } : {}),
         // COMPAT(skillManagement): added in v0.4.0, remove gate after 2027-08-16.
         skillManagement: true,
         // COMPAT(idleRuntimeCleanupSetting): added in v0.13.0, remove gate after 2027-04-26.

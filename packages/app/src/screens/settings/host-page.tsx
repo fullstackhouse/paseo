@@ -72,6 +72,7 @@ import { IdleRuntimeCleanupCard } from "./idle-runtime-cleanup-card";
 import { SnoozedPermissionCard } from "./snoozed-permission-card";
 import { restartDaemonFromSettings, updateDaemonFromSettings } from "./daemon-lifecycle";
 import { SettingsRevealText } from "@/components/settings/reveal-text";
+import { BrowserLiveViewCard } from "./browser-live-view-card";
 
 const ThemedRestart = withUnistyles(RotateCw);
 const ThemedUpdate = withUnistyles(ArrowUpToLine);
@@ -296,6 +297,7 @@ export function HostAgentsPage({ serverId }: { serverId: string }) {
         <SettingsSection title={t("settings.hostSections.agents")}>
           <PaseoToolsCard serverId={serverId} />
           <BrowserToolsOptInCard serverId={serverId} />
+          <BrowserLiveViewCard serverId={serverId} />
           <AppendSystemPromptCard serverId={serverId} />
           <RestartRecoveryCard serverId={serverId} />
           <IdleRuntimeCleanupCard serverId={serverId} />

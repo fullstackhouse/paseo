@@ -434,6 +434,8 @@ export interface PaseoDaemonConfig {
     maxProcessConcurrency: number;
   };
   autoArchiveAfterMerge?: boolean;
+  // COMPAT(browserLiveViewFlag): experimental opt-in added after v0.15.4, remove once live view ships on by default.
+  browserLiveView?: boolean;
   snoozedPermission?: SnoozedPermissionBehavior;
   enableTerminalAgentHooks?: boolean;
   appendSystemPrompt?: string;
@@ -619,6 +621,7 @@ function createInitialMutableDaemonConfig(config: ResolvedDaemonSettings): Mutab
       providers: config.metadataGeneration?.providers ?? [],
     },
     autoArchiveAfterMerge: config.autoArchiveAfterMerge ?? false,
+    browserLiveView: config.browserLiveView === true,
     snoozedPermission: config.snoozedPermission,
     enableTerminalAgentHooks: config.enableTerminalAgentHooks ?? false,
     idleRuntimeCleanup: config.idleRuntimeCleanup !== false,
@@ -691,7 +694,9 @@ export async function createPaseoDaemon(
     logger.error({ err: error }, "Failed to maintain orchestration skills at startup");
   });
   const browserToolsPolicy = new DaemonConfigBrowserToolsPolicy(daemonConfigStore);
-  const browserToolsBroker = new BrowserToolsBroker({});
+  const browserToolsBroker = new BrowserToolsBroker({
+    isLiveViewEnabled: () => daemonConfigStore.get().browserLiveView === true,
+  });
   const pluginRuntime: PluginService = new PluginService(logger, daemonConfigStore, daemonVersion, {
     usageAgents: {
       hasAgent: (id) => agentManager.getAgent(id) !== null,

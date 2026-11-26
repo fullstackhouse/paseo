@@ -1,3 +1,4 @@
+import type { MutableDaemonConfig } from "@getpaseo/protocol/messages";
 import { createWorkspaceRuntimeStore } from "./workspace-runtime-store/index.js";
 import { SessionDelivery } from "./session/owned-subscriptions/index.js";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
@@ -256,11 +257,18 @@ function createServer(options?: {
   logger?: ReturnType<typeof createLogger>;
   startPaused?: boolean;
   auth?: { password: string; localCredential: () => string | null };
+  daemonConfig?: { current: Partial<MutableDaemonConfig> };
+  configListeners?: Array<(config: MutableDaemonConfig) => void>;
 }) {
   const speechReadiness = options?.speechReadiness ?? null;
+  const daemonConfig = options?.daemonConfig ?? { current: {} };
   const daemonConfigStore = {
     onApply: vi.fn(() => () => {}),
-    onChange: vi.fn(() => () => {}),
+    onChange: vi.fn((listener: (config: MutableDaemonConfig) => void) => {
+      options?.configListeners?.push(listener);
+      return () => {};
+    }),
+    get: vi.fn(() => daemonConfig.current),
   };
   const logger = options?.logger ?? createLogger();
   return new VoiceAssistantWebSocketServer(
@@ -1160,6 +1168,41 @@ describe("relay external socket reconnect behavior", () => {
     expect(serverInfo.features?.["terminal-grapheme-widths"]).toBe(true);
     expect(serverInfo.features?.agentTurnIdentity).toBeUndefined();
     expect(serverInfo.permissions).toEqual(DAEMON_PERMISSIONS);
+    await server.close();
+  });
+
+  test("advertises browserLiveView only while the host setting is on", async () => {
+    const daemonConfig: { current: Partial<MutableDaemonConfig> } = { current: {} };
+    const configListeners: Array<(config: MutableDaemonConfig) => void> = [];
+    const server = createServer({ daemonConfig, configListeners });
+    const socket = new MockSocket();
+
+    const serverInfo = await attachRelayAndHello({
+      server,
+      socket,
+      clientId: "cid-browser-live-view-flag",
+    });
+    expect(serverInfo.features?.browserLiveView).toBeUndefined();
+
+    daemonConfig.current = { browserLiveView: true };
+    for (const listener of configListeners) listener(daemonConfig.current as MutableDaemonConfig);
+    const enabled = parseServerInfoStatusPayload(
+      sentServerInfoEnvelopes(socket).at(-1)?.message?.payload,
+    );
+    expect(sentServerInfoEnvelopes(socket)).toHaveLength(2);
+    expect(enabled?.features?.browserLiveView).toBe(true);
+
+    // An unrelated config change does not re-advertise.
+    for (const listener of configListeners) listener(daemonConfig.current as MutableDaemonConfig);
+    expect(sentServerInfoEnvelopes(socket)).toHaveLength(2);
+
+    daemonConfig.current = { browserLiveView: false };
+    for (const listener of configListeners) listener(daemonConfig.current as MutableDaemonConfig);
+    const disabled = parseServerInfoStatusPayload(
+      sentServerInfoEnvelopes(socket).at(-1)?.message?.payload,
+    );
+    expect(disabled?.features?.browserLiveView).toBeUndefined();
+
     await server.close();
   });
 

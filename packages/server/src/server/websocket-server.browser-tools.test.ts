@@ -293,6 +293,7 @@ function createVoiceAssistantWebSocketServer(params: {
   const daemonConfigStore = {
     onApply: () => () => {},
     onChange: () => () => {},
+    get: () => ({}),
   };
 
   return new VoiceAssistantWebSocketServer(

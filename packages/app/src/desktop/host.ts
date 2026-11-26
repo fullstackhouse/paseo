@@ -165,6 +165,20 @@ export interface DesktopBrowserBridge {
   executeAutomationCommand?: (
     request: BrowserAutomationExecuteRequest,
   ) => Promise<BrowserAutomationExecuteResponse["payload"]>;
+  /** Live view screencast of a tab; frames arrive as the `browser-live-frame` event. */
+  startLiveView?: (
+    request: Extract<SessionOutboundMessage, { type: "browser.host.live.start.request" }>,
+  ) => Promise<
+    Extract<SessionInboundMessage, { type: "browser.host.live.start.response" }>["payload"]
+  >;
+  stopLiveView?: (
+    request: Extract<SessionOutboundMessage, { type: "browser.host.live.stop.request" }>,
+  ) => Promise<
+    Extract<SessionInboundMessage, { type: "browser.host.live.stop.response" }>["payload"]
+  >;
+  ackLiveFrame?: (
+    ack: Extract<SessionOutboundMessage, { type: "browser.host.live.frame_ack" }>,
+  ) => Promise<void>;
   /** Capture a PNG screenshot of the guest viewport cropped to `rect`. */
   captureElement?: (
     browserId: string,

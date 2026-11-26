@@ -106,6 +106,9 @@
         "autoArchiveAfterMerge": {
           "type": "boolean"
         },
+        "browserLiveView": {
+          "type": "boolean"
+        },
         "enableTerminalAgentHooks": {
           "type": "boolean"
         },

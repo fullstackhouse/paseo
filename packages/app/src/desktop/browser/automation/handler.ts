@@ -14,6 +14,7 @@ import {
 } from "@/desktop/browser/store";
 import { collectAllTabs, useWorkspaceLayoutStore } from "@/stores/workspace-layout-store";
 import { buildWorkspaceTabPersistenceKey } from "@/workspace-tabs/model";
+import { createBrowserLiveViewHost, isBrowserLiveViewSupported } from "./live-view";
 
 type BrowserAutomationExecuteRequest = Extract<
   SessionOutboundMessage,
@@ -73,17 +74,23 @@ export function mountBrowserAutomationDaemonClientHandler(
   client: import("@getpaseo/client/internal/daemon-client").DaemonClient,
   options?: { serverId?: string },
 ): () => void {
+  const liveView = isBrowserLiveViewSupported(getDesktopHost)
+    ? createBrowserLiveViewHost({ client, getHost: getDesktopHost })
+    : null;
   const observation = client.registerBrowserHost({
     hostKind: "desktop app",
     supportedCommands: [...BROWSER_AUTOMATION_COMMAND_NAMES],
+    ...(liveView ? { liveView: true } : {}),
   });
   const unmount = mountBrowserAutomationHandler({
     client: {
       on: (_type, handler) =>
         observation.subscribe({
-          snapshot: () => {},
+          // Each snapshot is a new host registration; the daemon forgot earlier streams.
+          snapshot: () => liveView?.reset(),
           update: (message) => {
             if (message.type === "browser.automation.execute.request") handler(message);
+            else liveView?.handle(message);
           },
         }),
       sendBrowserAutomationExecuteResponse: (response) =>
@@ -91,8 +98,16 @@ export function mountBrowserAutomationDaemonClientHandler(
     },
     ...(options?.serverId ? { serverId: options.serverId } : {}),
   });
+  // A lost connection drops the registration and its streams on the daemon side.
+  const unsubscribeConnection = liveView
+    ? client.subscribeConnectionStatus((state) => {
+        if (state.status !== "connected") liveView.reset();
+      })
+    : () => {};
   return () => {
     unmount();
+    unsubscribeConnection();
+    liveView?.dispose();
     void observation
       .release()
       .catch((error) => console.warn("Failed to release browser host", error));
