@@ -320,3 +320,59 @@ test("does not mark agents it resumes itself, only ones whose resume fails or wa
     await rm(root, { recursive: true, force: true });
   }
 });
+
+// FSH fork: an agent that ended its turn to wait on background work loses that work too.
+test("resumes idle agents whose background work a stop killed, listing that work", async () => {
+  const root = await mkdtemp(join(tmpdir(), "restart-recovery-"));
+  try {
+    const storage = new AgentStorage(root, createTestLogger());
+    for (const id of ["waiting", "idle"]) {
+      await storage.upsert(
+        parseStoredAgentRecord({
+          id,
+          lastStatus: "idle",
+          provider: "claude",
+          cwd: root,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        }),
+      );
+    }
+    const dispatched = new Map<string, string>();
+    const recovery = createRestartRecovery({
+      storage,
+      settings: () => ({ enabled: true, prompt: "Resume working." }),
+      eligible: async () => true,
+      dispatch: async (id, prompt) => {
+        dispatched.set(id, prompt);
+      },
+      report: () => {},
+      liveWork: (id) =>
+        id === "waiting"
+          ? ["Subagent: Build detector phase 1", "Background shell: Run the validation gate"]
+          : [],
+    });
+    await recovery.captureRunningAgents();
+    await recovery.prepareStartup();
+    recovery.resumePending();
+    const running = new AbortController().signal;
+    await recovery.waitForResume("waiting", running);
+    await recovery.waitForResume("idle", running);
+
+    expect([...dispatched.keys()]).toEqual(["waiting"]);
+    expect(dispatched.get("waiting")).toBe(
+      [
+        "Resume working.",
+        "",
+        "The Paseo daemon restarted and stopped this background work before it finished:",
+        "- Subagent: Build detector phase 1",
+        "- Background shell: Run the validation gate",
+        "Check what each one left behind and restart whatever is unfinished.",
+      ].join("\n"),
+    );
+    expect((await storage.get("waiting"))?.interruptedWork).toBeUndefined();
+    expect((await storage.get("waiting"))?.resumeOnStartup).toBe(false);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});

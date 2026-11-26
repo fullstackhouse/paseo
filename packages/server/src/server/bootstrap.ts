@@ -1,5 +1,6 @@
 import { unarchiveWorkspaceAgents } from "./workspace-archive-service.js";
 import { createRestartRecovery } from "./agent/restart-recovery/index.js";
+import { describeLiveWork } from "./agent/restart-recovery/live-work.js";
 import { sendPromptToAgent, unarchiveAgentState } from "./agent/agent-prompt.js";
 import { createChangeRequestWatches } from "./agent/change-request-watches/index.js";
 import { createIdleRuntimeCleanup } from "./agent/idle-runtime-cleanup/index.js";
@@ -1109,6 +1110,7 @@ export async function createPaseoDaemon(
       });
     },
     report: (agentId, err) => logger.error({ agentId, err }, "Agent restart recovery failed"),
+    liveWork: (agentId) => describeLiveWork(agentManager, agentId),
   });
   await restartRecovery.prepareStartup();
   logger.info({ elapsed: elapsed() }, "Agent storage initialized");

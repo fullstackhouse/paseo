@@ -87,8 +87,32 @@ const RAW_STORED_AGENT_SCHEMA = z.object({
   archivedAt: z.string().nullable().optional(),
   /** Set when a daemon stop or crash cut a turn short; cleared when the next turn starts. */
   interruptedAt: z.string().nullable().optional(),
+  /**
+   * FSH fork: background work (subagents, shells, monitors) a daemon stop killed, one label each.
+   * The restart resume prompt lists it; cleared when that resume is sent.
+   */
+  interruptedWork: z.array(z.string()).optional(),
   owner: AgentOwnerSchema.optional(),
 });
+
+/**
+ * Restart intent survives snapshots: a pending resume until the agent goes idle or fails, and an
+ * interruption until its next turn starts. FSH fork: an idle agent whose background work a stop
+ * killed (`interruptedWork`) keeps its resume, since idle is how it waited on that work.
+ */
+function carryInterruption(
+  record: StoredAgentRecord,
+  existing: StoredAgentRecord | null | undefined,
+  lifecycle: ManagedAgent["lifecycle"],
+): void {
+  const hasInterruptedWork = (existing?.interruptedWork?.length ?? 0) > 0;
+  record.resumeOnStartup =
+    existing?.resumeOnStartup &&
+    ((lifecycle !== "idle" && lifecycle !== "error") || hasInterruptedWork);
+  if (lifecycle === "running") return;
+  if (existing?.interruptedWork) record.interruptedWork = existing.interruptedWork;
+  if (existing?.interruptedAt) record.interruptedAt = existing.interruptedAt;
+}
 
 export type SerializableAgentConfig = Pick<
   AgentSessionConfig,
@@ -412,9 +436,7 @@ export class AgentStorage {
       }
       // Background is fixed at creation; a runtime opened without it cannot clear it.
       if (existing?.background) record.background = true;
-      record.resumeOnStartup =
-        existing?.resumeOnStartup && agent.lifecycle !== "idle" && agent.lifecycle !== "error";
-      keepInterruption(record, existing, agent.lifecycle);
+      carryInterruption(record, existing, agent.lifecycle);
       return record;
     });
   }
@@ -605,12 +627,3 @@ function projectDirNameFromCwd(cwd: string): string {
 }
 
 /** FSH: an interruption stays until the agent's next turn starts. */
-function keepInterruption(
-  record: StoredAgentRecord,
-  existing: StoredAgentRecord | null | undefined,
-  lifecycle: string,
-): void {
-  if (existing?.interruptedAt && lifecycle !== "running") {
-    record.interruptedAt = existing.interruptedAt;
-  }
-}
