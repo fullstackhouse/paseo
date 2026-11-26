@@ -5,11 +5,13 @@ import { AppWindow, Copy, Globe, type LucideIcon } from "lucide-react-native";
 import { useTranslation } from "react-i18next";
 import { useToast } from "@/contexts/toast-api-context";
 import { ContextMenuContent, ContextMenuItem, useContextMenu } from "@/components/ui/context-menu";
+import { PluginIconView } from "@/plugins/icons";
 import type { ResolvedPluginLink } from "@/plugins/link-handlers";
 import { openExternalUrl } from "@/utils/open-external-url";
 import { ICON_SIZE, type Theme } from "@/styles/theme";
 
 const foregroundMutedColorMapping = (theme: Theme) => ({ color: theme.colors.foregroundMuted });
+const ThemedPluginIcon = withUnistyles(PluginIconView);
 
 /** Right-click or long-press menu of a link a plugin opens inside Paseo. Renders while open. */
 export function PluginLinkMenu({ link }: { link: ResolvedPluginLink | null }): ReactElement | null {
@@ -28,14 +30,26 @@ function PluginLinkMenuContent({ link }: { link: ResolvedPluginLink }): ReactEle
       (error: unknown) => toast.error(error instanceof Error ? error.message : String(error)),
     );
   }, [toast, url]);
+  const pluginIcon = link.icon ?? AppWindow;
+  const openLeading = useMemo(
+    () => (
+      <ThemedPluginIcon
+        icon={pluginIcon}
+        size={ICON_SIZE.sm}
+        uniProps={foregroundMutedColorMapping}
+      />
+    ),
+    [pluginIcon],
+  );
   return (
     <ContextMenuContent align="start" width={220} testID="plugin-link-context-menu">
-      <PluginLinkMenuItem
-        icon={AppWindow}
-        label={link.title}
+      <ContextMenuItem
+        leading={openLeading}
         onSelect={link.open}
         testID="plugin-link-open-in-paseo"
-      />
+      >
+        {link.title}
+      </ContextMenuItem>
       <PluginLinkMenuItem
         icon={Globe}
         label={t("linkActions.openInBrowser")}

@@ -1,4 +1,5 @@
 import { useCallback, useMemo } from "react";
+import type { PluginIcon } from "@getpaseo/plugin/client";
 import { useActiveWorkspaceSelection } from "@/stores/navigation-active-workspace-store";
 import { openExternalUrl } from "@/utils/open-external-url";
 import { createPluginCapabilities } from "../actions";
@@ -10,6 +11,7 @@ import { matchPluginLinkHandler } from "./model";
 export interface ResolvedPluginLink {
   url: string;
   title: string;
+  icon?: PluginIcon;
   open(): void;
 }
 
@@ -43,6 +45,7 @@ export function usePluginLinkResolver(serverId?: string | null): PluginLinkResol
       return {
         url,
         title: plugin.i18n.resolve(handler.title, plugin.locale),
+        icon: handler.icon,
         open() {
           const navigation = createPluginNavigation({ serverId: plugin.serverId, workspaceId });
           void (async () => {
