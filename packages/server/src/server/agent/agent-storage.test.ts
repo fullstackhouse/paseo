@@ -316,6 +316,22 @@ describe("AgentStorage", () => {
     expect((await storage.get(agentId))?.interruptedAt).toBeUndefined();
   });
 
+  // FSH fork: an idle agent whose background work a daemon stop killed keeps its resume.
+  test("an idle snapshot keeps the resume of an agent with interrupted work", async () => {
+    const agentId = "agent-interrupted-work";
+    await storage.applySnapshot(createManagedAgent({ id: agentId, lifecycle: "idle" }));
+    const record = await storage.get(agentId);
+    if (!record) throw new Error("expected stored agent");
+    const interruptedWork = ["Subagent: Build detector phase 1"];
+    await storage.upsert({ ...record, resumeOnStartup: true, interruptedWork });
+
+    await storage.applySnapshot(createManagedAgent({ id: agentId, lifecycle: "idle" }));
+    expect(await storage.get(agentId)).toMatchObject({ resumeOnStartup: true, interruptedWork });
+
+    await storage.applySnapshot(createManagedAgent({ id: agentId, lifecycle: "running" }));
+    expect((await storage.get(agentId))?.interruptedWork).toBeUndefined();
+  });
+
   test("stores titles independently of snapshots", async () => {
     await storage.applySnapshot(
       createManagedAgent({

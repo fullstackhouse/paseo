@@ -20,7 +20,10 @@ reopens the saved provider conversation and settings, then sends `Resume working
 the prompt with `agents.resumePrompt` or the same settings page.
 Disabling recovery consumes pending intent; enabling it later does not revive old work.
 
-Only agents recorded as running qualify. Idle and initializing agents stay inactive. Archived
+Agents recorded as running qualify, and so do idle agents whose background work (running
+subagents, background shells, monitors) the stop killed: an orchestrator ends its turn to wait on
+that work, so without this it would never hear it died. Their resume prompt lists each killed
+item. Other idle agents and initializing agents stay inactive. Archived
 agents or workspaces, private helpers and Hub-owned executions retain their own lifecycle.
 Explicit creation environment overrides are saved with the agent and reapplied when reopening.
 

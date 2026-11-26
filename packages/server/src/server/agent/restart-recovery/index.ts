@@ -5,6 +5,23 @@ interface Dependencies {
   eligible(record: StoredAgentRecord): Promise<boolean>;
   dispatch(agentId: string, prompt: string): Promise<unknown>;
   report(agentId: string, error: unknown): void;
+  /**
+   * FSH fork: what dies with the agent's provider process (running subagents, background shells,
+   * monitors), one label each. An idle agent waiting on it counts as interrupted too.
+   */
+  liveWork?(agentId: string): string[];
+}
+
+/** FSH fork: tells a resumed agent which background work the restart stopped. */
+export function describeInterruptedWork(prompt: string, work: readonly string[]): string {
+  if (work.length === 0) return prompt;
+  return [
+    prompt,
+    "",
+    "The Paseo daemon restarted and stopped this background work before it finished:",
+    ...work.map((label) => `- ${label}`),
+    "Check what each one left behind and restart whatever is unfinished.",
+  ].join("\n");
 }
 export function createRestartRecovery(deps: Dependencies) {
   // Candidates are chosen at startup; each settles once its resume was sent or abandoned.
@@ -21,11 +38,14 @@ export function createRestartRecovery(deps: Dependencies) {
   async function resume(agentId: string) {
     const record = await deps.storage.get(agentId);
     if (!record?.resumeOnStartup) return;
-    await deps.storage.upsert({ ...record, resumeOnStartup: false });
+    await deps.storage.upsert({ ...record, resumeOnStartup: false, interruptedWork: undefined });
     if (!(await eligible(record))) return;
     if (!deps.settings().enabled) return markInterrupted(agentId);
     try {
-      await deps.dispatch(agentId, deps.settings().prompt);
+      await deps.dispatch(
+        agentId,
+        describeInterruptedWork(deps.settings().prompt, record.interruptedWork ?? []),
+      );
     } catch (error) {
       await markInterrupted(agentId);
       throw error;
@@ -65,10 +85,13 @@ export function createRestartRecovery(deps: Dependencies) {
       const interruptedAt = new Date().toISOString();
       const enabled = deps.settings().enabled;
       for (const record of await deps.storage.list()) {
-        if (record.lastStatus === "running" && (await eligible(record)))
+        // FSH fork: an idle agent waiting on background work loses it too.
+        const work = deps.liveWork?.(record.id) ?? [];
+        if ((record.lastStatus === "running" || work.length > 0) && (await eligible(record)))
           await deps.storage.upsert({
             ...record,
             resumeOnStartup: enabled,
+            ...(work.length > 0 ? { interruptedWork: work } : {}),
             ...(enabled ? {} : { interruptedAt }),
           });
       }
