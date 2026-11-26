@@ -26,7 +26,8 @@ export function getScrollOffsetToRevealItem(args: {
   }
 
   if (itemBottom > viewportBottom) {
-    return Math.max(0, itemBottom - args.viewportHeight);
+    // An item taller than the viewport shows its top, where a card's title is.
+    return Math.max(0, Math.min(args.itemTop, itemBottom - args.viewportHeight));
   }
 
   return args.currentOffset;

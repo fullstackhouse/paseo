@@ -35,6 +35,17 @@ describe("getScrollOffsetToRevealItem", () => {
     ).toBe(220);
   });
 
+  it("aligns the top of an item taller than the viewport", () => {
+    expect(
+      getScrollOffsetToRevealItem({
+        currentOffset: 0,
+        viewportHeight: 200,
+        itemTop: 150,
+        itemHeight: 500,
+      }),
+    ).toBe(150);
+  });
+
   it("stays put before the viewport has been measured", () => {
     expect(
       getScrollOffsetToRevealItem({
