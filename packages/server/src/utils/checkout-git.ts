@@ -101,6 +101,14 @@ const lastSuccessfulPullRequestStatus = new Map<string, PullRequestStatusResult>
 let shortstatCacheTtlMs = DEFAULT_SHORTSTAT_CACHE_TTL_MS;
 let shortstatCache = createShortstatCache(shortstatCacheTtlMs);
 const shortstatInFlight = new Map<string, Promise<CheckoutShortstat | null>>();
+// The merge-base each checkout's last diff stat was measured against, with that stat. Unlike
+// the TTL cache this outlives quiet periods, so a ref change hours later can still tell
+// whether the stat moved without rescanning the working tree.
+interface ShortstatMeasurement {
+  diffBase: string | null;
+  shortstat: CheckoutShortstat | null;
+}
+const shortstatMeasurements = new Map<string, ShortstatMeasurement>();
 
 interface CheckoutReadCacheOptions {
   force?: boolean;
@@ -178,6 +186,15 @@ function getShortstatCacheKey(cwd: string): string {
   return resolve(cwd);
 }
 
+function rememberShortstatMeasurement(key: string, measurement: ShortstatMeasurement): void {
+  shortstatMeasurements.delete(key);
+  shortstatMeasurements.set(key, measurement);
+  if (shortstatMeasurements.size > SHORTSTAT_CACHE_MAX) {
+    const oldest = shortstatMeasurements.keys().next();
+    if (!oldest.done) shortstatMeasurements.delete(oldest.value);
+  }
+}
+
 export function __resetPullRequestStatusCacheForTests(): void {
   pullRequestStatusCache.clear();
   pullRequestStatusCache.cancelTimer();
@@ -197,6 +214,7 @@ export function __setPullRequestStatusCacheTtlForTests(ttlMs: number): void {
 }
 
 export function __resetCheckoutShortstatCacheForTests(): void {
+  shortstatMeasurements.clear();
   shortstatCache.clear();
   shortstatCache.cancelTimer();
   shortstatCacheTtlMs = DEFAULT_SHORTSTAT_CACHE_TTL_MS;
@@ -205,6 +223,7 @@ export function __resetCheckoutShortstatCacheForTests(): void {
 }
 
 export function __setCheckoutShortstatCacheTtlForTests(ttlMs: number): void {
+  shortstatMeasurements.clear();
   shortstatCache.clear();
   shortstatCache.cancelTimer();
   shortstatCacheTtlMs = ttlMs;
@@ -2449,6 +2468,10 @@ export async function getCheckoutPlacement(
 export async function getCheckoutStatus(
   cwd: string,
   context?: CheckoutContext,
+  options?: {
+    /** Carry a known dirty bit forward instead of running `git status` (ref-only refreshes). */
+    knownIsDirty?: boolean;
+  },
 ): Promise<CheckoutStatusResult> {
   const facts = await getCheckoutSnapshotFacts(cwd, context);
   if (!facts.isGit) {
@@ -2459,7 +2482,7 @@ export async function getCheckoutStatus(
   const currentBranch = facts.currentBranch;
   const remoteUrl = facts.remoteUrl;
   const paseoWorktree = facts.paseoWorktree;
-  const isDirty = await isWorkingTreeDirty(cwd, context);
+  const isDirty = options?.knownIsDirty ?? (await isWorkingTreeDirty(cwd, context));
   const hasRemote = remoteUrl !== null;
   const baseRef = facts.resolvedBaseRef;
   const mainRepoRoot = facts.mainRepoRoot;
@@ -3159,6 +3182,18 @@ function handleShortstatGitError(error: unknown, throwOnGitError = false): null 
   return null;
 }
 
+async function resolveShortstatComparisonRefForCwd(
+  cwd: string,
+  context?: CheckoutContext,
+): Promise<string | null> {
+  const facts = context?.facts;
+  const localBaseRef = facts?.isGit
+    ? facts.resolvedBaseRef
+    : await getResolvedBaseRefForCwd(cwd, context);
+  const currentBranch = facts?.isGit ? facts.currentBranch : await getCurrentBranch(cwd, context);
+  return resolveShortstatComparisonRef({ cwd, currentBranch, localBaseRef, facts, context });
+}
+
 async function getCheckoutShortstatUncached(
   cwd: string,
   context?: CheckoutContext,
@@ -3175,19 +3210,10 @@ async function getCheckoutShortstatUncached(
     }
   }
 
-  const facts = context?.facts;
-  const localBaseRef = facts?.isGit
-    ? facts.resolvedBaseRef
-    : await getResolvedBaseRefForCwd(cwd, context);
-  const currentBranch = facts?.isGit ? facts.currentBranch : await getCurrentBranch(cwd, context);
-  const comparisonRef = await resolveShortstatComparisonRef({
-    cwd,
-    currentBranch,
-    localBaseRef,
-    facts,
-    context,
-  });
+  const measurementKey = getShortstatCacheKey(cwd);
+  const comparisonRef = await resolveShortstatComparisonRefForCwd(cwd, context);
   if (!comparisonRef) {
+    rememberShortstatMeasurement(measurementKey, { diffBase: null, shortstat: null });
     return null;
   }
 
@@ -3198,6 +3224,7 @@ async function getCheckoutShortstatUncached(
       runGit: getRunGitCommand(context),
     });
     if (!mergeBase) {
+      rememberShortstatMeasurement(measurementKey, { diffBase: null, shortstat: null });
       return null;
     }
 
@@ -3211,16 +3238,51 @@ async function getCheckoutShortstatUncached(
 
     const tracked = parseCheckoutShortstat(stdout);
 
+    let shortstat: CheckoutShortstat | null = null;
     if (tracked) {
-      return { additions: tracked.additions + untrackedAdditions, deletions: tracked.deletions };
+      shortstat = {
+        additions: tracked.additions + untrackedAdditions,
+        deletions: tracked.deletions,
+      };
+    } else if (untrackedAdditions > 0) {
+      shortstat = { additions: untrackedAdditions, deletions: 0 };
     }
-    if (untrackedAdditions > 0) {
-      return { additions: untrackedAdditions, deletions: 0 };
-    }
-    return null;
+    rememberShortstatMeasurement(measurementKey, { diffBase: mergeBase, shortstat });
+    return shortstat;
   } catch (error) {
+    shortstatMeasurements.delete(measurementKey);
     return handleShortstatGitError(error, options?.throwOnGitError);
   }
+}
+
+/**
+ * The diff stat after a ref-only change: refs other than HEAD's own branch cannot touch the
+ * working tree, so the stat moves only when the merge-base it was measured against moves.
+ * Resolving that base costs a merge-base and a rev-parse; the diff and the untracked-file
+ * scan run only when it moved, or when this checkout has no measurement yet.
+ */
+export async function getCheckoutShortstatForRefChange(
+  cwd: string,
+  context?: CheckoutContext,
+): Promise<CheckoutShortstat | null> {
+  const key = getShortstatCacheKey(cwd);
+  const measured = shortstatMeasurements.get(key);
+  if (measured && context?.facts?.isGit) {
+    const comparisonRef = await resolveShortstatComparisonRefForCwd(cwd, context);
+    const diffBase = comparisonRef
+      ? await resolveBranchDiffBase({
+          cwd,
+          baseRef: comparisonRef,
+          runGit: getRunGitCommand(context),
+        })
+      : null;
+    if (diffBase === measured.diffBase) {
+      return measured.shortstat;
+    }
+  }
+  const shortstat = await getCheckoutShortstatUncached(cwd, context, { throwOnGitError: true });
+  shortstatCache.set(key, shortstat);
+  return shortstat;
 }
 
 async function resolveShortstatComparisonRef(input: {
@@ -3373,11 +3435,7 @@ export async function getCheckoutRefDerivedState(
     });
   }
   if (baseMoved || (upstreamMoved && currentBranch === normalizedResolvedBase)) {
-    diffStat = await getCheckoutShortstatUncached(
-      cwd,
-      { ...context, facts },
-      { throwOnGitError: true },
-    );
+    diffStat = await getCheckoutShortstatForRefChange(cwd, { ...context, facts });
   }
 
   let upstreamStatus = facts.upstreamStatus;

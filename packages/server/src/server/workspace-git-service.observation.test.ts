@@ -220,6 +220,7 @@ function createService(
       })),
       getCheckoutStatus,
       getCheckoutShortstat,
+      getCheckoutShortstatForRefChange: vi.fn(async () => getCheckoutShortstat()),
       getCheckoutWorktreeState: vi.fn(async (cwd: string) => {
         const status = await getCheckoutStatus(cwd);
         if (!status.isGit) {
@@ -1109,6 +1110,11 @@ describe("WorkspaceGitService checkout observation", () => {
     await vi.waitFor(() => {
       expect(getCalledCwds(getCheckoutStatus).sort()).toEqual([WORKTREE_A, WORKTREE_B].sort());
     });
+    // Neither has main checked out: the dependents keep their working-tree fields.
+    expect(getCheckoutStatus.mock.calls.map((call) => call[2])).toEqual([
+      { knownIsDirty: false },
+      { knownIsDirty: false },
+    ]);
 
     first.unsubscribe();
     second.unsubscribe();
@@ -1147,7 +1153,7 @@ describe("WorkspaceGitService checkout observation", () => {
     service.dispose();
   });
 
-  test("a newly created remote tracking ref refreshes every repository workspace", async () => {
+  test("a newly created remote tracking ref refreshes only the refs of workspaces naming its branch", async () => {
     const watcher = createWatcherHarness();
     const getCheckoutSnapshotFacts = vi.fn(async (cwd: string) => {
       const facts = createLinkedCheckoutFacts(cwd);
@@ -1189,8 +1195,9 @@ describe("WorkspaceGitService checkout observation", () => {
       ]);
     await vi.advanceTimersByTimeAsync(1_000);
     await vi.waitFor(() => {
-      expect(getCalledCwds(getCheckoutStatus).sort()).toEqual([WORKTREE_A, WORKTREE_B].sort());
+      expect(getCalledCwds(getCheckoutStatus)).toEqual([WORKTREE_A]);
     });
+    expect(getCheckoutStatus.mock.calls[0]?.[2]).toEqual({ knownIsDirty: false });
 
     first.unsubscribe();
     second.unsubscribe();
