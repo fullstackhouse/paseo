@@ -15,6 +15,7 @@ import {
   CircleAlert,
   CircleDashed,
   FolderOpen,
+  GitCommitHorizontal,
   GitPullRequest,
   LayoutDashboard,
   MessageCircleQuestion,
@@ -118,6 +119,7 @@ const ThemedAsk = withUnistyles(MessageCircleQuestion);
 const ThemedShield = withUnistyles(ShieldQuestion);
 const ThemedAlert = withUnistyles(CircleAlert);
 const ThemedPullRequest = withUnistyles(GitPullRequest);
+const ThemedCommit = withUnistyles(GitCommitHorizontal);
 const ThemedBot = withUnistyles(Bot);
 const ThemedFolder = withUnistyles(FolderOpen);
 const ThemedUser = withUnistyles(User);
@@ -941,6 +943,8 @@ function useMoveView(
         const action = gitActions && findGitAction(gitActions, "archive-workspace");
         return action ? archiveMoveView(action, runGitAction, input) : null;
       }
+      case "uncommitted":
+        return uncommittedMoveView(input);
     }
   }, [agent.label, facts, gitActions, permission, row, runGitAction, serverId, t, workspaceKey]);
 }
@@ -1029,6 +1033,20 @@ function archiveMoveView(
         ? t("panels.overview.prMergedTitle", { number: pr.number })
         : branchFacts(facts, t) || undefined,
     press: { action: action.label, run: () => runGitAction(action) },
+  };
+}
+
+/** The work shipped, but uncommitted changes keep Archive back (deriveYourMove). */
+function uncommittedMoveView({ t, workspaceKey }: MoveViewInput): MoveView {
+  return {
+    icon: <ThemedCommit size={ICON_SIZE} uniProps={warningColorMapping} />,
+    tone: "warn",
+    title: t("panels.overview.uncommitted"),
+    facts: t("panels.overview.uncommittedFacts"),
+    press: {
+      action: t("panels.overview.reviewChanges"),
+      run: () => openExplorerSidebarView({ isCompact: false, workspaceKey, view: "changes" }),
+    },
   };
 }
 

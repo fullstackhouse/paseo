@@ -65,7 +65,8 @@ export type YourMoveRow =
   | { kind: "entry"; key: string; item: WorkspaceSummaryItem; entry: PluginWorkspaceSummaryEntry }
   | { kind: "plugin"; key: string; item: WorkspaceSummaryItem }
   | { kind: "failed"; key: string; agentId: string }
-  | { kind: "archive"; key: string };
+  | { kind: "archive"; key: string }
+  | { kind: "uncommitted"; key: string };
 
 /**
  * Everything that waits on the human, in the attention ladder's order, then Archive. Git steps and
@@ -79,7 +80,8 @@ export type YourMoveRow =
  * below Your move, says what Archive waits for, so no row here does. Nor while anything else waits on
  * the human: an open ask means the work isn't settled (a "merge or request review" ask outlives a done
  * card), and a permission prompt or failed agent outranks `running` in the workspace status, which
- * would hide another agent's live work from `isWorkStillOpen`.
+ * would hide another agent's live work from `isWorkStillOpen`. When only uncommitted changes hold
+ * Archive back, an Uncommitted row says so, so a shipped workspace never goes quiet without a reason.
  */
 export function deriveYourMove(
   input: ArchiveInput & { items: readonly AttentionItem[] },
@@ -108,7 +110,11 @@ export function deriveYourMove(
     }
   }
   if (input.agentRunning || rows.length > 0 || input.workOpen || input.inProgress) return rows;
-  if (archiveFits(input)) rows.push({ kind: "archive", key: `git:${ARCHIVE_ACTION_ID}` });
+  if (archiveFits(input, ARCHIVABLE_GIT_STEPS)) {
+    rows.push({ kind: "archive", key: `git:${ARCHIVE_ACTION_ID}` });
+  } else if (archiveFits(input, COMMIT_STEP)) {
+    rows.push({ kind: "uncommitted", key: "git:commit" });
+  }
   return rows;
 }
 
@@ -126,15 +132,20 @@ interface ArchiveInput {
   inProgress: boolean;
 }
 
-/** Whether the work shipped and Archive fits the branch, before anything holds it back. */
-function archiveFits(input: ArchiveInput): boolean {
+const COMMIT_STEP: ReadonlySet<GitActionId> = new Set(["commit"]);
+
+/**
+ * Whether the work shipped and Archive fits the branch once its git step is one of `steps`, before
+ * anything holds it back.
+ */
+function archiveFits(input: ArchiveInput, steps: ReadonlySet<GitActionId>): boolean {
   const shipped = input.prMerged || input.statusDone;
   return (
     shipped &&
     input.canArchive &&
     (input.isWorktree || input.prMerged) &&
     input.gitPrimaryId !== null &&
-    ARCHIVABLE_GIT_STEPS.has(input.gitPrimaryId)
+    steps.has(input.gitPrimaryId)
   );
 }
 

@@ -2355,6 +2355,8 @@ export const en = {
       prMergedTitle: "PR #{{number}} merged",
       outdated: "You replied {{time}}; the agent hasn't updated this since.",
       readyToArchive: "Ready to archive",
+      uncommittedFacts: "Commit or discard them to archive",
+      reviewChanges: "Review changes",
       inProgress: "In progress",
       nothingMoving: "nothing moving",
       updatedAgo: "updated {{time}}",

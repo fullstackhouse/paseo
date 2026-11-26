@@ -192,10 +192,28 @@ describe("deriveYourMove", () => {
     });
 
     it("waits while work isn't in the PR yet, or there is no git step", () => {
-      for (const id of ["commit", "merge-pr-squash", "pr"] as const) {
+      for (const id of ["merge-pr-squash", "pr"] as const) {
         expect(deriveYourMove({ ...base, gitPrimaryId: id })).toEqual([]);
       }
       expect(deriveYourMove({ ...base, gitPrimaryId: null })).toEqual([]);
+    });
+
+    const commit = { ...base, gitPrimaryId: "commit" as GitActionId };
+    const uncommitted = [{ kind: "uncommitted", key: "git:commit" }];
+
+    it("says uncommitted changes hold it back once the work shipped", () => {
+      // Done, 10 PRs merged, +22 lines left in the worktree: the header's step is Commit.
+      expect(deriveYourMove(commit)).toEqual(uncommitted);
+      expect(deriveYourMove({ ...commit, statusDone: false, prMerged: true })).toEqual(uncommitted);
+    });
+
+    it("doesn't mention uncommitted changes when Archive wouldn't be offered anyway", () => {
+      expect(deriveYourMove({ ...commit, statusDone: false })).toEqual([]);
+      expect(deriveYourMove({ ...commit, canArchive: false })).toEqual([]);
+      expect(deriveYourMove({ ...commit, isWorktree: false })).toEqual([]);
+      expect(deriveYourMove({ ...commit, agentRunning: true })).toEqual([]);
+      expect(deriveYourMove({ ...commit, workOpen: true })).toEqual([]);
+      expect(deriveYourMove({ ...commit, inProgress: true })).toEqual([]);
     });
 
     it("waits while an agent runs or archive can't run", () => {
