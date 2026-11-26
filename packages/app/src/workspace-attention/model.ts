@@ -5,6 +5,7 @@ import type {
 import type { Agent, WorkspaceDescriptor } from "@/stores/session-store";
 import type { ExplorerAttentionRecord } from "@/stores/workspace-layout-store";
 import type { WorkspaceSummaryItem } from "@/plugins/workspace-summary/store";
+import { unrecordedWaits } from "@/workspace-status/attention";
 
 type PullRequest = NonNullable<NonNullable<WorkspaceDescriptor["githubRuntime"]>["pullRequest"]>;
 
@@ -12,6 +13,8 @@ type PullRequest = NonNullable<NonNullable<WorkspaceDescriptor["githubRuntime"]>
 export type AttentionItem =
   | { kind: "permission"; key: string; agentId: string }
   | { kind: "plugin"; key: string; item: WorkspaceSummaryItem }
+  /** An agent's status card waits on the human, but no open ask says what for. */
+  | { kind: "unrecorded"; key: string; item: WorkspaceSummaryItem; agentId: string }
   | { kind: "failed"; key: string; agentId: string }
   | { kind: "pr-checks-failed"; key: string }
   | { kind: "pr-ready"; key: string }
@@ -62,6 +65,14 @@ export function deriveAttentionItems(input: AttentionInput): AttentionItem[] {
       kind: "plugin",
       key: `plugin:${item.pluginId}:${item.itemId}:${item.key ?? ""}`,
       item,
+    });
+  }
+  for (const wait of unrecordedWaits(input.summaryItems)) {
+    items.push({
+      kind: "unrecorded",
+      key: `unrecorded:${wait.agentId}:${wait.updatedAt}`,
+      item: wait.item,
+      agentId: wait.agentId,
     });
   }
   for (const agent of agents) {
@@ -122,6 +133,7 @@ export function pickAttentionTab(input: {
     case "permission":
     case "failed":
     case "plugin":
+    case "unrecorded":
       return "overview";
     case "pr-checks-failed":
     case "pr-ready":

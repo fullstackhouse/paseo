@@ -2418,6 +2418,7 @@ export const en = {
       reviewPermission: "Review permission",
       openAgent: "Open agent",
       failedReason: "An agent stopped with an error",
+      unrecordedTitle: "Status waits on you, but no ask says what",
       uncommitted: "Uncommitted changes",
       merged: "Merged",
       checksFailing: "Checks failing",

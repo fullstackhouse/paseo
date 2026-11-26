@@ -2407,6 +2407,7 @@ export const ptBR: TranslationResources = {
       reviewPermission: "Revisar permissão",
       openAgent: "Abrir agente",
       failedReason: "Um agente parou com um erro",
+      unrecordedTitle: "O status aguarda você, mas nenhum pedido diz o quê",
       uncommitted: "Alterações não commitadas",
       merged: "Mesclado",
       checksFailing: "Verificações falhando",

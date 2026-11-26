@@ -3,6 +3,7 @@ import type { GitActionId } from "@/git/policy";
 import type { WorkspaceSummaryItem } from "@/plugins/workspace-summary/store";
 import type { Agent } from "@/stores/session-store";
 import type { AttentionItem } from "@/workspace-attention/model";
+import { deriveStatusCard } from "@/workspace-status/attention";
 import {
   blockerTarget,
   statusBlockers,
@@ -119,6 +120,40 @@ describe("deriveYourMove", () => {
       "permission",
       ...Array(7).fill("entry"),
       "failed",
+    ]);
+  });
+
+  it("lists one entry row per unrecorded agent, keyed and rendered by the card's item", () => {
+    const status = summaryItem({ pluginId: "paseo-status", itemId: "status", title: "Status" });
+    const rows = deriveYourMove({
+      items: [
+        { kind: "unrecorded", key: "unrecorded:a:1", item: status, agentId: "a" },
+        { kind: "unrecorded", key: "unrecorded:b:2", item: status, agentId: "b" },
+      ],
+      agentRunning: false,
+      gitPrimaryId: null,
+      canArchive: false,
+      isWorktree: true,
+      prMerged: false,
+      statusDone: false,
+      workOpen: false,
+      inProgress: false,
+    });
+    expect(rows).toEqual([
+      {
+        kind: "entry",
+        key: "entry:paseo-status:status:a",
+        item: status,
+        entry: { id: "a", title: "Status", agentId: "a" },
+        unrecorded: true,
+      },
+      {
+        kind: "entry",
+        key: "entry:paseo-status:status:b",
+        item: status,
+        entry: { id: "b", title: "Status", agentId: "b" },
+        unrecorded: true,
+      },
     ]);
   });
 
@@ -886,5 +921,35 @@ describe("deriveInProgress", () => {
   it("knows whether any plugin lists work in progress", () => {
     expect(hasInProgressEntries([asks([])])).toBe(false);
     expect(hasInProgressEntries([asks([{ id: "A1", title: "x", updatedAt: 1 }])])).toBe(true);
+  });
+});
+
+describe("a waiting card that attention reads as blocked", () => {
+  const status = summaryItem({
+    pluginId: "paseo-status",
+    itemId: "status",
+    status: { state: "waiting_on_you", summary: "PR #65 needs a reviewer", updatedAt: 5 },
+    cards: [{ agentId: "a", state: "waiting_on_you", updatedAt: 5, liveChildren: ["c"] }],
+  });
+  const asks = summaryItem({
+    pluginId: "paseo-asks",
+    itemId: "asks",
+    inProgress: [{ id: "A1", title: "Request review on PR #65", agentId: "a", updatedAt: 5 }],
+  });
+  const card = deriveStatusCard(status, [status, asks], () => "Child agent");
+
+  it("reads Blocked in Status and in the lineage word", () => {
+    expect(card?.state).toBe("blocked");
+    expect(deriveWorkspaceStateWord({ status: card, agents: [] })).toBe("blocked");
+  });
+
+  it("lists the ask under Waiting on and the child under the Tree's Blocked by", () => {
+    const blockers = statusBlockers(card);
+    expect(blockers.filter((blocker) => !isTreeBlocker(blocker))).toEqual([
+      { kind: "other", label: "Request review on PR #65" },
+    ]);
+    expect(blockers.filter(isTreeBlocker)).toEqual([
+      { kind: "agent", agentId: "c", label: "Child agent" },
+    ]);
   });
 });

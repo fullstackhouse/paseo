@@ -2395,6 +2395,7 @@ export const ja: TranslationResources = {
       reviewPermission: "権限を確認",
       openAgent: "エージェントを開く",
       failedReason: "エージェントがエラーで停止しました",
+      unrecordedTitle: "ステータスはあなたを待っていますが、何についての依頼もありません",
       uncommitted: "未コミットの変更",
       merged: "マージ済み",
       checksFailing: "チェック失敗",

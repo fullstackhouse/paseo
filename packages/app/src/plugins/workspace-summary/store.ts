@@ -11,6 +11,7 @@ import type {
   PluginWorkspacePullRequest,
   PluginWorkspaceWorkState,
   PluginWorkspaceSummaryEntryProps,
+  PluginWorkspaceAgentCard,
 } from "@getpaseo/plugin/client";
 import type { ComponentType } from "react";
 import { isHttpUrl } from "@/utils/http-url";
@@ -65,6 +66,7 @@ function cleanState(patch: PluginWorkspaceSummaryItemState): PluginWorkspaceSumm
   if (patch.pullRequests !== undefined) state.pullRequests = cleanPullRequests(patch.pullRequests);
   if (patch.pullRequestsStale !== undefined)
     state.pullRequestsStale = patch.pullRequestsStale === true;
+  if (patch.cards !== undefined) state.cards = cleanCards(patch.cards);
   return state;
 }
 
@@ -154,8 +156,45 @@ function cleanEntries(
     const title = typeof entry?.title === "string" ? entry.title.trim() : "";
     if (!id || !title || seen.has(id)) continue;
     seen.add(id);
-    const detail = typeof entry.detail === "string" ? entry.detail.trim() : "";
-    clean.push(detail ? { id, title, detail } : { id, title });
+    const item: PluginWorkspaceSummaryEntry = { id, title };
+    const detail = optionalText(entry.detail);
+    if (detail) item.detail = detail;
+    const agentId = optionalText(entry.agentId);
+    if (agentId) item.agentId = agentId;
+    clean.push(item);
+  }
+  return clean;
+}
+
+/** More cards than this is a plugin bug; a workspace doesn't run that many agents. */
+const MAX_CARDS = 50;
+
+function finiteTime(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+/** Drops malformed cards one by one; one card per agent, the first wins. */
+function cleanCards(cards: unknown): PluginWorkspaceAgentCard[] {
+  if (!Array.isArray(cards)) return [];
+  const clean: PluginWorkspaceAgentCard[] = [];
+  const seen = new Set<string>();
+  for (const card of cards as Partial<PluginWorkspaceAgentCard>[]) {
+    if (clean.length >= MAX_CARDS) break;
+    const agentId = optionalText(card?.agentId);
+    const updatedAt = finiteTime(card?.updatedAt);
+    if (!agentId || updatedAt === undefined || seen.has(agentId)) continue;
+    if (!card.state || !STATUS_STATES.has(card.state)) continue;
+    seen.add(agentId);
+    const item: PluginWorkspaceAgentCard = { agentId, state: card.state, updatedAt };
+    if (card.answered === true) item.answered = true;
+    if (card.live === true) item.live = true;
+    const lastLiveAt = finiteTime(card.lastLiveAt);
+    if (lastLiveAt !== undefined) item.lastLiveAt = lastLiveAt;
+    const children = Array.isArray(card.liveChildren)
+      ? card.liveChildren.flatMap((id: unknown) => optionalText(id) ?? [])
+      : [];
+    if (children.length > 0) item.liveChildren = children;
+    clean.push(item);
   }
   return clean;
 }

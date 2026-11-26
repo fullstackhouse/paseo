@@ -23,7 +23,8 @@ import {
 /** Shows Explorer on the tab that belongs to an attention item. */
 export function showExplorerForAttention(workspaceKey: string, item: AttentionItem): void {
   switch (item.kind) {
-    case "plugin": {
+    case "plugin":
+    case "unrecorded": {
       const paneId = showExplorerSidebar({ isCompact: false, workspaceKey });
       const panelId = item.item.panelId;
       if (!panelId || !paneId) return;

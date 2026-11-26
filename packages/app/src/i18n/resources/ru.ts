@@ -2407,6 +2407,7 @@ export const ru: TranslationResources = {
       reviewPermission: "Проверить разрешение",
       openAgent: "Открыть агента",
       failedReason: "Агент остановился с ошибкой",
+      unrecordedTitle: "Статус ждёт вас, но ни один запрос не говорит, чего именно",
       uncommitted: "Незакоммиченные изменения",
       merged: "Слит",
       checksFailing: "Проверки не прошли",

@@ -62,7 +62,14 @@ export function deriveWorkspaceStateWord(input: {
 
 export type YourMoveRow =
   | { kind: "permission"; key: string; agentId: string }
-  | { kind: "entry"; key: string; item: WorkspaceSummaryItem; entry: PluginWorkspaceSummaryEntry }
+  | {
+      kind: "entry";
+      key: string;
+      item: WorkspaceSummaryItem;
+      entry: PluginWorkspaceSummaryEntry;
+      /** The agent's card waits on you with no open ask; `entry.id` is the agent. */
+      unrecorded?: true;
+    }
   | { kind: "plugin"; key: string; item: WorkspaceSummaryItem }
   | { kind: "failed"; key: string; agentId: string }
   | { kind: "archive"; key: string }
@@ -90,6 +97,16 @@ export function deriveYourMove(
   for (const item of input.items) {
     if (item.kind === "permission" || item.kind === "failed") {
       rows.push({ kind: item.kind, key: item.key, agentId: item.agentId });
+    } else if (item.kind === "unrecorded") {
+      // The card's plugin renders the row (paseo-status: Sync asks) with the agent as the entry id.
+      const { pluginId, itemId } = item.item;
+      rows.push({
+        kind: "entry",
+        key: `entry:${pluginId}:${itemId}:${item.agentId}`,
+        item: item.item,
+        entry: { id: item.agentId, title: item.item.title, agentId: item.agentId },
+        unrecorded: true,
+      });
     } else if (item.kind === "plugin") {
       const entries = item.item.entries ?? [];
       if (entries.length === 0) {

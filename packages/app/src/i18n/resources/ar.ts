@@ -2367,6 +2367,7 @@ export const ar: TranslationResources = {
       reviewPermission: "مراجعة الإذن",
       openAgent: "فتح الوكيل",
       failedReason: "توقف وكيل بسبب خطأ",
+      unrecordedTitle: "الحالة تنتظرك، لكن لا يوجد طلب يوضح ما المطلوب",
       uncommitted: "تغييرات غير مُثبتة",
       merged: "مدموج",
       checksFailing: "الفحوصات فاشلة",
