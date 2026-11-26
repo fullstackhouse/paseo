@@ -28,6 +28,7 @@ import {
 } from "./connection/index.js";
 import { CreationClient } from "./creation/index.js";
 import type {
+  ChangeRequestRead,
   CreationSnapshot,
   WorkspaceAppearance,
   WorkspaceAppearanceSetRequest,
@@ -4258,6 +4259,25 @@ export class DaemonClient {
       delivered: payload.delivered,
       ...(payload.dropped !== undefined ? { dropped: payload.dropped } : {}),
     };
+  }
+
+  /** Reads pull request state once through the host's forge reader; one result per URL, in order. */
+  async readChangeRequests(
+    urls: string[],
+    options?: { requestId?: string },
+  ): Promise<ChangeRequestRead[]> {
+    // COMPAT(changeRequestsRead): FSH-only, added after v0.17.1, remove gate after 2027-05-26.
+    if (this.lastServerInfoMessage?.features?.changeRequestsRead !== true) {
+      throw new Error("Update the host to read pull requests through Paseo.");
+    }
+    const requestId = this.createRequestId(options?.requestId);
+    const payload = await this.sendCorrelatedSessionRequest({
+      requestId,
+      message: { type: "forge.change_requests.read.request", requestId, urls },
+      responseType: "forge.change_requests.read.response",
+    });
+    if (payload.error !== null) throw new Error(payload.error);
+    return payload.results;
   }
 
   async searchAgentTimeline({

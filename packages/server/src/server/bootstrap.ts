@@ -134,6 +134,7 @@ import { VoiceAssistantWebSocketServer, isDaemonOriginAllowed } from "./websocke
 import { WorkspaceSetupRuntime } from "./workspace-setup-runtime.js";
 import { createWorkspaceLabelService } from "./workspace-labels/index.js";
 import { createChangeRequestRouter } from "../services/change-request-router.js";
+import { createChangeRequestReader } from "../services/change-request-reader.js";
 import { createForgeService } from "../services/forge-registry.js";
 import { createForgeResolver } from "../services/forge-resolver.js";
 import { createGitHubService } from "../services/github-service.js";
@@ -1598,8 +1599,10 @@ export async function createPaseoDaemon(
     }
   });
 
+  const changeRequestRouter = createChangeRequestRouter({ forgeResolver });
+  const changeRequestReader = createChangeRequestReader({ router: changeRequestRouter });
   const changeRequestWatches = createChangeRequestWatches({
-    router: createChangeRequestRouter({ forgeResolver }),
+    router: changeRequestRouter,
     backgroundWork: agentManager,
     paseoHome: config.paseoHome,
     logger,
@@ -1997,6 +2000,7 @@ export async function createPaseoDaemon(
                 daemonStatusRpc: dependencies.serverFeatureOverrides?.daemonStatusRpc,
                 relayConfig: dependencies.serverFeatureOverrides?.relayConfig,
                 startPaused: true,
+                changeRequestReader,
               },
               workspaceAutoName,
               workspaceRuntimeStore,

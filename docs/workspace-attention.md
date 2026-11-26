@@ -73,10 +73,18 @@ type ChangeRequestRead =
       checks: { name: string; state: "passing" | "failing" | "pending" | "skipped" }[];
       headSha: string;
     }
-  | { url: string; ok: false; error: string };
+  | {
+      url: string;
+      ok: false;
+      error: string;
+      /** Missing means "error". */
+      reason?: "paused" | "not_found" | "unsupported" | "error";
+      /** For `paused`: when reads resume, epoch ms. */
+      retryAt?: number;
+    };
 ```
 
-It uses the reader behind `subscribe_change_request` (`services/change-request-source.ts`): any URL on any forge the router knows, batched, sharing one rate-limit pause, cached for 30 seconds. Plugins keep their own refresh intervals; repeated reads inside the cache window cost nothing.
+It uses the reader behind `subscribe_change_request` (`services/change-request-source.ts`): batched, sharing one rate-limit pause, cached for 30 seconds. Only GitHub implements `ChangeRequestSource.read` so far; a URL on another forge comes back `ok: false` with `reason: "unsupported"`. While the daemon pauses GitHub reads at the rate-limit reserve, every read answers `reason: "paused"` with `retryAt`: plugins keep their last state and mark it stale rather than showing the PR as unknown. Each check may also carry its `url`. Plugins keep their own refresh intervals; repeated reads inside the cache window cost nothing.
 
 What stays in plugins: finding which PRs belong to a workspace (paseo-prs' branch and stack lookups), deployments (paseo-asks), and paseo-inbox's review runs, which need files, threads and timeline events no other surface uses.
 

@@ -1,3 +1,5 @@
+import type { ChangeRequestReader } from "../services/change-request-reader.js";
+import type { ChangeRequestRead } from "@getpaseo/protocol/messages";
 import { DiffSession } from "./diff/index.js";
 import { type WorkspaceRuntimeStore } from "./workspace-runtime-store/index.js";
 import type { AgentMessageDelivery } from "./agent/agent-messages/index.js";
@@ -542,6 +544,7 @@ export interface SessionOptions {
     workspaceId: string;
     agentId?: string;
   }) => Promise<{ woke: boolean }>;
+  changeRequestReader?: ChangeRequestReader;
   sendPluginNotification?: (
     pluginId: string,
     notification: import("./plugin-notifications.js").PluginNotificationInput,
@@ -941,6 +944,7 @@ export class Session {
   private readonly messageReceipts: Pick<MessageReceipts, "send">;
   private readonly agentMessages: AgentMessageDelivery;
   private readonly sendPluginNotification: SessionOptions["sendPluginNotification"];
+  private readonly changeRequestReader: SessionOptions["changeRequestReader"];
   private readonly reportWorkspaceAttention: SessionOptions["reportWorkspaceAttention"];
   private readonly createAgentLifecycleDispatch: CreateAgentLifecycleDispatch;
   private readonly creationService: Pick<CreationService, "create" | "subscribe">;
@@ -1031,6 +1035,7 @@ export class Session {
     this.messageReceipts = options.messageReceipts;
     this.agentMessages = options.agentMessages;
     this.sendPluginNotification = options.sendPluginNotification;
+    this.changeRequestReader = options.changeRequestReader;
     this.reportWorkspaceAttention = options.reportWorkspaceAttention;
     this.creationService = options.creationService;
     this.projectIcons = new ProjectIconReader(paseoHome);
@@ -3580,6 +3585,8 @@ export class Session {
         return this.handleWorkspaceSnoozeSetRequest(msg);
       case "workspace.attention.report.request":
         return this.handleWorkspaceAttentionReportRequest(msg);
+      case "forge.change_requests.read.request":
+        return this.handleForgeChangeRequestsReadRequest(msg);
       case "workspace.group.set.request":
         return this.handleWorkspaceGroupSetRequest(msg);
       case "workspace.appearance.set.request":
@@ -4776,6 +4783,31 @@ export class Session {
         manualGroup: null,
         error: getErrorMessageOr(error, "Failed to move workspace"),
       });
+    }
+  }
+
+  private async handleForgeChangeRequestsReadRequest(
+    request: Extract<SessionInboundMessage, { type: "forge.change_requests.read.request" }>,
+  ): Promise<void> {
+    const { urls, requestId } = request;
+    const emitResponse = (results: ChangeRequestRead[], error: string | null) => {
+      this.emit({
+        type: "forge.change_requests.read.response",
+        payload: { requestId, results, error },
+      });
+    };
+    if (!this.changeRequestReader) {
+      emitResponse([], "Change request reads are unavailable");
+      return;
+    }
+    try {
+      emitResponse(await this.changeRequestReader.read(urls), null);
+    } catch (error) {
+      this.sessionLogger.error(
+        { requestId, err: error },
+        "session: forge.change_requests.read.request error",
+      );
+      emitResponse([], getErrorMessageOr(error, "Failed to read change requests"));
     }
   }
 

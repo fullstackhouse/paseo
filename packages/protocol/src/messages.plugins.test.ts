@@ -8,6 +8,39 @@ import {
 } from "./messages.js";
 
 describe("plugin protocol compatibility", () => {
+  it("round-trips change request reads", () => {
+    const request = {
+      type: "forge.change_requests.read.request",
+      requestId: "read",
+      urls: ["https://github.com/acme/widgets/pull/41", "https://example.com/x"],
+    };
+    expect(SessionInboundMessageSchema.parse(request)).toEqual(request);
+    const response = {
+      type: "forge.change_requests.read.response",
+      payload: {
+        requestId: "read",
+        error: null,
+        results: [
+          {
+            url: "https://github.com/acme/widgets/pull/41",
+            ok: true,
+            number: 41,
+            title: "Fix the login redirect",
+            state: "open",
+            isDraft: false,
+            mergeable: "conflicting",
+            reviewDecision: null,
+            checksState: "pending",
+            checks: [{ name: "build", state: "pending" }],
+            headSha: "abc",
+          },
+          { url: "https://example.com/x", ok: false, error: "Unsupported host" },
+        ],
+      },
+    };
+    expect(SessionOutboundMessageSchema.parse(response)).toEqual(response);
+  });
+
   it.each([undefined, { paseo: ">=0.8.0" }])(
     "parses plugin catalogs with requirements %j",
     (requirements) => {
