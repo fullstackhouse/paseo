@@ -2306,6 +2306,8 @@ export const ar: TranslationResources = {
       prMergedTitle: "تم دمج PR #{{number}}",
       outdated: "رددت {{time}}؛ لم يحدّث الوكيل هذا منذ ذلك الحين.",
       readyToArchive: "جاهز للأرشفة",
+      uncommittedFacts: "أودِعها أو تجاهلها لتتمكن من الأرشفة",
+      reviewChanges: "مراجعة التغييرات",
       inProgress: "قيد التنفيذ",
       nothingMoving: "لا شيء يتحرك",
       updatedAgo: "حُدّث {{time}}",

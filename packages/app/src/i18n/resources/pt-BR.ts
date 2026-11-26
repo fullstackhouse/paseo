@@ -2346,6 +2346,8 @@ export const ptBR: TranslationResources = {
       prMergedTitle: "PR #{{number}} mesclado",
       outdated: "Você respondeu {{time}}; o agente não atualizou isto desde então.",
       readyToArchive: "Pronto para arquivar",
+      uncommittedFacts: "Faça commit ou descarte para arquivar",
+      reviewChanges: "Revisar alterações",
       inProgress: "Em andamento",
       nothingMoving: "nada avançando",
       updatedAgo: "atualizado {{time}}",

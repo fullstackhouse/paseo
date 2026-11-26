@@ -2361,6 +2361,8 @@ export const fr: TranslationResources = {
       prMergedTitle: "PR #{{number}} fusionnée",
       outdated: "Vous avez répondu {{time}} ; l'agent ne l'a pas mis à jour depuis.",
       readyToArchive: "Prêt à archiver",
+      uncommittedFacts: "Validez-les ou abandonnez-les pour archiver",
+      reviewChanges: "Voir les modifications",
       inProgress: "En cours",
       nothingMoving: "rien ne bouge",
       updatedAgo: "mis à jour {{time}}",
