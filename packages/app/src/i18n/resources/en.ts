@@ -51,6 +51,10 @@ export const en = {
     position: "{{current}} of {{total}}",
     total: "{{total}} matches",
   },
+  linkActions: {
+    openInBrowser: "Open in browser",
+    copyLink: "Copy link",
+  },
   common: {
     bottomSheetBackdrop: "Bottom sheet backdrop",
     back: "Back",

@@ -53,6 +53,10 @@ export const ar: TranslationResources = {
     position: "{{current}} من {{total}}",
     total: "{{total}} تطابقات",
   },
+  linkActions: {
+    openInBrowser: "فتح في المتصفح",
+    copyLink: "نسخ الرابط",
+  },
   common: {
     bottomSheetBackdrop: "خلفية اللوحة السفلية",
     back: "خلف",

@@ -54,6 +54,10 @@ export const ptBR: TranslationResources = {
     position: "{{current}} de {{total}}",
     total: "{{total}} correspondências",
   },
+  linkActions: {
+    openInBrowser: "Abrir no navegador",
+    copyLink: "Copiar link",
+  },
   common: {
     bottomSheetBackdrop: "Fundo do painel inferior",
     back: "Voltar",

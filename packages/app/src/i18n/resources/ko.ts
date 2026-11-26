@@ -53,6 +53,10 @@ export const ko: TranslationResources = {
     position: "{{current}} / {{total}}",
     total: "일치 항목 {{total}}개",
   },
+  linkActions: {
+    openInBrowser: "브라우저에서 열기",
+    copyLink: "링크 복사",
+  },
   common: {
     bottomSheetBackdrop: "하단 시트 배경",
     back: "뒤로",

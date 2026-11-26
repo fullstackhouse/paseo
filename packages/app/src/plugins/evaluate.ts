@@ -32,6 +32,7 @@ import type {
   PluginThemeContribution,
   PluginCommandCenterItemContribution,
   PluginClientSlashCommandContribution,
+  PluginLinkHandlerContribution,
   PluginSidebarContribution,
   PluginScreenContribution,
   PluginSidebarItemContribution,
@@ -141,6 +142,7 @@ export function runPluginClientBundle(
     workspacePanels: [],
     commandCenterItems: [],
     clientSlashCommands: [],
+    linkHandlers: [],
     attachmentSources: [],
     themes: [],
     timelineTransformers: [],
@@ -160,6 +162,7 @@ export function runPluginClientBundle(
   const workspacePanelIds = new Set<string>();
   const commandCenterItemIds = new Set<string>();
   const clientSlashCommandNames = new Set<string>();
+  const linkHandlerIds = new Set<string>();
   const attachmentSourceIds = new Set<string>();
   const themeIds = new Set<string>();
   const timelineTransformerIds = new Set<string>();
@@ -458,6 +461,26 @@ export function runPluginClientBundle(
         () => commandCenterItemIds.delete(normalizedId),
       );
     },
+    addLinkHandler(contribution: PluginLinkHandlerContribution) {
+      const normalizedId = requireId(contribution.id, "link handler id");
+      if (linkHandlerIds.has(normalizedId))
+        throw new Error(`Duplicate link handler: ${normalizedId}`);
+      const title = normalizePluginText(contribution.title);
+      if (!title) throw new Error(`Link handler ${normalizedId} has no title`);
+      const icon =
+        contribution.icon === undefined
+          ? undefined
+          : parsePluginIcon(`Link handler ${normalizedId}`, contribution.icon);
+      if (typeof contribution.match !== "function" || typeof contribution.open !== "function") {
+        throw new Error(`Link handler ${normalizedId} needs match and open callbacks`);
+      }
+      linkHandlerIds.add(normalizedId);
+      return register(
+        collector.linkHandlers,
+        { ...contribution, id: normalizedId, title, icon },
+        () => linkHandlerIds.delete(normalizedId),
+      );
+    },
     addSlashCommand(contribution: PluginClientSlashCommandContribution) {
       const name = requireId(contribution.name, "client slash command name");
       if (clientSlashCommandNames.has(name)) {
@@ -667,6 +690,7 @@ export function runPluginClientBundle(
     workspacePanels: collector.workspacePanels as EvaluatedPlugin["workspacePanels"],
     commandCenterItems: collector.commandCenterItems,
     clientSlashCommands: collector.clientSlashCommands,
+    linkHandlers: collector.linkHandlers,
     attachmentSources: collector.attachmentSources,
     themes: collector.themes,
     timelineTransformers: collector.timelineTransformers,

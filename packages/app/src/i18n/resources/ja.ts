@@ -54,6 +54,10 @@ export const ja: TranslationResources = {
     position: "{{current}} / {{total}}",
     total: "{{total}} 件の一致",
   },
+  linkActions: {
+    openInBrowser: "ブラウザで開く",
+    copyLink: "リンクをコピー",
+  },
   common: {
     bottomSheetBackdrop: "ボトムシートの背景",
     back: "戻る",

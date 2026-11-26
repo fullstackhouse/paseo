@@ -54,6 +54,10 @@ export const es: TranslationResources = {
     position: "{{current}} de {{total}}",
     total: "{{total}} coincidencias",
   },
+  linkActions: {
+    openInBrowser: "Abrir en el navegador",
+    copyLink: "Copiar enlace",
+  },
   common: {
     bottomSheetBackdrop: "Fondo del panel inferior",
     back: "Atrás",

@@ -53,6 +53,10 @@ export const zhCN: TranslationResources = {
     position: "{{current}} / {{total}}",
     total: "{{total}} 个匹配项",
   },
+  linkActions: {
+    openInBrowser: "在浏览器中打开",
+    copyLink: "复制链接",
+  },
   common: {
     bottomSheetBackdrop: "底部面板背景",
     back: "返回",
