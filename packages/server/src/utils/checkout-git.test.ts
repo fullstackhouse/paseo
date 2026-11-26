@@ -28,6 +28,7 @@ import {
   getCurrentBranch,
   getCheckoutDiff,
   getCheckoutShortstat,
+  getCheckoutShortstatForRefChange,
   getPullRequestStatus,
   getCheckoutPlacement,
   getCheckoutStatus,
@@ -1314,6 +1315,41 @@ const x = 1;
 
       expect(await getCheckoutShortstat(repoDir)).toEqual({ additions: 3, deletions: 0 });
     });
+  });
+
+  it("recomputes the diff stat after a ref change only when its merge-base moved", async () => {
+    execFileSync("git", ["checkout", "-b", "feature"], { cwd: repoDir });
+    commitFile(repoDir, "feature.txt", "one\ntwo\n", "feature");
+    const featureHead = execFileSync("git", ["rev-parse", "HEAD"], { cwd: repoDir })
+      .toString()
+      .trim();
+    const readFacts = async () => getCheckoutSnapshotFacts(repoDir, { paseoHome });
+    expect(await getCheckoutShortstat(repoDir, { paseoHome, facts: await readFacts() })).toEqual({
+      additions: 2,
+      deletions: 0,
+    });
+
+    // main moves without reaching the feature commit: the merge-base, and so the stat, stay.
+    execFileSync("git", ["checkout", "main"], { cwd: repoDir });
+    commitFile(repoDir, "main.txt", "main\n", "main moves on");
+    execFileSync("git", ["checkout", "feature"], { cwd: repoDir });
+    let facts = await readFacts();
+    startGitCommandMetrics();
+    const unchanged = await getCheckoutShortstatForRefChange(repoDir, { paseoHome, facts });
+    const unchangedCommands = stopGitCommandMetrics().commands.map((command) => command.args[0]);
+    expect(unchanged).toEqual({ additions: 2, deletions: 0 });
+    expect(unchangedCommands).not.toContain("diff");
+    expect(unchangedCommands).not.toContain("ls-files");
+    expect(unchangedCommands).not.toContain("status");
+
+    // main now contains the feature commit: the merge-base moved, so the stat is measured again.
+    execFileSync("git", ["update-ref", "refs/heads/main", featureHead], { cwd: repoDir });
+    facts = await readFacts();
+    startGitCommandMetrics();
+    const moved = await getCheckoutShortstatForRefChange(repoDir, { paseoHome, facts });
+    const movedCommands = stopGitCommandMetrics().commands.map((command) => command.args[0]);
+    expect(moved).toBeNull();
+    expect(movedCommands).toContain("diff");
   });
 
   it("uses the merge-base for shortstat when the base branch diverged from its remote", async () => {

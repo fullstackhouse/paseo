@@ -356,6 +356,10 @@ function buildDefaultServiceDeps() {
       additions: 1,
       deletions: 0,
     })),
+    getCheckoutShortstatForRefChange: vi.fn(async () => ({
+      additions: 1,
+      deletions: 0,
+    })),
     getCheckoutWorktreeState: vi.fn(),
     getPullRequestStatus: vi.fn(async () => createPullRequestStatusResult()),
     getCheckoutDiff: vi.fn(async () => ({ diff: "", structured: [] })),
