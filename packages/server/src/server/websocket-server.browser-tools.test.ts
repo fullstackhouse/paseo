@@ -170,6 +170,68 @@ describe("WebSocketServer browser tools wiring", () => {
     });
   });
 
+  it("routes an existing tab to the reloaded app without browser_list_tabs", async () => {
+    const harness = await startBrowserToolsDaemonHarness();
+    const beforeReload = await harness.connectBrowserHostClient();
+    const newTab = harness.broker.execute({
+      command: { command: "new_tab", args: {} },
+      workspaceId: "workspace-1",
+    });
+    const newTabRequest = await beforeReload.nextBrowserRequest();
+    beforeReload.respondToBrowserRequest({
+      type: "browser.automation.execute.response",
+      payload: {
+        requestId: newTabRequest.requestId,
+        ok: true,
+        result: {
+          command: "new_tab",
+          browserId: BROWSER_ID,
+          workspaceId: "workspace-1",
+          url: "https://example.com",
+        },
+      },
+    });
+    await expect(newTab).resolves.toMatchObject({ ok: true });
+
+    await beforeReload.disconnect();
+    const afterReload = await harness.connectBrowserHostClient();
+
+    const click = harness.broker.execute({
+      command: { command: "click", args: { browserId: BROWSER_ID, ref: "@e1" } },
+    });
+    const probe = await afterReload.nextBrowserRequest();
+    expect(probe.command).toEqual({ command: "list_tabs", args: {} });
+    afterReload.respondToBrowserRequest({
+      type: "browser.automation.execute.response",
+      payload: {
+        requestId: probe.requestId,
+        ok: true,
+        result: {
+          command: "list_tabs",
+          tabs: [{ browserId: BROWSER_ID, url: "https://example.com", title: "Example" }],
+        },
+      },
+    });
+    const clickRequest = await afterReload.nextBrowserRequest();
+    expect(clickRequest.command).toMatchObject({
+      command: "click",
+      args: { browserId: BROWSER_ID, ref: "@e1" },
+    });
+    afterReload.respondToBrowserRequest({
+      type: "browser.automation.execute.response",
+      payload: {
+        requestId: clickRequest.requestId,
+        ok: true,
+        result: { command: "click", browserId: BROWSER_ID, ref: "@e1" },
+      },
+    });
+
+    await expect(click).resolves.toMatchObject({
+      ok: true,
+      result: { command: "click", browserId: BROWSER_ID },
+    });
+  });
+
   it("clears pending browser commands when a browser host changes capabilities", async () => {
     const harness = await startBrowserToolsDaemonHarness();
     const clientId = "browser-host-client-1";

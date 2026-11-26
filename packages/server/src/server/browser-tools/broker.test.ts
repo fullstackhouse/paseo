@@ -75,6 +75,68 @@ function snapshotCommand(): BrowserAutomationCommand {
   return { command: "snapshot", args: { browserId: BROWSER_ID } };
 }
 
+async function flushMicrotasks(): Promise<void> {
+  await new Promise((resolve) => setImmediate(resolve));
+}
+
+async function openTab(
+  broker: BrowserToolsBroker,
+  host: FakeBrowserHostClient,
+  browserId: string,
+): Promise<void> {
+  const newTabPromise = broker.execute({
+    command: { command: "new_tab", args: {} },
+    workspaceId: "workspace-1",
+  });
+  host.resolveLatestWith(broker, {
+    requestId: "req-1",
+    ok: true,
+    result: {
+      command: "new_tab",
+      browserId,
+      workspaceId: "workspace-1",
+      url: "https://example.com",
+    },
+  });
+  await newTabPromise;
+}
+
+function listTabsPayload(
+  browserIds: readonly string[],
+): BrowserAutomationExecuteResponse["payload"] {
+  return {
+    requestId: "req-1",
+    ok: true,
+    result: {
+      command: "list_tabs",
+      tabs: browserIds.map((browserId) => ({
+        browserId,
+        workspaceId: "workspace-1",
+        url: "https://example.com",
+        title: "Example",
+      })),
+    },
+  };
+}
+
+function snapshotPayload(browserId: string): BrowserAutomationExecuteResponse["payload"] {
+  return {
+    requestId: "req-1",
+    ok: true,
+    result: {
+      command: "snapshot",
+      browserId,
+      workspaceId: "workspace-1",
+      url: "https://example.com",
+      title: "Example",
+      format: "aria-yaml",
+      snapshot: "- document",
+      truncated: false,
+      stats: { nodeCount: 1, refCount: 0, textLength: 10 },
+    },
+  };
+}
+
 describe("BrowserToolsBroker", () => {
   afterEach(() => {
     vi.useRealTimers();
@@ -683,46 +745,200 @@ describe("BrowserToolsBroker", () => {
     expect(client.receivedRequests).toEqual([]);
   });
 
-  test("unregistering a host strands its browser ids instead of routing them to another host", async () => {
+  test("a reloaded host that still has the tab takes it over without browser_list_tabs", async () => {
+    const broker = createBroker();
+    const beforeReload = new FakeBrowserHostClient("host-1");
+    const unregisterBeforeReload = broker.registerClient(beforeReload);
+    await openTab(broker, beforeReload, BROWSER_ID);
+
+    unregisterBeforeReload();
+    const afterReload = new FakeBrowserHostClient("host-2");
+    broker.registerClient(afterReload);
+
+    const snapshotPromise = broker.execute({
+      command: { command: "snapshot", args: { browserId: BROWSER_ID } },
+      workspaceId: "workspace-1",
+    });
+    await flushMicrotasks();
+    expect(afterReload.receivedRequests).toEqual([
+      {
+        type: "browser.automation.execute.request",
+        requestId: "req-1:host-2",
+        workspaceId: "workspace-1",
+        command: { command: "list_tabs", args: {} },
+      },
+    ]);
+    afterReload.resolveLatestWith(broker, listTabsPayload([BROWSER_ID]));
+    await flushMicrotasks();
+    expect(afterReload.receivedRequests.at(-1)).toMatchObject({
+      requestId: "req-1",
+      command: { command: "snapshot", args: { browserId: BROWSER_ID } },
+    });
+    afterReload.resolveLatestWith(broker, snapshotPayload(BROWSER_ID));
+    await expect(snapshotPromise).resolves.toMatchObject({
+      ok: true,
+      result: { command: "snapshot", browserId: BROWSER_ID },
+    });
+
+    const secondSnapshot = broker.execute({
+      command: { command: "snapshot", args: { browserId: BROWSER_ID } },
+      workspaceId: "workspace-1",
+    });
+    await flushMicrotasks();
+    expect(afterReload.receivedRequests.map((request) => request.command.command)).toEqual([
+      "list_tabs",
+      "snapshot",
+      "snapshot",
+    ]);
+    afterReload.resolveLatestWith(broker, snapshotPayload(BROWSER_ID));
+    await expect(secondSnapshot).resolves.toMatchObject({ ok: true });
+  });
+
+  test("a tab closed while its host was away is not routed to the host that replaced it", async () => {
     const broker = createBroker();
     const owner = new FakeBrowserHostClient("host-1");
     const unregisterOwner = broker.registerClient(owner);
-
-    const newTabPromise = broker.execute({
-      command: { command: "new_tab", args: {} },
-      workspaceId: "workspace-1",
-    });
-    owner.resolveLatestWith(broker, {
-      requestId: "req-1",
-      ok: true,
-      result: {
-        command: "new_tab",
-        browserId: BROWSER_ID,
-        workspaceId: "workspace-1",
-        url: "https://example.com",
-      },
-    });
-    await newTabPromise;
+    await openTab(broker, owner, BROWSER_ID);
 
     unregisterOwner();
     const replacement = new FakeBrowserHostClient("host-2");
     broker.registerClient(replacement);
 
-    await expect(
-      broker.execute({
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const snapshotPromise = broker.execute({
         command: { command: "snapshot", args: { browserId: BROWSER_ID } },
         workspaceId: "workspace-1",
-      }),
-    ).resolves.toEqual({
-      requestId: "req-1",
-      ok: false,
-      error: {
-        code: "browser_no_host",
-        message: `The app hosting browser tab ${BROWSER_ID} disconnected.`,
-        retryable: true,
-      },
+      });
+      await flushMicrotasks();
+      replacement.resolveLatestWith(broker, listTabsPayload([]));
+      await expect(snapshotPromise).resolves.toEqual({
+        requestId: "req-1",
+        ok: false,
+        error: {
+          code: "browser_tab_not_found",
+          message: `Browser tab ${BROWSER_ID} is not open in any connected app. Call browser_list_tabs and use one of the returned browserId values.`,
+          retryable: false,
+        },
+      });
+    }
+    expect(replacement.receivedRequests.map((request) => request.command.command)).toEqual([
+      "list_tabs",
+      "list_tabs",
+    ]);
+  });
+
+  test("a reloaded desktop takes back only its own tab when another desktop is connected", async () => {
+    const broker = createBroker();
+    const desktopA = new FakeBrowserHostClient("desktop-a");
+    const unregisterDesktopA = broker.registerClient(desktopA);
+    await openTab(broker, desktopA, BROWSER_ID);
+    const desktopB = new FakeBrowserHostClient("desktop-b");
+    broker.registerClient(desktopB);
+    await openTab(broker, desktopB, SECOND_BROWSER_ID);
+
+    unregisterDesktopA();
+    const reloadedDesktopA = new FakeBrowserHostClient("desktop-a-reloaded");
+    broker.registerClient(reloadedDesktopA);
+
+    const snapshotPromise = broker.execute({
+      command: { command: "snapshot", args: { browserId: BROWSER_ID } },
+      workspaceId: "workspace-1",
     });
-    expect(replacement.receivedRequests).toEqual([]);
+    await flushMicrotasks();
+    desktopB.resolveLatestWith(broker, listTabsPayload([SECOND_BROWSER_ID]));
+    reloadedDesktopA.resolveLatestWith(broker, listTabsPayload([BROWSER_ID]));
+    await flushMicrotasks();
+    reloadedDesktopA.resolveLatestWith(broker, snapshotPayload(BROWSER_ID));
+    await expect(snapshotPromise).resolves.toMatchObject({
+      ok: true,
+      result: { command: "snapshot", browserId: BROWSER_ID },
+    });
+    expect(reloadedDesktopA.receivedRequests.map((request) => request.command.command)).toEqual([
+      "list_tabs",
+      "snapshot",
+    ]);
+    expect(desktopB.receivedRequests.map((request) => request.command.command)).toEqual([
+      "new_tab",
+      "list_tabs",
+    ]);
+
+    const otherSnapshot = broker.execute({
+      command: { command: "snapshot", args: { browserId: SECOND_BROWSER_ID } },
+      workspaceId: "workspace-1",
+    });
+    await flushMicrotasks();
+    expect(desktopB.receivedRequests.at(-1)?.command).toEqual({
+      command: "snapshot",
+      args: { browserId: SECOND_BROWSER_ID },
+    });
+    desktopB.resolveLatestWith(broker, snapshotPayload(SECOND_BROWSER_ID));
+    await expect(otherSnapshot).resolves.toMatchObject({ ok: true });
+    expect(reloadedDesktopA.receivedRequests).toHaveLength(2);
+  });
+
+  test("two reloaded windows of one desktop each get back their own tab", async () => {
+    const broker = createBroker();
+    const firstWindow = new FakeBrowserHostClient("window-1");
+    const unregisterFirstWindow = broker.registerClient(firstWindow);
+    await openTab(broker, firstWindow, BROWSER_ID);
+    const secondWindow = new FakeBrowserHostClient("window-2");
+    const unregisterSecondWindow = broker.registerClient(secondWindow);
+    await openTab(broker, secondWindow, SECOND_BROWSER_ID);
+
+    unregisterFirstWindow();
+    unregisterSecondWindow();
+    const reloadedFirstWindow = new FakeBrowserHostClient("window-1-reloaded");
+    const reloadedSecondWindow = new FakeBrowserHostClient("window-2-reloaded");
+    broker.registerClient(reloadedFirstWindow);
+    broker.registerClient(reloadedSecondWindow);
+
+    for (const [browserId, owner, other] of [
+      [BROWSER_ID, reloadedFirstWindow, reloadedSecondWindow],
+      [SECOND_BROWSER_ID, reloadedSecondWindow, reloadedFirstWindow],
+    ] as const) {
+      const snapshotPromise = broker.execute({
+        command: { command: "snapshot", args: { browserId } },
+        workspaceId: "workspace-1",
+      });
+      await flushMicrotasks();
+      owner.resolveLatestWith(broker, listTabsPayload([browserId]));
+      other.resolveLatestWith(broker, listTabsPayload([]));
+      await flushMicrotasks();
+      expect(owner.receivedRequests.at(-1)?.command).toEqual({
+        command: "snapshot",
+        args: { browserId },
+      });
+      owner.resolveLatestWith(broker, snapshotPayload(browserId));
+      await expect(snapshotPromise).resolves.toMatchObject({ ok: true, result: { browserId } });
+      expect(other.receivedRequests.at(-1)?.command.command).toBe("list_tabs");
+    }
+  });
+
+  test("a tab claimed by more than one connected host is not routed to either", async () => {
+    const broker = createBroker();
+    const owner = new FakeBrowserHostClient("host-1");
+    const unregisterOwner = broker.registerClient(owner);
+    await openTab(broker, owner, BROWSER_ID);
+
+    unregisterOwner();
+    const firstClaimant = new FakeBrowserHostClient("host-2");
+    const secondClaimant = new FakeBrowserHostClient("host-3");
+    broker.registerClient(firstClaimant);
+    broker.registerClient(secondClaimant);
+
+    const snapshotPromise = broker.execute({
+      command: { command: "snapshot", args: { browserId: BROWSER_ID } },
+      workspaceId: "workspace-1",
+    });
+    await flushMicrotasks();
+    firstClaimant.resolveLatestWith(broker, listTabsPayload([BROWSER_ID]));
+    secondClaimant.resolveLatestWith(broker, listTabsPayload([BROWSER_ID]));
+    await expect(snapshotPromise).resolves.toMatchObject({
+      ok: false,
+      error: { code: "browser_tab_not_found", retryable: false },
+    });
+    expect(firstClaimant.receivedRequests).toHaveLength(1);
+    expect(secondClaimant.receivedRequests).toHaveLength(1);
   });
 
   test("reconnecting the same host reclaims its stranded browser ids", async () => {
