@@ -93,18 +93,21 @@ test("opt-out consumes pending recovery and excludes archived, private, owned an
     });
     await recovery.captureRunningAgents();
     expect((await storage.get("running"))?.resumeOnStartup).toBe(true);
+    expect((await storage.get("running"))?.interruptedAt).toBeUndefined();
     enabled = false;
     await recovery.prepareStartup();
     enabled = true;
     recovery.resumePending();
     expect(dispatched).toEqual([]);
     expect((await storage.list()).every((record) => !record.resumeOnStartup)).toBe(true);
+    expect((await storage.get("running"))?.interruptedAt).toEqual(expect.any(String));
+    expect((await storage.get("archived"))?.interruptedAt).toBeUndefined();
   } finally {
     await rm(root, { recursive: true, force: true });
   }
 });
 
-// FSH fork: interruptedAt feeds the app's Resume all callout, whether or not recovery is on.
+// FSH fork: interruptedAt feeds the app's Resume all callout, only for agents not auto-resumed.
 test("marks eligible running agents interrupted on shutdown and after a crash, with recovery off", async () => {
   const root = await mkdtemp(join(tmpdir(), "restart-recovery-"));
   try {
@@ -143,6 +146,46 @@ test("marks eligible running agents interrupted on shutdown and after a crash, w
     expect((await storage.get("crashed"))?.lastStatus).toBe("closed");
     expect((await storage.get("starting"))?.interruptedAt).toBeUndefined();
     expect((await storage.list()).every((record) => !record.resumeOnStartup)).toBe(true);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("does not mark agents it resumes itself, only ones whose resume fails or was turned off", async () => {
+  const root = await mkdtemp(join(tmpdir(), "restart-recovery-"));
+  try {
+    const storage = new AgentStorage(root, createTestLogger());
+    for (const id of ["resumed", "failed"]) {
+      await storage.upsert(
+        parseStoredAgentRecord({
+          id,
+          lastStatus: "running",
+          provider: "codex",
+          cwd: root,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        }),
+      );
+    }
+    const recovery = createRestartRecovery({
+      storage,
+      settings: () => ({ enabled: true, prompt: "Resume working." }),
+      eligible: async () => true,
+      dispatch: async (id) => {
+        if (id === "failed") throw new Error("unavailable");
+      },
+      report: () => {},
+    });
+    await recovery.captureRunningAgents();
+    expect((await storage.list()).every((record) => !record.interruptedAt)).toBe(true);
+
+    await recovery.prepareStartup();
+    recovery.resumePending();
+    const running = new AbortController().signal;
+    await recovery.waitForResume("resumed", running);
+    await recovery.waitForResume("failed", running);
+    expect((await storage.get("resumed"))?.interruptedAt).toBeUndefined();
+    expect((await storage.get("failed"))?.interruptedAt).toEqual(expect.any(String));
   } finally {
     await rm(root, { recursive: true, force: true });
   }
