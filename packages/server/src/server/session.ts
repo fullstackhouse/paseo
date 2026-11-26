@@ -175,6 +175,7 @@ import {
   type AgentPermissionResponse,
   type AgentRunOptions,
   type AgentSessionConfig,
+  type AgentTurnOrigin,
 } from "./agent/agent-sdk-types.js";
 import type { StoredAgentRecord } from "./agent/agent-storage.js";
 import type { AgentStorage } from "./agent/agent-storage.js";
@@ -4950,6 +4951,18 @@ export class Session {
   }
 
   /**
+   * Who a prompt sent over this session comes from. The daemon admitted a plugin's session under its
+   * reserved client id, so a plugin can't pass as a person. A Hub attach is automation, not a person
+   * (see `wakeAgentWorkspace`). Anything else is a person at an app or the CLI.
+   */
+  private promptOrigin(): AgentTurnOrigin {
+    const pluginId = parsePluginClientId(this.clientId);
+    if (pluginId) return { kind: "plugin", pluginId };
+    if (this.hubExecutionController) return { kind: "system" };
+    return { kind: "human" };
+  }
+
+  /**
    * Handle text message to agent (with optional image attachments)
    */
   private async handleSendAgentMessage(
@@ -4994,7 +5007,7 @@ export class Session {
         agentId,
         prompt,
         messageId,
-        runOptions,
+        runOptions: { ...runOptions, origin: this.promptOrigin() },
         // A typed or spoken message from the human answers any permission the
         // agent is blocked on.
         clearPendingPermissions: true,
@@ -9648,6 +9661,7 @@ export class Session {
           agentId,
           prompt,
           messageId: msg.messageId,
+          runOptions: { origin: this.promptOrigin() },
           activeTurnBehavior: msg.activeTurnBehavior ?? "interrupt",
           sessionMode: msg.sessionMode,
           clearPendingPermissions: true,

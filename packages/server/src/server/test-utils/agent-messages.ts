@@ -49,7 +49,7 @@ export function createTestAgentMessages(params: {
         idleOnly: request.idleOnly,
         admit: request.admit,
         clearPendingPermissions: request.clearPendingPermissions,
-        runOptions: { clientMessageId: request.messageIds[0] },
+        runOptions: { clientMessageId: request.messageIds[0], origin: request.origin },
       });
       if (result.disposition === "turn_started")
         await waitForAgentRunStartWithTimeout(

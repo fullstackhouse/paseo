@@ -61,7 +61,7 @@ Paseo only sees the returned promise, so detached work gets no error reporting a
 | `agent.open.before`          | yes   | `{ request }`                             | Launch-only `env`, `appendSystemPrompt`, `tools`, `mcpServers` |
 | `agent.close.after`          | no    | `{ agent }`                               |                                                                |
 | `agent.archive.after`        | no    | `{ agent, archivedAt }`                   |                                                                |
-| `agent.turn.before`          | no    | `{ agent, turnId }`                       |                                                                |
+| `agent.turn.before`          | no    | `{ agent, turnId, origin? }`              |                                                                |
 | `agent.turn.after`           | no    | `{ agent, turnId, outcome }`              |                                                                |
 | `agent.permission.before`    | no    | `{ agent, request }`                      |                                                                |
 | `agent.permission.after`     | no    | `{ agent, requestId, resolution }`        |                                                                |
@@ -533,10 +533,22 @@ server.addHook("agent.archive.after", async ({ agent, archivedAt }) => {
 
 ## agent.turn.before
 
-A live turn starts. Receives `{ agent, turnId }`. History replay does not fire it.
+A live turn starts. Receives `{ agent, turnId, origin? }`. History replay does not fire it.
+
+`origin` says who sent the prompt that started the turn. The daemon sets it where the prompt entered, so a plugin cannot claim another sender:
+
+| `origin.kind` | Sent by                                                                                            |
+| ------------- | -------------------------------------------------------------------------------------------------- |
+| `human`       | a person, from an app or the CLI                                                                   |
+| `agent`       | another agent (`paseo send`, `send_agent_prompt`, a child's report); `agentId` names it when known |
+| `plugin`      | a plugin through its Paseo API; `pluginId` is the plugin the daemon admitted                       |
+| `system`      | the daemon: schedules, restart recovery, pull request updates, a Hub                               |
+
+It is absent on hosts without `server_info.features.turnOrigin` and on turns a provider starts on its own. The turn's `user_message` timeline item carries the same `origin`.
 
 ```ts
-server.addHook("agent.turn.before", async ({ agent, turnId }) => {
+server.addHook("agent.turn.before", async ({ agent, turnId, origin }) => {
+  if (origin?.kind === "plugin") return; // our own nudge, not a reply
   console.log(agent, turnId);
 });
 ```

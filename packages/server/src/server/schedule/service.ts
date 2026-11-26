@@ -1154,6 +1154,7 @@ export class ScheduleService {
       await startAgentRun(this.agentManager, agent.id, wrappedPrompt, this.logger, {
         replaceRunning: true,
         activeTurnBehavior: "steer",
+        runOptions: { origin: { kind: "system" } },
       });
       const waitResult = await this.agentManager.waitForAgentEvent(agent.id, {
         waitForActive: true,

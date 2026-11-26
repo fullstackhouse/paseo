@@ -16,7 +16,12 @@ import { z } from "zod";
 import { ensureValidJson } from "../../json-utils.js";
 import type { Logger } from "pino";
 
-import type { AgentMode, AgentProvider, AgentSessionConfig } from "../agent-sdk-types.js";
+import type {
+  AgentMode,
+  AgentProvider,
+  AgentSessionConfig,
+  AgentTurnOrigin,
+} from "../agent-sdk-types.js";
 import type { AgentManager, ManagedAgent } from "../agent-manager.js";
 import { ActiveTurnBehaviorSchema, AgentProfileSchema } from "@getpaseo/protocol/messages";
 import type { DaemonConfigStore } from "../../daemon-config-store.js";
@@ -193,6 +198,11 @@ interface ProviderSummary {
   modes: AgentMode[];
   status: string;
   error?: string;
+}
+
+/** A prompt sent through these tools comes from the calling agent, named when the daemon knows it. */
+function agentOrigin(callerAgentId: string | undefined): AgentTurnOrigin {
+  return callerAgentId ? { kind: "agent", agentId: callerAgentId } : { kind: "agent" };
 }
 
 const WorkspaceAutomationSummarySchema = z.object({
@@ -2113,6 +2123,7 @@ function createToolCatalog(
         agentId,
         prompt,
         source: callerAgentId ? { kind: "agent-message", agentId: callerAgentId } : undefined,
+        runOptions: { origin: agentOrigin(callerAgentId) },
         sessionMode,
         activeTurnBehavior,
         onDispatch: confirmDispatch,

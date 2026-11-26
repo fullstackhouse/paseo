@@ -220,7 +220,11 @@ export function publishAgentStream(
   event: AgentStreamEvent,
 ): void {
   if (event.type === "turn_started") {
-    lifecycle.emit("agent.turn.before", { agent, turnId: event.turnId ?? null });
+    lifecycle.emit("agent.turn.before", {
+      agent,
+      turnId: event.turnId ?? null,
+      ...(event.origin ? { origin: event.origin } : {}),
+    });
   } else if (event.type === "turn_completed") {
     lifecycle.emit("agent.turn.after", {
       agent,

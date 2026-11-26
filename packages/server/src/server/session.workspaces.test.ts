@@ -10655,6 +10655,27 @@ describe("a message to an agent in a snoozed workspace", () => {
     });
     expect(workspaces.get("ws-1")?.snoozedAt).toBe("2026-03-01T12:00:00.000Z");
   });
+
+  test.each([
+    ["a person", undefined, undefined, { kind: "human" }],
+    ["a plugin", "plugin:paseo-asks", undefined, { kind: "plugin", pluginId: "paseo-asks" }],
+    [
+      "a Hub",
+      "local-hub",
+      {
+        create: async () => {
+          throw new Error("unused");
+        },
+        control: async () => {},
+        subscribe: () => () => {},
+        invalidateAuthority: async () => {},
+      },
+      { kind: "system" },
+    ],
+  ] as const)("from %s starts a turn with that origin", (_label, clientId, hub, origin) => {
+    const { session } = setup(clientId, hub);
+    expect((session as unknown as { promptOrigin(): unknown }).promptOrigin()).toEqual(origin);
+  });
 });
 
 test("workspace.group.set.request moves a workspace to a group and clears the move", async () => {
