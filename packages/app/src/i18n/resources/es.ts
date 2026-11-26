@@ -582,6 +582,7 @@ export const es: TranslationResources = {
       openToSide: "Abrir al lado",
       copyPath: "Copiar ruta",
       copyRelativePath: "Copiar ruta relativa",
+      openWithDefaultApp: "Abrir",
       revealIn: "Mostrar en {{target}}",
       download: "Descargar",
       addToChat: "Añadir al chat",

@@ -574,6 +574,7 @@ export const ar: TranslationResources = {
       openToSide: "فتح إلى الجانب",
       copyPath: "نسخ المسار",
       copyRelativePath: "نسخ المسار النسبي",
+      openWithDefaultApp: "فتح",
       revealIn: "إظهار في {{target}}",
       download: "تحميل",
       addToChat: "إضافة إلى الدردشة",

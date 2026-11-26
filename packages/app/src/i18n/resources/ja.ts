@@ -583,6 +583,7 @@ export const ja: TranslationResources = {
       openToSide: "横に開く",
       copyPath: "パスをコピー",
       copyRelativePath: "相対パスをコピー",
+      openWithDefaultApp: "開く",
       revealIn: "{{target}}で表示",
       download: "ダウンロード",
       addToChat: "チャットに追加",

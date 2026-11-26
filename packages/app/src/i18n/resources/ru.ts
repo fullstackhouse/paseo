@@ -581,6 +581,7 @@ export const ru: TranslationResources = {
       openToSide: "Открыть сбоку",
       copyPath: "Копировать путь",
       copyRelativePath: "Копировать относительный путь",
+      openWithDefaultApp: "Открыть",
       revealIn: "Показать в {{target}}",
       download: "Скачать",
       addToChat: "Добавить в чат",
