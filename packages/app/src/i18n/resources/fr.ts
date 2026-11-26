@@ -503,6 +503,8 @@ export const fr: TranslationResources = {
       manual: "Contexte compacté manuellement",
       withTokens: "Contexte compacté ({{tokens}}K tokens)",
       completed: "Contexte compacté",
+      failed: "Échec de la compaction",
+      canceled: "Compaction annulée",
     },
   },
   importSession: {
