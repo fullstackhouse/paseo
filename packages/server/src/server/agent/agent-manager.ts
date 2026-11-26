@@ -1084,7 +1084,9 @@ export class AgentManager {
     }
     if (this.deferredPluginReloadGenerations.get(agentId) === generation) return;
 
-    const backgroundWorkItemCount = this.backgroundWork.list(agentId).length;
+    const backgroundWorkItemCount = this.backgroundWork
+      .list(agentId)
+      .filter((item) => !isDaemonBackgroundWorkItem(item)).length;
     const runningSubagentCount = this.providerSubagents
       .list(agentId)
       .filter((subagent) => subagent.status === "running").length;
@@ -1537,10 +1539,14 @@ export class AgentManager {
     this.publishBackgroundWork(input.agentId, this.backgroundWork.setDaemonBackgroundWork(input));
   }
 
-  /** Work that dies with the provider process, so reopening the session would stop it. */
+  /**
+   * Work that dies with the provider process, so reopening the session would stop it. Daemon-owned
+   * items (heartbeats) outlive the session and don't count.
+   */
   private hasActiveBackgroundWork(agentId: string): boolean {
     return (
-      this.backgroundWork.list(agentId).length > 0 || this.hasRunningProviderSubagents(agentId)
+      this.backgroundWork.list(agentId).some((item) => !isDaemonBackgroundWorkItem(item)) ||
+      this.hasRunningProviderSubagents(agentId)
     );
   }
 

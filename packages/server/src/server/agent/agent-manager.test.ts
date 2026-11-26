@@ -5049,6 +5049,57 @@ test.each(Object.keys(backgroundWorkEvents))(
   },
 );
 
+// A heartbeat is the daemon's own work: it outlives the session, so it never holds a reload back.
+test("a plugin change reopens an agent whose only background work is a heartbeat", async () => {
+  const workdir = mkdtempSync(join(tmpdir(), "agent-manager-plugin-change-heartbeat-"));
+  const storage = new AgentStorage(join(workdir, "agents"), logger);
+  const sessions: CloseRecordingTestAgentSession[] = [];
+  class RecordingClient extends TestAgentClient {
+    override async createSession(config: AgentSessionConfig): Promise<AgentSession> {
+      const session = new CloseRecordingTestAgentSession(config);
+      sessions.push(session);
+      return session;
+    }
+    override async resumeSession(
+      _handle: AgentPersistenceHandle,
+      config?: Partial<AgentSessionConfig>,
+    ): Promise<AgentSession> {
+      return this.createSession({ provider: "codex", cwd: workdir, ...config });
+    }
+  }
+  const manager = new AgentManager({
+    clients: { codex: new RecordingClient() },
+    registry: storage,
+    logger,
+  });
+  const agent = await manager.createAgent({ provider: "codex", cwd: workdir }, undefined, {
+    workspaceId: undefined,
+  });
+  onTestFinished(async () => {
+    await manager.closeAgent(agent.id);
+    await manager.flush();
+    await storage.flush();
+    rmSync(workdir, { recursive: true, force: true });
+  });
+  manager.setDaemonBackgroundWork({
+    agentId: agent.id,
+    namespace: "heartbeat",
+    id: "schedule-1",
+    kind: "heartbeat",
+    countsAsRunning: false,
+    description: "Check build",
+    startedAt: "2026-10-06T10:00:00.000Z",
+    stop: async () => undefined,
+  });
+  expect(manager.listAgentBackgroundWork(agent.id)).toHaveLength(1);
+
+  manager.invalidatePluginSessions();
+  await startAgentRun(manager, agent.id, "after the plugin change", logger);
+  await manager.waitForAgentEvent(agent.id);
+
+  expect(sessions.map((session) => session.closed)).toEqual([true, false]);
+});
+
 test("a replacement prompt recovers when the retired session fails to start", async () => {
   const workdir = mkdtempSync(join(tmpdir(), "agent-manager-stale-replacement-"));
   const storage = new AgentStorage(join(workdir, "agents"), logger);
