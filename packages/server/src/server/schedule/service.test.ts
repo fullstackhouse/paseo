@@ -913,7 +913,7 @@ describe("ScheduleService", () => {
     expect(steerOrReplace.mock.calls[0]).toEqual([
       agent.id,
       expect.stringContaining(`Schedule fired (id=${schedule.id}, run=`),
-      undefined,
+      { origin: { kind: "system" } },
       expect.any(ForegroundPromptStart),
     ]);
   });
