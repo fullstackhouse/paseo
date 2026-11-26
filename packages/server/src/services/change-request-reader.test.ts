@@ -1,7 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import { createChangeRequestReader } from "./change-request-reader.js";
 import type { ChangeRequestRouter } from "./change-request-router.js";
-import type { ChangeRequestReadResult, ChangeRequestSource } from "./change-request-source.js";
+import {
+  ChangeRequestReadError,
+  type ChangeRequestReadResult,
+  type ChangeRequestSource,
+} from "./change-request-source.js";
 
 const PR = "https://github.com/acme/widgets/pull/41";
 
@@ -23,6 +27,18 @@ const result: ChangeRequestReadResult = {
 function readAll(urls: string[], fail = false) {
   return new Map(
     urls.map((url) => [url, fail ? new Error(`Could not read ${url}.`) : result] as const),
+  );
+}
+
+/** /41 is paused until 5000; anything else is not found. */
+function readFailures(urls: string[]) {
+  return new Map<string, ChangeRequestReadResult | Error>(
+    urls.map((url) => [
+      url,
+      url.endsWith("/41")
+        ? new ChangeRequestReadError("paused", { reason: "paused", retryAt: 5_000 })
+        : new ChangeRequestReadError("gone", { reason: "not_found" }),
+    ]),
   );
 }
 
@@ -106,15 +122,28 @@ describe("createChangeRequestReader", () => {
       url: "https://example.com/acme/widgets/pull/1",
       ok: false,
       error: "Could not recognize a supported forge for host example.com.",
+      reason: "unsupported",
     });
     expect(unsupported).toMatchObject({
       ok: false,
       error: "Reading change requests is not supported for gitlab yet.",
+      reason: "unsupported",
     });
-    expect(failed).toEqual({ url: PR, ok: false, error: `Could not read ${PR}.` });
+    expect(failed).toEqual({ url: PR, ok: false, error: `Could not read ${PR}.`, reason: "error" });
 
     fail = false;
     await expect(reader.read([PR])).resolves.toEqual([expect.objectContaining({ ok: true })]);
     expect(read).toHaveBeenCalledTimes(2);
+  });
+
+  it("passes a forge's pause and not-found through with their reason", async () => {
+    const other = "https://github.com/acme/widgets/pull/42";
+    const read = vi.fn(async (urls: string[]) => readFailures(urls));
+    const { reader } = setup(read);
+
+    await expect(reader.read([PR, other])).resolves.toEqual([
+      { url: PR, ok: false, error: "paused", reason: "paused", retryAt: 5_000 },
+      { url: other, ok: false, error: "gone", reason: "not_found" },
+    ]);
   });
 });

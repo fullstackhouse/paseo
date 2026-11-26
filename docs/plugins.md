@@ -973,7 +973,9 @@ Plugin servers read pull request state with `paseo.changeRequests.read(urls)` (F
 `server_info.features.changeRequestsRead`) instead of calling `gh`. It goes through the reader behind
 `subscribe_change_request`, so reads share the daemon's GraphQL batching, rate-limit reserve and pause,
 and a 30-second cache. Only GitHub implements `ChangeRequestSource.read` today; other forges answer
-`ok: false`. Which PRs belong to a workspace stays the plugin's business. See
+`ok: false` with `reason: "unsupported"`. On `reason: "paused"` the daemon is holding reads to stay
+under the rate limit until `retryAt`: keep the last known state, mark it stale, and log once, not per
+PR. Which PRs belong to a workspace stays the plugin's business. See
 [Workspace attention](workspace-attention.md#pull-requests).
 
 ## Contribute client slash commands

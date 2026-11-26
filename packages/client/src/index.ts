@@ -716,7 +716,8 @@ export interface PaseoNotificationActions {
 export interface PaseoChangeRequestActions {
   /**
    * Reads pull request state once through the host, which batches, rate-limits and caches reads
-   * for 30 seconds. One result per URL, in order; a URL the host can't read is `ok: false`.
+   * for 30 seconds. One result per URL, in order; a URL the host can't read is `ok: false`
+   * with a `reason`; on `paused`, keep the last known state until `retryAt`.
    */
   read(urls: string[], options?: { requestId?: string }): Promise<ChangeRequestRead[]>;
 }

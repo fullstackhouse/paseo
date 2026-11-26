@@ -1,4 +1,8 @@
-import type { ChangeRequestReadResult, ChangeRequestSource } from "./change-request-source.js";
+import {
+  ChangeRequestReadError,
+  type ChangeRequestReadResult,
+  type ChangeRequestSource,
+} from "./change-request-source.js";
 import {
   GITHUB_POLL_CHECK_CONTEXT_FIELDS,
   type GitHubChangeRequestRead,
@@ -1692,6 +1696,8 @@ export function createGitHubService(options: CreateGitHubServiceOptions = {}): G
     read: GitHubPollReader,
     name: string,
     isObserved: (url: string) => boolean,
+    /** Collects URLs GitHub answered with NOT_FOUND. */
+    notFound?: Set<string>,
   ) {
     return async (selections: { url: string; graphql: string }[]) => {
       const response = await read({
@@ -1705,7 +1711,12 @@ export function createGitHubService(options: CreateGitHubServiceOptions = {}): G
         throw new Error("GitHub returned no rate limit for the polling request.");
       const data = { ...response.aliases };
       const errors = z
-        .array(z.object({ path: z.array(z.union([z.string(), z.number()])).optional() }))
+        .array(
+          z.object({
+            type: z.string().optional(),
+            path: z.array(z.union([z.string(), z.number()])).optional(),
+          }),
+        )
         .optional()
         .parse(JSON.parse(response.stdout).errors);
       for (const error of errors ?? []) {
@@ -1713,6 +1724,9 @@ export function createGitHubService(options: CreateGitHubServiceOptions = {}): G
         if (typeof alias !== "string")
           throw new Error("GitHub could not complete the polling request.");
         delete data[alias];
+        const index = /^request(\d+)$/.exec(alias)?.[1];
+        const url = index === undefined ? undefined : selections[Number(index)]?.url;
+        if (notFound && url && error.type === "NOT_FOUND") notFound.add(url);
       }
       return data;
     };
@@ -1739,6 +1753,29 @@ export function createGitHubService(options: CreateGitHubServiceOptions = {}): G
     };
   }
 
+  function pausedReadError(pausedUntil: number, cause?: unknown): ChangeRequestReadError {
+    return new ChangeRequestReadError(
+      `GitHub reads are paused until ${new Date(pausedUntil).toISOString()} to stay under the rate limit.`,
+      { reason: "paused", retryAt: pausedUntil, cause },
+    );
+  }
+
+  /** A pause anywhere in the read (before it, or hit by its batch) reads as `paused`. */
+  function classifyReadError(url: string, error: Error, notFound: ReadonlySet<string>): Error {
+    if (notFound.has(url)) {
+      return new ChangeRequestReadError(`${url} was not found on GitHub.`, {
+        reason: "not_found",
+        cause: error,
+      });
+    }
+    const paused = error instanceof GitHubGraphqlPollPausedError ? error : error.cause;
+    if (paused instanceof GitHubGraphqlPollPausedError) {
+      const resetAt = Date.parse(paused.resetAt);
+      return pausedReadError(Number.isFinite(resetAt) ? resetAt : deps.now(), error);
+    }
+    return error;
+  }
+
   /** One-shot reads share the poll's batching, rate-limit reserve and pause; they never watch. */
   async function readChangeRequestsOnce(
     urls: string[],
@@ -1754,16 +1791,12 @@ export function createGitHubService(options: CreateGitHubServiceOptions = {}): G
         const fail = (error: Error) => {
           for (const url of hostUrls) results.set(url, error);
         };
-        const resetAt = pollPausedUntilByHost.get(host) ?? 0;
-        if (resetAt > deps.now()) {
-          fail(
-            new GitHubGraphqlPollPausedError({
-              remaining: 0,
-              resetAt: new Date(resetAt).toISOString(),
-            }),
-          );
+        const pausedUntil = pollPausedUntilByHost.get(host) ?? 0;
+        if (pausedUntil > deps.now()) {
+          fail(pausedReadError(pausedUntil));
           return;
         }
+        const notFound = new Set<string>();
         try {
           if (host !== "github.com" && !authenticatedWatchHosts.has(host)) {
             await run(
@@ -1778,6 +1811,7 @@ export function createGitHubService(options: CreateGitHubServiceOptions = {}): G
               createCoDueGitHubPollReader(host),
               "PaseoChangeRequestRead",
               () => true,
+              notFound,
             ),
             batchSize: GITHUB_POLL_BATCH_MAX,
             firstBatchSize: GITHUB_POLL_BATCH_MAX,
@@ -1787,11 +1821,17 @@ export function createGitHubService(options: CreateGitHubServiceOptions = {}): G
             details: true,
           });
           for (const [url, result] of read) {
-            results.set(url, result instanceof Error ? result : withDetails(url, result));
+            results.set(
+              url,
+              result instanceof Error
+                ? classifyReadError(url, result, notFound)
+                : withDetails(url, result),
+            );
           }
         } catch (error) {
           if (error instanceof GitHubAuthenticationError) authenticatedWatchHosts.delete(host);
-          fail(error instanceof Error ? error : new Error(String(error)));
+          const failed = error instanceof Error ? error : new Error(String(error));
+          for (const url of hostUrls) results.set(url, classifyReadError(url, failed, notFound));
         }
       }),
     );

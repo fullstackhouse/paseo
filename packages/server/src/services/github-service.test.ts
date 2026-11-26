@@ -3,6 +3,7 @@ import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync 
 import { tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { ChangeRequestReadError } from "./change-request-source.js";
 import {
   GitHubAuthenticationError,
   GitHubCliMissingError,
@@ -5485,6 +5486,64 @@ it("reads a PR once with details and no activity", async () => {
       isDraft: true,
       mergeable: "CONFLICTING",
     });
+  } finally {
+    service.dispose?.();
+  }
+});
+
+it("marks one-shot reads paused once the rate limit reaches the reserve", async () => {
+  const resetAt = new Date(Date.now() + 100_000).toISOString();
+  const runner = createRunner([
+    batchPollStatusJson({
+      rateLimit: { limit: 5000, remaining: 100, resetAt },
+      request0: {
+        pullRequest: {
+          state: "OPEN",
+          headRefOid: "abc",
+          reviewDecision: null,
+          number: 41,
+          title: "Fix the login redirect",
+          isDraft: false,
+          mergeable: "MERGEABLE",
+          statusCheckRollup: null,
+        },
+      },
+    }),
+  ]);
+  const service = createGitHubService({ runner: runner.runner, resolveGhPath: async () => "gh" });
+  try {
+    const url = "https://github.com/acme/widgets/pull/41";
+    await service.changeRequests.read!([url]);
+    const second = (await service.changeRequests.read!([url])).get(url);
+    expect(second).toBeInstanceOf(ChangeRequestReadError);
+    expect(second).toMatchObject({ reason: "paused" });
+    expect((second as ChangeRequestReadError).retryAt).toBeGreaterThanOrEqual(Date.parse(resetAt));
+    expect(runner.calls).toHaveLength(1);
+  } finally {
+    service.dispose?.();
+  }
+});
+
+it("marks a one-shot read not found when GitHub says NOT_FOUND", async () => {
+  const runner = createRunner([
+    JSON.stringify({
+      data: {
+        rateLimit: {
+          limit: 5000,
+          remaining: 4900,
+          resetAt: new Date(Date.now() + 100_000).toISOString(),
+        },
+        request0: { pullRequest: null },
+      },
+      errors: [{ type: "NOT_FOUND", path: ["request0", "pullRequest"], message: "Not found" }],
+    }),
+  ]);
+  const service = createGitHubService({ runner: runner.runner, resolveGhPath: async () => "gh" });
+  try {
+    const url = "https://github.com/acme/widgets/pull/999999";
+    const result = (await service.changeRequests.read!([url])).get(url);
+    expect(result).toBeInstanceOf(ChangeRequestReadError);
+    expect(result).toMatchObject({ reason: "not_found" });
   } finally {
     service.dispose?.();
   }

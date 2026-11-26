@@ -2585,7 +2585,16 @@ export const ChangeRequestReadSchema = z.union([
     checks: z.array(ChangeRequestReadCheckSchema),
     headSha: z.string(),
   }),
-  z.object({ url: z.string(), ok: z.literal(false), error: z.string() }),
+  z.object({
+    url: z.string(),
+    ok: z.literal(false),
+    error: z.string(),
+    // Why it failed; read a missing one as "error". paused: the host holds reads to stay under
+    // the forge's rate limit, so keep the last known state until retryAt.
+    reason: z.enum(["paused", "not_found", "unsupported", "error"]).optional(),
+    // When a pause ends, epoch ms.
+    retryAt: z.number().optional(),
+  }),
 ]);
 
 export const ForgeChangeRequestsReadResponseSchema = z.object({

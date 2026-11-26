@@ -1,12 +1,19 @@
 import type { ChangeRequestRead } from "@getpaseo/protocol/messages";
-import type { ChangeRequestReadResult, ChangeRequestStatus } from "./change-request-source.js";
+import {
+  ChangeRequestReadError,
+  type ChangeRequestReadResult,
+  type ChangeRequestStatus,
+} from "./change-request-source.js";
 import type { ChangeRequestRouter } from "./change-request-router.js";
 
 /** How long a read result is served again before the forge is asked again. */
 export const CHANGE_REQUEST_READ_TTL_MS = 30_000;
 
 export interface ChangeRequestReader {
-  /** One result per URL, in order. A URL the router can't place, or a forge read error, is `ok: false`. */
+  /**
+   * One result per URL, in order. A URL the router can't place, or a forge read error, is
+   * `ok: false` with a `reason`; `paused` carries `retryAt`.
+   */
   read(urls: string[]): Promise<ChangeRequestRead[]>;
 }
 
@@ -72,11 +79,20 @@ export function toChangeRequestRead(
 }
 
 function failure(url: string, error: unknown): ChangeRequestRead {
+  const reason = error instanceof ChangeRequestReadError ? error.reason : "error";
+  const retryAt = error instanceof ChangeRequestReadError ? error.retryAt : undefined;
   return {
     url,
     ok: false,
     error: error instanceof Error ? error.message : "Could not read the change request.",
+    reason,
+    ...(retryAt !== undefined ? { retryAt } : {}),
   };
+}
+
+function unsupported(error: unknown): ChangeRequestReadError {
+  const message = error instanceof Error ? error.message : "Unsupported change request URL.";
+  return new ChangeRequestReadError(message, { reason: "unsupported", cause: error });
 }
 
 /**
@@ -100,7 +116,7 @@ export function createChangeRequestReader({
           try {
             return { url, target: await router.resolve(url) };
           } catch (error) {
-            return { url, error };
+            return { url, error: unsupported(error) };
           }
         }),
       );
@@ -123,7 +139,10 @@ export function createChangeRequestReader({
           const canonical = [...set];
           const source = router.source(forge);
           if (!source?.read) {
-            const error = new Error(`Reading change requests is not supported for ${forge} yet.`);
+            const error = new ChangeRequestReadError(
+              `Reading change requests is not supported for ${forge} yet.`,
+              { reason: "unsupported" },
+            );
             for (const url of canonical) fresh.set(`${forge}:${url}`, error);
             return;
           }

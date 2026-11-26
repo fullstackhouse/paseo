@@ -164,6 +164,13 @@ const SourceSchema = z.discriminatedUnion("ok", [
             headSha: "abc",
           },
           { url: "https://example.com/x", ok: false, error: "Unsupported host" },
+          {
+            url: "https://github.com/acme/widgets/pull/42",
+            ok: false,
+            error: "Paused",
+            reason: "paused",
+            retryAt: 1_700_000_000_000,
+          },
         ],
       },
     };
