@@ -6,6 +6,7 @@ import {
   useState,
   type ComponentProps,
   type MouseEvent,
+  useContext,
 } from "react";
 import type {
   CodeBlockRendererProps,
@@ -31,6 +32,7 @@ import { usePluginLinkResolver } from "@/plugins/link-handlers";
 import { FileLinkMenu } from "./file-link-menu";
 import { PluginLinkMenu } from "./plugin-link-menu";
 import { MermaidFence } from "./fence/mermaid";
+import { MarkdownExternalContext } from "./external-context";
 import { isRecognizedLink, markdownLinkSource } from "./source";
 
 const ThemedCodeBlock = withUnistyles(HighlightedCodeBlock);
@@ -63,9 +65,10 @@ function WebLink(props: LinkRendererProps) {
   const environment = useAssistantFileLinkEnvironment();
   const isLocalDaemon = useIsLocalDaemon(environment.serverId ?? "");
   const pluginLinks = usePluginLinkResolver(environment.serverId);
+  const external = useContext(MarkdownExternalContext);
   // Only a link a plugin opens gets this menu; other web links keep the browser's own.
   const pluginLink =
-    pluginLinks.active && !fileLink.isFileLink
+    pluginLinks.active && !external && !fileLink.isFileLink
       ? pluginLinks.resolve(forgeUrl ?? props.link.url)
       : null;
   if (pluginLink) {

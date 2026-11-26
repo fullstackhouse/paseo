@@ -5,6 +5,7 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { ToastApi } from "@/components/toast-host";
 import { ToastApiProvider } from "@/contexts/toast-api-context";
 import { i18n } from "@/i18n/i18next";
+import { MarkdownExternalContext } from "./external-context";
 import { WEB_RENDERERS } from "./renderers.web";
 
 const PR_URL = "https://github.com/o/r/pull/12";
@@ -41,7 +42,10 @@ function anchorPropsFor(url: string) {
   return { href: url };
 }
 
-function renderAnchor(link: { url: string; sourceType?: "markdown" | "text" | "inline-code" }) {
+function renderAnchor(
+  link: { url: string; sourceType?: "markdown" | "text" | "inline-code" },
+  { external = false }: { external?: boolean } = {},
+) {
   if (!Link) {
     throw new Error("Expected a web link renderer");
   }
@@ -51,9 +55,11 @@ function renderAnchor(link: { url: string; sourceType?: "markdown" | "text" | "i
     root.render(
       <QueryClientProvider client={client}>
         <ToastApiProvider api={toast}>
-          <Link link={link} anchorProps={anchorProps}>
-            {LINK_TEXT}
-          </Link>
+          <MarkdownExternalContext.Provider value={external}>
+            <Link link={link} anchorProps={anchorProps}>
+              {LINK_TEXT}
+            </Link>
+          </MarkdownExternalContext.Provider>
         </ToastApiProvider>
       </QueryClientProvider>,
     ),
@@ -103,5 +109,10 @@ it("gives a link a plugin opens a menu with Paseo, browser and copy", async () =
 
 it("leaves the browser menu of a link no plugin opens", () => {
   const anchor = renderAnchor({ url: "https://example.test/doc", sourceType: "markdown" });
+  expect(rightClick(anchor).defaultPrevented).toBe(false);
+});
+
+it("keeps plugins off the links of external Markdown", () => {
+  const anchor = renderAnchor({ url: PR_URL, sourceType: "markdown" }, { external: true });
   expect(rightClick(anchor).defaultPrevented).toBe(false);
 });

@@ -30,6 +30,7 @@ import { splitStreamingMarkdown } from "./streaming";
 import { useMarkdownSource, type MarkdownImageContext } from "./images";
 
 import { MermaidFence, MermaidStreamingContext, splitMermaidFences } from "./fence/mermaid";
+import { MarkdownExternalContext } from "./external-context";
 
 const ThemedMarkdown = withUnistyles(EnrichedMarkdownText);
 const MD4C_FLAGS = { latexMath: false, hardSoftBreaks: true, admonitions: true };
@@ -188,44 +189,46 @@ const MarkdownPart = memo(function MarkdownPart({
     [markdown],
   );
   return (
-    <MermaidStreamingContext.Provider value={streaming}>
-      <MarkdownBlockStack
-        imageSources={imageSources}
-        onTouchStart={nativeLinkMenu ? recordTouch : undefined}
-      >
-        {segments.map((segment) =>
-          segment.kind === "mermaid" ? (
-            <MermaidFence key={`${segment.kind}:${segment.id}`} code={segment.source} />
-          ) : (
-            <ThemedMarkdown
-              key={`${segment.kind}:${segment.id}`}
-              markdown={segment.source}
-              uniProps={pickMarkdownStyle(compact, muted)}
-              flavor="github"
-              selectable={selectable}
-              md4cFlags={external ? EXTERNAL_MD4C_FLAGS : MD4C_FLAGS}
-              linkRecognition={linkRecognition}
-              enableTaskListItemToggle={false}
-              enableLinkPreview={false}
-              enableBlockContextMenu={false}
-              // JS reveal owns pacing; native fade animation is a separate experiment.
-              streamingAnimation={false}
-              onLinkPress={pressLink}
-              onLinkLongPress={nativeLinkMenu ? longPressLink : undefined}
-              onImagePress={pressImage}
-              renderers={isWeb ? WEB_RENDERERS : undefined}
-            />
-          ),
-        )}
-      </MarkdownBlockStack>
-      {image ? <AttachmentLightbox source={image} onClose={closeImage} /> : null}
-      {menu ? (
-        <ContextMenu open onOpenChange={closeMenu}>
-          <MenuAnchor point={menu.point} />
-          <PluginLinkMenu link={menu.link} />
-        </ContextMenu>
-      ) : null}
-    </MermaidStreamingContext.Provider>
+    <MarkdownExternalContext.Provider value={external}>
+      <MermaidStreamingContext.Provider value={streaming}>
+        <MarkdownBlockStack
+          imageSources={imageSources}
+          onTouchStart={nativeLinkMenu ? recordTouch : undefined}
+        >
+          {segments.map((segment) =>
+            segment.kind === "mermaid" ? (
+              <MermaidFence key={`${segment.kind}:${segment.id}`} code={segment.source} />
+            ) : (
+              <ThemedMarkdown
+                key={`${segment.kind}:${segment.id}`}
+                markdown={segment.source}
+                uniProps={pickMarkdownStyle(compact, muted)}
+                flavor="github"
+                selectable={selectable}
+                md4cFlags={external ? EXTERNAL_MD4C_FLAGS : MD4C_FLAGS}
+                linkRecognition={linkRecognition}
+                enableTaskListItemToggle={false}
+                enableLinkPreview={false}
+                enableBlockContextMenu={false}
+                // JS reveal owns pacing; native fade animation is a separate experiment.
+                streamingAnimation={false}
+                onLinkPress={pressLink}
+                onLinkLongPress={nativeLinkMenu ? longPressLink : undefined}
+                onImagePress={pressImage}
+                renderers={isWeb ? WEB_RENDERERS : undefined}
+              />
+            ),
+          )}
+        </MarkdownBlockStack>
+        {image ? <AttachmentLightbox source={image} onClose={closeImage} /> : null}
+        {menu ? (
+          <ContextMenu open onOpenChange={closeMenu}>
+            <MenuAnchor point={menu.point} />
+            <PluginLinkMenu link={menu.link} />
+          </ContextMenu>
+        ) : null}
+      </MermaidStreamingContext.Provider>
+    </MarkdownExternalContext.Provider>
   );
 });
 
