@@ -15,42 +15,80 @@
 # packaged-app smoke test cannot catch it — keep the flag rather than relying on the gate.
 #
 # Only `fsh` publishes a normal release: install-fsh.sh and the in-app updater install GitHub's
-# "latest" release, so a normal release from any other ref would reach every install. A PR with
-# the `deploy` label, or a manual run on another branch, publishes a prerelease instead
-# (`fsh-pr<N>-<sha>` / `fsh-test-<sha>`): a DMG link to test, which "latest" never points at.
-# Closing the PR deletes its prereleases.
+# "latest" release, so a normal release from any other ref would reach every install. Other refs
+# publish a prerelease (a test build), which "latest" never points at:
+# - a PR with the `deploy` label: `fsh-pr<N>-<sha>` on every push;
+# - every push to an `fsh-rebase-*` branch (the weekly upstream rebase): `fsh-test-<sha>`. Their PRs
+#   always conflict with `fsh`, and GitHub runs no pull_request workflow for a conflicting PR;
+# - a manual run on another branch: `fsh-test-<sha>`.
+# The desktop app lists and installs test builds (fsh-updater.ts). A test build stamps `fshBuild`
+# as `pr<N>-<sha>` / `test-<sha>`, which is how the app knows it runs one. Closing a PR deletes its
+# test builds and its branch's (pull_request_target, which runs for conflicting PRs too).
 name: FSH desktop build
 
 on:
   push:
-    branches: [fsh]
+    branches: [fsh, "fsh-rebase-*"]
     paths-ignore: [FSH.md, README.md, "docs/fsh/**"]
   pull_request:
-    types: [opened, synchronize, reopened, labeled, closed]
+    types: [opened, synchronize, reopened, labeled]
+  # Only for the cleanup job, which checks out nothing.
+  pull_request_target:
+    types: [closed]
   workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  macos-arm64:
+  # The release tag both builds stamp into the app and publish uses.
+  meta:
     if: >-
-      github.event_name != 'pull_request' ||
-      (github.event.action != 'closed' &&
+      github.event_name == 'push' || github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'pull_request' &&
        contains(github.event.pull_request.labels.*.name, 'deploy') &&
        (github.event.action != 'labeled' || github.event.label.name == 'deploy'))
-    runs-on: macos-15
-    # Job-level, so PR events that skip this job (other labels, close) don't cancel a running build.
-    concurrency:
-      group: fsh-desktop-${{ github.event.pull_request.number || github.ref }}
-      cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+    runs-on: ubuntu-latest
     env:
       FSH_PRERELEASE: ${{ github.ref != 'refs/heads/fsh' }}
       FSH_PR: ${{ github.event.pull_request.number }}
     outputs:
-      version: ${{ steps.stamp.outputs.version }}
-      sha: ${{ steps.stamp.outputs.sha }}
-      tag: ${{ steps.stamp.outputs.tag }}
+      version: ${{ steps.tag.outputs.version }}
+      sha: ${{ steps.tag.outputs.sha }}
+      tag: ${{ steps.tag.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Build the PR branch itself, not GitHub's merge commit, so the stamped sha is one you can find.
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Name the release
+        id: tag
+        run: |
+          set -euo pipefail
+          version="$(node -p 'require("./packages/desktop/package.json").version')"
+          # Seven characters, so a branch's test build tag can be worked out from `git rev-parse --short=7`.
+          sha="$(git rev-parse --short=7 HEAD)"
+          if [[ "$FSH_PRERELEASE" != "true" ]]; then
+            tag="fsh-${version}-${sha}"
+          elif [[ -n "$FSH_PR" ]]; then
+            tag="fsh-pr${FSH_PR}-${sha}"
+          else
+            tag="fsh-test-${sha}"
+          fi
+          printf 'version=%s\nsha=%s\ntag=%s\n' "$version" "$sha" "$tag" >> "$GITHUB_OUTPUT"
+
+  macos-arm64:
+    needs: meta
+    runs-on: macos-15
+    # Job-level, so PR events that skip this job (other labels) don't cancel a running build. A newer
+    # push to a test branch replaces its build; `fsh` builds every commit.
+    concurrency:
+      group: fsh-desktop-${{ github.event.pull_request.number || github.ref }}
+      cancel-in-progress: ${{ github.ref != 'refs/heads/fsh' }}
+    env:
+      FSH_VERSION: ${{ needs.meta.outputs.version }}
+      FSH_SHA: ${{ needs.meta.outputs.sha }}
+      FSH_TAG: ${{ needs.meta.outputs.tag }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -71,22 +109,9 @@ jobs:
       # copyright. Upstream's defaults make every FSH build look the same, so stamp the commit,
       # the build time and links to the release and commit.
       - name: Stamp FSH build info
-        id: stamp
         run: |
           set -euo pipefail
-          version="$(node -p 'require("./packages/desktop/package.json").version')"
-          sha="$(git rev-parse --short HEAD)"
-          if [[ "$FSH_PRERELEASE" != "true" ]]; then
-            tag="fsh-${version}-${sha}"
-          elif [[ -n "$FSH_PR" ]]; then
-            tag="fsh-pr${FSH_PR}-${sha}"
-          else
-            tag="fsh-test-${sha}"
-          fi
-          echo "FSH_SHA=${sha}" >> "$GITHUB_ENV"
-          echo "FSH_VERSION=${version}" >> "$GITHUB_ENV"
-          echo "FSH_TAG=${tag}" >> "$GITHUB_ENV"
-          printf 'version=%s\nsha=%s\ntag=%s\n' "$version" "$sha" "$tag" >> "$GITHUB_OUTPUT"
+          tag="$FSH_TAG" sha="$FSH_SHA"
           cat > packages/desktop/Credits.html <<EOF
           <div style="font: 11px -apple-system, sans-serif; text-align: center">
           Built $(date -u '+%Y-%m-%d %H:%M UTC')<br>
@@ -145,7 +170,7 @@ jobs:
           NODE_OPTIONS: --max-old-space-size=4096
         run: |
           npm run build:desktop -- --publish never --mac dmg --arm64 \
-            "-c.extraMetadata.fshBuild=${FSH_VERSION}-${FSH_SHA}" \
+            "-c.extraMetadata.fshBuild=${FSH_TAG#fsh-}" \
             "-c.mac.identity=${FSH_SIGNING_IDENTITY}" \
             -c.mac.notarize=false \
             -c.mac.hardenedRuntime=false \
@@ -172,18 +197,16 @@ jobs:
 
   # Fedora/RHEL x86_64 RPM, installed and updated by scripts/install-fsh.sh like the DMG.
   linux-x64:
-    if: >-
-      github.event_name != 'pull_request' ||
-      (github.event.action != 'closed' &&
-       contains(github.event.pull_request.labels.*.name, 'deploy') &&
-       (github.event.action != 'labeled' || github.event.label.name == 'deploy'))
+    needs: meta
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     concurrency:
       group: fsh-desktop-linux-${{ github.event.pull_request.number || github.ref }}
-      cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+      cancel-in-progress: ${{ github.ref != 'refs/heads/fsh' }}
     env:
       ONNXRUNTIME_NODE_INSTALL: skip
+      FSH_SHA: ${{ needs.meta.outputs.sha }}
+      FSH_TAG: ${{ needs.meta.outputs.tag }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -213,12 +236,10 @@ jobs:
         run: |
           set -euo pipefail
           node -e '
-            const { execSync } = require("child_process");
-            const version = require("./packages/desktop/package.json").version;
-            const sha = execSync("git rev-parse --short HEAD").toString().trim();
+            const sha = process.env.FSH_SHA;
             const config = {
               extends: `${process.env.GITHUB_WORKSPACE}/packages/desktop/electron-builder.yml`,
-              extraMetadata: { fshBuild: `${version}-${sha}` },
+              extraMetadata: { fshBuild: process.env.FSH_TAG.replace(/^fsh-/, "") },
               buildVersion: `fsh.${sha}`,
               copyright: `Copyright © ${new Date().getFullYear()} Mohamed Boudra · FSH build by Full Stack House`,
               publish: { provider: "github", owner: "fullstackhouse", repo: "paseo" },
@@ -261,7 +282,7 @@ jobs:
   # installs with nothing to install (install-fsh.sh only looks at the latest release). A flaky
   # Linux job costs a "Re-run failed jobs"; publish then runs on the DMG already built.
   publish:
-    needs: [macos-arm64, linux-x64]
+    needs: [meta, macos-arm64, linux-x64]
     runs-on: ubuntu-latest
     # The build jobs serialize per platform, but publish jobs from back-to-back pushes could still
     # run out of order and make the older commit "latest". Never cancelled: a waiting publish that a
@@ -272,9 +293,9 @@ jobs:
     env:
       FSH_PRERELEASE: ${{ github.ref != 'refs/heads/fsh' }}
       FSH_PR: ${{ github.event.pull_request.number }}
-      FSH_VERSION: ${{ needs.macos-arm64.outputs.version }}
-      FSH_SHA: ${{ needs.macos-arm64.outputs.sha }}
-      FSH_TAG: ${{ needs.macos-arm64.outputs.tag }}
+      FSH_VERSION: ${{ needs.meta.outputs.version }}
+      FSH_SHA: ${{ needs.meta.outputs.sha }}
+      FSH_TAG: ${{ needs.meta.outputs.tag }}
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@v4
@@ -304,7 +325,7 @@ jobs:
               --target "$(git rev-parse HEAD)" \
               --prerelease --latest=false \
               --title "Paseo ${version} test build (${source//\`/} ${FSH_SHA})" \
-              --notes "Test build of ${source} ($(git log -1 --format=%h)). Not offered to installs or the in-app updater. ${unsigned} Fedora: ${rpm}."
+              --notes "Test build of ${source} ($(git log -1 --format=%h)). The update check never offers it; install it from Paseo (Settings → About → Test builds, or **Install test build…** in the command palette) or with \`install-fsh.sh --tag ${tag}\`. ${unsigned} Fedora: ${rpm}."
           else
             gh release create "$tag" "${files[@]}" \
               --target "$GITHUB_SHA" \
@@ -312,15 +333,23 @@ jobs:
               --notes "Upstream Paseo ${version} plus the FSH patches on \`fsh\` ($(git log -1 --format=%h)). ${unsigned} Fedora: ${rpm}, or the install script."
           fi
 
+  # The PR's `fsh-pr<N>-*` builds, and the `fsh-test-*` builds of its branch (their titles name it).
   delete-pr-prereleases:
-    if: github.event_name == 'pull_request' && github.event.action == 'closed'
+    if: github.event_name == 'pull_request_target'
     runs-on: ubuntu-latest
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      PR: ${{ github.event.pull_request.number }}
+      BRANCH: ${{ github.event.pull_request.head.ref }}
     steps:
       - name: Delete this PR's test builds
         run: |
           set -euo pipefail
-          gh release list --repo "$GITHUB_REPOSITORY" --limit 200 --json tagName -q '.[].tagName' |
-            grep "^fsh-pr${{ github.event.pull_request.number }}-" |
-            while read -r tag; do gh release delete "$tag" --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes; done || true
+          gh release list --repo "$GITHUB_REPOSITORY" --limit 200 --json tagName,name,isPrerelease \
+            --jq '.[] | select(.isPrerelease) | [.tagName, .name] | @tsv' |
+            while IFS=$'\t' read -r tag name; do
+              if [[ "$tag" == "fsh-pr${PR}-"* ]] ||
+                { [[ "$tag" == fsh-test-* ]] && [[ "$name" == *"branch ${BRANCH} "* ]]; }; then
+                gh release delete "$tag" --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes || true
+              fi
+            done

@@ -1793,6 +1793,7 @@ export const ptBR: TranslationResources = {
         installWhenIdle: "Instalar quando ocioso",
         installNow: "Instalar agora",
       },
+      testBuilds: en.desktop.updates.testBuilds,
     },
     settings: {
       loadFailed: "Não foi possível carregar as configurações do desktop.",

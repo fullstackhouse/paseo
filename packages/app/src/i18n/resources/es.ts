@@ -1803,6 +1803,7 @@ export const es: TranslationResources = {
         installWhenIdle: "Instalar en reposo",
         installNow: "Instalar ahora",
       },
+      testBuilds: en.desktop.updates.testBuilds,
     },
     settings: {
       loadFailed: "No se puede cargar la configuración del escritorio.",

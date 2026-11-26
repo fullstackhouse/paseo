@@ -1779,6 +1779,7 @@ export const ja: TranslationResources = {
         installWhenIdle: "アイドル時にインストール",
         installNow: "今すぐインストール",
       },
+      testBuilds: en.desktop.updates.testBuilds,
     },
     settings: {
       loadFailed: "デスクトップ設定を読み込めません。",

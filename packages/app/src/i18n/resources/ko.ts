@@ -1769,6 +1769,7 @@ export const ko: TranslationResources = {
         installWhenIdle: "유휴 시 설치",
         installNow: "지금 설치",
       },
+      testBuilds: en.desktop.updates.testBuilds,
     },
     settings: {
       loadFailed: "데스크톱 설정을 불러올 수 없습니다.",

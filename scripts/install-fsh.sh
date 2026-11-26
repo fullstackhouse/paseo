@@ -4,21 +4,33 @@
 #
 #   curl -fsSL https://raw.githubusercontent.com/fullstackhouse/paseo/fsh/scripts/install-fsh.sh | bash
 #
-# Options: --yes (don't ask before quitting Paseo), --no-plugins, --force (reinstall the same build).
+# Options: --yes (don't ask before quitting Paseo), --no-plugins, --force (reinstall the same build),
+# --tag <tag> (install that release instead of the latest, e.g. a `fsh-pr<N>-<sha>` or `fsh-test-<sha>`
+# test build).
 set -euo pipefail
 
 REPO="fullstackhouse/paseo"
 PLUGINS=(paseo-asks paseo-status paseo-limits paseo-prs paseo-inbox paseo-claude-cloud)
 MARKER="$HOME/.paseo/fsh-release"
 
-yes=0 plugins=1 force=0
-for arg in "$@"; do
-  case "$arg" in
+yes=0 plugins=1 force=0 want_tag=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
     --yes | -y) yes=1 ;;
     --no-plugins) plugins=0 ;;
     --force) force=1 ;;
-    *) echo "Unknown option: $arg" >&2; exit 2 ;;
+    --tag)
+      [[ $# -ge 2 && "$2" =~ ^fsh-[A-Za-z0-9._-]+$ ]] || { echo "--tag needs an fsh-* release tag" >&2; exit 2; }
+      want_tag="$2"
+      shift
+      ;;
+    --tag=*)
+      want_tag="${1#--tag=}"
+      [[ "$want_tag" =~ ^fsh-[A-Za-z0-9._-]+$ ]] || { echo "--tag needs an fsh-* release tag" >&2; exit 2; }
+      ;;
+    *) echo "Unknown option: $1" >&2; exit 2 ;;
   esac
+  shift
 done
 
 say() { printf '\033[1m==>\033[0m %s\n' "$*"; }
@@ -118,9 +130,18 @@ installed() {
 }
 
 # GitHub's "latest" release is always the newest desktop build; Android releases opt out of it.
-asset_url="$(curl -fsSL "https://api.github.com/repos/$REPO/releases/latest" |
-  grep -o "\"browser_download_url\": *\"[^\"]*\\.$ASSET\"" | head -1 | sed 's/.*"\(https[^"]*\)"/\1/')"
-[[ -n "$asset_url" ]] || die "No .$ASSET found in the latest $REPO release."
+# --tag picks any release by tag, prereleases (test builds) included.
+if [[ -n "$want_tag" ]]; then
+  release_api="https://api.github.com/repos/$REPO/releases/tags/$want_tag"
+  release_name="$want_tag"
+else
+  release_api="https://api.github.com/repos/$REPO/releases/latest"
+  release_name="latest $REPO"
+fi
+release_json="$(curl -fsSL "$release_api")" || die "No $release_name release found."
+asset_url="$(grep -o "\"browser_download_url\": *\"[^\"]*\\.$ASSET\"" <<<"$release_json" | head -1 |
+  sed 's/.*"\(https[^"]*\)"/\1/')"
+[[ -n "$asset_url" ]] || die "No .$ASSET found in the $release_name release."
 tag="$(basename "$(dirname "$asset_url")")"
 
 if [[ $force -eq 0 ]] && installed && [[ -f "$MARKER" && "$(cat "$MARKER")" == "$tag" ]]; then

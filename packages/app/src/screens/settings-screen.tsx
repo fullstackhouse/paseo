@@ -90,6 +90,7 @@ import { BrowserDataSection } from "@/desktop/browser/settings/browser-data-sect
 import { IntegrationsSection } from "@/desktop/components/integrations-section";
 import { isElectronRuntime } from "@/desktop/host";
 import { useDesktopAppUpdater } from "@/desktop/updates/use-desktop-app-updater";
+import { FshTestBuildRows } from "@/desktop/updates/fsh-test-build-rows";
 import { formatVersionWithPrefix } from "@/desktop/updates/desktop-updates";
 import { resolveAppVersion } from "@/utils/app-version";
 import { openChangelog } from "@/changelog";
@@ -778,6 +779,7 @@ function DesktopAppUpdateRow() {
           </Button>
         </View>
       </View>
+      <FshTestBuildRows busy={isChecking || isInstalling} installUpdate={installUpdate} />
     </>
   );
 }

@@ -1743,6 +1743,7 @@ export const zhCN: TranslationResources = {
         installWhenIdle: "空闲时安装",
         installNow: "立即安装",
       },
+      testBuilds: en.desktop.updates.testBuilds,
     },
     settings: {
       loadFailed: "无法加载桌面设置。",

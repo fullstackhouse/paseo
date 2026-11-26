@@ -4,6 +4,7 @@ import type {
   DesktopAppUpdateInstallResult,
   DesktopReleaseChannel,
 } from "@/desktop/updates/desktop-updates";
+import type { FshRelease } from "@/desktop/updates/fsh-test-builds";
 import { i18n } from "@/i18n/i18next";
 
 export type DesktopAppUpdateStatus =
@@ -35,6 +36,7 @@ export interface DesktopAppUpdaterPort {
   }): Promise<DesktopAppUpdateCheckResult>;
   installDesktopAppUpdate(input: {
     releaseChannel: DesktopReleaseChannel;
+    fshRelease?: FshRelease;
   }): Promise<DesktopAppUpdateInstallResult>;
 }
 
@@ -62,6 +64,8 @@ export interface DesktopAppUpdater {
   }): Promise<DesktopAppUpdateCheckResult | null>;
   installUpdate(options: {
     releaseChannel: DesktopReleaseChannel;
+    /** FSH fork: install this test build, or go back to `stable`. */
+    fshRelease?: FshRelease;
   }): Promise<DesktopAppUpdateInstallResult | null>;
 }
 
@@ -341,6 +345,7 @@ export function createDesktopAppUpdater(deps: DesktopAppUpdaterDeps): DesktopApp
 
   async function installUpdate(options: {
     releaseChannel: DesktopReleaseChannel;
+    fshRelease?: FshRelease;
   }): Promise<DesktopAppUpdateInstallResult | null> {
     commit({
       ...state,
@@ -352,6 +357,7 @@ export function createDesktopAppUpdater(deps: DesktopAppUpdaterDeps): DesktopApp
     try {
       const result = await deps.port.installDesktopAppUpdate({
         releaseChannel: options.releaseChannel,
+        ...(options.fshRelease ? { fshRelease: options.fshRelease } : {}),
       });
       const nextLastCheckedAt = deps.now();
       commit({
