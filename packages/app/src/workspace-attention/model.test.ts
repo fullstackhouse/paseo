@@ -127,6 +127,49 @@ describe("deriveAttentionItems", () => {
   });
 });
 
+describe("deriveAttentionItems unrecorded waits", () => {
+  const card = (agentId: string, updatedAt: number) => ({
+    agentId,
+    state: "waiting_on_you" as const,
+    updatedAt,
+  });
+  const status = summary({
+    pluginId: "paseo-status",
+    itemId: "status",
+    title: "Status",
+    needsYou: undefined,
+    cards: [card("a", 1), card("b", 2)],
+  });
+
+  it("lists one item per agent whose card waits on you with no open ask, after plugin items", () => {
+    const asks = summary({ entries: [{ id: "A1", title: "Merge?", agentId: "c" }] });
+    const items = deriveAttentionItems({
+      agents: [],
+      summaryItems: [status, asks],
+      pullRequest: null,
+    });
+    expect(keys(items)).toEqual([
+      "plugin:paseo-asks:asks:ask-1",
+      "unrecorded:a:1",
+      "unrecorded:b:2",
+    ]);
+    expect(items[1]).toMatchObject({ kind: "unrecorded", agentId: "a", item: status });
+  });
+
+  it("drops an agent whose only ask is in progress", () => {
+    const asks = summary({
+      needsYou: false,
+      inProgress: [{ id: "A1", title: "Review", agentId: "a", updatedAt: 1 }],
+    });
+    const items = deriveAttentionItems({
+      agents: [],
+      summaryItems: [status, asks],
+      pullRequest: null,
+    });
+    expect(keys(items)).toEqual(["unrecorded:b:2"]);
+  });
+});
+
 describe("decideExplorerAutoShow", () => {
   const ask: AttentionItem = {
     kind: "plugin",
@@ -183,6 +226,7 @@ describe("pickAttentionTab", () => {
   const item = (kind: AttentionItem["kind"]): AttentionItem => {
     if (kind === "permission" || kind === "failed") return { kind, key: kind, agentId: "a" };
     if (kind === "plugin") return { kind, key: kind, item: summary() };
+    if (kind === "unrecorded") return { kind, key: kind, item: summary(), agentId: "a" };
     return { kind, key: kind };
   };
   const pick = (
@@ -201,6 +245,7 @@ describe("pickAttentionTab", () => {
     expect(pick("permission")).toBe("overview");
     expect(pick("failed")).toBe("overview");
     expect(pick("plugin")).toBe("overview");
+    expect(pick("unrecorded")).toBe("overview");
     expect(pick("pr-checks-failed")).toBe("overview");
     expect(pick("pr-ready")).toBe("overview");
     expect(pick("pr-merged")).toBe("overview");

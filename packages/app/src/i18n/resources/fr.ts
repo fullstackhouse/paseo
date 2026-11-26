@@ -2422,6 +2422,7 @@ export const fr: TranslationResources = {
       reviewPermission: "Examiner l’autorisation",
       openAgent: "Ouvrir l’agent",
       failedReason: "Un agent s’est arrêté sur une erreur",
+      unrecordedTitle: "Le statut vous attend, mais aucune demande ne dit quoi",
       uncommitted: "Modifications non validées",
       merged: "Fusionnée",
       checksFailing: "Vérifications en échec",

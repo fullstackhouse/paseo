@@ -246,6 +246,28 @@ export interface PluginWorkspaceSummaryItemState {
   pullRequests?: PluginWorkspacePullRequest[];
   /** True while `pullRequests` couldn't be refreshed (the forge is unreachable); the rows keep their last facts. */
   pullRequestsStale?: boolean;
+  /**
+   * Every agent's status card in the workspace, as facts. FSH-only. The host decides from them
+   * whether the workspace needs you, works, or is blocked or done (docs/workspace-attention.md),
+   * and ignores this item's `needsYou` and `workState`. An empty list says there are no cards.
+   */
+  cards?: PluginWorkspaceAgentCard[];
+}
+
+/** One agent's status card, as facts the host decides workspace attention from. FSH-only. */
+export interface PluginWorkspaceAgentCard {
+  agentId: string;
+  state: "working" | "waiting_on_you" | "blocked" | "done";
+  /** A turn started after the card was written: the human replied, or a child reported back. */
+  answered?: boolean;
+  /** When the card was last written, in epoch milliseconds. */
+  updatedAt: number;
+  /** The agent, its background work, or a descendant agent is live right now. */
+  live?: boolean;
+  /** When live work was last seen for this agent, in epoch milliseconds. */
+  lastLiveAt?: number;
+  /** Descendant agents live in other workspaces, for an idle agent with a waiting card. */
+  liveChildren?: string[];
 }
 
 /** One pull request on the Overview. Pressing it opens `url`, or the PR tab for the branch's own PR. */
@@ -309,6 +331,8 @@ export interface PluginWorkspaceSummaryEntry {
   title: string;
   /** A short facts line, such as "Decision · 2 options". */
   detail?: string;
+  /** The agent that waits on this, such as the ask's owner. FSH-only. */
+  agentId?: string;
 }
 
 /** One thing an agent has taken on but not finished, as an Overview In progress row. FSH-only. */

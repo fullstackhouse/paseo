@@ -67,7 +67,7 @@ import { requestSubagentsTrackOpen } from "@/subagents/track-open-request";
 import { normalizeWorkspaceOpaqueId } from "@/utils/workspace-identity";
 import { useWorkspaceAttention } from "@/workspace-attention/attention";
 import { hasRunningAgent } from "@/workspace-attention/model";
-import { foldReportedWork } from "@/workspace-status/reported-work";
+import { useReportedWorkLookup } from "@/workspace-status/reported-work";
 import { showExplorerForAttention } from "@/workspace-attention/auto-show";
 import { openExplorerSidebarView } from "@/workspace-tabs/explorer-sidebar";
 import { buildWorkspaceTabPersistenceKey } from "@/workspace-tabs/model";
@@ -318,6 +318,7 @@ function useYourMove(input: {
   summaryItems: readonly WorkspaceSummaryItem[];
 }): YourMoveRow[] {
   const items = useWorkspaceAttention(input.serverId, input.workspaceId);
+  const reportedWork = useReportedWorkLookup();
   const lastPromptAt = useSessionStore((state) =>
     selectLastPromptAt(state.sessions[input.serverId]?.agents, input.workspaceId),
   );
@@ -336,7 +337,7 @@ function useYourMove(input: {
       lastPromptAt,
     }),
     workOpen: isWorkStillOpen({
-      reported: foldReportedWork(input.summaryItems),
+      reported: reportedWork.items?.(input.serverId, input.workspaceId) ?? null,
       workspaceRunning: Boolean(input.facts?.isRunning),
       cardState: input.status?.state ?? null,
     }),
@@ -921,7 +922,7 @@ function useMoveView(
 ): MoveView | null {
   const { t } = useTranslation();
   const runGitAction = useGitActionRunner();
-  const agentId = row.kind === "permission" || row.kind === "failed" ? row.agentId : "";
+  const agentId = moveAgentId(row);
   const agent = useAgentDescriptor({ kind: "agent", agentId }, { serverId: context.serverId });
   const permission = useSessionStore((state) =>
     row.kind === "permission"
@@ -947,6 +948,13 @@ function useMoveView(
         return uncommittedMoveView(input);
     }
   }, [agent.label, facts, gitActions, permission, row, runGitAction, serverId, t, workspaceKey]);
+}
+
+/** The agent a row is about: a permission, a failure, or a card with no ask. */
+function moveAgentId(row: YourMoveRow): string {
+  if (row.kind === "permission" || row.kind === "failed") return row.agentId;
+  if (row.kind === "entry" && row.unrecorded) return row.entry.id;
+  return "";
 }
 
 interface MoveViewInput {
@@ -990,13 +998,20 @@ function failedMoveView(agentId: string, { t, serverId, agentLabel }: MoveViewIn
 
 function pluginMoveView(
   row: Extract<YourMoveRow, { kind: "entry" | "plugin" }>,
-  { t, workspaceKey }: MoveViewInput,
+  { t, workspaceKey, agentLabel }: MoveViewInput,
 ): MoveView {
+  const unrecorded = row.kind === "entry" && row.unrecorded;
+  let title = row.kind === "entry" ? row.entry.title : row.item.title;
+  let facts = row.kind === "entry" ? row.entry.detail : row.item.label;
+  if (unrecorded) {
+    title = t("panels.overview.unrecordedTitle");
+    facts = agentLabel || undefined;
+  }
   return {
     icon: <ThemedAsk size={ICON_SIZE} uniProps={warningColorMapping} />,
     tone: "warn",
-    title: row.kind === "entry" ? row.entry.title : row.item.title,
-    facts: row.kind === "entry" ? row.entry.detail : row.item.label,
+    title,
+    facts,
     press: {
       action: t("panels.overview.open"),
       run: () => {

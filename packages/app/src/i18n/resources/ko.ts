@@ -2380,6 +2380,7 @@ export const ko: TranslationResources = {
       reviewPermission: "권한 검토",
       openAgent: "에이전트 열기",
       failedReason: "에이전트가 오류로 중지되었습니다",
+      unrecordedTitle: "상태가 당신을 기다리지만 무엇인지 알려 주는 요청이 없습니다",
       uncommitted: "커밋되지 않은 변경 사항",
       merged: "병합됨",
       checksFailing: "검사 실패",

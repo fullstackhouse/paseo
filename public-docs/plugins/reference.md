@@ -1186,6 +1186,15 @@ entry waits on a review and it goes to Blocked ("awaiting review"). So moving wo
 and an open ask beats moving work. The row's "N in progress" and "awaiting review" show only when the
 entries are why the workspace sits in that group; "N not moving" shows wherever some are stuck.
 
+On FSH hosts, send status cards as facts instead of a verdict: `cards` lists every agent's card
+(`agentId`, `state`, `answered`, `updatedAt`, and `live`, `lastLiveAt`, `liveChildren` for what backs it),
+and `agentId` on an `entries` row names the agent that waits on it. The host then decides the group and
+ignores that item's `workState` and `needsYou` (except `needsYou` on its own `entries`). A card waiting
+on the human whose agent has no open ask reads Blocked while the agent holds an `inProgress` entry or
+has `liveChildren`, and otherwise gets its own Your move row, rendered by the item's `EntryComponent`
+with the agent id as `entryId`. The rules are in
+[workspace attention](https://github.com/fullstackhouse/paseo/blob/fsh/docs/workspace-attention.md).
+
 Use `"blocked"` when the work waits on something other than the human: another workspace or agent, a
 reviewer, CI. Blocked sits at the bottom of the sidebar with no needs-you mark. Hosts without the
 Blocked group drop the value and group the workspace by its turn.

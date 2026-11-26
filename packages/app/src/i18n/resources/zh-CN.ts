@@ -2342,6 +2342,7 @@ export const zhCN: TranslationResources = {
       reviewPermission: "查看权限请求",
       openAgent: "打开智能体",
       failedReason: "有智能体因错误停止",
+      unrecordedTitle: "状态在等你，但没有请求说明是什么",
       uncommitted: "未提交的更改",
       merged: "已合并",
       checksFailing: "检查未通过",

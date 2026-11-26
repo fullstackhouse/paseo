@@ -5,20 +5,16 @@ import {
 } from "@/plugins/workspace-summary/store";
 import type { SidebarStateBucket } from "@/utils/sidebar-agent-state";
 import type { WorkspaceManualGroup } from "@getpaseo/protocol/messages";
-import { isEntryMoving, nextNothingMovingAt, type MovementContext } from "./moving";
+import type { MovementContext } from "./moving";
+import {
+  deriveWorkspaceAttention,
+  nextAttentionChangeAt,
+  type InProgressTally,
+  type ReportedWork,
+  type WorkspaceAttention,
+} from "./attention";
 
-/** What plugins say about an idle workspace's work, folded across their summary items. */
-export type ReportedWork = "needs_you" | "blocked" | "working" | "done";
-
-/** A workspace's in-progress entries, counted, and the group they ask for. */
-export interface InProgressTally {
-  moving: number;
-  stuck: number;
-  /** Moving entries that wait on a person's review rather than on machines. */
-  awaitingReview: number;
-  /** needs_you when nothing moves most of them, working when machines move any, else blocked. */
-  work: ReportedWork;
-}
+export type { InProgressTally, ReportedWork } from "./attention";
 
 export type ReportedWorkLookup = ((
   serverId: string,
@@ -33,59 +29,6 @@ export type ReportedWorkLookup = ((
   /** What the items report on their own, without their in-progress entries. */
   items?: (serverId: string, workspaceId: string) => ReportedWork | null;
 };
-
-/** Most to least telling: done only when nothing else is reported. */
-const REPORTED_WORK_RANK: readonly ReportedWork[] = ["needs_you", "working", "blocked", "done"];
-
-function reportedWorkOf(item: WorkspaceSummaryItem): ReportedWork | null {
-  if (item.needsYou || item.workState === "waiting") return "needs_you";
-  return item.workState ?? null;
-}
-
-function moreTelling(a: ReportedWork | null, b: ReportedWork | null): ReportedWork | null {
-  if (a === null) return b;
-  if (b === null) return a;
-  return REPORTED_WORK_RANK.indexOf(b) < REPORTED_WORK_RANK.indexOf(a) ? b : a;
-}
-
-/**
- * Something waiting on the human wins, then any work still going, then work waiting on something
- * else (other workspaces, a reviewer, CI); done only when nothing else is reported.
- */
-export function foldReportedWork(items: readonly WorkspaceSummaryItem[]): ReportedWork | null {
-  let result: ReportedWork | null = null;
-  for (const item of items) result = moreTelling(result, reportedWorkOf(item));
-  return result;
-}
-
-/**
- * Counts every item's in-progress entries by `isEntryMoving` and picks the group they ask for: as
- * many stuck as moving (and any stuck) needs the human; otherwise machines moving any entry (one not
- * waiting on a review, or live work) keep it working; otherwise every moving entry waits on a
- * reviewer, so it is blocked. Null without entries.
- */
-export function foldInProgress(
-  items: readonly WorkspaceSummaryItem[],
-  movement: MovementContext,
-): InProgressTally | null {
-  let moving = 0;
-  let stuck = 0;
-  let awaitingReview = 0;
-  for (const item of items) {
-    for (const entry of item.inProgress ?? []) {
-      if (!isEntryMoving(entry, movement)) stuck += 1;
-      else {
-        moving += 1;
-        if (entry.watched && entry.waitingOnReview) awaitingReview += 1;
-      }
-    }
-  }
-  if (moving + stuck === 0) return null;
-  let work: ReportedWork = "blocked";
-  if (stuck > 0 && stuck >= moving) work = "needs_you";
-  else if (movement.liveWork || awaitingReview < moving) work = "working";
-  return { moving, stuck, awaitingReview, work };
-}
 
 interface TurnStatus {
   status: SidebarStateBucket;
@@ -168,7 +111,10 @@ function sidebarMovement(turn: TurnStatus | undefined, now: number): MovementCon
 
 const NO_AGENTS: ReadonlySet<string> = new Set();
 
-/** Folds every summary item once, keyed by host and workspace; `now` ages in-progress entries. */
+/**
+ * Decides every workspace's attention (`deriveWorkspaceAttention`), keyed by host and workspace, once
+ * per movement context; `now` ages cards and in-progress entries.
+ */
 export function createReportedWorkLookup(
   entries: readonly WorkspaceSummaryItem[],
   now: number = Date.now(),
@@ -180,36 +126,33 @@ export function createReportedWorkLookup(
     if (list) list.push(entry);
     else grouped.set(key, [entry]);
   }
-  const folded = new Map<string, ReportedWork | null>();
-  const newest = new Map<string, number>();
-  for (const [key, items] of grouped) {
-    folded.set(key, foldReportedWork(items));
-    for (const item of items) {
-      const at = item.status?.updatedAt;
-      if (at !== undefined && at > (newest.get(key) ?? Number.NEGATIVE_INFINITY))
-        newest.set(key, at);
+  const decided = new Map<string, WorkspaceAttention>();
+  const attention = (serverId: string, workspaceId: string, turn?: TurnStatus) => {
+    const key = `${serverId}:${workspaceId}`;
+    const items = grouped.get(key);
+    if (!items) return null;
+    const movement = sidebarMovement(turn, now);
+    const cacheKey = `${key}:${movement.liveWork}`;
+    let result = decided.get(cacheKey);
+    if (!result) {
+      result = deriveWorkspaceAttention(items, movement);
+      decided.set(cacheKey, result);
     }
-  }
-  const inProgress = (serverId: string, workspaceId: string, turn?: TurnStatus) => {
-    const items = grouped.get(`${serverId}:${workspaceId}`);
-    return items ? foldInProgress(items, sidebarMovement(turn, now)) : null;
+    return result;
   };
-  const items = (serverId: string, workspaceId: string) =>
-    folded.get(`${serverId}:${workspaceId}`) ?? null;
   const lookup: ReportedWorkLookup = (serverId, workspaceId, turn) =>
-    moreTelling(
-      items(serverId, workspaceId),
-      inProgress(serverId, workspaceId, turn)?.work ?? null,
-    );
-  lookup.updatedAt = (serverId, workspaceId) => newest.get(`${serverId}:${workspaceId}`) ?? null;
-  lookup.inProgress = inProgress;
-  lookup.items = items;
+    attention(serverId, workspaceId, turn)?.work ?? null;
+  lookup.updatedAt = (serverId, workspaceId) => attention(serverId, workspaceId)?.updatedAt ?? null;
+  lookup.inProgress = (serverId, workspaceId, turn) =>
+    attention(serverId, workspaceId, turn)?.inProgress ?? null;
+  lookup.items = (serverId, workspaceId) => attention(serverId, workspaceId)?.reported ?? null;
   return lookup;
 }
 
 /**
  * The lookup status derivation takes; a new one whenever a plugin updates a summary item, and when
- * an in-progress entry stops moving by age, so its workspace regroups without a fixed tick.
+ * time alone changes a workspace's attention (`nextAttentionChangeAt`), so it regroups without a
+ * fixed tick.
  */
 export function useReportedWorkLookup(): ReportedWorkLookup {
   const entries = useSyncExternalStore(
@@ -218,18 +161,11 @@ export function useReportedWorkLookup(): ReportedWorkLookup {
     workspaceSummaryStore.getSnapshot,
   );
   const [now, setNow] = useState(() => Date.now());
-  const nextAt = useMemo(
-    () => nextNothingMovingAt(inProgressEntries(entries), now),
-    [entries, now],
-  );
+  const nextAt = useMemo(() => nextAttentionChangeAt(entries, now), [entries, now]);
   useEffect(() => {
     if (nextAt === null) return undefined;
     const id = setTimeout(() => setNow(Date.now()), Math.max(0, nextAt - Date.now()));
     return () => clearTimeout(id);
   }, [nextAt]);
   return useMemo(() => createReportedWorkLookup(entries, now), [entries, now]);
-}
-
-function* inProgressEntries(items: readonly WorkspaceSummaryItem[]) {
-  for (const item of items) yield* item.inProgress ?? [];
 }

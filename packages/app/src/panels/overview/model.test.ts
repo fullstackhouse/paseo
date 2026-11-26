@@ -122,6 +122,40 @@ describe("deriveYourMove", () => {
     ]);
   });
 
+  it("lists one entry row per unrecorded agent, keyed and rendered by the card's item", () => {
+    const status = summaryItem({ pluginId: "paseo-status", itemId: "status", title: "Status" });
+    const rows = deriveYourMove({
+      items: [
+        { kind: "unrecorded", key: "unrecorded:a:1", item: status, agentId: "a" },
+        { kind: "unrecorded", key: "unrecorded:b:2", item: status, agentId: "b" },
+      ],
+      agentRunning: false,
+      gitPrimaryId: null,
+      canArchive: false,
+      isWorktree: true,
+      prMerged: false,
+      statusDone: false,
+      workOpen: false,
+      inProgress: false,
+    });
+    expect(rows).toEqual([
+      {
+        kind: "entry",
+        key: "entry:paseo-status:status:a",
+        item: status,
+        entry: { id: "a", title: "Status", agentId: "a" },
+        unrecorded: true,
+      },
+      {
+        kind: "entry",
+        key: "entry:paseo-status:status:b",
+        item: status,
+        entry: { id: "b", title: "Status", agentId: "b" },
+        unrecorded: true,
+      },
+    ]);
+  });
+
   it("keeps an entry's row key when the plugin item's key moves to a newer entry", () => {
     // Asks sets the item key to its newest ask, so a new ask changes the attention key.
     const rowsFor = (attentionKey: string, ids: string[]) =>

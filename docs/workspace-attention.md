@@ -43,10 +43,12 @@ paseo-status sends `answered`, `live` and `liveChildren` because only its server
 
 1. A card **needs you** when it is `waiting_on_you` and not `answered`.
 2. A card that needs you reads **blocked** instead when its agent has no open ask and either has an ask in progress or has `liveChildren`. Its asks or children say what it waits on; the card is out of date.
-3. A card that still needs you with no open ask and nothing in progress is **unrecorded**: Your move shows one row per such agent, named, with Sync asks.
+3. A card that still needs you with no open ask and nothing in progress is **unrecorded** (`unrecordedWaits`). Each one is an attention item, so Your move shows one row per agent, named, and entering the workspace opens Overview. The card's item renders the row through its `EntryComponent` with the agent id as `entryId` (paseo-status: Sync asks).
 4. A `working` card counts while `live`, or for 5 minutes after the later of `updatedAt` and `lastLiveAt`.
 5. In-progress entries: stuck after 10 minutes unless their agent runs, live work exists, or they are watched (`workspace-status/moving.ts`).
 6. The workspace takes the most telling of: needs you, working, blocked, done. Done only when every card is done.
+
+The sidebar reads it through `createReportedWorkLookup` (`workspace-status/reported-work.ts`), which re-runs when time alone changes a verdict (`nextAttentionChangeAt`): a working card's grace ends or an entry stops moving.
 
 Live state still wins over all of this: a running agent, a permission prompt or a failure decides the sidebar group (`isStatusDecidedByReport`).
 

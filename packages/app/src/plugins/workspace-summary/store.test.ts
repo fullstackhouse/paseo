@@ -295,6 +295,48 @@ describe("WorkspaceSummaryStore", () => {
     ]);
   });
 
+  it("keeps valid status cards, one per agent, and an entry's agent", () => {
+    const store = new WorkspaceSummaryStore();
+    const item = store.add(owner, {
+      id: "status",
+      workspaceId: "w",
+      title: "Status",
+      entries: [{ id: "A1", title: "Merge?", agentId: " agent-1 " }],
+      cards: [
+        {
+          agentId: "agent-1",
+          state: "waiting_on_you",
+          updatedAt: 10,
+          answered: true,
+          live: true,
+          lastLiveAt: 5,
+          liveChildren: ["child", " "],
+        },
+        { agentId: "agent-1", state: "done", updatedAt: 20 },
+        // @ts-expect-error a plugin can send any state
+        { agentId: "agent-2", state: "sleeping", updatedAt: 1 },
+        { agentId: "agent-3", state: "done", updatedAt: Number.NaN },
+        { agentId: "agent-4", state: "working", updatedAt: 3, lastLiveAt: Number.NaN },
+      ],
+    });
+    const [state] = store.forWorkspace("s", "w");
+    expect(state?.entries).toEqual([{ id: "A1", title: "Merge?", agentId: "agent-1" }]);
+    expect(state?.cards).toEqual([
+      {
+        agentId: "agent-1",
+        state: "waiting_on_you",
+        updatedAt: 10,
+        answered: true,
+        live: true,
+        lastLiveAt: 5,
+        liveChildren: ["child"],
+      },
+      { agentId: "agent-4", state: "working", updatedAt: 3 },
+    ]);
+    item.update({ cards: [] });
+    expect(store.forWorkspace("s", "w")[0]?.cards).toEqual([]);
+  });
+
   it("keeps the entry component across updates", () => {
     const store = new WorkspaceSummaryStore();
     const EntryComponent = () => null;

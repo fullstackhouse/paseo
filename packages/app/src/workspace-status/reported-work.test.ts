@@ -4,8 +4,6 @@ import {
   applyManualGroup,
   applyReportedWork,
   createReportedWorkLookup,
-  foldInProgress,
-  foldReportedWork,
   isStatusDecidedByReport,
 } from "./reported-work";
 
@@ -23,42 +21,6 @@ function item(fields: Partial<WorkspaceSummaryItem>): WorkspaceSummaryItem {
 }
 
 const at = new Date("2026-11-12T10:00:00Z");
-
-describe("foldReportedWork", () => {
-  it("lets needs-you win, then working, then blocked, then done", () => {
-    expect(foldReportedWork([item({ workState: "blocked" })])).toBe("blocked");
-    expect(foldReportedWork([item({ workState: "blocked" }), item({ workState: "working" })])).toBe(
-      "working",
-    );
-    expect(foldReportedWork([item({ workState: "blocked" }), item({ workState: "done" })])).toBe(
-      "blocked",
-    );
-    expect(
-      foldReportedWork([
-        item({ workState: "blocked" }),
-        item({ pluginId: "asks", needsYou: true }),
-      ]),
-    ).toBe("needs_you");
-  });
-
-  it("lets needs-you win, then working, then done", () => {
-    expect(foldReportedWork([])).toBeNull();
-    expect(foldReportedWork([item({ count: 1 })])).toBeNull();
-    expect(foldReportedWork([item({ workState: "done" })])).toBe("done");
-    expect(foldReportedWork([item({ workState: "working" }), item({ workState: "waiting" })])).toBe(
-      "needs_you",
-    );
-    expect(foldReportedWork([item({ workState: "done" }), item({ workState: "working" })])).toBe(
-      "working",
-    );
-    expect(
-      foldReportedWork([
-        item({ workState: "working" }),
-        item({ pluginId: "asks", needsYou: true }),
-      ]),
-    ).toBe("needs_you");
-  });
-});
 
 describe("applyReportedWork", () => {
   it("moves an unread finished turn to Working while the agent says it is still working", () => {
@@ -185,6 +147,33 @@ describe("applyManualGroup", () => {
   });
 });
 
+describe("createReportedWorkLookup with status cards", () => {
+  it("groups a waiting card whose agent only holds an ask in progress as blocked", () => {
+    const now = 1_000_000_000;
+    const lookup = createReportedWorkLookup(
+      [
+        item({ cards: [{ agentId: "a", state: "waiting_on_you", updatedAt: now }] }),
+        item({
+          pluginId: "paseo-asks",
+          itemId: "asks",
+          inProgress: [
+            {
+              id: "A1",
+              title: "Request review on PR #65",
+              agentId: "a",
+              watched: true,
+              waitingOnReview: true,
+              updatedAt: now,
+            },
+          ],
+        }),
+      ],
+      now,
+    );
+    expect(lookup("s", "w")).toBe("blocked");
+  });
+});
+
 describe("createReportedWorkLookup updatedAt", () => {
   it("gives the newest agent status time per workspace", () => {
     const status = (updatedAt: number) => ({ state: "done" as const, summary: "s", updatedAt });
@@ -195,88 +184,6 @@ describe("createReportedWorkLookup updatedAt", () => {
     ]);
     expect(lookup.updatedAt?.("s", "a")).toBe(30);
     expect(lookup.updatedAt?.("s", "b")).toBeNull();
-  });
-});
-
-describe("foldInProgress", () => {
-  const now = 1_000_000_000;
-  const idle = { runningAgentIds: new Set<string>(), liveWork: false, now };
-  const stale = { title: "t", updatedAt: now - 11 * 60_000 };
-  const ci = { title: "t", watched: true, updatedAt: now };
-  const review = { title: "t", watched: true, waitingOnReview: true, updatedAt: now };
-  const asks = (
-    ...entries: Array<Partial<NonNullable<WorkspaceSummaryItem["inProgress"]>[number]>>
-  ) =>
-    item({
-      pluginId: "paseo-asks",
-      itemId: "asks",
-      inProgress: entries.map((entry, index) =>
-        Object.assign({ id: `A${index}`, title: "t", updatedAt: now }, entry),
-      ),
-    });
-
-  it("is null without entries", () => {
-    expect(foldInProgress([item({ workState: "working" })], idle)).toBeNull();
-    expect(foldInProgress([asks()], idle)).toBeNull();
-  });
-
-  it("works while CI watches an entry", () => {
-    expect(foldInProgress([asks(ci, ci)], idle)).toEqual({
-      moving: 2,
-      stuck: 0,
-      awaitingReview: 0,
-      work: "working",
-    });
-  });
-
-  it("is blocked when every moving entry waits on a review", () => {
-    expect(foldInProgress([asks(review, review)], idle)).toEqual({
-      moving: 2,
-      stuck: 0,
-      awaitingReview: 2,
-      work: "blocked",
-    });
-  });
-
-  it("works when CI and review are mixed", () => {
-    expect(foldInProgress([asks(ci, review)], idle)?.work).toBe("working");
-  });
-
-  it("keeps the moving majority's group over a stuck entry", () => {
-    expect(foldInProgress([asks(ci, ci, ci, stale)], idle)).toEqual({
-      moving: 3,
-      stuck: 1,
-      awaitingReview: 0,
-      work: "working",
-    });
-    expect(foldInProgress([asks(review, review, stale)], idle)?.work).toBe("blocked");
-  });
-
-  it("needs the human once stuck entries are at least as many as moving ones", () => {
-    expect(foldInProgress([asks(ci, stale)], idle)?.work).toBe("needs_you");
-    expect(foldInProgress([asks(stale)], idle)).toEqual({
-      moving: 0,
-      stuck: 1,
-      awaitingReview: 0,
-      work: "needs_you",
-    });
-  });
-
-  it("counts live work and a running agent as machines moving", () => {
-    const live = { ...idle, liveWork: true };
-    expect(foldInProgress([asks(review, stale)], live)).toEqual({
-      moving: 2,
-      stuck: 0,
-      awaitingReview: 1,
-      work: "working",
-    });
-    const running = { ...idle, runningAgentIds: new Set(["agent-1"]) };
-    expect(foldInProgress([asks({ ...stale, agentId: "agent-1" })], running)?.work).toBe("working");
-  });
-
-  it("ignores waitingOnReview on an entry nothing watches", () => {
-    const fresh = { title: "t", waitingOnReview: true, updatedAt: now };
-    expect(foldInProgress([asks(fresh)], idle)?.work).toBe("working");
   });
 });
 
