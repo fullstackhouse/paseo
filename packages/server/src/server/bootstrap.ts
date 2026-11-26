@@ -1,4 +1,5 @@
 import { createRestartRecovery } from "./agent/restart-recovery/index.js";
+import { describeLiveWork } from "./agent/restart-recovery/live-work.js";
 import { sendPromptToAgent } from "./agent/agent-prompt.js";
 import { createIdleRuntimeCleanup } from "./agent/idle-runtime-cleanup/index.js";
 import {
@@ -1078,6 +1079,7 @@ export async function createPaseoDaemon(
     dispatch: (agentId, prompt) =>
       sendPromptToAgent({ agentId, prompt, agentManager, agentStorage, logger, unarchive: false }),
     report: (agentId, err) => logger.error({ agentId, err }, "Agent restart recovery failed"),
+    liveWork: (agentId) => describeLiveWork(agentManager, agentId),
   });
   await restartRecovery.prepareStartup();
   logger.info({ elapsed: elapsed() }, "Agent storage initialized");
