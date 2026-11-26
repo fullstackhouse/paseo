@@ -2475,6 +2475,54 @@ async function getUntrackedDiffText(
   };
 }
 
+export type CheckoutPlacement =
+  | { isGit: false }
+  | Pick<
+      CheckoutStatusGit,
+      "isGit" | "repoRoot" | "mainRepoRoot" | "currentBranch" | "remoteUrl" | "isPaseoOwnedWorktree"
+    >;
+
+/**
+ * Where a checkout sits (roots, branch, origin, Paseo ownership), classified exactly like
+ * `getCheckoutStatus` but without scanning the working tree or walking history. Registry
+ * bookkeeping needs only this; a status read per workspace runs `git status` over every
+ * worktree on the host.
+ */
+export async function getCheckoutPlacement(
+  cwd: string,
+  context?: CheckoutContext,
+): Promise<CheckoutPlacement> {
+  const inspected = await inspectCheckoutContext(cwd, context);
+  if (!inspected) {
+    return { isGit: false };
+  }
+  const worktreeRoot = inspected.worktreeRoot;
+  const mainRepoRoot = await getMainRepoRootFromCommonDir(
+    cwd,
+    inspected.gitCommonDir,
+    context,
+  ).catch(() => null);
+  const located = {
+    isGit: true as const,
+    repoRoot: worktreeRoot,
+    currentBranch: inspected.currentBranch,
+    remoteUrl: inspected.remoteUrl,
+  };
+  if (inspected.paseoWorktree.isPaseoOwnedWorktree) {
+    const metadata = await readPaseoWorktreeMetadata(inspected.paseoWorktree.worktreeRoot);
+    const baseRef = storedBaseRefFromMetadata(metadata) ?? (await resolveBaseRef(cwd, context));
+    if (baseRef) {
+      return { ...located, mainRepoRoot: mainRepoRoot ?? worktreeRoot, isPaseoOwnedWorktree: true };
+    }
+  }
+  return {
+    ...located,
+    mainRepoRoot:
+      mainRepoRoot && resolve(mainRepoRoot) !== resolve(worktreeRoot) ? mainRepoRoot : null,
+    isPaseoOwnedWorktree: false,
+  };
+}
+
 export async function getCheckoutStatus(
   cwd: string,
   context?: CheckoutContext,

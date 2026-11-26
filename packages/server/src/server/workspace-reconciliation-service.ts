@@ -52,15 +52,11 @@ export interface ReconciliationTimer {
 export interface ReconciliationClock {
   setTimeout(callback: () => void | Promise<void>, delayMs: number): ReconciliationTimer;
   clearTimeout(timer: ReconciliationTimer): void;
-  setInterval(callback: () => void | Promise<void>, delayMs: number): ReconciliationTimer;
-  clearInterval(timer: ReconciliationTimer): void;
 }
 
 const systemClock: ReconciliationClock = {
   setTimeout: (callback, delayMs) => setTimeout(() => void callback(), delayMs),
   clearTimeout: (timer) => clearTimeout(timer as ReturnType<typeof setTimeout>),
-  setInterval: (callback, delayMs) => setInterval(() => void callback(), delayMs),
-  clearInterval: (timer) => clearInterval(timer as ReturnType<typeof setInterval>),
 };
 
 const watchProjectRoot: ProjectRootWatch = (rootPath, options, onChange, onError) => {
@@ -204,10 +200,19 @@ export class WorkspaceReconciliationService {
         }
       }) ?? null;
     await this.syncProjectRootWatches();
-    this.rescanTimer = this.clock.setInterval(
-      () => this.reconcileObservedGitMetadata("full"),
-      this.rescanIntervalMs,
-    );
+    this.scheduleRescan();
+  }
+
+  // The interval is the idle gap between full sweeps, not their period. A sweep reads every
+  // workspace, and on a large host one sweep outlasts the interval; a fixed-period timer then
+  // queues the next sweep behind the running one, so sweeps run back to back forever.
+  private scheduleRescan(): void {
+    if (this.disposed) return;
+    this.rescanTimer = this.clock.setTimeout(async () => {
+      this.rescanTimer = null;
+      await this.reconcileObservedGitMetadata("full");
+      this.scheduleRescan();
+    }, this.rescanIntervalMs);
     this.rescanTimer.unref?.();
   }
 
@@ -216,7 +221,7 @@ export class WorkspaceReconciliationService {
     this.wakeInspectionWaiters();
     this.unsubscribeRegistry?.();
     this.unsubscribeRegistry = null;
-    if (this.rescanTimer) this.clock.clearInterval(this.rescanTimer);
+    if (this.rescanTimer) this.clock.clearTimeout(this.rescanTimer);
     if (this.debounceTimer) this.clock.clearTimeout(this.debounceTimer);
     for (const { watcher } of this.watchers) watcher.close();
     this.watchers.length = 0;

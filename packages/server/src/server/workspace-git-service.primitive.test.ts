@@ -321,6 +321,7 @@ interface CreateServiceOptions {
   subscribe?: ReturnType<typeof vi.fn>;
   getCheckoutSnapshotFacts?: ReturnType<typeof vi.fn>;
   getCheckoutStatus?: ReturnType<typeof vi.fn>;
+  getCheckoutPlacement?: ReturnType<typeof vi.fn>;
   getCheckoutShortstat?: ReturnType<typeof vi.fn>;
   getCheckoutWorktreeState?: ReturnType<typeof vi.fn>;
   getPullRequestStatus?: ReturnType<typeof vi.fn>;
@@ -350,6 +351,7 @@ function buildDefaultServiceDeps() {
       upstreamStatus: facts.upstreamStatus,
     })),
     getCheckoutStatus: vi.fn(async (cwd: string) => createCheckoutStatus(cwd)),
+    getCheckoutPlacement: vi.fn(async (cwd: string) => createCheckoutStatus(cwd)),
     getCheckoutShortstat: vi.fn(async () => ({
       additions: 1,
       deletions: 0,
@@ -427,12 +429,27 @@ describe("WorkspaceGitServiceImpl primitive refresh entrypoint", () => {
 
   test("getCheckout surfaces an unexpected Git read failure", async () => {
     const service = createService({
-      getCheckoutStatus: vi.fn(async () => {
+      getCheckoutPlacement: vi.fn(async () => {
         throw new Error("Git read failed");
       }),
     });
 
     await expect(service.getCheckout(REPO_CWD)).rejects.toThrow("Git read failed");
+
+    service.dispose();
+  });
+
+  test("getCheckout reads placement only, never the working-tree status", async () => {
+    const getCheckoutStatus = vi.fn(async (cwd: string) => createCheckoutStatus(cwd));
+    const getCheckoutPlacement = vi.fn(async (cwd: string) => createCheckoutStatus(cwd));
+    const service = createService({ getCheckoutStatus, getCheckoutPlacement });
+
+    await expect(service.getCheckout(REPO_CWD)).resolves.toMatchObject({
+      isGit: true,
+      currentBranch: "main",
+    });
+    expect(getCheckoutPlacement).toHaveBeenCalledTimes(1);
+    expect(getCheckoutStatus).not.toHaveBeenCalled();
 
     service.dispose();
   });
