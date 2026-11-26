@@ -52,6 +52,7 @@ import {
   type AgentPromptInput,
   type AgentProvider,
   type AgentRunOptions,
+  type AgentTurnOrigin,
   type AgentSteerOptions,
   type AgentRunResult,
   type AgentSession,
@@ -876,6 +877,11 @@ function totalWorkedMs(
 ): number | undefined {
   if (agent.workedMs === undefined || !agent.activeTurnStartedAt) return agent.workedMs;
   return agent.workedMs + Math.max(0, Date.now() - agent.activeTurnStartedAt.getTime());
+}
+
+/** The turn's origin as an optional event field: absent when the prompt carried none. */
+function originField(options: AgentRunOptions | undefined): { origin?: AgentTurnOrigin } {
+  return options?.origin ? { origin: options.origin } : {};
 }
 
 export class AgentManager {
@@ -3252,7 +3258,9 @@ export class AgentManager {
     onAccepted?.();
     this.touchUpdatedAt(agent);
     if (options?.clientMessageId) {
-      this.recordSubmittedPrompt(agent, prompt, options.clientMessageId, "accepted");
+      this.recordSubmittedPrompt(agent, prompt, options.clientMessageId, "accepted", {
+        origin: options.origin,
+      });
       this.emitState(agent);
     }
     const dispatch = (event: AgentStreamEvent): void => {
@@ -3345,6 +3353,7 @@ export class AgentManager {
           if (options?.clientMessageId) {
             this.recordSubmittedPrompt(agent, prompt, options.clientMessageId, "rejected", {
               messageId: options.clientMessageId,
+              origin: options.origin,
             });
           }
           await this.handleStreamEvent(agent, {
@@ -3379,6 +3388,7 @@ export class AgentManager {
         if (options?.clientMessageId) {
           this.recordSubmittedPrompt(agent, prompt, options.clientMessageId, "rejected", {
             messageId: options.clientMessageId,
+            origin: options.origin,
           });
         }
         await this.handleStreamEvent(agent, {
@@ -3552,7 +3562,12 @@ export class AgentManager {
       // The provider's duplicate start for this turn is suppressed at the ingestion boundary.
       this.dispatchStream(
         agent.id,
-        { type: "turn_started", provider: agent.provider, turnId },
+        {
+          type: "turn_started",
+          provider: agent.provider,
+          turnId,
+          ...originField(options),
+        },
         { timestamp: turnStartedAt.toISOString() },
       );
       const stagedSubmittedPromptEcho = options?.clientMessageId
@@ -3567,6 +3582,7 @@ export class AgentManager {
         this.recordSubmittedPrompt(agent, prompt, options.clientMessageId, "accepted", {
           messageId: options.clientMessageId,
           turnId,
+          origin: options.origin,
           providerMessageId:
             stagedSubmittedPromptEcho?.item.type === "user_message"
               ? stagedSubmittedPromptEcho.item.messageId
@@ -3602,6 +3618,7 @@ export class AgentManager {
           type: "turn_started",
           provider: agent.provider,
           turnId,
+          ...originField(options),
         };
         yield acceptedTurnStartedEvent;
         for await (const event of turnStream.events(isTurnTerminalEvent)) {
@@ -3720,6 +3737,7 @@ export class AgentManager {
           options?.clientMessageId,
           expectedTurnId,
           admission.providerMessageId,
+          options?.origin,
         );
       }
       return admission;
@@ -3760,6 +3778,7 @@ export class AgentManager {
               options?.clientMessageId,
               expectedTurnId,
               admission.providerMessageId,
+              options?.origin,
             );
           }
           return admission;
@@ -3939,6 +3958,7 @@ export class AgentManager {
     clientMessageId: string | undefined,
     expectedTurnId: string,
     providerMessageId: string | undefined,
+    origin: AgentTurnOrigin | undefined,
   ): Promise<void> {
     if (!clientMessageId) {
       return;
@@ -3946,6 +3966,7 @@ export class AgentManager {
     this.recordSubmittedPrompt(agent, prompt, clientMessageId, "accepted", {
       messageId: clientMessageId,
       turnId: expectedTurnId,
+      origin,
       ...(providerMessageId ? { providerMessageId } : {}),
     });
     this.emitState(agent);
@@ -5930,13 +5951,19 @@ export class AgentManager {
     prompt: AgentPromptInput,
     clientMessageId: string,
     outcome: "accepted" | "rejected",
-    options?: { messageId?: string; providerMessageId?: string; turnId?: string },
+    options?: {
+      messageId?: string;
+      providerMessageId?: string;
+      turnId?: string;
+      origin?: AgentTurnOrigin;
+    },
   ): void {
     const items = projectAgentMessages({
       type: "user_message",
       text: submittedPromptText(prompt),
       clientMessageId,
       ...(options?.messageId ? { messageId: options.messageId } : {}),
+      ...(options?.origin ? { origin: options.origin } : {}),
     });
     for (const item of items) {
       // Human attempts stay in history on rejection; delivery notifications require acceptance.

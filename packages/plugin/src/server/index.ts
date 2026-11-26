@@ -38,6 +38,8 @@ export { spawnProcess, execCommand, terminateProcess } from "./process.js";
 export { defineAgentTool } from "./agent-tools.js";
 // FSH: FSH plugins (paseo-asks, paseo-status) import it; upstream reads turns with refetch({ wholeTurns }).
 export { latestTurn } from "./timeline.js";
+// FSH: who started a turn, on `agent.turn.before` and timeline user messages.
+export type { AgentTurnOrigin } from "@getpaseo/protocol/agent-types";
 export type { AgentToolDefinition, AgentToolResult, AgentToolContext } from "./agent-tools.js";
 export type {
   PluginWorktreeContext,

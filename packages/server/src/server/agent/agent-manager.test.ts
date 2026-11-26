@@ -1030,6 +1030,57 @@ test("retries provider history hydration after a stream failure", async () => {
   }
 });
 
+test("a turn carries the origin its prompt was sent with", async () => {
+  const session = new SteeringTestSession({ provider: "codex", cwd: process.cwd() });
+  const workdir = mkdtempSync(join(tmpdir(), "agent-turn-origin-"));
+  const manager = new AgentManager({
+    clients: {
+      codex: new (class extends TestAgentClient {
+        override async createSession(): Promise<AgentSession> {
+          return session;
+        }
+      })(),
+    },
+    logger,
+  });
+  const agent = await manager.createAgent({ provider: "codex", cwd: workdir }, undefined, {
+    workspaceId: undefined,
+  });
+  const started: unknown[] = [];
+  const unsubscribe = manager.subscribe((event) => {
+    if (event.type === "agent_stream" && event.event.type === "turn_started")
+      started.push(event.event.origin);
+  });
+  try {
+    const run = (async () => {
+      for await (const _event of manager.streamAgent(agent.id, "check your asks", {
+        clientMessageId: "plugin-prompt",
+        origin: { kind: "plugin", pluginId: "paseo-asks" },
+      })) {
+      }
+    })();
+    await manager.waitForAgentRunStart(agent.id);
+    session.pushEvent({ type: "turn_completed", provider: "codex", turnId: "active-turn-1" });
+    await run;
+    expect(started).toEqual([{ kind: "plugin", pluginId: "paseo-asks" }]);
+    expect(
+      manager
+        .fetchTimeline(agent.id, { limit: 0 })
+        .rows.map((row) => row.item)
+        .filter((item) => item.type === "user_message"),
+    ).toEqual([
+      expect.objectContaining({
+        text: "check your asks",
+        origin: { kind: "plugin", pluginId: "paseo-asks" },
+      }),
+    ]);
+  } finally {
+    unsubscribe();
+    await manager.closeAgent(agent.id);
+    rmSync(workdir, { recursive: true, force: true });
+  }
+});
+
 test("notification batches share the run they start or join", async () => {
   const session = new SteeringTestSession({ provider: "codex", cwd: process.cwd() });
   const workdir = mkdtempSync(join(tmpdir(), "agent-notification-turns-"));

@@ -9,6 +9,7 @@ import type {
   ProviderOptions,
   ProviderSettingsScreen,
   ToolPolicy,
+  AgentTurnOrigin,
 } from "@getpaseo/protocol/agent-types";
 import type { AgentMessage } from "@getpaseo/protocol/agent-message";
 import type { AgentAttachment } from "@getpaseo/protocol/messages";
@@ -220,6 +221,8 @@ export interface AgentRunOptions {
   resumeFrom?: AgentPersistenceHandle;
   maxThinkingTokens?: number;
   clientMessageId?: string;
+  /** Who sent the prompt; stamped by the daemon at the entry point, never taken from a plugin or client. */
+  origin?: AgentTurnOrigin;
 }
 
 export interface AgentSteerOptions extends AgentRunOptions {
@@ -417,7 +420,13 @@ export interface PluginTimelineItem {
 }
 
 export type AgentTimelineItem =
-  | { type: "user_message"; text: string; messageId?: string; clientMessageId?: string }
+  | {
+      type: "user_message";
+      text: string;
+      messageId?: string;
+      clientMessageId?: string;
+      origin?: AgentTurnOrigin;
+    }
   | { type: "assistant_message"; text: string; messageId?: string }
   | { type: "reasoning"; text: string }
   | ToolCallTimelineItem
@@ -431,9 +440,11 @@ export type AgentTimelineItem =
   | CompactionTimelineItem
   | PluginTimelineItem;
 
+export type { AgentTurnOrigin };
+
 export type AgentStreamEvent =
   | { type: "thread_started"; sessionId: string; provider: AgentProvider }
-  | { type: "turn_started"; provider: AgentProvider; turnId?: string }
+  | { type: "turn_started"; provider: AgentProvider; turnId?: string; origin?: AgentTurnOrigin }
   | { type: "turn_completed"; provider: AgentProvider; usage?: AgentUsage; turnId?: string }
   | { type: "usage_updated"; provider: AgentProvider; usage: AgentUsage; turnId?: string }
   | {

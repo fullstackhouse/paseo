@@ -1108,6 +1108,7 @@ export async function createPaseoDaemon(
         agentStorage,
         logger,
         unarchive: false,
+        runOptions: { origin: { kind: "system" } },
       });
     },
     report: (agentId, err) => logger.error({ agentId, err }, "Agent restart recovery failed"),

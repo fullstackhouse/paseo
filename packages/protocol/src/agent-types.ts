@@ -403,8 +403,26 @@ export interface AgentTaskItem {
   activeForm?: string;
 }
 
+/**
+ * Who sent the prompt that started a turn, stamped by the daemon where the prompt entered: a person
+ * through an app or the CLI, another agent, a plugin (by the id the daemon admitted it under), or the
+ * daemon itself (schedules, restart recovery, change-request updates). Absent on older daemons and on
+ * items replayed from a provider's own history.
+ */
+export type AgentTurnOrigin =
+  | { kind: "human" }
+  | { kind: "agent"; agentId?: string }
+  | { kind: "plugin"; pluginId: string }
+  | { kind: "system" };
+
 export type AgentTimelineItem =
-  | { type: "user_message"; text: string; messageId?: string; clientMessageId?: string }
+  | {
+      type: "user_message";
+      text: string;
+      messageId?: string;
+      clientMessageId?: string;
+      origin?: AgentTurnOrigin;
+    }
   | { type: "assistant_message"; text: string; messageId?: string }
   | { type: "reasoning"; text: string }
   | ToolCallTimelineItem
@@ -420,7 +438,7 @@ export type AgentTimelineItem =
 
 export type AgentStreamEvent =
   | { type: "thread_started"; sessionId: string; provider: AgentProvider }
-  | { type: "turn_started"; provider: AgentProvider; turnId?: string }
+  | { type: "turn_started"; provider: AgentProvider; turnId?: string; origin?: AgentTurnOrigin }
   | { type: "turn_completed"; provider: AgentProvider; usage?: AgentUsage; turnId?: string }
   | { type: "usage_updated"; provider: AgentProvider; usage: AgentUsage; turnId?: string }
   | {

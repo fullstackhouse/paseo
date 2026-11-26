@@ -1,7 +1,12 @@
 import { expect, test } from "vitest";
 import { createPaseoApi } from "@getpaseo/client";
 import { DaemonClient } from "@getpaseo/client/internal/daemon-client";
-import { validateBeforeResult, PluginHookHandlers } from "./index.js";
+import {
+  publishAgentStream,
+  validateBeforeResult,
+  PluginHookHandlers,
+  type PluginLifecycle,
+} from "./index.js";
 
 const paseo = createPaseoApi(
   new DaemonClient({ url: "ws://127.0.0.1:1/ws", clientId: "lifecycle-unit" }),
@@ -420,4 +425,35 @@ test("schedule run finish hooks set attention but cannot change the run they des
   await expect(
     validateBeforeResult("schedule.run.finish.before", request, { ...flagged, runId: "run-2" }),
   ).rejects.toThrow("can only change attention");
+});
+
+test("agent.turn.before carries who started the turn, and omits it when unknown", () => {
+  const emitted: unknown[] = [];
+  const lifecycle = {
+    emit: (name: string, event: unknown) => emitted.push({ name, event }),
+  } as unknown as PluginLifecycle;
+  const agent = {
+    id: "a1",
+    workspaceId: null,
+    parentAgentId: null,
+    provider: "codex",
+    cwd: "/tmp",
+    title: null,
+    background: false,
+    metadata: {},
+  };
+  publishAgentStream(lifecycle, agent, {
+    type: "turn_started",
+    provider: "codex",
+    turnId: "t1",
+    origin: { kind: "plugin", pluginId: "paseo-asks" },
+  });
+  publishAgentStream(lifecycle, agent, { type: "turn_started", provider: "codex", turnId: "t2" });
+  expect(emitted).toEqual([
+    {
+      name: "agent.turn.before",
+      event: { agent, turnId: "t1", origin: { kind: "plugin", pluginId: "paseo-asks" } },
+    },
+    { name: "agent.turn.before", event: { agent, turnId: "t2" } },
+  ]);
 });

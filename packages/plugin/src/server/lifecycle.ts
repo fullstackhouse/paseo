@@ -3,6 +3,7 @@ import type {
   AgentPermissionRequest,
   AgentPermissionResponse,
   AgentSessionConfig,
+  AgentTurnOrigin,
   JsonValue,
 } from "@getpaseo/protocol/agent-types";
 import type { PaseoApi } from "@getpaseo/client";
@@ -125,7 +126,16 @@ export type PluginTurnOutcome =
   | { kind: "canceled"; reason: string };
 
 export interface PluginHookEvents {
-  "agent.turn.before": { agent: PluginHookAgent; turnId: string | null };
+  "agent.turn.before": {
+    agent: PluginHookAgent;
+    turnId: string | null;
+    /**
+     * Who sent the prompt that started the turn, stamped by the daemon: a person, another agent, a
+     * plugin (by its id), or the daemon itself (schedules, restart recovery). FSH-only; absent on hosts
+     * without `server_info.features.turnOrigin` and for turns a provider started on its own.
+     */
+    origin?: AgentTurnOrigin;
+  };
   "agent.turn.after": {
     agent: PluginHookAgent;
     turnId: string | null;

@@ -59,7 +59,7 @@ Paseo 只观察返回的 Promise，因此独立任务没有错误报告，也没
 | `agent.open.before`          | 是   | `{ request }`                             | 仅用于启动的 `env`、`appendSystemPrompt`、`tools`、`mcpServers` |
 | `agent.close.after`          | 否   | `{ agent }`                               |                                                                 |
 | `agent.archive.after`        | 否   | `{ agent, archivedAt }`                   |                                                                 |
-| `agent.turn.before`          | 否   | `{ agent, turnId }`                       |                                                                 |
+| `agent.turn.before`          | 否   | `{ agent, turnId, origin? }`              |                                                                 |
 | `agent.turn.after`           | 否   | `{ agent, turnId, outcome }`              |                                                                 |
 | `agent.permission.before`    | 否   | `{ agent, request }`                      |                                                                 |
 | `agent.permission.after`     | 否   | `{ agent, requestId, resolution }`        |                                                                 |
@@ -520,10 +520,22 @@ server.addHook("agent.archive.after", async ({ agent, archivedAt }) => {
 
 ## agent.turn.before {#agentturnbefore}
 
-实时轮次开始后触发，收到 `{ agent, turnId }`。历史重放不会触发。
+实时轮次开始后触发，收到 `{ agent, turnId, origin? }`。历史重放不会触发。
+
+`origin` 表示是谁发送了开启本轮次的提示。它由守护进程在提示进入时设置，插件无法冒充其他发送方：
+
+| `origin.kind` | 发送方                                                                                   |
+| ------------- | ---------------------------------------------------------------------------------------- |
+| `human`       | 通过应用或 CLI 发送的人                                                                  |
+| `agent`       | 另一个代理（`paseo send`、`send_agent_prompt`、子代理的汇报）；已知时 `agentId` 指明是谁 |
+| `plugin`      | 通过 Paseo API 发送的插件；`pluginId` 是守护进程接纳的插件                               |
+| `system`      | 守护进程本身：定时任务、重启恢复、拉取请求更新、Hub                                      |
+
+主机没有 `server_info.features.turnOrigin`，或轮次由提供方自行开启时，没有该字段。本轮次的 `user_message` 时间线条目带有相同的 `origin`。
 
 ```ts
-server.addHook("agent.turn.before", async ({ agent, turnId }) => {
+server.addHook("agent.turn.before", async ({ agent, turnId, origin }) => {
+  if (origin?.kind === "plugin") return; // 插件自己的提醒，不是回复
   console.log(agent, turnId);
 });
 ```

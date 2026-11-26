@@ -3836,6 +3836,43 @@ describe("send_agent_prompt MCP tool", () => {
     },
   );
 
+  it("starts the turn as coming from the calling agent", async () => {
+    const workdir = await mkdtemp(join(tmpdir(), "mcp-send-origin-"));
+    const storage = new AgentStorage(join(workdir, "agents"), logger);
+    const client = new HeldTurnAgentClient("codex", true, { steerResult: "accepted" });
+    const manager = new AgentManager({ clients: { codex: client }, registry: storage, logger });
+    const origins: unknown[] = [];
+    const unsubscribe = manager.subscribe((event) => {
+      if (event.type === "agent_stream" && event.event.type === "turn_started")
+        origins.push(event.event.origin);
+    });
+    try {
+      const parent = await manager.createAgent({ provider: "codex", cwd: existingCwd }, undefined, {
+        workspaceId: "wks_parent",
+      });
+      const child = await manager.createAgent({ provider: "codex", cwd: existingCwd }, undefined, {
+        workspaceId: "wks_parent",
+      });
+      const server = await createAgentMcpServer({
+        agentManager: manager,
+        agentStorage: storage,
+        callerAgentId: parent.id,
+        providerSnapshotManager: createOpenCodeManager().manager,
+        logger,
+      });
+      await invokeToolWithParsedInput(registeredTool(server, "send_agent_prompt"), {
+        agentId: child.id,
+        prompt: "Do the thing",
+        notifyOnFinish: false,
+        activeTurnBehavior: "interrupt",
+      });
+      expect(origins).toEqual([{ kind: "agent", agentId: parent.id }]);
+    } finally {
+      unsubscribe();
+      await removeAgentStateDir(manager, storage, workdir);
+    }
+  });
+
   it.each([
     { rejected: false, priorNotification: false },
     { rejected: false, priorNotification: true },

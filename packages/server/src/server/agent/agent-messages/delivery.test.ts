@@ -80,6 +80,42 @@ test("a queued child report and completion reach the recipient in one steer afte
   ]);
 });
 
+test("a batch's turn comes from its first agent sender, else from the daemon", async () => {
+  const clock = createClock();
+  const origins: unknown[] = [];
+  const delivery = createAgentMessageDelivery({
+    schedule: clock.schedule,
+    dispatch: async (batch) => {
+      origins.push(batch.origin);
+      return "turn_started";
+    },
+    onError: (error) => {
+      throw error;
+    },
+  });
+  delivery.enqueue({
+    recipientId: "parent",
+    messageId: "pr",
+    prompt: "PR merged",
+    source: { kind: "change-request-update", url: "https://github.com/acme/app/pull/1" },
+  });
+  delivery.enqueue({
+    recipientId: "parent",
+    messageId: "report",
+    prompt: "Results",
+    source: { kind: "agent-message", agentId: "worker" },
+  });
+  delivery.enqueue({
+    recipientId: "other",
+    messageId: "pr-only",
+    prompt: "PR merged",
+    source: { kind: "change-request-update", url: "https://github.com/acme/app/pull/2" },
+  });
+  clock.advance(2000);
+  await delivery.close();
+  expect(origins).toEqual([{ kind: "agent", agentId: "worker" }, { kind: "system" }]);
+});
+
 test("recipient timers are independent, later messages form another batch, and close flushes pending work", async () => {
   const clock = createClock();
   const sent: string[] = [];

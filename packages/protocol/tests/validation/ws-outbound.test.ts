@@ -178,6 +178,42 @@ const SourceSchema = z.discriminatedUnion("ok", [
     expect(validateWSOutboundMessage(message)).toMatchObject({ success: true, data: message });
   });
 
+  it("keeps a turn's origin on turn_started and on the user message", () => {
+    const stream = (event: unknown) => ({
+      type: "session",
+      message: {
+        type: "agent_stream",
+        payload: { agentId: "agent_live", timestamp: "2026-11-26T20:00:00.000Z", event },
+      },
+    });
+    const origins = [
+      { kind: "human" },
+      { kind: "agent", agentId: "worker" },
+      { kind: "agent" },
+      { kind: "plugin", pluginId: "paseo-asks" },
+      { kind: "system" },
+    ];
+    for (const origin of origins) {
+      for (const message of [
+        stream({ type: "turn_started", provider: "codex", turnId: "t1", origin }),
+        stream({
+          type: "timeline",
+          provider: "codex",
+          item: { type: "user_message", text: "hi", origin },
+        }),
+      ]) {
+        const generated = validateWSOutboundMessage(message);
+        expect(generated).toMatchObject({ success: true, data: message });
+        expect(WSOutboundMessageSchema.parse(message)).toEqual(message);
+      }
+    }
+    expect(
+      validateWSOutboundMessage(
+        stream({ type: "turn_started", provider: "codex", origin: { kind: "plugin" } }),
+      ).success,
+    ).toBe(false);
+  });
+
   it("accepts a minimal valid envelope and rejects a corrupted envelope", () => {
     expect(validateWSOutboundMessage({ type: "pong" }).success).toBe(true);
     expect(validateWSOutboundMessage({ type: "not_a_message" }).success).toBe(false);

@@ -4,7 +4,11 @@ import {
   type PromptDispatchResult,
 } from "../agent-prompt.js";
 import { randomUUID } from "node:crypto";
-import type { AgentPromptInput, AgentPromptContentBlock } from "../agent-sdk-types.js";
+import type {
+  AgentPromptInput,
+  AgentPromptContentBlock,
+  AgentTurnOrigin,
+} from "../agent-sdk-types.js";
 import { envelopeMessage, prepareAgentMessage, type AgentPromptSource } from "./envelope.js";
 
 /** A message's quiet window closes this long after the latest arrival. */
@@ -77,6 +81,8 @@ interface DispatchRequest {
   sessionMode?: string;
   clearPendingPermissions: boolean;
   unarchive: boolean;
+  /** Who the turn comes from: the first agent among the senders, else the daemon itself. */
+  origin: AgentTurnOrigin;
 }
 /** A prompt that does not wait its turn: a person's, or the daemon's own. */
 interface DirectPrompt {
@@ -231,6 +237,7 @@ export function createAgentMessageDelivery(dependencies: Dependencies): AgentMes
       sessionMode: messages.findLast((message) => message.sessionMode)?.sessionMode,
       clearPendingPermissions: messages.some((message) => message.clearPendingPermissions),
       unarchive: messages.some((message) => message.unarchive !== false),
+      origin: batchOrigin(messages),
     };
   }
 
@@ -659,4 +666,14 @@ export function createAgentMessageDelivery(dependencies: Dependencies): AgentMes
       return closing;
     },
   };
+}
+
+/** Queued messages come from agents, or from the daemon (change-request updates). */
+function batchOrigin(messages: readonly { source: AgentPromptSource }[]): AgentTurnOrigin {
+  for (const { source } of messages) {
+    if (source.kind === "agent-message" || source.kind === "agent-notification") {
+      return { kind: "agent", agentId: source.agentId };
+    }
+  }
+  return { kind: "system" };
 }

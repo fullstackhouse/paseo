@@ -775,6 +775,15 @@ const ToolCallTimelineItemPayloadSchema: z.ZodType<ToolCallTimelineItem, unknown
     ToolCallCanceledPayloadSchema,
   ]);
 
+// A plain union, not discriminatedUnion: keeps zod-aot's generated validator on the path the
+// other timeline unions already exercise.
+export const AgentTurnOriginSchema = z.union([
+  z.object({ kind: z.literal("human") }),
+  z.object({ kind: z.literal("agent"), agentId: z.string().optional() }),
+  z.object({ kind: z.literal("plugin"), pluginId: z.string() }),
+  z.object({ kind: z.literal("system") }),
+]);
+
 // zod-aot 0.20.4 miscompiles this as a nested discriminated union by omitting
 // the inner tool_call branch from the generated outer dispatch.
 export const AgentTimelineItemPayloadSchema: z.ZodType<AgentTimelineItem, unknown> = z.union([
@@ -783,6 +792,7 @@ export const AgentTimelineItemPayloadSchema: z.ZodType<AgentTimelineItem, unknow
     text: z.string(),
     messageId: z.string().optional(),
     clientMessageId: z.string().optional(),
+    origin: AgentTurnOriginSchema.optional(),
   }),
   z.object({
     type: z.literal("assistant_message"),
@@ -841,6 +851,7 @@ export const AgentStreamEventPayloadSchema = z.discriminatedUnion("type", [
     type: z.literal("turn_started"),
     provider: AgentProviderSchema,
     turnId: z.string().optional(),
+    origin: AgentTurnOriginSchema.optional(),
   }),
   z.object({
     type: z.literal("turn_completed"),
@@ -4413,6 +4424,8 @@ export const ServerInfoStatusPayloadSchema = z
         workspaceManualGroup: z.boolean().optional(),
         // COMPAT(workspaceAppearance): FSH-only, added after v0.17.1, remove gate after 2027-05-23.
         workspaceAppearance: z.boolean().optional(),
+        // COMPAT(turnOrigin): FSH-only, added after v0.17.1, remove gate after 2027-05-26.
+        turnOrigin: z.boolean().optional(),
         // COMPAT(scheduleRunAttention): FSH-only, added after v0.15.4, remove gate after 2027-05-16.
         scheduleRunAttention: z.boolean().optional(),
         // COMPAT(skillManagement): added in v0.4.0, remove gate after 2027-08-16.
