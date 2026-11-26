@@ -281,7 +281,7 @@ export function deriveInProgress(input: {
       agentId: agent.agentId,
       running: agent.running,
       subagents: agent.subagentsActive,
-      jobs: agent.jobs.toSorted((a, b) => a.startedAt - b.startedAt || a.id.localeCompare(b.id)),
+      jobs: [...agent.jobs].sort((a, b) => a.startedAt - b.startedAt || a.id.localeCompare(b.id)),
     });
   }
   return rows.sort((a, b) => a.at - b.at || a.key.localeCompare(b.key));
