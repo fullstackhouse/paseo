@@ -22,6 +22,7 @@ This is an npm workspace monorepo:
 `docs/` is the source of truth for system-level and process-level knowledge. **"The docs", "check the docs", or "check the X docs" always mean this directory — not the web.** Look here before fetching anything online; the docs capture gotchas and conventions you cannot derive from the code or external sources.
 
 At the start of non-trivial work, list `docs/` and skim anything relevant to the task.
+When describing shipped behavior from an older checkout, verify the current release; distinguish checkout, released, and installed behavior.
 
 | Doc                                                                  | What's in it                                                                                                                   |
 | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
@@ -73,6 +74,8 @@ At the start of non-trivial work, list `docs/` and skim anything relevant to the
 | [docs/terminal-activity.md](docs/terminal-activity.md)               | Terminal activity indicators — source-agnostic tracker, agent hook reporting, adding a new hook provider                       |
 | [SECURITY.md](SECURITY.md)                                           | Relay threat model, E2E encryption, DNS rebinding, agent auth                                                                  |
 | [public-docs/hub/security.md](public-docs/hub/security.md)           | Public Hub guide — trust boundaries, untrusted triggers, provider controls, and output authority                               |
+
+Proposals: [Chrome browser host](docs/refactors/2026-11-08-chrome-browser-host.md), [shared native desktop control](docs/refactors/2026-11-17-native-desktop-control.md), and [mobile attention delivery](docs/refactors/2026-11-17-mobile-attention-delivery.md).
 
 ### Writing docs
 

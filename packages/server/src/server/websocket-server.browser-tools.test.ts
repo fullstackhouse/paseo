@@ -459,3 +459,124 @@ async function waitFor(predicate: () => boolean): Promise<void> {
     await new Promise((resolve) => setTimeout(resolve, 10));
   }
 }
+
+describe("Chrome proof local human control", () => {
+  async function form(control: { url: string }, action: "stop" | "continue") {
+    const page = await (await fetch(control.url)).text();
+    const token = new RegExp(`action="/${action}"[^>]*><input[^>]*value="([^"]+)"`).exec(page)?.[1];
+    if (!token) throw new Error(`Missing ${action} form`);
+    return token;
+  }
+
+  function post(
+    control: { url: string },
+    action: "stop" | "continue",
+    token: string,
+    origin = control.url,
+  ) {
+    return fetch(`${control.url}/${action}`, {
+      method: "POST",
+      redirect: "manual",
+      headers: { origin, "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ token, fresh1password: "yes" }),
+    });
+  }
+
+  it("stops again after Continue, including from an older Stop form", async () => {
+    const { createControl } = await import("./browser-tools/chrome-proof/live.js");
+    let holds = 0;
+    const control = await createControl({
+      holdForHuman: async () => {
+        holds++;
+      },
+      continueAfterHuman: async () => {},
+    });
+    try {
+      control.begin("claude");
+      const oldStop = await form(control, "stop");
+      const waited = control.waitForHuman();
+      expect((await post(control, "continue", await form(control, "continue"))).status).toBe(303);
+      await waited;
+      expect(holds).toBe(1);
+      expect((await post(control, "stop", oldStop)).status).toBe(303);
+      expect(holds).toBe(2);
+      expect(await (await fetch(control.url)).text()).toContain("State: human");
+      expect(() => control.begin("codex")).toThrow("Human takeover");
+    } finally {
+      await control.close();
+    }
+  });
+
+  it("keeps the waiter paused when Stop races an in-flight Continue", async () => {
+    const { createControl } = await import("./browser-tools/chrome-proof/live.js");
+    let releaseResume = () => {};
+    const resume = new Promise<void>((resolve) => {
+      releaseResume = resolve;
+    });
+    let resumes = 0;
+    let holds = 0;
+    const control = await createControl({
+      holdForHuman: async () => {
+        holds++;
+        if (holds === 2) await resume;
+      },
+      continueAfterHuman: async () => {
+        resumes++;
+        if (resumes === 1) await resume;
+      },
+    });
+    try {
+      control.begin("claude");
+      let returned = false;
+      const waited = control.waitForHuman().then(() => {
+        returned = true;
+        return undefined;
+      });
+      const oldContinue = await form(control, "continue");
+      const stoppingToken = await form(control, "stop");
+      const continuing = post(control, "continue", oldContinue);
+      await waitFor(() => resumes === 1);
+      const stopping = post(control, "stop", stoppingToken);
+      // A GET round trip confirms the Stop handler has claimed the transition.
+      for (let i = 0; i < 20; i++) {
+        if ((await (await fetch(control.url)).text()).includes("State: stopping")) break;
+        await new Promise((resolve) => setTimeout(resolve, 5));
+      }
+      expect(await (await fetch(control.url)).text()).toContain("State: stopping");
+      expect(holds).toBe(2); // Admission was closed before Continue persistence finished.
+      releaseResume();
+      expect((await continuing).status).toBe(303);
+      expect((await stopping).status).toBe(303);
+      expect(holds).toBe(2);
+      expect(returned).toBe(false);
+      expect((await post(control, "continue", oldContinue)).status).toBe(409);
+      expect((await post(control, "continue", await form(control, "continue"))).status).toBe(303);
+      await waited;
+      expect(returned).toBe(true);
+    } finally {
+      releaseResume();
+      await control.close();
+    }
+  });
+
+  it("rejects foreign origins and latches Stop before a provider is admitted", async () => {
+    const { createControl } = await import("./browser-tools/chrome-proof/live.js");
+    let holds = 0;
+    const control = await createControl({
+      holdForHuman: async () => {
+        holds++;
+      },
+      continueAfterHuman: async () => {},
+    });
+    try {
+      const token = await form(control, "stop");
+      expect((await post(control, "stop", token, "https://example.com")).status).toBe(403);
+      expect((await post(control, "stop", "invalid")).status).toBe(409);
+      expect((await post(control, "stop", token)).status).toBe(303);
+      expect(holds).toBe(0);
+      expect(() => control.begin("claude")).toThrow("Human takeover");
+    } finally {
+      await control.close();
+    }
+  });
+});

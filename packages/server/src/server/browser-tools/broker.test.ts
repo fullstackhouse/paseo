@@ -1,3 +1,7 @@
+import { mkdtemp, mkdir, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { createChromeProofAdapter } from "./chrome-proof/adapter.js";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import type {
   BrowserAutomationCommand,
@@ -940,5 +944,356 @@ describe("BrowserToolsBroker", () => {
       },
     });
     expect(broker.getPendingRequestCount()).toBe(0);
+  });
+});
+
+describe("Chrome fixture proof ownership", () => {
+  const homes: string[] = [];
+  const fixtureUrl = "http://127.0.0.1:12345/fixture";
+  const owner = { serverId: "server-one", agentId: "agent-one", workspaceId: "workspace-one" };
+
+  afterEach(async () => {
+    await Promise.all(homes.splice(0).map((home) => rm(home, { recursive: true, force: true })));
+  });
+
+  function request(id: string, command: BrowserAutomationCommand): BrowserAutomationExecuteRequest {
+    return {
+      type: "browser.automation.execute.request",
+      requestId: id,
+      agentId: owner.agentId,
+      workspaceId: owner.workspaceId,
+      command,
+    };
+  }
+
+  async function setup(
+    runCommand = vi.fn(async (_args: string[]) => JSON.stringify({ success: true, data: {} })),
+  ) {
+    const stateDir = await mkdtemp(join(tmpdir(), "paseo-chrome-fixture-"));
+    homes.push(stateDir);
+    const options = {
+      stateDir,
+      fixtureUrl,
+      agentBrowserPath: "/unused-in-unit-test",
+      cdpEndpoint: "1234",
+    };
+    const adapter = createChromeProofAdapter(options, { runCommand });
+    return { adapter, options, runCommand };
+  }
+
+  test("reserves admission before asynchronous state reads", async () => {
+    const { adapter } = await setup();
+    const first = adapter.admitOwner(owner);
+    await expect(adapter.admitOwner({ ...owner, agentId: "competitor" })).rejects.toThrow(
+      "already reserved",
+    );
+    await first;
+    await expect(
+      adapter.execute(request("list", { command: "list_tabs", args: {} }), owner.serverId),
+    ).resolves.toMatchObject({ payload: { ok: true } });
+    await adapter.close();
+  });
+
+  test("closes admission synchronously and cancels queued dispatch before releasing", async () => {
+    const { adapter, runCommand } = await setup();
+    await adapter.admitOwner(owner);
+    const queued = adapter.execute(
+      request("queued", { command: "new_tab", args: { url: fixtureUrl } }),
+      owner.serverId,
+    );
+    const releasing = adapter.releaseOwner();
+    const late = adapter.execute(
+      request("late", { command: "new_tab", args: { url: fixtureUrl } }),
+      owner.serverId,
+    );
+    await expect(queued).resolves.toMatchObject({ payload: { ok: false } });
+    await expect(late).resolves.toMatchObject({ payload: { ok: false } });
+    await releasing;
+    expect(runCommand.mock.calls.flat()).not.toContain("open");
+    await adapter.admitOwner({ ...owner, agentId: "next" });
+    await adapter.close();
+  });
+
+  test("waits for an executing operation before cleanup and rejects later calls", async () => {
+    let started!: () => void;
+    let complete!: () => void;
+    const dispatchStarted = new Promise<void>((resolve) => {
+      started = resolve;
+    });
+    const dispatchFinished = new Promise<void>((resolve) => {
+      complete = resolve;
+    });
+    const events: string[] = [];
+    const runCommand = vi.fn(async (args: string[]): Promise<string> => {
+      if (args.includes("open")) {
+        events.push("open");
+        started();
+        await dispatchFinished;
+        events.push("open-complete");
+        return JSON.stringify({
+          success: true,
+          data: { url: fixtureUrl, targetId: "fixture-target" },
+        });
+      }
+      events.push("cleanup");
+      return JSON.stringify({ success: true, data: {} });
+    });
+    const { adapter } = await setup(runCommand);
+    await adapter.admitOwner(owner);
+    const running = adapter.execute(
+      request("open", { command: "new_tab", args: { url: fixtureUrl } }),
+      owner.serverId,
+    );
+    await dispatchStarted;
+    const releasing = adapter.releaseOwner();
+    expect(adapter.releaseOwner()).toBe(releasing);
+    await expect(
+      adapter.execute(request("late", { command: "list_tabs", args: {} }), owner.serverId),
+    ).resolves.toMatchObject({ payload: { ok: false } });
+    expect(events).toEqual(["open"]);
+    complete();
+    await expect(running).resolves.toMatchObject({ payload: { ok: true } });
+    await releasing;
+    expect(events).toEqual(["open", "open-complete", "cleanup", "cleanup"]);
+  });
+
+  test("deduplicates exact IDs and rejects changed arguments without dispatching", async () => {
+    const { adapter, runCommand } = await setup();
+    await adapter.admitOwner(owner);
+    const original = request("duplicate", { command: "list_tabs", args: {} });
+    const first = adapter.execute(original, owner.serverId);
+    expect(adapter.execute(structuredClone(original), owner.serverId)).toBe(first);
+    await expect(
+      adapter.execute(
+        request("duplicate", { command: "new_tab", args: { url: fixtureUrl } }),
+        owner.serverId,
+      ),
+    ).resolves.toMatchObject({ payload: { ok: false } });
+    await first;
+    expect(runCommand).not.toHaveBeenCalled();
+    expect(adapter.evidence.filter((event) => event.event === "dispatch")).toHaveLength(1);
+    await adapter.close();
+  });
+
+  test("does not admit foreign daemon or agent provenance", async () => {
+    const { adapter, runCommand } = await setup();
+    await adapter.admitOwner(owner);
+    const original = request("foreign", { command: "list_tabs", args: {} });
+    await expect(adapter.execute(original, "server-two")).resolves.toMatchObject({
+      payload: { ok: false },
+    });
+    await expect(
+      adapter.execute({ ...original, agentId: "agent-two" }, owner.serverId),
+    ).resolves.toMatchObject({ payload: { ok: false } });
+    expect(runCommand).not.toHaveBeenCalled();
+    await adapter.close();
+  });
+
+  test("operation failure prevents transfer and leaves durable recovery state", async () => {
+    const runCommand = vi.fn(async (_args: string[]): Promise<string> => {
+      throw new Error("executor timed out");
+    });
+    const { adapter, options } = await setup(runCommand);
+    await adapter.admitOwner(owner);
+    await expect(
+      adapter.execute(
+        request("open", { command: "new_tab", args: { url: fixtureUrl } }),
+        owner.serverId,
+      ),
+    ).resolves.toMatchObject({ payload: { ok: false } });
+    await expect(adapter.releaseOwner()).rejects.toThrow("Unknown execution");
+    expect(
+      JSON.parse(await readFile(join(options.stateDir, "adapter-state.json"), "utf8")),
+    ).toMatchObject({ state: "recovery_required" });
+    const restarted = createChromeProofAdapter(options, { runCommand });
+    await expect(restarted.admitOwner(owner)).rejects.toThrow("requires recovery");
+  });
+
+  test("cleanup failure persists recovery instead of releasing ownership", async () => {
+    const runCommand = vi.fn(async (_args: string[]): Promise<string> => {
+      throw new Error("close failed");
+    });
+    const { adapter, options } = await setup(runCommand);
+    await adapter.admitOwner(owner);
+    await expect(adapter.close()).rejects.toThrow("close failed");
+    expect(
+      JSON.parse(await readFile(join(options.stateDir, "adapter-state.json"), "utf8")),
+    ).toMatchObject({ state: "recovery_required" });
+    await expect(adapter.admitOwner({ ...owner, agentId: "next" })).rejects.toThrow(
+      "already reserved",
+    );
+  });
+
+  test("human-login mode denies input and requires explicit return from durable human hold", async () => {
+    const { options, runCommand } = await setup();
+    const liveOptions = {
+      ...options,
+      mode: "human-login" as const,
+      lockPath: join(options.stateDir, "owner-lock"),
+    };
+    const adapter = createChromeProofAdapter(liveOptions, { runCommand });
+    await adapter.admitOwner(owner);
+    await expect(
+      adapter.execute(
+        request("click", {
+          command: "click",
+          args: {
+            browserId: BROWSER_ID,
+            ref: "@e1",
+            button: "left",
+            doubleClick: false,
+            modifiers: [],
+          },
+        }),
+        owner.serverId,
+      ),
+    ).resolves.toMatchObject({ payload: { ok: false } });
+    expect(runCommand).not.toHaveBeenCalled();
+    const holding = adapter.holdForHuman();
+    await expect(
+      adapter.execute(request("during-hold", { command: "list_tabs", args: {} }), owner.serverId),
+    ).resolves.toMatchObject({ payload: { ok: false } });
+    await holding;
+    expect(
+      JSON.parse(await readFile(join(options.stateDir, "adapter-state.json"), "utf8")),
+    ).toMatchObject({ state: "human_control" });
+    await expect(adapter.releaseOwner()).rejects.toThrow("returned explicitly");
+    await expect(adapter.close()).rejects.toThrow("returned explicitly");
+    const restarted = createChromeProofAdapter(liveOptions, { runCommand });
+    await expect(restarted.admitOwner(owner)).rejects.toThrow();
+    // Even a separate lock cannot turn an existing human journal into fresh ownership.
+    const separateLock = createChromeProofAdapter(
+      { ...liveOptions, lockPath: join(options.stateDir, "different-lock") },
+      { runCommand },
+    );
+    await expect(separateLock.admitOwner(owner)).rejects.toThrow("requires recovery");
+    await adapter.continueAfterHuman();
+    await expect(adapter.continueAfterHuman()).rejects.toThrow("not held");
+    await expect(
+      adapter.execute(request("after-return", { command: "list_tabs", args: {} }), owner.serverId),
+    ).resolves.toMatchObject({ payload: { ok: true } });
+    await adapter.close();
+    await expect(readFile(join(liveOptions.lockPath, "owner.json"))).rejects.toMatchObject({
+      code: "ENOENT",
+    });
+  });
+
+  test("human-login observations accept same-origin redirects and reject another origin", async () => {
+    let observedUrl = "http://127.0.0.1:12345/logged-in?session=private#secret";
+    const runCommand = vi.fn(async (args: string[]): Promise<string> => {
+      if (args.includes("open"))
+        return JSON.stringify({
+          success: true,
+          data: { url: fixtureUrl, targetId: "fixture-target" },
+        });
+      if (args.includes("get"))
+        return JSON.stringify({ success: true, data: { url: observedUrl } });
+      if (args.includes("snapshot"))
+        return JSON.stringify({ success: true, data: { snapshot: "Signed in", refs: {} } });
+      return JSON.stringify({ success: true, data: {} });
+    });
+    const { options } = await setup(runCommand);
+    const adapter = createChromeProofAdapter(
+      { ...options, mode: "human-login", lockPath: join(options.stateDir, "lock") },
+      { runCommand },
+    );
+    await adapter.admitOwner(owner);
+    const opened = await adapter.execute(
+      request("open", { command: "new_tab", args: { url: fixtureUrl } }),
+      owner.serverId,
+    );
+    if (!opened.payload.ok || opened.payload.result.command !== "new_tab")
+      throw new Error("Expected owned tab");
+    const browserId = opened.payload.result.browserId;
+    await expect(
+      adapter.execute(
+        request("snapshot", { command: "snapshot", args: { browserId } }),
+        owner.serverId,
+      ),
+    ).resolves.toMatchObject({
+      payload: {
+        ok: true,
+        result: { url: "http://127.0.0.1:12345/logged-in", snapshot: "Signed in" },
+      },
+    });
+    observedUrl = "https://other.example/logged-in";
+    await expect(
+      adapter.execute(
+        request("foreign-snapshot", { command: "snapshot", args: { browserId } }),
+        owner.serverId,
+      ),
+    ).resolves.toMatchObject({ payload: { ok: false } });
+    expect(runCommand.mock.calls.filter(([args]) => args.includes("snapshot"))).toHaveLength(1);
+    await expect(adapter.close()).rejects.toThrow("Unknown execution");
+  });
+
+  test("user-wide lock spans separate adapter state directories and provider releases", async () => {
+    const { options, runCommand } = await setup();
+    const lockPath = join(options.stateDir, "shared-lock");
+    const first = createChromeProofAdapter({ ...options, lockPath }, { runCommand });
+    await first.admitOwner(owner);
+    await first.releaseOwner();
+    const secondOptions = { ...options, stateDir: join(options.stateDir, "other-state"), lockPath };
+    await expect(
+      createChromeProofAdapter(secondOptions, { runCommand }).admitOwner(owner),
+    ).rejects.toThrow();
+    await first.close();
+    const next = createChromeProofAdapter(secondOptions, { runCommand });
+    await next.admitOwner(owner);
+    await next.close();
+  });
+
+  test("human Stop drains an executing observation without closing its tab", async () => {
+    let started!: () => void;
+    let complete!: () => void;
+    const dispatchStarted = new Promise<void>((resolve) => {
+      started = resolve;
+    });
+    const dispatchFinished = new Promise<void>((resolve) => {
+      complete = resolve;
+    });
+    const commands: string[] = [];
+    const runCommand = vi.fn(async (args: string[]): Promise<string> => {
+      if (args.includes("open")) {
+        commands.push("open");
+        started();
+        await dispatchFinished;
+        return JSON.stringify({
+          success: true,
+          data: { url: fixtureUrl, targetId: "fixture-target" },
+        });
+      }
+      commands.push("cleanup");
+      return JSON.stringify({ success: true, data: {} });
+    });
+    const { options } = await setup(runCommand);
+    const adapter = createChromeProofAdapter(
+      { ...options, mode: "human-login", lockPath: join(options.stateDir, "lock") },
+      { runCommand },
+    );
+    await adapter.admitOwner(owner);
+    const running = adapter.execute(
+      request("open", { command: "new_tab", args: { url: fixtureUrl } }),
+      owner.serverId,
+    );
+    await dispatchStarted;
+    const holding = adapter.stop();
+    await expect(adapter.continueAfterHuman()).rejects.toThrow("not held");
+    await expect(
+      adapter.execute(request("late", { command: "list_tabs", args: {} }), owner.serverId),
+    ).resolves.toMatchObject({ payload: { ok: false } });
+    complete();
+    await running;
+    await holding;
+    expect(commands).toEqual(["open"]);
+    await adapter.continueAfterHuman();
+    await adapter.close();
+  });
+
+  test("does not treat unreadable journal as absent", async () => {
+    const { adapter, options } = await setup();
+    await mkdir(join(options.stateDir, "adapter-state.json"));
+    await expect(adapter.admitOwner(owner)).rejects.toThrow();
+    await expect(adapter.admitOwner(owner)).rejects.toThrow("already reserved");
   });
 });
