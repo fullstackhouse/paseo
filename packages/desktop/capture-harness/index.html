@@ -112,12 +112,22 @@
         return index;
       }
 
+      // Same barrier as resident-webviews.ts: did-attach can land before the reply carrying the
+      // guest id, so getWebContentsId() throws. A round trip on the reply's pipe lands after it.
+      async function readAttachedIdentity(webview, browserId) {
+        await window.captureHarnessHost.waitForPendingIpc();
+        if (!webview.isConnected) {
+          throw new Error(`${browserId} was removed before its guest id arrived`);
+        }
+        return { browserId, webContentsId: webview.getWebContentsId() };
+      }
+
       function appendProfileHarnessWebview({ browserId, partition, sourceUrl }) {
         const webview = createHarnessWebview({ browserId, partition, sourceUrl });
-        const attached = new Promise((resolve) => {
+        const attached = new Promise((resolve, reject) => {
           webview.addEventListener(
             "did-attach",
-            () => resolve({ browserId, webContentsId: webview.getWebContentsId() }),
+            () => readAttachedIdentity(webview, browserId).then(resolve, reject),
             { once: true },
           );
         });
