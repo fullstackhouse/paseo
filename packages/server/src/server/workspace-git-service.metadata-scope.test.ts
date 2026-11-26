@@ -42,7 +42,7 @@ function git(cwd: string, ...args: string[]): string {
 }
 
 function seedRepository(options: { siblings: number; withOrigin?: boolean }) {
-  const root = realpathSync(mkdtempSync(path.join(tmpdir(), "paseo-metadata-scope-")));
+  const root = realpathSync.native(mkdtempSync(path.join(tmpdir(), "paseo-metadata-scope-")));
   const repoRoot = path.join(root, "repo");
   mkdirSync(repoRoot);
   git(repoRoot, "init", "-b", "main");
@@ -118,8 +118,8 @@ async function deliver(
   gitDir: string,
   events: Array<[relativePath: string, type: FileChange["type"]]>,
 ): Promise<GitCommandSubmissionMetric[]> {
-  const commonDir = realpathSync(gitDir);
-  const record = records.find((candidate) => realpathSync(candidate.directory) === commonDir);
+  const commonDir = realpathSync.native(gitDir);
+  const record = records.find((candidate) => realpathSync.native(candidate.directory) === commonDir);
   if (!record) throw new Error(`No repository metadata watcher for ${gitDir}`);
   startGitCommandMetrics();
   record.callback(
@@ -140,7 +140,7 @@ function workingTreeScans(commands: GitCommandSubmissionMetric[]): Record<string
   for (const command of commands) {
     const operation = command.args[0] ?? "";
     if (!WORKING_TREE_SCANS.has(operation)) continue;
-    const cwd = realpathSync(command.cwd);
+    const cwd = realpathSync.native(command.cwd);
     scans[cwd] = [...(scans[cwd] ?? []), operation].sort();
   }
   return scans;
@@ -211,7 +211,7 @@ test("a commit fully refreshes its own checkout and runs no git status in siblin
   ]);
 
   // main is its own base, so its full refresh has no diff stat to measure: status is the scan.
-  expect(workingTreeScans(commit)).toEqual({ [realpathSync(repo.repoRoot)]: ["status"] });
+  expect(workingTreeScans(commit)).toEqual({ [realpathSync.native(repo.repoRoot)]: ["status"] });
   expect(latest.get(repo.repoRoot)?.git).toMatchObject({ isDirty: false });
   for (const cwd of repo.siblings) expect(behind(latest, cwd)).toBe(1);
 }, 120_000);
@@ -228,9 +228,9 @@ test("an unclassifiable shared config change still fully refreshes every workspa
   const statusCwds = new Set(
     coreConfig
       .filter((command) => command.args[0] === "status")
-      .map((command) => realpathSync(command.cwd)),
+      .map((command) => realpathSync.native(command.cwd)),
   );
-  expect(statusCwds).toEqual(new Set(repo.siblings.map((cwd) => realpathSync(cwd))));
+  expect(statusCwds).toEqual(new Set(repo.siblings.map((cwd) => realpathSync.native(cwd))));
 }, 120_000);
 
 test("a push -u refreshes only the pushing worktree among 20 siblings", async () => {
@@ -248,8 +248,8 @@ test("a push -u refreshes only the pushing worktree among 20 siblings", async ()
     ["config", "update"],
   ]);
 
-  const pusherRoot = realpathSync(pusher);
-  expect(push.filter((command) => realpathSync(command.cwd) !== pusherRoot)).toEqual([]);
+  const pusherRoot = realpathSync.native(pusher);
+  expect(push.filter((command) => realpathSync.native(command.cwd) !== pusherRoot)).toEqual([]);
   expect(push.length).toBeGreaterThan(0);
   expect(latest.get(pusher)?.git).toMatchObject({ aheadOfOrigin: 0, behindOfOrigin: 0 });
 }, 180_000);
