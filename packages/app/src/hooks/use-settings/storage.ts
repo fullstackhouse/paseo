@@ -170,7 +170,7 @@ export const DEFAULT_CLIENT_SETTINGS: AppSettings = {
   sidebarRowItems: DEFAULT_SIDEBAR_ROW_ITEMS,
   sidebarChecksDisplay: DEFAULT_SIDEBAR_CHECKS_DISPLAY,
   sidebarPluginRowItems: {},
-  sidebarArchiveButton: false,
+  sidebarArchiveButton: true,
   autoInstallUpdatesWhenIdle: false,
   sidebarNavItems: [],
   sidebarFooterItems: [],
@@ -272,7 +272,7 @@ const StoredAppSettingsSchema = z
       .optional()
       .catch(DEFAULT_SIDEBAR_CHECKS_DISPLAY),
     sidebarPluginRowItems: z.record(z.string(), z.boolean()).catch({}),
-    sidebarArchiveButton: z.boolean().catch(false),
+    sidebarArchiveButton: z.boolean().catch(true),
     autoInstallUpdatesWhenIdle: z.boolean().catch(false),
     sidebarNavItems: z.array(z.object({ key: z.string(), visible: z.boolean() })).catch([]),
     sidebarFooterItems: z.array(z.object({ key: z.string(), visible: z.boolean() })).catch([]),

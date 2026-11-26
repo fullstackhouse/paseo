@@ -6,12 +6,12 @@ import {
 } from "./row-items";
 
 describe("parseSidebarRowItems", () => {
-  it("shows operational metadata but hides identity badges by default", () => {
+  it("shows project, host, services and labels by default", () => {
     expect(DEFAULT_SIDEBAR_ROW_ITEMS).toEqual({
       branch: false,
-      project: false,
+      project: true,
       host: true,
-      changeRequest: true,
+      changeRequest: false,
       services: true,
       labels: true,
     });

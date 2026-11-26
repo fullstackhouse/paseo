@@ -1,8 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { WorkspaceLabelDefinition } from "@getpaseo/protocol/workspace-labels";
 import type { PrHint } from "@/git/pr-hint";
-import { DEFAULT_SIDEBAR_CHECKS_DISPLAY } from "@/components/sidebar/display-preferences/checks-display";
-import { DEFAULT_SIDEBAR_ROW_ITEMS } from "@/components/sidebar/display-preferences/row-items";
+import type { SidebarRowItems } from "@/components/sidebar/display-preferences/row-items";
 import { selectMetaRowItems } from "./meta-items";
 import type { WorkspaceServiceSummary } from "./service-summary";
 
@@ -27,10 +26,20 @@ function select(overrides: Partial<Parameters<typeof selectMetaRowItems>[0]> = {
     serviceSummary: SERVICE,
     labels: LABELS,
     visible: DEFAULT_SIDEBAR_ROW_ITEMS,
-    checksDisplay: DEFAULT_SIDEBAR_CHECKS_DISPLAY,
+    checksDisplay: "iconAndText",
     ...overrides,
   });
 }
+
+// Fixed here rather than read from the product defaults, which change independently.
+const DEFAULT_SIDEBAR_ROW_ITEMS: SidebarRowItems = {
+  branch: false,
+  project: false,
+  host: true,
+  changeRequest: true,
+  services: true,
+  labels: true,
+};
 
 const kinds = (items: ReturnType<typeof selectMetaRowItems>) => items.map((item) => item.kind);
 
