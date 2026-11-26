@@ -11,12 +11,25 @@ export function createRestartRecovery(deps: Dependencies) {
   const resuming = new Map<string, { promise: Promise<void>; resolve(): void }>();
   const eligible = async (record: StoredAgentRecord) =>
     !record.archivedAt && !record.internal && !record.owner && (await deps.eligible(record));
+  // FSH fork: interruptedAt feeds the app's Resume all callout, so only agents the daemon
+  // won't resume itself get it. An automatic restart (e.g. an update) then asks nothing.
+  async function markInterrupted(agentId: string) {
+    const record = await deps.storage.get(agentId);
+    if (record && !record.interruptedAt)
+      await deps.storage.upsert({ ...record, interruptedAt: new Date().toISOString() });
+  }
   async function resume(agentId: string) {
     const record = await deps.storage.get(agentId);
     if (!record?.resumeOnStartup) return;
     await deps.storage.upsert({ ...record, resumeOnStartup: false });
-    if (!deps.settings().enabled || !(await eligible(record))) return;
-    await deps.dispatch(agentId, deps.settings().prompt);
+    if (!(await eligible(record))) return;
+    if (!deps.settings().enabled) return markInterrupted(agentId);
+    try {
+      await deps.dispatch(agentId, deps.settings().prompt);
+    } catch (error) {
+      await markInterrupted(agentId);
+      throw error;
+    }
   }
   return {
     /** Choose candidates before anything else reads or repairs persisted running status. */
@@ -27,11 +40,11 @@ export function createRestartRecovery(deps: Dependencies) {
           (record.resumeOnStartup === true || record.lastStatus === "running") &&
           (await eligible(record));
         const pending = deps.settings().enabled && candidate;
-        // FSH fork: a record still "running" at startup means the daemon crashed mid-turn.
-        const crashed = candidate && record.lastStatus === "running";
+        // FSH fork: a candidate that won't be resumed is offered in the Resume all callout.
+        const unresumed = candidate && !pending;
         await deps.storage.upsert({
           ...record,
-          ...(crashed && !record.interruptedAt ? { interruptedAt: now } : {}),
+          ...(unresumed && !record.interruptedAt ? { interruptedAt: now } : {}),
           resumeOnStartup: pending,
           lastStatus:
             record.lastStatus === "running" || record.lastStatus === "initializing"
@@ -50,13 +63,13 @@ export function createRestartRecovery(deps: Dependencies) {
     async captureRunningAgents() {
       await deps.storage.flush();
       const interruptedAt = new Date().toISOString();
+      const enabled = deps.settings().enabled;
       for (const record of await deps.storage.list()) {
-        // FSH fork: interruptedAt marks the agent for the app's Resume all callout.
         if (record.lastStatus === "running" && (await eligible(record)))
           await deps.storage.upsert({
             ...record,
-            resumeOnStartup: deps.settings().enabled,
-            interruptedAt,
+            resumeOnStartup: enabled,
+            ...(enabled ? {} : { interruptedAt }),
           });
       }
     },
