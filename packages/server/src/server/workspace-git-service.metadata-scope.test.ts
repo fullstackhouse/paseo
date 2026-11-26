@@ -119,7 +119,9 @@ async function deliver(
   events: Array<[relativePath: string, type: FileChange["type"]]>,
 ): Promise<GitCommandSubmissionMetric[]> {
   const commonDir = realpathSync.native(gitDir);
-  const record = records.find((candidate) => realpathSync.native(candidate.directory) === commonDir);
+  const record = records.find(
+    (candidate) => realpathSync.native(candidate.directory) === commonDir,
+  );
   if (!record) throw new Error(`No repository metadata watcher for ${gitDir}`);
   startGitCommandMetrics();
   record.callback(
