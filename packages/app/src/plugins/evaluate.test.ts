@@ -31,6 +31,42 @@ function bundle(body: string): string {
 }
 
 describe("evaluatePluginClientBundle", () => {
+  it("registers link handlers and rejects invalid ones", () => {
+    const plugin = evaluatePluginClientBundle(
+      "links",
+      bundle(`
+        plugin.addLinkHandler({
+          id: " pr ",
+          title: "Open in Inbox",
+          icon: "Scan",
+          match(url) { return url.includes("/pull/"); },
+          open() {},
+        });
+      `),
+    );
+    expect(plugin.linkHandlers.map(({ id, title, icon }) => ({ id, title, icon }))).toEqual([
+      { id: "pr", title: "Open in Inbox", icon: "Scan" },
+    ]);
+    expect(plugin.linkHandlers[0]?.match("https://github.com/o/r/pull/1")).toBe(true);
+
+    const register = (body: string) => () => evaluatePluginClientBundle("links", bundle(body));
+    expect(
+      register(`
+        const handler = { id: "pr", title: "Open", match() { return true; }, open() {} };
+        plugin.addLinkHandler(handler);
+        plugin.addLinkHandler(handler);
+      `),
+    ).toThrow("Duplicate link handler: pr");
+    expect(register(`plugin.addLinkHandler({ id: "pr", title: "Open", open() {} })`)).toThrow(
+      "Link handler pr needs match and open callbacks",
+    );
+    expect(
+      register(
+        `plugin.addLinkHandler({ id: "pr", title: " ", match() { return true; }, open() {} })`,
+      ),
+    ).toThrow("Link handler pr has no title");
+  });
+
   it("releases button registrations when client setup throws", () => {
     let active = 0;
     function addButton() {
@@ -132,6 +168,7 @@ describe("evaluatePluginClientBundle", () => {
           plugin.addWorkspacePanel({ id: "panel", title: "Panel", icon: "Blocks", context: "workspace", Component }),
           plugin.addCommandCenterItem({ id: "command", title: "Command", icon: "Blocks", context: "global", onSelect() {} }),
           plugin.addSlashCommand({ name: "review", description: "Review", argumentHint: "", context: "workspace", onSubmit() {} }),
+          plugin.addLinkHandler({ id: "pr", title: "Open in Inbox", match() { return true; }, open() {} }),
           plugin.addComposerPill({ id: "pill", workspaceId: "workspace", agentId: "agent", button: { title: "Pill", icon: "Scan", behavior: { kind: "action", onPress() {} } } }).remove,
           plugin.addAttachmentSource({ id: "issues", title: "Issues", icon: "Blocks", pickerTitle: "Attach issue", searchPlaceholder: "Search", search: { name: "issues.search", input: {}, output: {} } }),
           plugin.addTheme({ id: "night", name: "Night", appearance: "dark", colors: { background: "#000", foreground: "#fff", raised: "#111", control: "#222", border: "#333", mutedForeground: "#aaa", ring: "#555" } }),
@@ -164,6 +201,7 @@ describe("evaluatePluginClientBundle", () => {
         plugin.workspacePanels,
         plugin.commandCenterItems,
         plugin.clientSlashCommands,
+        plugin.linkHandlers,
         plugin.attachmentSources,
         plugin.themes,
         plugin.timelineTransformers,
@@ -185,6 +223,7 @@ describe("evaluatePluginClientBundle", () => {
         plugin.workspacePanels,
         plugin.commandCenterItems,
         plugin.clientSlashCommands,
+        plugin.linkHandlers,
         plugin.attachmentSources,
         plugin.themes,
         plugin.timelineTransformers,

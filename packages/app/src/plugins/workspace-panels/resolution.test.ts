@@ -40,6 +40,7 @@ function installed(): InstalledPlugin {
     ],
     commandCenterItems: [],
     clientSlashCommands: [],
+    linkHandlers: [],
     attachmentSources: [],
     themes: [],
     timelineTransformers: [],

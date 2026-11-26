@@ -1884,6 +1884,33 @@ client.addCommandCenterItem({
 
 Agent 回调可以打开 Agent 面板或工作区面板。工作区回调只能打开工作区面板。未知的界面和面板 ID 会明确报错。普通的工作区、Agent、Provider 和 daemon 配置操作请使用 `paseo`。插件特有的文件系统、凭据、厂商或 daemon 本地工作请使用 `rpc`。
 
+## 链接处理器 {#link-handlers}
+
+让匹配的链接在 Paseo 内打开，而不是在浏览器中打开。点击聊天或插件 Markdown 中的链接时会调用 `open`。在网页和桌面端右键，或在 iOS 和 Android 上长按，会显示一个菜单，包含你的 `title`、**在浏览器中打开**和**复制链接**：
+
+```tsx
+client.addLinkHandler({
+  id: "pull-request",
+  title: "Open in Inbox",
+  match: (url) => /^https:\/\/github\.com\/[^/]+\/[^/]+\/pull\/\d+/.test(url),
+  open({ url, workspaceId, openScreen }) {
+    openScreen({ screenId: "review", params: { pr: url }, workspaceId: workspaceId ?? undefined });
+  },
+});
+```
+
+| 字段    | 必填 | 含义                                                            |
+| ------- | ---- | --------------------------------------------------------------- |
+| `id`    | 是   | 插件内的处理器 ID。                                             |
+| `title` | 是   | 用此处理器打开链接的菜单项。                                    |
+| `icon`  | 否   | Lucide 名称、`{ svg }` 或组件。参见[图标](#icons)。             |
+| `match` | 是   | `(url) => boolean`。必须同步且无副作用；渲染时会调用它。        |
+| `open`  | 是   | 调用时传入 Command Center 的能力，以及 `url` 和 `workspaceId`。 |
+
+`url` 始终是绝对的 http(s) 地址。`#123` 这类 forge 简写会先解析成地址；即使是拉取请求，GitHub 也会解析为 `/issues/123`，所以处理拉取请求时要同时匹配这两种路径。`workspaceId` 是插件所在主机上的当前工作区，没有则为 `null`；把它传给 `openScreen`，即可在聊天旁打开一个标签页。
+
+第一个匹配的处理器生效，显示该链接的主机上的处理器优先。如果 `open` 抛出错误，Paseo 会在浏览器中打开链接。终端链接，以及你自己的界面通过 `openExternalUrl` 打开的链接，不会经过处理器。
+
 ## 斜杠命令 {#slash-commands}
 
 注册一个命令，当用户在消息 Composer 中提交 `/name args` 时，它会在 Paseo 客户端中运行。这段文本

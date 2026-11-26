@@ -63,6 +63,7 @@ function installation(
     workspacePanels: [],
     commandCenterItems: [],
     clientSlashCommands: [],
+    linkHandlers: [],
     attachmentSources: [],
     themes: [],
     timelineTransformers: [],

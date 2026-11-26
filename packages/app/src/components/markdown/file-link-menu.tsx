@@ -1,8 +1,13 @@
 import { useCallback, useMemo, type ReactElement } from "react";
 import { withUnistyles } from "react-native-unistyles";
-import { Copy, ExternalLink, FolderOpen, type LucideIcon } from "lucide-react-native";
+import { AppWindow, Copy, ExternalLink, FolderOpen, type LucideIcon } from "lucide-react-native";
 import { useTranslation } from "react-i18next";
-import { useFileLinkDesktopActions, type InlinePathTarget } from "@/assistant-file-links";
+import {
+  canOpenFileLinkWithDefaultApp,
+  useFileLinkDesktopActions,
+  useOpenFileLinkWithDefaultApp,
+  type InlinePathTarget,
+} from "@/assistant-file-links";
 import { ContextMenuContent, ContextMenuItem, useContextMenu } from "@/components/ui/context-menu";
 import { ICON_SIZE, type Theme } from "@/styles/theme";
 
@@ -27,6 +32,7 @@ function FileLinkMenuContent({
 }: FileLinkMenuProps): ReactElement {
   const { t } = useTranslation();
   const actions = useFileLinkDesktopActions({ serverId, workspaceRoot });
+  const openWithDefaultApp = useOpenFileLinkWithDefaultApp();
   const withTarget = useCallback(
     (run: (target: InlinePathTarget) => void) => () => {
       void (async () => {
@@ -38,6 +44,14 @@ function FileLinkMenuContent({
   );
   return (
     <ContextMenuContent align="start" width={220} testID="assistant-file-link-context-menu">
+      {canOpenFileLinkWithDefaultApp() ? (
+        <FileLinkMenuItem
+          icon={AppWindow}
+          label={t("workspace.fileActions.openWithDefaultApp")}
+          onSelect={withTarget(openWithDefaultApp)}
+          testID="assistant-file-link-open-with-default-app"
+        />
+      ) : null}
       {actions.editorLabel ? (
         <FileLinkMenuItem
           icon={ExternalLink}

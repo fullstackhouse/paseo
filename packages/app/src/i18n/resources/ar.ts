@@ -53,6 +53,10 @@ export const ar: TranslationResources = {
     position: "{{current}} من {{total}}",
     total: "{{total}} تطابقات",
   },
+  linkActions: {
+    openInBrowser: "فتح في المتصفح",
+    copyLink: "نسخ الرابط",
+  },
   common: {
     bottomSheetBackdrop: "خلفية اللوحة السفلية",
     back: "خلف",
@@ -570,6 +574,7 @@ export const ar: TranslationResources = {
       openToSide: "فتح إلى الجانب",
       copyPath: "نسخ المسار",
       copyRelativePath: "نسخ المسار النسبي",
+      openWithDefaultApp: "فتح",
       revealIn: "إظهار في {{target}}",
       download: "تحميل",
       addToChat: "إضافة إلى الدردشة",

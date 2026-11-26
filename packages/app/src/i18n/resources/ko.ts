@@ -53,6 +53,10 @@ export const ko: TranslationResources = {
     position: "{{current}} / {{total}}",
     total: "일치 항목 {{total}}개",
   },
+  linkActions: {
+    openInBrowser: "브라우저에서 열기",
+    copyLink: "링크 복사",
+  },
   common: {
     bottomSheetBackdrop: "하단 시트 배경",
     back: "뒤로",
@@ -571,6 +575,7 @@ export const ko: TranslationResources = {
       openToSide: "옆에 열기",
       copyPath: "경로 복사",
       copyRelativePath: "상대 경로 복사",
+      openWithDefaultApp: "열기",
       revealIn: "{{target}}에서 보기",
       download: "다운로드",
       addToChat: "채팅에 추가",

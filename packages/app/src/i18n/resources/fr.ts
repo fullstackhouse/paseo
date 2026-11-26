@@ -54,6 +54,10 @@ export const fr: TranslationResources = {
     position: "{{current}} sur {{total}}",
     total: "{{total}} résultats",
   },
+  linkActions: {
+    openInBrowser: "Ouvrir dans le navigateur",
+    copyLink: "Copier le lien",
+  },
   common: {
     bottomSheetBackdrop: "Arrière-plan du panneau inférieur",
     back: "Retour",
@@ -577,6 +581,7 @@ export const fr: TranslationResources = {
       openToSide: "Ouvrir sur le côté",
       copyPath: "Copier le chemin",
       copyRelativePath: "Copier le chemin relatif",
+      openWithDefaultApp: "Ouvrir",
       revealIn: "Afficher dans {{target}}",
       download: "Télécharger",
       addToChat: "Ajouter à la conversation",

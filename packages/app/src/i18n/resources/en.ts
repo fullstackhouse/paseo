@@ -51,6 +51,10 @@ export const en = {
     position: "{{current}} of {{total}}",
     total: "{{total}} matches",
   },
+  linkActions: {
+    openInBrowser: "Open in browser",
+    copyLink: "Copy link",
+  },
   common: {
     bottomSheetBackdrop: "Bottom sheet backdrop",
     back: "Back",
@@ -570,6 +574,7 @@ export const en = {
       openToSide: "Open to the side",
       copyPath: "Copy path",
       copyRelativePath: "Copy relative path",
+      openWithDefaultApp: "Open",
       revealIn: "Reveal in {{target}}",
       download: "Download",
       addToChat: "Add to chat",

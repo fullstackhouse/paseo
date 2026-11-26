@@ -54,6 +54,10 @@ export const es: TranslationResources = {
     position: "{{current}} de {{total}}",
     total: "{{total}} coincidencias",
   },
+  linkActions: {
+    openInBrowser: "Abrir en el navegador",
+    copyLink: "Copiar enlace",
+  },
   common: {
     bottomSheetBackdrop: "Fondo del panel inferior",
     back: "Atrás",
@@ -578,6 +582,7 @@ export const es: TranslationResources = {
       openToSide: "Abrir al lado",
       copyPath: "Copiar ruta",
       copyRelativePath: "Copiar ruta relativa",
+      openWithDefaultApp: "Abrir",
       revealIn: "Mostrar en {{target}}",
       download: "Descargar",
       addToChat: "Añadir al chat",

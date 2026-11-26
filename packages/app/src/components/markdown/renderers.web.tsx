@@ -6,6 +6,7 @@ import {
   useState,
   type ComponentProps,
   type MouseEvent,
+  useContext,
 } from "react";
 import type {
   CodeBlockRendererProps,
@@ -27,8 +28,11 @@ import { HighlightedCodeBlock } from "@/components/highlighted-code-block";
 import { useIsLocalDaemon } from "@/hooks/use-is-local-daemon";
 import { hasDesktopOpenTargetsBridge } from "@/workspace/desktop-open-targets";
 import type { Theme } from "@/styles/theme";
+import { usePluginLinkResolver } from "@/plugins/link-handlers";
 import { FileLinkMenu } from "./file-link-menu";
+import { PluginLinkMenu } from "./plugin-link-menu";
 import { MermaidFence } from "./fence/mermaid";
+import { MarkdownExternalContext } from "./external-context";
 import { isRecognizedLink, markdownLinkSource } from "./source";
 
 const ThemedCodeBlock = withUnistyles(HighlightedCodeBlock);
@@ -60,6 +64,21 @@ function WebLink(props: LinkRendererProps) {
   );
   const environment = useAssistantFileLinkEnvironment();
   const isLocalDaemon = useIsLocalDaemon(environment.serverId ?? "");
+  const pluginLinks = usePluginLinkResolver(environment.serverId);
+  const external = useContext(MarkdownExternalContext);
+  // Only a link a plugin opens gets this menu; other web links keep the browser's own.
+  const pluginLink =
+    pluginLinks.active && !external && !fileLink.isFileLink
+      ? pluginLinks.resolve(forgeUrl ?? props.link.url)
+      : null;
+  if (pluginLink) {
+    return (
+      <ContextMenu>
+        <ContextMenuLinkAnchor {...props} fileLink={fileLink} forgeUrl={forgeUrl} />
+        <PluginLinkMenu link={pluginLink} />
+      </ContextMenu>
+    );
+  }
   if (!fileLink.isFileLink || !isLocalDaemon || !environment.serverId) {
     return <WebLinkAnchor {...props} fileLink={fileLink} forgeUrl={forgeUrl} />;
   }
@@ -116,6 +135,25 @@ function DesktopFileLinkAnchor({ anchorProps, fileLink, ...props }: WebLinkAncho
     [anchorProps, handleClick, handleContextMenu],
   );
   return <WebLinkAnchor {...props} anchorProps={desktopAnchorProps} fileLink={fileLink} />;
+}
+
+// Right click opens the link menu of a link a plugin opens inside Paseo.
+function ContextMenuLinkAnchor({ anchorProps, ...props }: WebLinkAnchorProps) {
+  const menu = useContextMenu();
+  const handleContextMenu = useCallback(
+    (event: MouseEvent<HTMLAnchorElement>) => {
+      event.preventDefault();
+      event.stopPropagation();
+      menu.setAnchorRect({ x: event.pageX, y: event.pageY, width: 0, height: 0 });
+      menu.setOpen(true);
+    },
+    [menu],
+  );
+  const menuAnchorProps = useMemo(
+    () => ({ ...anchorProps, onContextMenu: handleContextMenu }),
+    [anchorProps, handleContextMenu],
+  );
+  return <WebLinkAnchor {...props} anchorProps={menuAnchorProps} />;
 }
 
 function WebLinkAnchor({ link, anchorProps, children, fileLink, forgeUrl }: WebLinkAnchorProps) {

@@ -475,6 +475,7 @@ export interface PluginClientContext extends PluginCommandCapabilities, PluginCl
     contribution: PluginCommandCenterItemContribution<PluginText>,
   ): PluginCleanup;
   addSlashCommand(contribution: PluginClientSlashCommandContribution<PluginText>): PluginCleanup;
+  addLinkHandler(contribution: PluginLinkHandlerContribution<PluginText>): PluginCleanup;
   addHeaderButton(
     contribution: PluginHeaderButtonContribution<PluginText>,
   ): PluginButtonRegistration<PluginText>;
@@ -649,6 +650,28 @@ export type PluginCommandCenterItemContribution<Text extends PluginText = string
       context: "agent";
       onSelect(context: PluginAgentCommandContext): void | Promise<void>;
     });
+
+export interface PluginLinkHandlerContext extends PluginCommandCapabilities {
+  /** The absolute http(s) URL the user opened. `#123` forge shorthand arrives resolved. */
+  url: string;
+  /** The workspace the link was opened from, or null outside one. Pass it to `openScreen` for a tab beside the chat. */
+  workspaceId: string | null;
+}
+
+/**
+ * Opens matching links in Markdown inside Paseo instead of the browser. A click calls `open`;
+ * right click or long press shows a menu with this handler's `title`, "Open in browser" and
+ * "Copy link". The first installed handler whose `match` returns true wins.
+ */
+export interface PluginLinkHandlerContribution<Text extends PluginText = string> {
+  id: string;
+  /** The menu item, for example "Open in Inbox". */
+  title: Text;
+  icon?: PluginIcon;
+  /** Synchronous and side-effect free; called on render and on every press. */
+  match(url: string): boolean;
+  open(context: PluginLinkHandlerContext): void | Promise<void>;
+}
 
 interface PluginClientSlashCommandBase<Text extends PluginText = string> {
   name: string;

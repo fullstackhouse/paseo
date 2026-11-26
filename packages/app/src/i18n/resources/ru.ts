@@ -54,6 +54,10 @@ export const ru: TranslationResources = {
     position: "{{current}} из {{total}}",
     total: "Совпадений: {{total}}",
   },
+  linkActions: {
+    openInBrowser: "Открыть в браузере",
+    copyLink: "Копировать ссылку",
+  },
   common: {
     bottomSheetBackdrop: "Фон нижней панели",
     back: "Назад",
@@ -577,6 +581,7 @@ export const ru: TranslationResources = {
       openToSide: "Открыть сбоку",
       copyPath: "Копировать путь",
       copyRelativePath: "Копировать относительный путь",
+      openWithDefaultApp: "Открыть",
       revealIn: "Показать в {{target}}",
       download: "Скачать",
       addToChat: "Добавить в чат",

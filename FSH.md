@@ -129,6 +129,7 @@ temporary by design: every patch is meant to go upstream and then drop out of `f
 - FSH-only (upstreamable, requested in getpaseo/paseo#4876): terminals on web and desktop have 8 px of padding on every side. The phone app draws its own grid and is unchanged
 - FSH-only (upstreamable): the plugin compiler no longer rejects a plugin whose dependency declarations reference type packages that are not installed, such as `@anthropic-ai/sdk` probing several `undici-types` paths. TypeScript tolerates those; only a plugin's own missing type imports still fail the build.
 - FSH-only (upstreamable): a plugin provider can name one of its plugin's settings screens (`settingsScreen` on `registerProvider`), and its row in Settings → Providers then shows **Configure**, which opens that screen. Provider snapshot entries carry an optional `settingsScreen: { pluginId, screenId }`; older hosts send none and the row looks as before
+- FSH-only (upstreamable): plugins can open matching links inside Paseo (`addLinkHandler`). A click on a matching chat or Markdown link runs the plugin; right click or long press offers Open in Paseo, Open in browser and Copy link. paseo-inbox uses it for GitHub PR links
 
 Keep this list in sync with what's merged into `fsh`.
 

@@ -53,6 +53,10 @@ export const zhCN: TranslationResources = {
     position: "{{current}} / {{total}}",
     total: "{{total}} 个匹配项",
   },
+  linkActions: {
+    openInBrowser: "在浏览器中打开",
+    copyLink: "复制链接",
+  },
   common: {
     bottomSheetBackdrop: "底部面板背景",
     back: "返回",
@@ -569,6 +573,7 @@ export const zhCN: TranslationResources = {
       openToSide: "在侧边打开",
       copyPath: "复制路径",
       copyRelativePath: "复制相对路径",
+      openWithDefaultApp: "打开",
       revealIn: "在 {{target}} 中显示",
       download: "下载",
       addToChat: "添加到聊天",

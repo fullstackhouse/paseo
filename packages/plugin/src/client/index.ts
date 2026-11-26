@@ -56,6 +56,8 @@ export type {
   PluginAgentCommandContext,
   PluginCommandCenterItemContribution,
   PluginClientSlashCommandContribution,
+  PluginLinkHandlerContext,
+  PluginLinkHandlerContribution,
   SettingsState,
 } from "./contracts.js";
 export type {

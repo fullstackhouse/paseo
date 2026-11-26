@@ -2393,6 +2393,39 @@ Every callback receives:
 
 An agent callback may open either an agent panel or a workspace panel. A workspace callback may open only a workspace panel. Unknown screen and panel IDs fail visibly. Use `paseo` for normal workspace, agent, provider, and daemon-config operations. Use `rpc` for plugin-specific filesystem, credential, vendor, or daemon-local work.
 
+## Link handlers
+
+Open matching links inside Paseo instead of the browser. A click on a link in chat or plugin Markdown calls
+`open`. A right click on web and desktop, or a long press on iOS and Android, shows a menu with your `title`,
+**Open in browser**, and **Copy link**:
+
+```tsx
+client.addLinkHandler({
+  id: "pull-request",
+  title: "Open in Inbox",
+  match: (url) => /^https:\/\/github\.com\/[^/]+\/[^/]+\/pull\/\d+/.test(url),
+  open({ url, workspaceId, openScreen }) {
+    openScreen({ screenId: "review", params: { pr: url }, workspaceId: workspaceId ?? undefined });
+  },
+});
+```
+
+| Field   | Required | Meaning                                                                   |
+| ------- | -------- | ------------------------------------------------------------------------- |
+| `id`    | Yes      | Plugin-local handler ID.                                                  |
+| `title` | Yes      | The menu item that opens the link with this handler.                      |
+| `icon`  | No       | Lucide name, `{ svg }`, or component. See [Icons](#icons).                |
+| `match` | Yes      | `(url) => boolean`. Synchronous and side-effect free; it runs on render.  |
+| `open`  | Yes      | Called with the Command Center capabilities plus `url` and `workspaceId`. |
+
+`url` is always absolute http(s). Forge shorthand such as `#123` arrives resolved, and GitHub resolves it to
+`/issues/123` even for a pull request, so match both paths when you handle pull requests. `workspaceId` is
+the active workspace on the plugin's host, or `null`; pass it to `openScreen` to open a tab beside the chat.
+
+The first matching handler wins, with handlers on the host that shows the link checked first. If `open`
+throws, Paseo opens the link in the browser. Terminal links and links your own UI opens with
+`openExternalUrl` don't go through handlers.
+
 ## Slash commands
 
 Register a command that runs in the Paseo client when the user submits `/name args` from the
