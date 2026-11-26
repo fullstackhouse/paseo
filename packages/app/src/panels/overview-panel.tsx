@@ -68,6 +68,7 @@ import { normalizeWorkspaceOpaqueId } from "@/utils/workspace-identity";
 import { useWorkspaceAttention } from "@/workspace-attention/attention";
 import { hasRunningAgent } from "@/workspace-attention/model";
 import { useReportedWorkLookup } from "@/workspace-status/reported-work";
+import { deriveStatusCard } from "@/workspace-status/attention";
 import { showExplorerForAttention } from "@/workspace-attention/auto-show";
 import { openExplorerSidebarView } from "@/workspace-tabs/explorer-sidebar";
 import { buildWorkspaceTabPersistenceKey } from "@/workspace-tabs/model";
@@ -179,10 +180,16 @@ function OverviewPanel(): ReactElement {
   const workspaceKey = buildWorkspaceTabPersistenceKey({ serverId, workspaceId });
   const facts = useWorkspaceFields(serverId, workspaceId, selectWorkspaceFacts);
   const summaryItems = useWorkspaceSummaryItems(serverId, workspaceId);
-  const { status, pullRequests, more } = useMemo(
-    () => partitionSummaryItems(summaryItems),
-    [summaryItems],
-  );
+  const partition = useMemo(() => partitionSummaryItems(summaryItems), [summaryItems]);
+  const { pullRequests, more } = partition;
+  const agents = useSessionStore((state) => state.sessions[serverId]?.agents);
+  // The card as attention reads it, so Status agrees with the sidebar (docs/workspace-attention.md).
+  const status = useMemo(() => {
+    const item = partition.status;
+    if (!item) return null;
+    const card = deriveStatusCard(item, summaryItems, (id) => agents?.get(id)?.title ?? null);
+    return card === item.status ? item : { ...item, status: card };
+  }, [agents, partition.status, summaryItems]);
   const agentRunning = useSessionStore((state) =>
     hasRunningAgent(state.sessions[serverId]?.agents, workspaceId),
   );
@@ -1773,7 +1780,12 @@ function workspaceStateWord(
   workspace: WorkspaceRef,
   summaryItems: (workspace: WorkspaceRef) => readonly WorkspaceSummaryItem[],
 ): WorkspaceStateWord {
-  const status = partitionSummaryItems(summaryItems(workspace)).status?.status ?? null;
+  const items = summaryItems(workspace);
+  const status = deriveStatusCard(
+    partitionSummaryItems(items).status,
+    items,
+    (id) => agents?.get(id)?.title ?? null,
+  );
   return deriveWorkspaceStateWord({
     status,
     agents: agentsInWorkspace(agents, workspace.workspaceId),

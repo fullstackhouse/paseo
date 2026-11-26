@@ -42,7 +42,7 @@ paseo-status sends `answered`, `live` and `liveChildren` because only its server
 `deriveWorkspaceAttention` in `packages/app/src/workspace-status/attention.ts`. In order:
 
 1. A card **needs you** when it is `waiting_on_you` and not `answered`.
-2. A card that needs you reads **blocked** instead when its agent has no open ask and either has an ask in progress or has `liveChildren`. Its asks or children say what it waits on; the card is out of date.
+2. A card that needs you reads **blocked** instead when its agent has no open ask and either has an ask in progress or has `liveChildren`. Its asks or children say what it waits on; the card is out of date. Overview's Status shows such a card as Blocked (`deriveStatusCard`), with the asks under Waiting on and the children under the Tree's Blocked by, so it agrees with the sidebar.
 3. A card that still needs you with no open ask and nothing in progress is **unrecorded** (`unrecordedWaits`). Each one is an attention item, so Your move shows one row per agent, named, and entering the workspace opens Overview. The card's item renders the row through its `EntryComponent` with the agent id as `entryId` (paseo-status: Sync asks).
 4. A `working` card counts while `live`, or for 5 minutes after the later of `updatedAt` and `lastLiveAt`.
 5. In-progress entries: stuck after 10 minutes unless their agent runs, live work exists, or they are watched (`workspace-status/moving.ts`).

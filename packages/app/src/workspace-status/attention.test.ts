@@ -3,6 +3,7 @@ import type { PluginWorkspaceAgentCard } from "@getpaseo/plugin/client";
 import type { WorkspaceSummaryItem } from "@/plugins/workspace-summary/store";
 import type { MovementContext } from "./moving";
 import {
+  deriveStatusCard,
   deriveWorkspaceAttention,
   nextAttentionChangeAt,
   unrecordedWaits,
@@ -277,5 +278,55 @@ describe("deriveWorkspaceAttention in-progress tally", () => {
   it("ignores waitingOnReview on an entry nothing watches", () => {
     const fresh = { title: "t", waitingOnReview: true, updatedAt: now };
     expect(tallyOf([asksWith(fresh)], idle)?.work).toBe("working");
+  });
+});
+
+describe("deriveStatusCard", () => {
+  const written = (updatedAt = NOW) => ({
+    state: "waiting_on_you" as const,
+    summary: "PR #65 needs a reviewer",
+    updatedAt,
+  });
+  const statusItem = (...cards: PluginWorkspaceAgentCard[]) => item({ status: written(), cards });
+  const review = {
+    ...inProgressAsk("A1", "a"),
+    title: "Request review on PR #65",
+    waitingOn: "review requested",
+    tone: "warning" as const,
+  };
+
+  it("shows Blocked, waiting on the agent's asks in progress", () => {
+    const written1 = statusItem(card("a", { state: "waiting_on_you" }));
+    expect(deriveStatusCard(written1, [written1, asks({ inProgress: [review] })])).toEqual({
+      ...written(),
+      state: "blocked",
+      blockedBy: [
+        {
+          kind: "other",
+          label: "Request review on PR #65",
+          detail: "review requested",
+          tone: "warning",
+        },
+      ],
+    });
+  });
+
+  it("shows Blocked, waiting on children live elsewhere, by title", () => {
+    const written1 = statusItem(card("a", { state: "waiting_on_you", liveChildren: ["c1", "c2"] }));
+    const titles: Record<string, string> = { c1: "Fix the flaky test" };
+    expect(deriveStatusCard(written1, [written1], (id) => titles[id] ?? null)?.blockedBy).toEqual([
+      { kind: "agent", agentId: "c1", label: "Fix the flaky test" },
+      { kind: "agent", agentId: "c2", label: "c2" },
+    ]);
+  });
+
+  it("keeps the card while it needs you, is answered, or isn't the newest card's", () => {
+    const needsYou = statusItem(card("a", { state: "waiting_on_you" }));
+    expect(deriveStatusCard(needsYou, [needsYou])).toBe(needsYou.status);
+    const withOpenAsk = [needsYou, asks({ entries: [openAsk("A2", "a")], inProgress: [review] })];
+    expect(deriveStatusCard(needsYou, withOpenAsk)).toBe(needsYou.status);
+    const older = statusItem(card("a", { state: "waiting_on_you", updatedAt: NOW - 1 }));
+    expect(deriveStatusCard(older, [older, asks({ inProgress: [review] })])).toBe(older.status);
+    expect(deriveStatusCard(null, [])).toBeNull();
   });
 });

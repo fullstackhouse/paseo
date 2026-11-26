@@ -1,4 +1,8 @@
-import type { PluginWorkspaceAgentCard } from "@getpaseo/plugin/client";
+import type {
+  PluginWorkspaceAgentCard,
+  PluginWorkspaceBlocker,
+  PluginWorkspaceStatus,
+} from "@getpaseo/plugin/client";
 import type { WorkspaceSummaryItem } from "@/plugins/workspace-summary/store";
 import { isEntryMoving, nextNothingMovingAt, type MovementContext } from "./moving";
 
@@ -226,4 +230,62 @@ export function nextAttentionChangeAt(
     }
   }
   return next;
+}
+
+/**
+ * The Status card as Overview shows it. The plugin sends its newest card as written; when that card
+ * waits on you but reads blocked here (its agent holds an ask in progress or has children live
+ * elsewhere, and owns no open ask), it shows Blocked, with those asks and children as what it waits
+ * on, so the card agrees with the sidebar. Otherwise the card is unchanged.
+ */
+export function deriveStatusCard(
+  statusItem: WorkspaceSummaryItem | null,
+  items: readonly WorkspaceSummaryItem[],
+  agentTitle: (agentId: string) => string | null = () => null,
+): PluginWorkspaceStatus | null {
+  const status = statusItem?.status ?? null;
+  if (!status || status.state !== "waiting_on_you" || status.answered) return status;
+  const card = newestCard(statusItem?.cards ?? []);
+  if (!card || card.state !== status.state || card.updatedAt !== status.updatedAt) return status;
+  if (cardWait(card, recordedAsks(items)) !== "blocked") return status;
+  const blockedBy = [...askBlockers(items, card.agentId), ...childBlockers(card, agentTitle)];
+  return { ...status, state: "blocked", ...(blockedBy.length > 0 ? { blockedBy } : {}) };
+}
+
+/** The agent's asks in progress, as what its card waits on. */
+function askBlockers(
+  items: readonly WorkspaceSummaryItem[],
+  agentId: string,
+): PluginWorkspaceBlocker[] {
+  return items.flatMap((item) =>
+    (item.inProgress ?? [])
+      .filter((entry) => entry.agentId === agentId)
+      .map((entry) => {
+        const blocker: PluginWorkspaceBlocker = { kind: "other", label: entry.title };
+        if (entry.waitingOn) blocker.detail = entry.waitingOn;
+        if (entry.tone) blocker.tone = entry.tone;
+        return blocker;
+      }),
+  );
+}
+
+/** The card's children live elsewhere, by title. */
+function childBlockers(
+  card: PluginWorkspaceAgentCard,
+  agentTitle: (agentId: string) => string | null,
+): PluginWorkspaceBlocker[] {
+  return (card.liveChildren ?? []).map((agentId) => ({
+    kind: "agent",
+    agentId,
+    label: agentTitle(agentId) ?? agentId,
+  }));
+}
+
+function newestCard(
+  cards: readonly PluginWorkspaceAgentCard[],
+): PluginWorkspaceAgentCard | undefined {
+  return cards.reduce<PluginWorkspaceAgentCard | undefined>(
+    (newest, card) => (!newest || card.updatedAt > newest.updatedAt ? card : newest),
+    undefined,
+  );
 }
