@@ -39,6 +39,7 @@ import type {
   WorkspaceAppearance,
   WorkspaceDescriptorPayload,
   WorkspaceCreateRequest,
+  ChangeRequestRead,
 } from "@getpaseo/protocol/messages";
 import {
   DaemonClient,
@@ -77,6 +78,7 @@ import type {
   WaitForFinishResult,
 } from "./daemon-client.js";
 export type { WorkspaceAppearance, WorkspaceAppearanceInput };
+export type { ChangeRequestRead };
 
 /**
  * Coding turns routinely run for minutes, so the handle waits far longer than
@@ -711,6 +713,14 @@ export interface PaseoNotificationActions {
   ): Promise<PaseoNotificationSendResult>;
 }
 
+export interface PaseoChangeRequestActions {
+  /**
+   * Reads pull request state once through the host, which batches, rate-limits and caches reads
+   * for 30 seconds. One result per URL, in order; a URL the host can't read is `ok: false`.
+   */
+  read(urls: string[], options?: { requestId?: string }): Promise<ChangeRequestRead[]>;
+}
+
 export interface PaseoApi {
   readonly hosts: PaseoHostActions;
   dispose(): Promise<void>;
@@ -722,6 +732,7 @@ export interface PaseoApi {
   readonly providers: PaseoProviderActions;
   readonly config: PaseoConfigActions;
   readonly notifications: PaseoNotificationActions;
+  readonly changeRequests: PaseoChangeRequestActions;
 }
 
 export interface PaseoClient extends PaseoApi {
@@ -1031,6 +1042,9 @@ export function createPaseoApi(
     },
     notifications: {
       send: (input, options) => daemonClient.sendPluginNotification(input, options),
+    },
+    changeRequests: {
+      read: (urls, options) => daemonClient.readChangeRequests(urls, options),
     },
   };
 }

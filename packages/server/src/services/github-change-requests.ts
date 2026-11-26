@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { ChangeRequestSnapshot } from "./change-request-source.js";
+import type { ChangeRequestDetails, ChangeRequestSnapshot } from "./change-request-source.js";
 
 const PAGE_SIZE = 100;
 // GitHub charges GraphQL points for requested nested connections, even on quiet PRs.
@@ -104,14 +104,20 @@ const activitySchema = z.object({ id: z.string(), url: z.string().url() });
 const reviewSchema = activitySchema.extend({ submittedAt: z.string().nullable() });
 const inlineSchema = activitySchema.extend({ publishedAt: z.string().nullable() });
 const prStates = { OPEN: "open", CLOSED: "closed", MERGED: "merged" } as const;
+const detailsSchema = z.object({
+  number: z.number(),
+  title: z.string(),
+  isDraft: z.boolean(),
+  mergeable: z.string().nullable(),
+});
 const prSchema = z.object({
   state: z.enum(["OPEN", "CLOSED", "MERGED"]),
   headRefOid: z.string(),
   reviewDecision: z.string().nullable(),
   statusCheckRollup: rollupSchema.nullable(),
-  comments: pageSchema,
-  reviews: pageSchema,
-  reviewThreads: pageSchema,
+  comments: pageSchema.optional(),
+  reviews: pageSchema.optional(),
+  reviewThreads: pageSchema.optional(),
 });
 
 function connection(name: string, fields: string, cursor?: string, size = PAGE_SIZE) {
@@ -157,7 +163,11 @@ interface ReadOptions {
   onChecks(url: string, headSha: string, contexts: unknown[]): void;
   knownActivity(url: string): ReadonlySet<string> | undefined;
   isObserved(url: string): boolean;
+  /** One-shot reads: add `ChangeRequestDetails` and skip comments, reviews and threads. */
+  details?: boolean;
 }
+
+export type GitHubChangeRequestRead = ChangeRequestSnapshot & Partial<ChangeRequestDetails>;
 
 const pullRequestResult = z
   .object({ pullRequest: z.unknown() })
@@ -169,9 +179,9 @@ const threadFields = `id ${connection("comments", inlineFields, undefined, 10)}`
 
 export async function readGitHubChangeRequests(
   urls: string[],
-  { read, batchSize, firstBatchSize, onChecks, knownActivity, isObserved }: ReadOptions,
-): Promise<Map<string, ChangeRequestSnapshot | Error>> {
-  const snapshots = new Map<string, ChangeRequestSnapshot>();
+  { read, batchSize, firstBatchSize, onChecks, knownActivity, isObserved, details }: ReadOptions,
+): Promise<Map<string, GitHubChangeRequestRead | Error>> {
+  const snapshots = new Map<string, GitHubChangeRequestRead>();
   const failed = new Map<string, Error>();
   const pending: PageRead[] = [];
 
@@ -220,21 +230,27 @@ export async function readGitHubChangeRequests(
         `
         state headRefOid reviewDecision
         statusCheckRollup { state ${connection("contexts", GITHUB_POLL_CHECK_CONTEXT_FIELDS)} }
-        ${conversation()}
+        ${
+          details
+            ? "number title isDraft mergeable"
+            : `${conversation()}
         ${connection("reviews", reviewFields)}
-        ${connection("reviewThreads", threadFields, undefined, REVIEW_THREAD_PAGE_SIZE)}
+        ${connection("reviewThreads", threadFields, undefined, REVIEW_THREAD_PAGE_SIZE)}`
+        }
       `,
       ),
       accept(result) {
-        const pr = prSchema.parse(pullRequestResult.parse(result));
+        const raw = pullRequestResult.parse(result);
+        const pr = prSchema.parse(raw);
         onChecks(url, pr.headRefOid, pr.statusCheckRollup?.contexts.nodes ?? []);
-        const snapshot: ChangeRequestSnapshot = {
+        const snapshot: GitHubChangeRequestRead = {
           state: prStates[pr.state],
           headSha: pr.headRefOid,
           checksState: checkState(pr.statusCheckRollup?.state ?? null),
           checks: [],
           reviewDecision: pr.reviewDecision,
           activity: [],
+          ...(details ? detailsSchema.parse(raw) : {}),
         };
         snapshots.set(url, snapshot);
         if (pr.statusCheckRollup) {
@@ -264,6 +280,7 @@ export async function readGitHubChangeRequests(
             },
           );
         }
+        if (!pr.comments || !pr.reviews || !pr.reviewThreads) return;
         const seen = knownActivity(url);
         schedulePages(
           url,

@@ -5420,6 +5420,76 @@ it("batches co-due workspace discovery and exact PR reads with one check rollup"
   }
 });
 
+it("reads a PR once with details and no activity", async () => {
+  const pageInfo = { hasNextPage: false, endCursor: null };
+  const runner = createRunner([
+    batchPollStatusJson({
+      rateLimit: {
+        limit: 5000,
+        remaining: 4900,
+        resetAt: new Date(Date.now() + 100_000).toISOString(),
+      },
+      request0: {
+        pullRequest: {
+          state: "OPEN",
+          headRefOid: "abc",
+          reviewDecision: "REVIEW_REQUIRED",
+          number: 41,
+          title: "Fix the login redirect",
+          isDraft: true,
+          mergeable: "CONFLICTING",
+          statusCheckRollup: {
+            state: "FAILURE",
+            contexts: {
+              nodes: [
+                {
+                  __typename: "CheckRun",
+                  id: "run",
+                  name: "build",
+                  status: "COMPLETED",
+                  conclusion: "FAILURE",
+                  detailsUrl: "https://github.com/acme/widgets/actions/runs/7",
+                },
+              ],
+              pageInfo,
+            },
+          },
+        },
+      },
+    }),
+  ]);
+  const service = createGitHubService({ runner: runner.runner, resolveGhPath: async () => "gh" });
+  try {
+    const url = "https://github.com/acme/widgets/pull/41";
+    const results = await service.changeRequests.read!([url]);
+    const query = runner.calls[0]?.args.at(-1) ?? "";
+    expect(query).toMatch(/query PaseoChangeRequestRead/);
+    expect(query).toContain("number title isDraft mergeable");
+    expect(query).not.toContain("reviewThreads");
+    expect(query).not.toContain("comments(");
+    expect(results.get(url)).toEqual({
+      state: "open",
+      headSha: "abc",
+      checksState: "failed",
+      checks: [
+        {
+          id: "run",
+          name: "build",
+          state: "failed",
+          url: "https://github.com/acme/widgets/actions/runs/7",
+        },
+      ],
+      reviewDecision: "REVIEW_REQUIRED",
+      number: 41,
+      title: "Fix the login redirect",
+      isDraft: true,
+      mergeable: "CONFLICTING",
+    });
+  } finally {
+    service.dispose?.();
+  }
+});
+
 it("skips pagination after the last exact observer releases its PR", async () => {
   vi.useFakeTimers();
   const runner = createDeferredRunner();

@@ -1210,6 +1210,14 @@ export const WorkspaceAppearanceSetRequestSchema = z.object({
   requestId: z.string(),
 });
 
+// COMPAT(changeRequestsRead): FSH-only, added after v0.17.1, remove gate after 2027-05-26.
+// Reads pull request state once, through the daemon's forge reader, for plugin servers.
+export const ForgeChangeRequestsReadRequestSchema = z.object({
+  type: z.literal("forge.change_requests.read.request"),
+  urls: z.array(z.string()),
+  requestId: z.string(),
+});
+
 // COMPAT(workspaceAttentionReport): FSH-only, added after v0.15.4, remove gate after 2027-05-17.
 // A plugin says the workspace needs the human (an ask waits on them, the agent's work is done).
 // A snoozed workspace treats it like a permission prompt; an awake one ignores it.
@@ -2556,6 +2564,39 @@ export const WorkspaceAppearanceSetResponseSchema = z.object({
   payload: WorkspaceAppearanceSetResponsePayloadSchema,
 });
 
+export const ChangeRequestReadCheckSchema = z.object({
+  name: z.string(),
+  state: z.enum(["passing", "failing", "pending", "skipped"]),
+  url: z.string().optional(),
+});
+
+export const ChangeRequestReadSchema = z.discriminatedUnion("ok", [
+  z.object({
+    url: z.string(),
+    ok: z.literal(true),
+    number: z.number(),
+    title: z.string(),
+    state: z.enum(["open", "merged", "closed"]),
+    isDraft: z.boolean(),
+    mergeable: z.enum(["mergeable", "conflicting", "unknown"]).optional(),
+    reviewDecision: z.enum(["approved", "changes_requested", "review_required"]).nullable(),
+    checksState: z.enum(["passing", "failing", "pending", "none"]),
+    checks: z.array(ChangeRequestReadCheckSchema),
+    headSha: z.string(),
+  }),
+  z.object({ url: z.string(), ok: z.literal(false), error: z.string() }),
+]);
+
+export const ForgeChangeRequestsReadResponseSchema = z.object({
+  type: z.literal("forge.change_requests.read.response"),
+  payload: z.object({
+    requestId: z.string(),
+    // One per requested URL, in request order.
+    results: z.array(ChangeRequestReadSchema),
+    error: z.string().nullable(),
+  }),
+});
+
 export const WorkspaceAttentionReportResponsePayloadSchema = z.object({
   requestId: z.string(),
   workspaceId: z.string(),
@@ -3874,6 +3915,7 @@ export const SessionInboundMessageSchema = z.discriminatedUnion("type", [
   WorkspaceGroupSetRequestSchema,
   WorkspaceAppearanceSetRequestSchema,
   WorkspaceAttentionReportRequestSchema,
+  ForgeChangeRequestsReadRequestSchema,
   WorkspaceLabelListRequestSchema,
   WorkspaceLabelAssignmentSetRequestSchema,
   WorkspaceLabelUpdateRequestSchema,
@@ -4355,6 +4397,8 @@ export const ServerInfoStatusPayloadSchema = z
         workspaceSnoozeWakePrompt: z.boolean().optional(),
         // COMPAT(workspaceAttentionReport): FSH-only, added after v0.15.4, remove gate after 2027-05-17.
         workspaceAttentionReport: z.boolean().optional(),
+        // COMPAT(changeRequestsRead): FSH-only, added after v0.17.1, remove gate after 2027-05-26.
+        changeRequestsRead: z.boolean().optional(),
         // COMPAT(workspaceManualGroup): FSH-only, added after v0.15.4, remove gate after 2027-05-21.
         workspaceManualGroup: z.boolean().optional(),
         // COMPAT(workspaceAppearance): FSH-only, added after v0.17.1, remove gate after 2027-05-23.
@@ -8214,6 +8258,7 @@ export const SessionOutboundMessageSchema = z.discriminatedUnion("type", [
   WorkspaceGroupSetResponseSchema,
   WorkspaceAppearanceSetResponseSchema,
   WorkspaceAttentionReportResponseSchema,
+  ForgeChangeRequestsReadResponseSchema,
   WorkspaceRecoveryInspectResponseSchema,
   WorkspaceRecoveryRestoreResponseSchema,
   WorkspaceArchiveUndoResponseSchema,
@@ -8650,6 +8695,9 @@ export type WorkspaceSnoozeSetRequest = z.infer<typeof WorkspaceSnoozeSetRequest
 export type WorkspaceGroupSetRequest = z.infer<typeof WorkspaceGroupSetRequestSchema>;
 export type WorkspaceAppearanceSetRequest = z.infer<typeof WorkspaceAppearanceSetRequestSchema>;
 export type WorkspaceAttentionReportRequest = z.infer<typeof WorkspaceAttentionReportRequestSchema>;
+export type ForgeChangeRequestsReadRequest = z.infer<typeof ForgeChangeRequestsReadRequestSchema>;
+export type ForgeChangeRequestsReadResponse = z.infer<typeof ForgeChangeRequestsReadResponseSchema>;
+export type ChangeRequestRead = z.infer<typeof ChangeRequestReadSchema>;
 export type WorkspaceRecoveryInspectRequest = z.infer<typeof WorkspaceRecoveryInspectRequestSchema>;
 export type WorkspaceRecoveryRestoreRequest = z.infer<typeof WorkspaceRecoveryRestoreRequestSchema>;
 export type WorkspaceArchiveUndoRequest = z.infer<typeof WorkspaceArchiveUndoRequestSchema>;

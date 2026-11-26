@@ -25,6 +25,18 @@ const changeRequestSnapshotSchema = changeRequestStatusSchema.extend({
 });
 
 export type ChangeRequestSnapshot = z.infer<typeof changeRequestSnapshotSchema>;
+export type ChangeRequestStatus = z.infer<typeof changeRequestStatusSchema>;
+
+/** Facts a one-shot read adds to the status a watch tracks. */
+export interface ChangeRequestDetails {
+  number: number;
+  title: string;
+  isDraft: boolean;
+  /** The forge's own value, such as GitHub's MERGEABLE, CONFLICTING or UNKNOWN. */
+  mergeable: string | null;
+}
+
+export type ChangeRequestReadResult = ChangeRequestStatus & ChangeRequestDetails;
 
 export interface ChangeRequestSource {
   /** Resolve the URL to the forge's canonical change request address. */
@@ -40,4 +52,9 @@ export interface ChangeRequestSource {
       knownActivity?(): ReadonlySet<string>;
     },
   ): () => void;
+  /**
+   * Read canonical addresses once, without watching them: status plus details, no activity.
+   * Forges without it can only be watched.
+   */
+  read?(urls: string[]): Promise<Map<string, ChangeRequestReadResult | Error>>;
 }
