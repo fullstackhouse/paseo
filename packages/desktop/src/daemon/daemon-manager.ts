@@ -27,6 +27,7 @@ import {
   type AppReleaseChannel,
 } from "../features/auto-updater.js";
 import { createElectronFshUpdater } from "../features/fsh-updater-electron.js";
+import { parseFshInstallTarget } from "../features/fsh-updater.js";
 import {
   getBundledCliShimPath,
   getCliInstallStatus,
@@ -536,7 +537,7 @@ export function createDaemonCommandHandlers(): Record<string, DesktopCommandHand
       });
     },
     install_app_update: async (args) => {
-      if (fshUpdater) return fshUpdater.install();
+      if (fshUpdater) return fshUpdater.install(parseFshInstallTarget(args));
       const currentVersion = resolveDesktopAppVersion();
       return downloadAndInstallUpdate(
         { currentVersion, releaseChannel: await resolveRequestedReleaseChannel(args) },
@@ -545,6 +546,8 @@ export function createDaemonCommandHandlers(): Record<string, DesktopCommandHand
         },
       );
     },
+    // FSH fork: test builds. Null when this isn't a packaged FSH build.
+    fsh_test_builds: async () => (fshUpdater ? fshUpdater.listTestBuilds() : null),
     get_local_daemon_version: () => getLocalDaemonVersion(),
     install_cli: () => installCli(),
     uninstall_cli: () => uninstallCli(),

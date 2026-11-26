@@ -5,8 +5,10 @@ import {
   buildAppUpdateCheckContribution,
   buildGroupingContribution,
   buildPluginUpdateCheckContribution,
+  buildTestBuildContributions,
   buildUpdateContribution,
   type AppUpdateCheckCommandCenterSource,
+  type TestBuildCommandCenterSource,
   type GroupingCommandCenterSource,
   type PluginUpdateCheckCommandCenterSource,
   type UpdateCommandCenterSource,
@@ -194,5 +196,64 @@ describe("plugin update check command center contribution", () => {
 
   it("is absent when no connected host can update plugins", () => {
     expect(buildPluginUpdateCheckContribution(check(false).value)).toBeNull();
+  });
+});
+
+describe("test build command center contributions", () => {
+  function testBuildSource(overrides: Partial<TestBuildCommandCenterSource> = {}) {
+    const installed: string[] = [];
+    let wentBack = 0;
+    const value: TestBuildCommandCenterSource = {
+      isDesktopApp: true,
+      isInstalling: false,
+      installedTag: "fsh-0.17.1-abc1234",
+      onTestBuild: false,
+      builds: [
+        { tag: "fsh-pr12-def5678", label: "PR #12 · feat/thing · def5678" },
+        { tag: "fsh-test-4d2a5d0", label: "fsh-rebase-v0.17.1 · 4d2a5d0" },
+      ],
+      labels: {
+        section: "Actions",
+        installTestBuild: "Install test build",
+        backToStable: "Back to stable build",
+      },
+      install: (tag) => installed.push(tag),
+      backToStable: () => {
+        wentBack += 1;
+      },
+      ...overrides,
+    };
+    return { value, installed, wentBack: () => wentBack };
+  }
+
+  it("lists each test build under Install test build, without Back to stable", () => {
+    const fixture = testBuildSource();
+    const contributions = buildTestBuildContributions(fixture.value);
+
+    expect(contributions.map((entry) => entry.presentation)).toMatchObject([
+      { kind: "choice", path: ["Install test build", "PR #12 · feat/thing · def5678"] },
+      { kind: "choice", path: ["Install test build", "fsh-rebase-v0.17.1 · 4d2a5d0"] },
+    ]);
+    void contributions[1]?.run();
+    expect(fixture.installed).toEqual(["fsh-test-4d2a5d0"]);
+  });
+
+  it("marks the installed test build and offers Back to stable build", () => {
+    const fixture = testBuildSource({ installedTag: "fsh-pr12-def5678", onTestBuild: true });
+    const contributions = buildTestBuildContributions(fixture.value);
+
+    expect(contributions[0]?.presentation).toMatchObject({ selected: true });
+    void contributions[0]?.run();
+    expect(fixture.installed).toEqual([]);
+
+    const back = contributions.find((entry) => entry.id === "back-to-stable-build");
+    expect(back?.presentation).toMatchObject({ kind: "action", title: "Back to stable build" });
+    void back?.run();
+    expect(fixture.wentBack()).toBe(1);
+  });
+
+  it("lists nothing outside the desktop app or while installing", () => {
+    expect(buildTestBuildContributions(testBuildSource({ isDesktopApp: false }).value)).toEqual([]);
+    expect(buildTestBuildContributions(testBuildSource({ isInstalling: true }).value)).toEqual([]);
   });
 });

@@ -1714,6 +1714,7 @@ export const fr: TranslationResources = {
         installWhenIdle: "Installer au repos",
         installNow: "Installer maintenant",
       },
+      testBuilds: en.desktop.updates.testBuilds,
     },
     settings: {
       loadFailed: "Impossible de charger les paramètres de l’application de bureau.",

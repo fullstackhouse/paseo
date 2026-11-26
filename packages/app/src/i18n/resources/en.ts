@@ -1703,6 +1703,27 @@ export const en = {
         installWhenIdle: "Install when idle",
         installNow: "Install now",
       },
+      // FSH fork: test builds (fsh-test-builds.ts). Other languages use these English strings.
+      testBuilds: {
+        title: "Test builds",
+        description:
+          "Builds of open PRs and the weekly rebase. Installing one quits and reopens Paseo.",
+        none: "No test builds right now.",
+        install: "Install",
+        installed: "Installed",
+        onTestBuild: "On test build {{build}}",
+        onTestBuildHint: "Update checks are paused until you go back to stable.",
+        backToStable: "Back to stable",
+        installTestBuild: "Install test build",
+        backToStableBuild: "Back to stable build",
+        installTitle: "Install test build",
+        installMessage: "Paseo quits, installs {{build}} and reopens. Running agents stop.",
+        installConfirm: "Install",
+        stableTitle: "Back to stable build",
+        stableMessage: "Paseo quits, installs the latest release and reopens. Running agents stop.",
+        stableConfirm: "Install stable",
+        checkOnTestBuild: "On test build {{build}}. Go back to stable to get updates.",
+      },
     },
     settings: {
       loadFailed: "Unable to load desktop settings.",

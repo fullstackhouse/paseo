@@ -2,6 +2,7 @@ import { isElectronRuntime } from "@/desktop/host";
 import { invokeDesktopCommand } from "@/desktop/electron/invoke";
 import { isWeb } from "@/constants/platform";
 import { i18n } from "@/i18n/i18next";
+import type { FshRelease } from "@/desktop/updates/fsh-test-builds";
 
 export interface DesktopAppUpdateCheckResult {
   hasUpdate: boolean;
@@ -128,10 +129,16 @@ export async function checkDesktopAppUpdate({
 
 export async function installDesktopAppUpdate({
   releaseChannel,
+  fshRelease,
 }: {
   releaseChannel: DesktopReleaseChannel;
+  /** FSH fork: a test build tag, or `stable`. Absent installs the found update. */
+  fshRelease?: FshRelease;
 }): Promise<DesktopAppUpdateInstallResult> {
-  const result = await invokeDesktopCommand<unknown>("install_app_update", { releaseChannel });
+  const result = await invokeDesktopCommand<unknown>("install_app_update", {
+    releaseChannel,
+    ...(fshRelease ? { fshRelease } : {}),
+  });
   if (!isRecord(result)) {
     throw new Error("Unexpected response while installing desktop update.");
   }

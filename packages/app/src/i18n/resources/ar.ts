@@ -1675,6 +1675,7 @@ export const ar: TranslationResources = {
         installWhenIdle: "التثبيت عند الخمول",
         installNow: "التثبيت الآن",
       },
+      testBuilds: en.desktop.updates.testBuilds,
     },
     settings: {
       loadFailed: "غير قادر على تحميل إعدادات سطح المكتب.",

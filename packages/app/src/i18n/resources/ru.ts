@@ -1702,6 +1702,7 @@ export const ru: TranslationResources = {
         installWhenIdle: "Установить в простое",
         installNow: "Установить сейчас",
       },
+      testBuilds: en.desktop.updates.testBuilds,
     },
     settings: {
       loadFailed: "Не удалось загрузить настройки настольного приложения.",

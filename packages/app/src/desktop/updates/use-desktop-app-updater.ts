@@ -8,6 +8,7 @@ import {
   type DesktopAppUpdateCheckIntent,
   type DesktopAppUpdateInstallResult,
 } from "@/desktop/updates/desktop-updates";
+import type { FshRelease } from "@/desktop/updates/fsh-test-builds";
 import { useDesktopSettings } from "@/desktop/settings/desktop-settings";
 import { useDesktopIpcErrorReporter } from "@/desktop/hooks/desktop-ipc-error";
 import {
@@ -34,7 +35,8 @@ export interface UseDesktopAppUpdaterReturn {
     silent?: boolean;
     quietErrors?: boolean;
   }) => Promise<DesktopAppUpdateCheckResult | null>;
-  installUpdate: () => Promise<DesktopAppUpdateInstallResult | null>;
+  /** FSH fork: `fshRelease` installs a test build, or goes back to `stable`. */
+  installUpdate: (fshRelease?: FshRelease) => Promise<DesktopAppUpdateInstallResult | null>;
 }
 
 export function useDesktopAppUpdater(): UseDesktopAppUpdaterReturn {
@@ -83,12 +85,15 @@ export function useDesktopAppUpdater(): UseDesktopAppUpdaterReturn {
     [isDesktopApp, releaseChannel, updater],
   );
 
-  const installUpdate = useCallback(async () => {
-    if (!isDesktopApp) {
-      return null;
-    }
-    return updater.installUpdate({ releaseChannel });
-  }, [isDesktopApp, releaseChannel, updater]);
+  const installUpdate = useCallback(
+    async (fshRelease?: FshRelease) => {
+      if (!isDesktopApp) {
+        return null;
+      }
+      return updater.installUpdate({ releaseChannel, fshRelease });
+    },
+    [isDesktopApp, releaseChannel, updater],
+  );
 
   useEffect(() => {
     if (!isDesktopApp) {
