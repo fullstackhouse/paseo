@@ -133,6 +133,44 @@ const SourceSchema = z.object({
     });
   });
 
+  it("miscompiles discriminated unions on a boolean tag, so they use z.union", async () => {
+    const schema = await compileInlineSchema(`
+const SourceSchema = z.discriminatedUnion("ok", [
+  z.object({ ok: z.literal(true), value: z.string() }),
+  z.object({ ok: z.literal(false), error: z.string() }),
+]);
+`);
+
+    expect(schema.safeParse({ ok: true, value: "x" }).success).toBe(false);
+  });
+
+  it("validates both branches of a change request read", () => {
+    const response = {
+      type: "forge.change_requests.read.response",
+      payload: {
+        requestId: "read",
+        error: null,
+        results: [
+          {
+            url: "https://github.com/acme/widgets/pull/41",
+            ok: true,
+            number: 41,
+            title: "Fix the login redirect",
+            state: "open",
+            isDraft: false,
+            reviewDecision: null,
+            checksState: "none",
+            checks: [],
+            headSha: "abc",
+          },
+          { url: "https://example.com/x", ok: false, error: "Unsupported host" },
+        ],
+      },
+    };
+    const message = { type: "session", message: response };
+    expect(validateWSOutboundMessage(message)).toMatchObject({ success: true, data: message });
+  });
+
   it("accepts a minimal valid envelope and rejects a corrupted envelope", () => {
     expect(validateWSOutboundMessage({ type: "pong" }).success).toBe(true);
     expect(validateWSOutboundMessage({ type: "not_a_message" }).success).toBe(false);

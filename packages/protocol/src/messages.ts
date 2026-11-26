@@ -2570,7 +2570,8 @@ export const ChangeRequestReadCheckSchema = z.object({
   url: z.string().optional(),
 });
 
-export const ChangeRequestReadSchema = z.discriminatedUnion("ok", [
+// z.union, not discriminatedUnion: zod-aot miscompiles a boolean tag (tests/validation/ws-outbound.test.ts).
+export const ChangeRequestReadSchema = z.union([
   z.object({
     url: z.string(),
     ok: z.literal(true),
