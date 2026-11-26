@@ -150,3 +150,24 @@ test("sync IO exceptions must be removed when a module stops using the API", () 
   assert.equal(result.failed, true, result.output);
   assert.match(result.output, /Remove the unused sync IO exception for readFileSync/);
 });
+
+for (const source of [
+  "export const f = (a: number[]) => a.toSorted();",
+  'export const f = (a: number[]) => a["toSorted"]();',
+]) {
+  test(`toSorted is reported: ${source}`, () => {
+    const result = lint(source, "paseo/no-to-sorted", undefined, "probe.ts");
+    assert.equal(result.failed, true, result.output);
+    assert.match(result.output, /no Array.prototype.toSorted/);
+  });
+}
+
+test("copy-then-sort is allowed", () => {
+  const result = lint(
+    "export const f = (a: number[]) => [...a].sort();",
+    "paseo/no-to-sorted",
+    undefined,
+    "probe.ts",
+  );
+  assert.equal(result.failed, false, result.output);
+});

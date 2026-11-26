@@ -815,6 +815,22 @@ describe("deriveInProgress", () => {
     ];
     const [row] = derive({ agents: [agent({ running: true, jobs })] });
     expect(row?.kind === "agent" && row.jobs.map((job) => job.id)).toEqual(["a", "b"]);
+    expect(jobs.map((job) => job.id)).toEqual(["b", "a"]);
+  });
+
+  it("sorts jobs without Array.prototype.toSorted, which Android's Hermes lacks", () => {
+    const descriptor = Object.getOwnPropertyDescriptor(Array.prototype, "toSorted");
+    Reflect.deleteProperty(Array.prototype, "toSorted");
+    try {
+      const jobs = [
+        { id: "b", kind: "monitor", description: null, startedAt: minutes(5) },
+        { id: "a", kind: "shell", description: "dev", startedAt: minutes(50) },
+      ];
+      const [row] = derive({ agents: [agent({ running: true, jobs })] });
+      expect(row?.kind === "agent" && row.jobs.map((job) => job.id)).toEqual(["a", "b"]);
+    } finally {
+      if (descriptor) Reflect.defineProperty(Array.prototype, "toSorted", descriptor);
+    }
   });
 
   describe("nothing moving", () => {

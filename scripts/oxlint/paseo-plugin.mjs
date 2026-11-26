@@ -34,6 +34,22 @@ const noRawPressable = {
   },
 };
 
+export const NO_TO_SORTED_MESSAGE =
+  "Hermes in the production Android app has no Array.prototype.toSorted, so this throws " +
+  '"undefined is not a function" there. Use [...array].sort(compare).';
+
+const noToSorted = {
+  create(context) {
+    return {
+      MemberExpression(node) {
+        if (node.computed && node.property.type !== "Literal") return;
+        if (propertyName(node.property) !== "toSorted") return;
+        context.report({ node: node.property, message: NO_TO_SORTED_MESSAGE });
+      },
+    };
+  },
+};
+
 const SYNC_IO_MODULES = new Set(["fs", "node:fs", "child_process", "node:child_process"]);
 
 function propertyName(node) {
@@ -159,5 +175,6 @@ export default {
   rules: {
     "no-raw-pressable": noRawPressable,
     "no-sync-io": noSyncIo,
+    "no-to-sorted": noToSorted,
   },
 };
