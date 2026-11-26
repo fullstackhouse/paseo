@@ -525,7 +525,7 @@ function topRowInView(): string | null {
   const rows = mountedRows()
     .map((row) => ({ rect: row.getBoundingClientRect(), label: row.getAttribute("aria-label") }))
     .filter(({ rect }) => rect.top >= popover.top - 0.5 && rect.bottom <= popover.bottom + 0.5)
-    .toSorted((a, b) => a.rect.top - b.rect.top);
+    .sort((a, b) => a.rect.top - b.rect.top);
   return rows[0]?.label?.split(",")[0] ?? null;
 }
 
