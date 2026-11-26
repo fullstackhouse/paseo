@@ -2408,6 +2408,8 @@ export const ko: TranslationResources = {
       prMergedTitle: "PR #{{number}} 병합됨",
       outdated: "{{time}}에 답장했지만 에이전트가 그 후로 업데이트하지 않았습니다.",
       readyToArchive: "보관 준비됨",
+      uncommittedFacts: "보관하려면 커밋하거나 버리세요",
+      reviewChanges: "변경 사항 검토",
       inProgress: "진행 중",
       nothingMoving: "진행 없음",
       updatedAgo: "{{time}} 업데이트됨",

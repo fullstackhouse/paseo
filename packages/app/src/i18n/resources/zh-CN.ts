@@ -2370,6 +2370,8 @@ export const zhCN: TranslationResources = {
       prMergedTitle: "PR #{{number}} 已合并",
       outdated: "你在{{time}}回复过；智能体此后没有更新。",
       readyToArchive: "可以归档",
+      uncommittedFacts: "提交或丢弃它们后即可归档",
+      reviewChanges: "查看更改",
       inProgress: "进行中",
       nothingMoving: "无进展",
       updatedAgo: "{{time}}更新",

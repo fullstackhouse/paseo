@@ -2435,6 +2435,8 @@ export const ru: TranslationResources = {
       prMergedTitle: "PR #{{number}} слит",
       outdated: "Вы ответили {{time}}; агент с тех пор это не обновлял.",
       readyToArchive: "Можно архивировать",
+      uncommittedFacts: "Закоммитьте или отмените их, чтобы архивировать",
+      reviewChanges: "Посмотреть изменения",
       inProgress: "В работе",
       nothingMoving: "ничего не движется",
       updatedAgo: "обновлено {{time}}",

@@ -2423,6 +2423,8 @@ export const ja: TranslationResources = {
       prMergedTitle: "PR #{{number}} マージ済み",
       outdated: "{{time}}に返信しました。エージェントはその後これを更新していません。",
       readyToArchive: "アーカイブできます",
+      uncommittedFacts: "アーカイブするにはコミットするか破棄してください",
+      reviewChanges: "変更を確認",
       inProgress: "進行中",
       nothingMoving: "動きなし",
       updatedAgo: "{{time}}に更新",
