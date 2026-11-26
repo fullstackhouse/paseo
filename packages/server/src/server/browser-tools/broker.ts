@@ -32,6 +32,14 @@ interface PendingBrowserToolsRequest {
   resolve: (payload: BrowserToolsResponsePayload) => void;
 }
 
+// A new_tab request the broker gave up on. If the host still opens the tab, the broker closes it:
+// the agent got an error and never learned the browserId, so the tab would be unreachable.
+interface AbandonedNewTabRequest {
+  clientId: string;
+  request: BrowserAutomationExecuteRequest;
+  expiry: ReturnType<typeof setTimeout>;
+}
+
 interface RegisteredBrowserHost {
   client: BrowserHostClient;
   registeredAt: number;
@@ -44,12 +52,14 @@ export interface BrowserToolsBrokerOptions {
 }
 
 const DEFAULT_BROWSER_TOOLS_TIMEOUT_MS = 15_000;
+const ABANDONED_NEW_TAB_TTL_MS = 60_000;
 
 export class BrowserToolsBroker {
   private readonly defaultTimeoutMs: number;
   private readonly createRequestId: () => string;
   private readonly clients = new Map<string, RegisteredBrowserHost>();
   private readonly pending = new Map<string, PendingBrowserToolsRequest>();
+  private readonly abandonedNewTabs = new Map<string, AbandonedNewTabRequest>();
   private readonly browserHostByBrowserId = new Map<string, string>();
   private readonly strandedBrowserHostByBrowserId = new Map<string, string>();
   private registrationSequence = 0;
@@ -76,6 +86,7 @@ export class BrowserToolsBroker {
       return;
     }
     this.clients.delete(clientId);
+    this.forgetAbandonedNewTabs(clientId);
 
     for (const [browserId, ownerClientId] of this.browserHostByBrowserId) {
       if (ownerClientId !== clientId) {
@@ -187,7 +198,10 @@ export class BrowserToolsBroker {
     }
 
     const pending = this.pending.get(parsed.data.payload.requestId);
-    if (!pending || (clientIds && !clientIds.includes(pending.clientId))) {
+    if (!pending) {
+      return this.receiveAbandonedNewTabResponse(parsed.data.payload, clientIds);
+    }
+    if (clientIds && !clientIds.includes(pending.clientId)) {
       return false;
     }
 
@@ -198,6 +212,60 @@ export class BrowserToolsBroker {
     }
     pending.resolve(parsed.data.payload);
     return true;
+  }
+
+  private receiveAbandonedNewTabResponse(
+    payload: BrowserToolsResponsePayload,
+    clientIds: readonly string[] | undefined,
+  ): boolean {
+    const abandoned = this.abandonedNewTabs.get(payload.requestId);
+    if (!abandoned || (clientIds && !clientIds.includes(abandoned.clientId))) {
+      return false;
+    }
+    this.abandonedNewTabs.delete(payload.requestId);
+    clearTimeout(abandoned.expiry);
+    if (payload.ok && payload.result.command === "new_tab") {
+      this.closeAbandonedTab(abandoned, payload.result.browserId);
+    }
+    return true;
+  }
+
+  private closeAbandonedTab(abandoned: AbandonedNewTabRequest, browserId: string): void {
+    const host = this.clients.get(abandoned.clientId);
+    if (!host || !host.supportedCommands.has("close_tab")) {
+      return;
+    }
+    const { agentId, cwd, workspaceId } = abandoned.request;
+    void this.sendRequest({
+      host,
+      request: {
+        type: "browser.automation.execute.request",
+        requestId: this.createRequestId(),
+        ...(agentId ? { agentId } : {}),
+        ...(cwd ? { cwd } : {}),
+        ...(workspaceId ? { workspaceId } : {}),
+        command: { command: "close_tab", args: { browserId } },
+      },
+      rememberAffinity: false,
+      timeoutMs: this.defaultTimeoutMs,
+    });
+  }
+
+  private abandonNewTabRequest(clientId: string, request: BrowserAutomationExecuteRequest): void {
+    const expiry = setTimeout(() => {
+      this.abandonedNewTabs.delete(request.requestId);
+    }, ABANDONED_NEW_TAB_TTL_MS);
+    expiry.unref?.();
+    this.abandonedNewTabs.set(request.requestId, { clientId, request, expiry });
+  }
+
+  private forgetAbandonedNewTabs(clientId: string): void {
+    for (const [requestId, abandoned] of this.abandonedNewTabs) {
+      if (abandoned.clientId === clientId) {
+        clearTimeout(abandoned.expiry);
+        this.abandonedNewTabs.delete(requestId);
+      }
+    }
   }
 
   private async executeListTabs(params: {
@@ -418,11 +486,17 @@ export class BrowserToolsBroker {
         if (!this.pending.delete(request.requestId)) {
           return;
         }
+        const isNewTab = request.command.command === "new_tab";
+        if (isNewTab) {
+          this.abandonNewTabRequest(client.id, request);
+        }
         resolve(
           browserToolsFailure({
             requestId: request.requestId,
             code: "browser_timeout",
-            message: `Browser automation timed out after ${timeoutMs}ms.`,
+            message: isNewTab
+              ? `Could not open a browser tab: the browser automation host did not answer within ${timeoutMs}ms. Try browser_new_tab again.`
+              : `Browser automation timed out after ${timeoutMs}ms.`,
             retryable: true,
           }),
         );

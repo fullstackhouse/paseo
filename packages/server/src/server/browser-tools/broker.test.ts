@@ -807,6 +807,176 @@ describe("BrowserToolsBroker", () => {
     expect(broker.getPendingRequestCount()).toBe(0);
   });
 
+  test("new_tab timeout tells the agent the tab could not be opened", async () => {
+    vi.useFakeTimers();
+    const broker = createBroker({ timeoutMs: 50 });
+    broker.registerClient(new FakeBrowserHostClient("host-1"));
+
+    const resultPromise = broker.execute({ command: { command: "new_tab", args: {} } });
+    await vi.advanceTimersByTimeAsync(50);
+
+    await expect(resultPromise).resolves.toEqual({
+      requestId: "req-1",
+      ok: false,
+      error: {
+        code: "browser_timeout",
+        message:
+          "Could not open a browser tab: the browser automation host did not answer within 50ms. Try browser_new_tab again.",
+        retryable: true,
+      },
+    });
+  });
+
+  test("a new_tab success arriving after the timeout closes that tab on the same host", async () => {
+    vi.useFakeTimers();
+    let nextRequestId = 0;
+    const broker = new BrowserToolsBroker({
+      defaultTimeoutMs: 50,
+      createRequestId: () => `req-${++nextRequestId}`,
+    });
+    const host = new FakeBrowserHostClient("host-1");
+    const other = new FakeBrowserHostClient("host-2");
+    broker.registerClient(other);
+    broker.registerClient(host);
+
+    const resultPromise = broker.execute({
+      agentId: "agent-1",
+      workspaceId: "wks_workspace_a",
+      command: { command: "new_tab", args: {} },
+    });
+    await vi.advanceTimersByTimeAsync(50);
+    await expect(resultPromise).resolves.toMatchObject({ ok: false });
+    const [newTabRequest] = host.receivedRequests;
+    if (!newTabRequest) {
+      throw new Error("Expected the new_tab request on the latest host");
+    }
+
+    expect(
+      host.resolveRequestWith(broker, newTabRequest, {
+        requestId: newTabRequest.requestId,
+        ok: true,
+        result: {
+          command: "new_tab",
+          browserId: BROWSER_ID,
+          workspaceId: "wks_workspace_a",
+          url: "https://example.com/",
+        },
+      }),
+    ).toBe(true);
+
+    expect(other.receivedRequests).toEqual([]);
+    expect(host.receivedRequests.slice(1)).toEqual([
+      {
+        type: "browser.automation.execute.request",
+        requestId: expect.any(String),
+        agentId: "agent-1",
+        workspaceId: "wks_workspace_a",
+        command: { command: "close_tab", args: { browserId: BROWSER_ID } },
+      },
+    ]);
+    expect(
+      host.resolveLatestWith(broker, {
+        requestId: "ignored",
+        ok: true,
+        result: { command: "close_tab", browserId: BROWSER_ID },
+      }),
+    ).toBe(true);
+    expect(broker.getPendingRequestCount()).toBe(0);
+
+    const snapshotPromise = broker.execute({
+      command: { command: "snapshot", args: { browserId: BROWSER_ID } },
+    });
+    await expect(snapshotPromise).resolves.toMatchObject({
+      ok: false,
+      error: { code: "browser_tab_not_found" },
+    });
+  });
+
+  test("late responses that did not open a tab close nothing", async () => {
+    vi.useFakeTimers();
+    let nextRequestId = 0;
+    const broker = new BrowserToolsBroker({
+      defaultTimeoutMs: 50,
+      createRequestId: () => `req-${++nextRequestId}`,
+    });
+    const host = new FakeBrowserHostClient("host-1");
+    broker.registerClient(host);
+
+    const failedNewTab = broker.execute({ command: { command: "new_tab", args: {} } });
+    const lateSnapshot = broker.execute({ command: snapshotCommand() });
+    await vi.advanceTimersByTimeAsync(50);
+    await Promise.all([failedNewTab, lateSnapshot]);
+    const [newTabRequest, snapshotRequest] = host.receivedRequests;
+    if (!newTabRequest || !snapshotRequest) {
+      throw new Error("Expected both requests on the host");
+    }
+
+    host.resolveRequestWith(broker, newTabRequest, {
+      requestId: newTabRequest.requestId,
+      ok: false,
+      error: { code: "browser_timeout", message: "did not register", retryable: true },
+    });
+    host.resolveRequestWith(broker, snapshotRequest, {
+      requestId: snapshotRequest.requestId,
+      ok: true,
+      result: {
+        command: "new_tab",
+        browserId: BROWSER_ID,
+        workspaceId: "wks_workspace_a",
+        url: "https://example.com/",
+      },
+    });
+    broker.receiveResponse({
+      type: "browser.automation.execute.response",
+      payload: {
+        requestId: "never-sent",
+        ok: true,
+        result: {
+          command: "new_tab",
+          browserId: SECOND_BROWSER_ID,
+          workspaceId: "wks_workspace_a",
+          url: "https://example.com/",
+        },
+      },
+    });
+
+    expect(host.receivedRequests).toHaveLength(2);
+  });
+
+  test("a late new_tab success from another host closes nothing", async () => {
+    vi.useFakeTimers();
+    const broker = createBroker({ timeoutMs: 50 });
+    const host = new FakeBrowserHostClient("host-1");
+    const other = new FakeBrowserHostClient("host-2");
+    broker.registerClient(other);
+    broker.registerClient(host);
+
+    const resultPromise = broker.execute({ command: { command: "new_tab", args: {} } });
+    await vi.advanceTimersByTimeAsync(50);
+    await resultPromise;
+
+    expect(
+      broker.receiveResponse(
+        {
+          type: "browser.automation.execute.response",
+          payload: {
+            requestId: "req-1",
+            ok: true,
+            result: {
+              command: "new_tab",
+              browserId: BROWSER_ID,
+              workspaceId: "wks_workspace_a",
+              url: "https://example.com/",
+            },
+          },
+        },
+        ["host-2"],
+      ),
+    ).toBe(false);
+    expect(host.receivedRequests).toHaveLength(1);
+    expect(other.receivedRequests).toEqual([]);
+  });
+
   test("disconnect resolves retryable failure and clears pending request", async () => {
     const broker = createBroker();
     const client = new FakeBrowserHostClient("host-1");
