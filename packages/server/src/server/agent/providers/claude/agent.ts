@@ -61,6 +61,7 @@ import { withClaudeReplayHistory, type ClaudeReplayHistory } from "./transcript-
 import { ClaudeSidechainTracker } from "./sidechain-tracker.js";
 import { readClaudeSubagentHandback } from "./subagent-handback.js";
 import { ClaudeTaskState } from "./task-state.js";
+import { CLAUDE_USAGE_SOURCE_ID, readClaudeRateLimitUsage } from "./rate-limit-usage.js";
 import {
   ClaudeTaskProtocolSource,
   type ClaudeHookObservationInput,
@@ -4643,6 +4644,31 @@ class ClaudeAgentSession implements AgentSession {
     }
   }
 
+  /**
+   * Claude Code sends a `rate_limit_event` with the account's utilization once per query, after
+   * its first API response, so it shows usage as the turn starts. The turn's result asks for a
+   * refetch to show what the turn itself used; the usage registry limits those to one a minute.
+   */
+  private observeUsage(message: SDKMessage): void {
+    if (message.type === "rate_limit_event") {
+      const windows = readClaudeRateLimitUsage(message.rate_limit_info);
+      if (!windows?.length) return;
+      this.dispatchEvents([
+        { type: "usage_observed", provider: "claude", sourceId: CLAUDE_USAGE_SOURCE_ID, windows },
+      ]);
+      return;
+    }
+    if (message.type === "result")
+      this.dispatchEvents([
+        {
+          type: "usage_observed",
+          provider: "claude",
+          sourceId: CLAUDE_USAGE_SOURCE_ID,
+          windows: [],
+        },
+      ]);
+  }
+
   private shouldSuppressStaleResult(message: SDKMessage): boolean {
     // Suppress stale results from interrupted requests. The cancel path already
     // emitted the terminal event; this result is leftover from the killed API
@@ -4730,6 +4756,7 @@ class ClaudeAgentSession implements AgentSession {
   }
 
   private async routeSdkMessageFromPump(message: SDKMessage): Promise<void> {
+    this.observeUsage(message);
     if (this.consumeSessionStateChange(message)) {
       return;
     }
