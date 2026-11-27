@@ -57,6 +57,14 @@ export function derivePendingPermissionKey(
   return `${agentId}:${fallbackId}`;
 }
 
+/** `lastReplyAt` for the wire, omitted when the daemon never sent it. */
+export function lastReplyAtField(agent: Pick<Agent, "lastReplyAt">): {
+  lastReplyAt?: string | null;
+} {
+  if (agent.lastReplyAt === undefined) return {};
+  return { lastReplyAt: agent.lastReplyAt?.toISOString() ?? null };
+}
+
 export function projectAgentSnapshot(agent: Agent): AgentSnapshotPayload {
   return {
     id: agent.id,
@@ -70,6 +78,7 @@ export function projectAgentSnapshot(agent: Agent): AgentSnapshotPayload {
     createdAt: agent.createdAt.toISOString(),
     updatedAt: agent.updatedAt.toISOString(),
     lastUserMessageAt: agent.lastUserMessageAt?.toISOString() ?? null,
+    ...lastReplyAtField(agent),
     status: agent.status,
     backgroundWork: agent.backgroundWork,
     ...projectActiveTurn(agent),
@@ -129,6 +138,9 @@ export function normalizeAgentSnapshot(snapshot: AgentSnapshotPayload, serverId:
     createdAt,
     updatedAt,
     lastUserMessageAt,
+    ...(snapshot.lastReplyAt !== undefined
+      ? { lastReplyAt: snapshot.lastReplyAt ? new Date(snapshot.lastReplyAt) : null }
+      : {}),
     lastActivityAt: updatedAt,
     capabilities: snapshot.capabilities,
     currentModeId: snapshot.currentModeId,

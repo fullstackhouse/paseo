@@ -1,4 +1,5 @@
 import { isSameOrDescendantPath } from "../path-utils.js";
+import { storedReplyAt } from "./agent-storage.js";
 import type {
   AgentListItemPayload,
   AgentSnapshotPayload,
@@ -92,6 +93,7 @@ export function toStoredAgentRecord(
     updatedAt: agent.updatedAt.toISOString(),
     lastActivityAt: agent.updatedAt.toISOString(),
     lastUserMessageAt: agent.lastUserMessageAt ? agent.lastUserMessageAt.toISOString() : null,
+    lastReplyAt: agent.lastReplyAt ? agent.lastReplyAt.toISOString() : null,
     workedMs: agent.workedMs,
     title: options?.title ?? null,
     labels: agent.labels,
@@ -144,6 +146,7 @@ export function toAgentPayload(
     createdAt: agent.createdAt.toISOString(),
     updatedAt: agent.updatedAt.toISOString(),
     lastUserMessageAt: agent.lastUserMessageAt ? agent.lastUserMessageAt.toISOString() : null,
+    lastReplyAt: agent.lastReplyAt ? agent.lastReplyAt.toISOString() : null,
     status: agent.lifecycle,
     activeTurn: agent.activeTurnId
       ? {
@@ -274,6 +277,10 @@ function storedWorkedMs(record: StoredAgentRecord): { workedMs?: number } {
   return record.workedMs === undefined ? {} : { workedMs: record.workedMs };
 }
 
+function storedReplyAtIso(record: StoredAgentRecord): string | null {
+  return storedReplyAt(record)?.toISOString() ?? null;
+}
+
 export function buildStoredAgentPayload(
   record: StoredAgentRecord,
   validProviders: Iterable<AgentProvider>,
@@ -318,6 +325,7 @@ export function buildStoredAgentPayload(
     createdAt: createdAt.toISOString(),
     updatedAt: updatedAt.toISOString(),
     lastUserMessageAt: lastUserMessageAt ? lastUserMessageAt.toISOString() : null,
+    lastReplyAt: storedReplyAtIso(record),
     status: record.lastStatus,
     backgroundWork: visibleStoredBackgroundWork(record, backgroundWork),
     ...storedWorkedMs(record),

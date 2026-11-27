@@ -94,6 +94,7 @@ import {
   pinOpenMove,
   isStatusDone,
   isStatusOutdated,
+  newestReplyAt,
   isWorkStillOpen,
   noPullRequestFacts,
   overviewSubtitle,
@@ -385,20 +386,17 @@ function Identity({
 
 // ── 2. Where does it stand ───────────────────────────────────────────────
 
-/** Newest prompt among the workspace's agents, to tell whether the status card is outdated. */
+/** Newest reply among the workspace's agents, to tell whether the status card is outdated. */
 function selectLastPromptAt(
   agents: ReadonlyMap<string, Agent> | undefined,
   workspaceId: string,
 ): number | null {
   if (!agents) return null;
   const target = normalizeWorkspaceOpaqueId(workspaceId);
-  let latest: number | null = null;
-  for (const agent of agents.values()) {
-    if (agent.archivedAt || normalizeWorkspaceOpaqueId(agent.workspaceId) !== target) continue;
-    const at = agent.lastUserMessageAt?.getTime() ?? null;
-    if (at !== null && (latest === null || at > latest)) latest = at;
-  }
-  return latest;
+  const inWorkspace = [...agents.values()].filter(
+    (agent) => normalizeWorkspaceOpaqueId(agent.workspaceId) === target,
+  );
+  return newestReplyAt(inWorkspace);
 }
 
 type StatusTone = "working" | "waiting_on_you" | "blocked" | "done" | "answered";

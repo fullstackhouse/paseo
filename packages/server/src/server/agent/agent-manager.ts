@@ -1,4 +1,5 @@
 import type { AttachedAgentTool, PluginAgentToolsRuntime } from "../plugins/agent-tools.js";
+import { storedReplyAt } from "./agent-storage.js";
 import { ProviderOptionsValidationError } from "./provider-options.js";
 import type { AgentToolResult } from "@getpaseo/plugin/server";
 import type { RuntimeCleanupCandidate } from "./idle-runtime-cleanup/index.js";
@@ -520,6 +521,8 @@ interface ManagedAgentBase {
   persistence: AgentPersistenceHandle | null;
   historyPrimed: boolean;
   lastUserMessageAt: Date | null;
+  /** Newest prompt a person or an agent sent; plugin and system prompts don't move it. */
+  lastReplyAt: Date | null;
   activeTurnId: string | null;
   activeTurnStartedAt: Date | null;
   /**
@@ -723,6 +726,24 @@ function createAbortError(signal: AbortSignal | undefined, fallbackMessage: stri
 /** The user labels and plugin metadata an agent carries; both default to empty. */
 function agentEntityData(source?: { labels?: Record<string, string>; metadata?: AgentMetadata }) {
   return { labels: source?.labels ?? {}, metadata: source?.metadata ?? {} };
+}
+
+/**
+ * Whether a prompt is someone replying to the agent: a person or another agent. Plugin nudges and
+ * Paseo's own prompts (schedules, restart recovery) aren't. A prompt without an origin came from an
+ * entry point that doesn't stamp one yet, so it counts, as every prompt did before origins existed.
+ */
+export function isReplyOrigin(origin: AgentTurnOrigin | undefined): boolean {
+  return origin === undefined || origin.kind === "human" || origin.kind === "agent";
+}
+
+function noteUserMessage(
+  agent: { lastUserMessageAt: Date | null; lastReplyAt: Date | null },
+  item: { origin?: AgentTurnOrigin },
+): void {
+  const now = new Date();
+  agent.lastUserMessageAt = now;
+  if (isReplyOrigin(item.origin)) agent.lastReplyAt = now;
 }
 
 // PASEO_WORKSPACE_ID lets an agent rename or archive its own workspace; several workspaces can
@@ -1775,6 +1796,7 @@ export class AgentManager {
       createdAt?: Date;
       updatedAt?: Date;
       lastUserMessageAt?: Date | null;
+      lastReplyAt?: Date | null;
       workedMs?: number;
       labels?: Record<string, string>;
       metadata?: AgentMetadata;
@@ -1810,6 +1832,7 @@ export class AgentManager {
       createdAt?: Date;
       updatedAt?: Date;
       lastUserMessageAt?: Date | null;
+      lastReplyAt?: Date | null;
       workedMs?: number;
       labels?: Record<string, string>;
       metadata?: AgentMetadata;
@@ -2110,6 +2133,7 @@ export class AgentManager {
         createdAt: existing.createdAt,
         updatedAt: existing.updatedAt,
         lastUserMessageAt: existing.lastUserMessageAt,
+        lastReplyAt: existing.lastReplyAt,
         workedMs: closedExisting.workedMs,
         historyPrimed: rehydrateFromDisk ? false : preservedHistoryPrimed,
         lastUsage: preservedLastUsage,
@@ -2570,6 +2594,7 @@ export class AgentManager {
         persistence: record.persistence ?? null,
         historyPrimed: true,
         lastUserMessageAt: record.lastUserMessageAt ? new Date(record.lastUserMessageAt) : null,
+        lastReplyAt: storedReplyAt(record),
         lastUsage: undefined,
         lastError: record.lastError ?? undefined,
         attention,
@@ -4629,6 +4654,7 @@ export class AgentManager {
       createdAt?: Date;
       updatedAt?: Date;
       lastUserMessageAt?: Date | null;
+      lastReplyAt?: Date | null;
       workedMs?: number;
       labels?: Record<string, string>;
       metadata?: AgentMetadata;
@@ -4846,6 +4872,7 @@ export class AgentManager {
           createdAt?: Date;
           updatedAt?: Date;
           lastUserMessageAt?: Date | null;
+          lastReplyAt?: Date | null;
           labels?: Record<string, string>;
           metadata?: AgentMetadata;
           historyPrimed?: boolean;
@@ -4904,6 +4931,7 @@ export class AgentManager {
       ),
       historyPrimed: options?.historyPrimed ?? durableTimelineHasRows,
       lastUserMessageAt: options?.lastUserMessageAt ?? null,
+      lastReplyAt: options?.lastReplyAt ?? null,
       lastUsage: options?.lastUsage,
       lastError: options?.lastError,
       attention: resolveInitialAttention(options?.attention),
@@ -5715,7 +5743,7 @@ export class AgentManager {
 
       this.recordAndDispatchTimelineItem(agent.id, item, event.provider, event.turnId);
       if (item.type === "user_message") {
-        agent.lastUserMessageAt = new Date();
+        noteUserMessage(agent, item);
         this.emitState(agent);
       }
       flags.shouldNotifyWaiters = true;
@@ -6040,7 +6068,7 @@ export class AgentManager {
     )
       return;
     this.touchUpdatedAt(agent);
-    if (item.type === "user_message") agent.lastUserMessageAt = new Date();
+    if (item.type === "user_message") noteUserMessage(agent, item);
     this.recordAndDispatchTimelineItem(agent.id, item, agent.provider, options?.turnId, options);
   }
 

@@ -1,4 +1,5 @@
 import type { AgentManager } from "./agent/agent-manager.js";
+import { storedReplyAt } from "./agent/agent-storage.js";
 import { stripInternalPaseoMcpServer } from "./agent/runtime-mcp-config.js";
 import type {
   AgentPersistenceHandle,
@@ -136,6 +137,7 @@ export function extractTimestamps(record: StoredAgentRecord): {
   createdAt: Date;
   updatedAt: Date;
   lastUserMessageAt: Date | null;
+  lastReplyAt: Date | null;
   workedMs?: number;
   labels?: Record<string, string>;
   metadata?: StoredAgentRecord["metadata"];
@@ -147,6 +149,7 @@ export function extractTimestamps(record: StoredAgentRecord): {
     createdAt: new Date(record.createdAt),
     updatedAt: new Date(resolveStoredAgentUpdatedAt(record)),
     lastUserMessageAt: record.lastUserMessageAt ? new Date(record.lastUserMessageAt) : null,
+    lastReplyAt: storedReplyAt(record),
     workedMs: record.workedMs,
     labels: record.labels,
     metadata: record.metadata,

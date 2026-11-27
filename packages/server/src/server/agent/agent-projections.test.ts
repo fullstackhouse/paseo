@@ -98,6 +98,7 @@ function createManagedAgent(overrides: ManagedAgentOverrides = {}): ManagedAgent
     lastError: lastErrorValue,
     historyPrimed: true,
     lastUserMessageAt: now,
+    lastReplyAt: now,
     attention: { requiresAttention: false },
   };
 
@@ -376,6 +377,28 @@ describe("toAgentPayload", () => {
       provider: "codex",
       sessionId: "persist-mcp-only",
     });
+  });
+
+  it("keeps lastReplyAt apart from lastUserMessageAt through the record and payloads", () => {
+    const agent = createManagedAgent({
+      lastUserMessageAt: new Date("2026-01-02T00:00:00.000Z"),
+      lastReplyAt: new Date("2026-01-01T00:00:00.000Z"),
+    });
+    const record = toStoredAgentRecord(agent);
+    expect(record.lastReplyAt).toBe("2026-01-01T00:00:00.000Z");
+    expect(toAgentPayload(agent).lastReplyAt).toBe("2026-01-01T00:00:00.000Z");
+    expect(buildStoredAgentPayload(record, ["claude"], ownOptionsOnly).lastReplyAt).toBe(
+      "2026-01-01T00:00:00.000Z",
+    );
+  });
+
+  it("treats every prompt as a reply on records written before lastReplyAt", () => {
+    const { lastReplyAt: _dropped, ...legacy } = toStoredAgentRecord(
+      createManagedAgent({ lastUserMessageAt: new Date("2026-01-02T00:00:00.000Z") }),
+    );
+    expect(buildStoredAgentPayload(legacy, ["claude"], ownOptionsOnly).lastReplyAt).toBe(
+      "2026-01-02T00:00:00.000Z",
+    );
   });
 
   it("strips MCP metadata from stored wire payloads while preserving private persistence", () => {

@@ -90,6 +90,11 @@ export interface Agent {
   createdAt: Date;
   updatedAt: Date;
   lastUserMessageAt: Date | null;
+  /**
+   * Newest prompt from a person or an agent; plugin and system prompts don't move it. Absent from
+   * daemons that don't record it.
+   */
+  lastReplyAt?: Date | null;
   lastActivityAt: Date;
   capabilities: AgentCapabilityFlags;
   currentModeId: string | null;

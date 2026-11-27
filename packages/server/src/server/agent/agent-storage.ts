@@ -55,6 +55,8 @@ const RAW_STORED_AGENT_SCHEMA = z.object({
   updatedAt: z.string(),
   lastActivityAt: z.string().optional(),
   lastUserMessageAt: z.string().nullable().optional(),
+  /** Newest prompt from a person or an agent; absent on records written before it existed. */
+  lastReplyAt: z.string().nullable().optional(),
   workedMs: z.number().optional(),
   title: z.string().nullable().optional(),
   /**
@@ -647,3 +649,12 @@ function projectDirNameFromCwd(cwd: string): string {
 }
 
 /** FSH: an interruption stays until the agent's next turn starts. */
+
+/** Records written before `lastReplyAt` existed didn't tell prompts apart: every prompt was a reply. */
+export function storedReplyAt(record: {
+  lastReplyAt?: string | null;
+  lastUserMessageAt?: string | null;
+}) {
+  const at = record.lastReplyAt !== undefined ? record.lastReplyAt : record.lastUserMessageAt;
+  return at ? new Date(at) : null;
+}

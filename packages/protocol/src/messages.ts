@@ -968,6 +968,8 @@ export const AgentSnapshotPayloadSchema = z.object({
   createdAt: z.string(),
   updatedAt: z.string(),
   lastUserMessageAt: z.string().nullable(),
+  /** Newest prompt from a person or an agent; plugin and system prompts don't move it. */
+  lastReplyAt: z.string().nullable().optional(),
   status: AgentStatusSchema,
   backgroundWork: AgentBackgroundWorkSummarySchema.optional(),
   activeTurn: AgentActiveTurnPayloadSchema.nullable().optional(),

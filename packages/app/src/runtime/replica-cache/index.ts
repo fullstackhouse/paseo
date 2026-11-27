@@ -26,7 +26,7 @@ import {
   type StreamItem,
 } from "@/types/stream";
 import type { UnsettledTurn } from "@/timeline/turn-liveness";
-import { normalizeAgentSnapshot } from "@/utils/agent-snapshots";
+import { lastReplyAtField, normalizeAgentSnapshot } from "@/utils/agent-snapshots";
 import { clearLegacyReplicaCache } from "./legacy-cleanup";
 import {
   REPLICA_SINGLETON_ROW_ID,
@@ -239,6 +239,7 @@ const StoredAgentSnapshotSchema = z.strictObject({
   createdAt: IsoDateSchema,
   updatedAt: IsoDateSchema,
   lastUserMessageAt: IsoDateSchema.nullable(),
+  lastReplyAt: IsoDateSchema.nullable().optional(),
   status: AgentStatusSchema,
   backgroundWork: AgentBackgroundWorkSummarySchema.optional(),
   activeTurn: z
@@ -692,6 +693,7 @@ function serializeAgent(agent: Agent): StoredAgent {
     createdAt: agent.createdAt.toISOString(),
     updatedAt: agent.updatedAt.toISOString(),
     lastUserMessageAt: agent.lastUserMessageAt?.toISOString() ?? null,
+    ...lastReplyAtField(agent),
     status: agent.status,
     workedMs: agent.workedMs,
     ...(agent.turn.phase === "open" && agent.turn.turnId
