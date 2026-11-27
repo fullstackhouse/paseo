@@ -202,6 +202,37 @@ export function buildForgeReferenceUrl(
   return `${forgeOrigin(location)}/${repo}${referencePath.infix}${input.number}`;
 }
 
+/**
+ * Web URL of the repository that owns change-request numbers (a fork's parent, else the
+ * remote's), the form the daemon's pull request service takes. Null without a usable remote.
+ */
+export function buildForgeRepositoryUrl(
+  forge: string,
+  input: { remoteUrl: string | null | undefined; forgeWeb?: ForgeWeb | null },
+): string | null {
+  const location = resolveForgeWebLocation(forge, input.remoteUrl, input.forgeWeb);
+  const repo = input.forgeWeb?.referenceRepository ?? location?.repo;
+  if (!location || !repo || !isValidRepoPath(repo)) {
+    return null;
+  }
+  return `${forgeOrigin(location)}/${repo}`;
+}
+
+/** Web URL of change request `number` in the repository at `repositoryUrl`; null for an unknown forge. */
+export function buildForgeChangeRequestUrl(
+  forge: string,
+  repositoryUrl: string,
+  number: number,
+): string | null {
+  const referencePath = getClientForgeLogicModule(forge)?.urlGrammar?.referencePaths?.find(
+    (path) => path.kind === "change_request",
+  );
+  if (!referencePath || !Number.isSafeInteger(number) || number <= 0) {
+    return null;
+  }
+  return `${repositoryUrl.replace(/\/$/, "")}${referencePath.infix}${number}`;
+}
+
 /** Whether the forge has web URL builders (i.e. a known URL grammar). */
 export function hasForgeWebUrls(forge: string): boolean {
   return getClientForgeLogicModule(forge)?.urlGrammar !== undefined;

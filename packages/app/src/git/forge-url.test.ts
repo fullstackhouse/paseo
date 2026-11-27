@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 import {
   buildForgeBlobUrl,
   buildForgeBranchTreeUrl,
+  buildForgeChangeRequestUrl,
   buildForgeChecksUrl,
   buildForgeReferenceUrl,
+  buildForgeRepositoryUrl,
   hasForgeWebUrls,
 } from "./forge-url";
 
@@ -71,6 +73,40 @@ describe("buildForgeReferenceUrl", () => {
   it("rejects non-positive numbers", () => {
     const remoteUrl = "git@github.com:acme/repo.git";
     expect(buildForgeReferenceUrl("github", { remoteUrl, sigil: "#", number: 0 })).toBeNull();
+  });
+});
+
+describe("buildForgeRepositoryUrl", () => {
+  it.each([
+    ["github", "git@github.com:acme/repo.git", undefined, "https://github.com/acme/repo"],
+    ["github", "https://github.com/acme/repo", undefined, "https://github.com/acme/repo"],
+    [
+      "github",
+      "git@github.com:me/repo.git",
+      { host: "github.com", referenceRepository: "acme/repo" },
+      "https://github.com/acme/repo",
+    ],
+    [
+      "gitlab",
+      "https://gitlab.corp:8443/g/sub/p.git",
+      undefined,
+      "https://gitlab.corp:8443/g/sub/p",
+    ],
+    ["github", null, undefined, null],
+  ])("%s %s -> %s", (forge, remoteUrl, forgeWeb, expected) => {
+    expect(buildForgeRepositoryUrl(forge, { remoteUrl, forgeWeb })).toBe(expected);
+  });
+});
+
+describe("buildForgeChangeRequestUrl", () => {
+  it.each([
+    ["github", "https://github.com/acme/repo", 12, "https://github.com/acme/repo/pull/12"],
+    ["gitlab", "https://gitlab.com/g/p", 12, "https://gitlab.com/g/p/-/merge_requests/12"],
+    ["codeberg", "https://codeberg.org/acme/repo", 12, "https://codeberg.org/acme/repo/pulls/12"],
+    ["unknown", "https://example.com/acme/repo", 12, null],
+    ["github", "https://github.com/acme/repo", 0, null],
+  ])("%s %s %d -> %s", (forge, repositoryUrl, number, expected) => {
+    expect(buildForgeChangeRequestUrl(forge, repositoryUrl, number)).toBe(expected);
   });
 });
 
