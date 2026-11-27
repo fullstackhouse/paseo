@@ -1,6 +1,7 @@
 import type { AgentToolDefinition } from "./agent-tools.js";
 import type {
   AgentPermissionRequest,
+  McpToolRef,
   AgentPermissionResponse,
   AgentSessionConfig,
   AgentTurnOrigin,
@@ -147,7 +148,16 @@ export interface PluginHookEvents {
      */
     outcome: PluginTurnOutcome;
   };
-  "agent.permission.before": { agent: PluginHookAgent; request: AgentPermissionRequest };
+  "agent.permission.before": {
+    agent: PluginHookAgent;
+    request: AgentPermissionRequest;
+    /**
+     * FSH-only: the MCP tool the request is for, whatever the provider calls it (`mcp__prs__prs_link`,
+     * `prs.prs_link`, ...). Absent when it isn't one of the agent's MCP tools, and on older hosts
+     * (`server_info.features.pluginToolGrants`).
+     */
+    tool?: McpToolRef;
+  };
   "agent.permission.after": {
     agent: PluginHookAgent;
     requestId: string;

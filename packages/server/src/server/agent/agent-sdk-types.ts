@@ -153,6 +153,8 @@ export interface ProviderSnapshotEntry {
   iconSvg?: string;
   defaultModeId?: string | null;
   supportsPlanApproval?: boolean;
+  /** Whether agents on this provider can hold exact MCP tool grants (`toolPolicy.preapproved`). */
+  supportsToolPolicy?: boolean;
   /** Plugin settings screen that configures this provider. */
   settingsScreen?: ProviderSettingsScreen;
 }

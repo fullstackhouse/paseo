@@ -453,6 +453,22 @@ describe("ProviderSnapshotManager public surface", () => {
     }
   });
 
+  test("getSnapshot says which providers can hold exact MCP tool grants", () => {
+    const manager = new ProviderSnapshotManager({ logger: createTestLogger() });
+    try {
+      const snapshot = manager.getSnapshot("/tmp/project").records.map(({ entry }) => entry);
+      const supportsToolPolicy = (provider: string) =>
+        snapshot.find((entry) => entry.provider === provider)?.supportsToolPolicy;
+      expect(supportsToolPolicy("claude")).toBe(true);
+      expect(supportsToolPolicy("codex")).toBe(true);
+      expect(supportsToolPolicy("opencode")).toBe(true);
+      expect(supportsToolPolicy("copilot")).toBe(false);
+      expect(supportsToolPolicy("pi")).toBe(false);
+    } finally {
+      manager.destroy();
+    }
+  });
+
   test("providerOverrides with enabled:false marks the provider as unavailable without probing", async () => {
     const isAvailable = vi.fn(async () => true);
     const fetchCatalog = vi.fn(async () => ({

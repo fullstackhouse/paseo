@@ -457,3 +457,34 @@ test("agent.turn.before carries who started the turn, and omits it when unknown"
     { name: "agent.turn.before", event: { agent, turnId: "t2" } },
   ]);
 });
+
+test("agent.permission.before names the agent's MCP tool whatever the provider calls it", () => {
+  const emitted: Array<{ name: string; event: { tool?: unknown } }> = [];
+  const lifecycle = {
+    emit: (name: string, event: { tool?: unknown }) => emitted.push({ name, event }),
+  } as unknown as PluginLifecycle;
+  const agent = {
+    id: "a1",
+    workspaceId: null,
+    parentAgentId: null,
+    provider: "copilot",
+    cwd: "/tmp",
+    title: null,
+    background: false,
+    metadata: {},
+  };
+  const request = (name: string) => ({
+    type: "permission_requested" as const,
+    provider: "copilot",
+    request: { id: name, provider: "copilot", name, kind: "tool" as const },
+  });
+  for (const name of ["mcp__prs__prs_link", "prs.prs_link", "prs/prs_list", "Bash"]) {
+    publishAgentStream(lifecycle, agent, request(name), ["prs", "hub"]);
+  }
+  expect(emitted.map((entry) => entry.event.tool)).toEqual([
+    { kind: "mcp", server: "prs", tool: "prs_link" },
+    { kind: "mcp", server: "prs", tool: "prs_link" },
+    { kind: "mcp", server: "prs", tool: "prs_list" },
+    undefined,
+  ]);
+});
