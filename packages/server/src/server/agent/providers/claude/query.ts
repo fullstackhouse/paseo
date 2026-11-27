@@ -78,7 +78,8 @@ function applyRuntimeSettingsToClaudeOptions(
       providerEnvSpec.envOverlay.CLAUDE_CODE_ENTRYPOINT = launchEnv?.CLAUDE_CODE_ENTRYPOINT;
       // Keep the SDK's own version marker. Without it and without an entrypoint, Claude Code
       // (2.1.326) labels the process a bare `claude -p` run (`sdk-cli`) and never writes the
-      // automatic chat title (`ai-title`) to the transcript.
+      // automatic chat title (`ai-title`) to the transcript. The value is always the SDK's own:
+      // Paseo clears an inherited one from the env it hands the SDK, which then sets its version.
       providerEnvSpec.envOverlay.CLAUDE_AGENT_SDK_VERSION =
         spawnOptions.env.CLAUDE_AGENT_SDK_VERSION;
       const providerEnv = createExternalProcessEnv(spawnOptions.env, providerEnvSpec.envOverlay);
