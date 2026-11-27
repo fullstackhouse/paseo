@@ -355,6 +355,7 @@ interface SessionForTestOptions {
   messages?: unknown[];
   targetedMessages?: Array<{ source: object; message: SessionOutboundMessage }>;
   binaryMessages?: Uint8Array[];
+  pullRequestService?: SessionOptions["pullRequestService"];
   clientCapabilities?: SessionOptions["clientCapabilities"];
   pluginRuntime?: SessionOptions["pluginRuntime"];
   orchestrationSkills?: SessionOptions["orchestrationSkills"];
@@ -457,6 +458,7 @@ function createSessionForTest(options: SessionForTestOptions = {}): Session {
       onChange: vi.fn(() => () => {}),
     }),
     pluginRuntime: options.pluginRuntime,
+    pullRequestService: options.pullRequestService,
     orchestrationSkills: options.orchestrationSkills,
     stt: options.stt ?? null,
     tts: null,
@@ -680,6 +682,69 @@ test("losing daemon.manage releases the session's plugin subscriptions", async (
 
   // Bytes have no outbound permission check, so the stream itself has to end.
   await vi.waitFor(() => expect(release).toHaveBeenCalledOnce());
+});
+
+test("follows pull requests for the connection's caller, pushes updates and releases", async () => {
+  const messages: SessionOutboundMessage[] = [];
+  const unsubscribe = vi.fn();
+  let push: ((update: { results: unknown[]; branches: unknown[] }) => void) | null = null;
+  const subscribe = vi.fn(async (_caller: string, _target: unknown, onUpdate: typeof push) => {
+    push = onUpdate;
+    return { initial: { results: [], branches: [] }, unsubscribe };
+  });
+  const pullRequestService = {
+    subscribe,
+    read: vi.fn(),
+    usage: vi.fn(),
+    dispose: vi.fn(),
+  } as unknown as NonNullable<SessionOptions["pullRequestService"]>;
+  const session = createSessionForTest({
+    messages,
+    clientId: "plugin:paseo-prs",
+    pullRequestService,
+  });
+  const source = {};
+  session.updateClientCapabilities({ [CLIENT_CAPS.ownedSubscriptions]: true }, source);
+
+  await session.handleMessage(
+    {
+      type: "forge.change_requests.subscribe.request",
+      requestId: "sub",
+      urls: ["https://github.com/acme/widgets/pull/1"],
+      priority: "visible",
+    },
+    source,
+  );
+  expect(subscribe).toHaveBeenCalledWith(
+    "plugin:paseo-prs",
+    { urls: ["https://github.com/acme/widgets/pull/1"], priority: "visible" },
+    expect.any(Function),
+  );
+  const response = messages.find(
+    (message) => message.type === "forge.change_requests.subscribe.response",
+  );
+  expect(response?.payload).toMatchObject({
+    requestId: "sub",
+    results: [],
+    branches: [],
+    error: null,
+  });
+  const subscriptionId = (response!.payload as { subscriptionId: string }).subscriptionId;
+
+  push!({
+    results: [{ url: "https://github.com/acme/widgets/pull/1", ok: false, error: "x" }],
+    branches: [],
+  });
+  expect(messages.at(-1)).toMatchObject({
+    type: "forge.change_requests.update",
+    payload: { subscriptionId, branches: [] },
+  });
+
+  await session.handleMessage(
+    { type: "subscription.release.request", requestId: "release", subscriptionId },
+    source,
+  );
+  expect(unsubscribe).toHaveBeenCalledOnce();
 });
 
 test("losing daemon.manage during a plugin RPC withholds its JSON and binary results", async () => {

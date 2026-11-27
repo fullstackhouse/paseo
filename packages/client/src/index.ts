@@ -39,10 +39,15 @@ import type {
   WorkspaceAppearance,
   WorkspaceDescriptorPayload,
   WorkspaceCreateRequest,
+  ChangeRequestBranchRead,
+  ChangeRequestDeploymentRead,
   ChangeRequestRead,
+  ChangeRequestUsage,
 } from "@getpaseo/protocol/messages";
 import {
   DaemonClient,
+  type ChangeRequestSubscriptionTarget,
+  type ChangeRequestSubscriptionUpdate,
   type CreateAgentRequestOptions,
   type WorkspaceAppearanceInput,
 } from "./daemon-client.js";
@@ -78,7 +83,14 @@ import type {
   WaitForFinishResult,
 } from "./daemon-client.js";
 export type { WorkspaceAppearance, WorkspaceAppearanceInput };
-export type { ChangeRequestRead };
+export type {
+  ChangeRequestBranchRead,
+  ChangeRequestDeploymentRead,
+  ChangeRequestRead,
+  ChangeRequestSubscriptionTarget,
+  ChangeRequestSubscriptionUpdate,
+  ChangeRequestUsage,
+};
 
 /**
  * Coding turns routinely run for minutes, so the handle waits far longer than
@@ -720,6 +732,18 @@ export interface PaseoChangeRequestActions {
    * with a `reason`; on `paused`, keep the last known state until `retryAt`.
    */
   read(urls: string[], options?: { requestId?: string }): Promise<ChangeRequestRead[]>;
+  /**
+   * Follows pull requests and branches. The host reads each PR once for every subscriber, at the
+   * pace it needs, and calls `onUpdate` with only what changed (everything again after a
+   * reconnect). Needs `server_info.features.changeRequestSubscriptions`. See docs/pr-service.md.
+   */
+  subscribe(
+    target: ChangeRequestSubscriptionTarget,
+    onUpdate: (update: ChangeRequestSubscriptionUpdate) => void,
+    options?: { signal?: AbortSignal },
+  ): Promise<{ initial: ChangeRequestSubscriptionUpdate; unsubscribe(): Promise<void> }>;
+  /** Forge points and reads per caller, since start and in the last hour. */
+  usage(options?: { requestId?: string }): Promise<ChangeRequestUsage>;
 }
 
 export interface PaseoApi {
@@ -1046,6 +1070,9 @@ export function createPaseoApi(
     },
     changeRequests: {
       read: (urls, options) => daemonClient.readChangeRequests(urls, options),
+      subscribe: (target, onUpdate, options) =>
+        daemonClient.subscribeChangeRequests(target, onUpdate, options),
+      usage: (options) => daemonClient.getChangeRequestUsage(options),
     },
   };
 }

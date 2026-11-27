@@ -41,6 +41,91 @@ describe("plugin protocol compatibility", () => {
     expect(SessionOutboundMessageSchema.parse(response)).toEqual(response);
   });
 
+  it("round-trips pull request subscriptions, updates and usage", () => {
+    const subscribe = {
+      type: "forge.change_requests.subscribe.request",
+      requestId: "sub",
+      urls: ["https://github.com/acme/widgets/pull/41"],
+      branches: [{ repo: "https://github.com/acme/widgets", headRef: "feat/login" }],
+      priority: "visible",
+      include: ["deployments"],
+    };
+    expect(SessionInboundMessageSchema.parse(subscribe)).toEqual(subscribe);
+    const result = {
+      url: "https://github.com/acme/widgets/pull/41",
+      ok: true,
+      number: 41,
+      title: "Fix the login redirect",
+      state: "open",
+      isDraft: false,
+      reviewDecision: "review_required",
+      checksState: "passing",
+      checks: [],
+      headSha: "abc",
+      author: null,
+      reviewRequestCount: 1,
+      viewerCanMergeAsAdmin: true,
+      deployments: [
+        {
+          environment: "preview",
+          state: "SUCCESS",
+          createdAt: "2026-11-27T11:00:00Z",
+          url: "https://pr-41.example",
+        },
+      ],
+    };
+    const branch = {
+      repo: "https://github.com/acme/widgets",
+      headRef: "feat/login",
+      ok: false,
+      urls: [],
+      error: "Paused",
+      reason: "paused",
+      retryAt: 1_700_000_000_000,
+    };
+    for (const message of [
+      {
+        type: "forge.change_requests.subscribe.response",
+        payload: {
+          requestId: "sub",
+          subscriptionId: "s1",
+          results: [result],
+          branches: [branch],
+          error: null,
+        },
+      },
+      {
+        type: "forge.change_requests.update",
+        payload: { subscriptionId: "s1", results: [result], branches: [] },
+      },
+      {
+        type: "forge.change_requests.usage.response",
+        payload: {
+          requestId: "usage",
+          error: null,
+          usage: {
+            since: 1,
+            followed: 2,
+            callers: [
+              {
+                caller: "plugin:paseo-prs",
+                points: 2.5,
+                reads: 3,
+                pointsLastHour: 2.5,
+                readsLastHour: 3,
+                subscriptions: 1,
+              },
+            ],
+          },
+        },
+      },
+    ]) {
+      expect(SessionOutboundMessageSchema.parse(message)).toEqual(message);
+    }
+    const usage = { type: "forge.change_requests.usage.request", requestId: "usage" };
+    expect(SessionInboundMessageSchema.parse(usage)).toEqual(usage);
+  });
+
   it.each([undefined, { paseo: ">=0.8.0" }])(
     "parses plugin catalogs with requirements %j",
     (requirements) => {

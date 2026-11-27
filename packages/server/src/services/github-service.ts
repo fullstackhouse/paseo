@@ -1,7 +1,15 @@
 import {
   ChangeRequestReadError,
+  type ChangeRequestBranchEntry,
+  type ChangeRequestBranchQuery,
+  type ChangeRequestObservedRead,
+  type ChangeRequestQueryCost,
+  type ChangeRequestReadObserver,
+  type ChangeRequestReadOptions,
+  type ChangeRequestReadPurpose,
   type ChangeRequestReadResult,
   type ChangeRequestSource,
+  type ChangeRequestStatus,
 } from "./change-request-source.js";
 import {
   GITHUB_POLL_CHECK_CONTEXT_FIELDS,
@@ -696,6 +704,8 @@ const GitHubGraphqlRateLimitSchema = z.object({
   limit: z.number(),
   remaining: z.number(),
   resetAt: z.string(),
+  /** Points this query cost; the pull request service splits it across callers. */
+  cost: z.number().optional(),
 });
 
 const GitHubRateLimitResponseSchema = z.object({
@@ -852,6 +862,10 @@ interface GitHubPollQuery {
   targetCount: number;
   selections(): string[];
   fragments?: string;
+  /** Who the query is for, for budget accounting; workspace polls when omitted. */
+  purpose?: ChangeRequestReadPurpose;
+  /** The change requests it reads, when known. */
+  urls?(): string[];
 }
 
 interface GitHubPollResponse {
@@ -865,7 +879,7 @@ type GitHubPollReader = (query: GitHubPollQuery) => Promise<GitHubPollResponse>;
 
 function renderGitHubPollQuery(name: string, selections: string[], fragments = ""): string {
   return `query ${name} {
-  rateLimit { limit remaining resetAt }
+  rateLimit { limit remaining resetAt cost }
 ${selections.join("\n")}
 }
 ${fragments}`;
@@ -898,6 +912,7 @@ function buildBatchPullRequestChecksQuery(
     limit
     remaining
     resetAt
+    cost
   }
 ${aliases.join("\n")}
 }`;
@@ -1154,6 +1169,108 @@ interface ResolvedPullRequestCandidate {
   updatedAt?: string;
 }
 
+/** A watch snapshot's status, without the activity only the watch uses. */
+function statusOf(read: GitHubChangeRequestRead): ChangeRequestStatus {
+  return {
+    state: read.state,
+    headSha: read.headSha,
+    checksState: read.checksState,
+    checks: read.checks,
+    reviewDecision: read.reviewDecision,
+  };
+}
+
+const WORKSPACE_CHECK_STATES = {
+  success: "passed",
+  failure: "failed",
+  pending: "pending",
+  cancelled: "neutral",
+  skipped: "neutral",
+} as const satisfies Record<PullRequestCheck["status"], ChangeRequestStatus["checksState"]>;
+
+const WORKSPACE_ROLLUP_STATES = {
+  success: "passed",
+  failure: "failed",
+  pending: "pending",
+  none: "neutral",
+} as const satisfies Record<
+  CurrentPullRequestStatus["checksStatus"],
+  ChangeRequestStatus["checksState"]
+>;
+
+const WORKSPACE_REVIEW_DECISIONS = {
+  approved: "APPROVED",
+  changes_requested: "CHANGES_REQUESTED",
+  pending: "REVIEW_REQUIRED",
+} as const;
+
+/**
+ * A workspace poll's status as the pull request service caches it. Null when it lacks what a
+ * cached read needs (a head commit, a number, a known state).
+ */
+function observedWorkspaceRead(status: CurrentPullRequestStatus): ChangeRequestObservedRead | null {
+  const state = status.isMerged ? "merged" : status.state;
+  if (state !== "open" && state !== "closed" && state !== "merged") return null;
+  if (!status.headSha || status.number === undefined) return null;
+  let url: string;
+  try {
+    url = resolveGitHubChangeRequest(status.url);
+  } catch {
+    return null;
+  }
+  return {
+    url,
+    purpose: "workspace",
+    status: {
+      state,
+      headSha: status.headSha,
+      checksState: WORKSPACE_ROLLUP_STATES[status.checksStatus],
+      checks: status.checks.map((check) => ({
+        id: check.name,
+        name: check.name,
+        state: WORKSPACE_CHECK_STATES[check.status],
+        ...(check.url ? { url: check.url } : {}),
+      })),
+      reviewDecision: status.reviewDecision
+        ? WORKSPACE_REVIEW_DECISIONS[status.reviewDecision]
+        : null,
+      number: status.number,
+      title: status.title,
+      isDraft: status.isDraft ?? false,
+      mergeable: status.mergeable,
+    },
+  };
+}
+
+/** `https://host/owner/repo` for a GitHub repository URL, or one of its pages. */
+export function resolveGitHubRepository(input: string): string {
+  const match =
+    /^https:\/\/([a-z0-9.-]+)\/([a-z0-9_-]+)\/([a-z0-9_.-]+?)(?:\.git)?\/?(?:[/?#][^\s]*)?$/i.exec(
+      input.trim(),
+    );
+  if (!match) throw new Error("Enter a GitHub repository URL.");
+  const [, hostname, owner, repo] = match;
+  if (repo === "." || repo === "..") throw new Error("Enter a GitHub repository URL.");
+  const host = hostname!.toLowerCase().replace(/\.$/, "");
+  return `https://${host}/${owner!.toLowerCase()}/${repo!.toLowerCase()}`;
+}
+
+const BRANCH_PR_STATES = { OPEN: "open", MERGED: "merged", CLOSED: "closed" } as const;
+
+const BranchPullRequestsSchema = z.object({
+  pullRequests: z.object({
+    nodes: z.array(
+      z
+        .object({
+          url: z.string(),
+          number: z.number(),
+          state: z.enum(["OPEN", "CLOSED", "MERGED"]),
+        })
+        .nullable(),
+    ),
+  }),
+});
+
 export function createGitHubService(options: CreateGitHubServiceOptions = {}): GitHubService {
   const ttlMs = options.ttlMs ?? DEFAULT_GITHUB_CACHE_TTL_MS;
   const deps: GitHubServiceDependencies = {
@@ -1224,9 +1341,30 @@ export function createGitHubService(options: CreateGitHubServiceOptions = {}): G
     GITHUB_ENTERPRISE_TOKEN: "",
   };
   const watchPollMs = 15_000;
+  const readObservers = new Set<ChangeRequestReadObserver>();
   const rateLimitResetLoads = new Map<string, Promise<number | null>>();
   let githubPollTimer: NodeJS.Timeout | null = null;
   let api!: GitHubService;
+
+  function emitObservedRead(read: ChangeRequestObservedRead): void {
+    for (const observer of readObservers) {
+      try {
+        observer.read?.(read);
+      } catch {
+        // An observer's failure must not break the poll that fed it.
+      }
+    }
+  }
+
+  function emitQueryCost(cost: ChangeRequestQueryCost): void {
+    for (const observer of readObservers) {
+      try {
+        observer.cost?.(cost);
+      } catch {
+        // Accounting never breaks a poll.
+      }
+    }
+  }
 
   async function cached<T>(params: {
     cwd: string;
@@ -1440,6 +1578,8 @@ export function createGitHubService(options: CreateGitHubServiceOptions = {}): G
 
     target.latestStatus = update.status;
     target.consecutiveErrors = 0;
+    const observed = update.status ? observedWorkspaceRead(update.status) : null;
+    if (observed) emitObservedRead(observed);
     if (update.notify) {
       for (const callback of target.callbacks) {
         callback(update.status);
@@ -1653,11 +1793,12 @@ export function createGitHubService(options: CreateGitHubServiceOptions = {}): G
 
     async function issue(batch: PendingQuery[]): Promise<void> {
       const cwd = batch.length === 1 ? batch[0]!.query.cwd : process.cwd();
+      let current: { query: GitHubPollQuery; selections: string[] }[] = [];
       try {
         const response = await runPollGraphql(
           host,
           () => {
-            const current = batch.flatMap(({ query }) => {
+            current = batch.flatMap(({ query }) => {
               const selections = query.selections();
               return selections.length ? [{ query, selections }] : [];
             });
@@ -1670,6 +1811,12 @@ export function createGitHubService(options: CreateGitHubServiceOptions = {}): G
             return run(["api", "graphql", "-f", `query=${graphql}`], { cwd }, host);
           },
           () => run(["api", "rate_limit"], { cwd }, host),
+          () =>
+            current.map(({ query, selections }) => ({
+              purpose: query.purpose ?? "workspace",
+              urls: query.urls?.() ?? [],
+              count: selections.length,
+            })),
         );
         for (const task of batch) task.resolve(response);
       } catch (error) {
@@ -1695,6 +1842,7 @@ export function createGitHubService(options: CreateGitHubServiceOptions = {}): G
   function changeRequestSelectionReader(
     read: GitHubPollReader,
     name: string,
+    purpose: ChangeRequestReadPurpose,
     isObserved: (url: string) => boolean,
     /** Collects URLs GitHub answered with NOT_FOUND. */
     notFound?: Set<string>,
@@ -1704,6 +1852,10 @@ export function createGitHubService(options: CreateGitHubServiceOptions = {}): G
         name,
         cwd: process.cwd(),
         targetCount: selections.length,
+        purpose,
+        urls: () => [
+          ...new Set(selections.filter(({ url }) => isObserved(url)).map(({ url }) => url)),
+        ],
         selections: () =>
           selections.filter(({ url }) => isObserved(url)).map(({ graphql }) => graphql),
       });
@@ -1750,6 +1902,14 @@ export function createGitHubService(options: CreateGitHubServiceOptions = {}): G
       title,
       isDraft,
       mergeable: mergeable ?? null,
+      ...(read.author !== undefined ? { author: read.author } : {}),
+      ...(read.reviewRequestCount !== undefined
+        ? { reviewRequestCount: read.reviewRequestCount }
+        : {}),
+      ...(read.viewerCanMergeAsAdmin !== undefined
+        ? { viewerCanMergeAsAdmin: read.viewerCanMergeAsAdmin }
+        : {}),
+      ...(read.deployments ? { deployments: read.deployments } : {}),
     };
   }
 
@@ -1776,9 +1936,75 @@ export function createGitHubService(options: CreateGitHubServiceOptions = {}): G
     return error;
   }
 
+  /**
+   * Pull requests whose head is a branch of a repository, newest first. Shares the poll's batching,
+   * rate-limit reserve and pause. Same-named branches in forks are not told apart.
+   */
+  async function listPullRequestsForBranch(
+    query: ChangeRequestBranchQuery,
+  ): Promise<ChangeRequestBranchEntry[]> {
+    const { host, pathname } = new URL(query.repo);
+    const [, owner, name] = pathname.split("/");
+    if (!owner || !name) throw new Error(`Not a repository address: ${query.repo}`);
+    const pausedUntil = pollPausedUntilByHost.get(host) ?? 0;
+    if (pausedUntil > deps.now()) throw pausedReadError(pausedUntil);
+    try {
+      if (host !== "github.com" && !authenticatedWatchHosts.has(host)) {
+        await run(
+          ["auth", "status", "--hostname", host],
+          { cwd: process.cwd(), envOverlay: watchAuthProbeEnv },
+          host,
+        );
+        authenticatedWatchHosts.add(host);
+      }
+      const states = query.includeClosed ? "" : ", states: [OPEN]";
+      const selection = `request0: repository(owner: ${graphqlString(owner)}, name: ${graphqlString(name)}) {
+    pullRequests(headRefName: ${graphqlString(query.headRef)}, first: 20${states}, orderBy: { field: CREATED_AT, direction: DESC }) {
+      nodes { url number state }
+    }
+  }`;
+      const response = await createCoDueGitHubPollReader(host)({
+        name: "PaseoBranchPullRequests",
+        cwd: process.cwd(),
+        targetCount: 1,
+        purpose: "branch",
+        // The branch identity, so the pull request service can credit its subscribers.
+        urls: () => [`${query.repo}#${query.headRef}`],
+        selections: () => [selection],
+      });
+      const repository = response.aliases.request0;
+      if (repository === null || repository === undefined) {
+        throw new ChangeRequestReadError(`${query.repo} was not found on GitHub.`, {
+          reason: "not_found",
+        });
+      }
+      const parsed = BranchPullRequestsSchema.parse(repository);
+      return parsed.pullRequests.nodes.flatMap((node) => {
+        if (!node) return [];
+        try {
+          return [
+            {
+              url: resolveGitHubChangeRequest(node.url),
+              number: node.number,
+              state: BRANCH_PR_STATES[node.state],
+            } satisfies ChangeRequestBranchEntry,
+          ];
+        } catch {
+          return [];
+        }
+      });
+    } catch (error) {
+      if (error instanceof ChangeRequestReadError) throw error;
+      if (error instanceof GitHubAuthenticationError) authenticatedWatchHosts.delete(host);
+      const failed = error instanceof Error ? error : new Error(String(error));
+      throw classifyReadError(query.repo, failed, new Set());
+    }
+  }
+
   /** One-shot reads share the poll's batching, rate-limit reserve and pause; they never watch. */
   async function readChangeRequestsOnce(
     urls: string[],
+    readOptions?: ChangeRequestReadOptions,
   ): Promise<Map<string, ChangeRequestReadResult | Error>> {
     const byHost = new Map<string, string[]>();
     for (const url of urls) {
@@ -1810,6 +2036,7 @@ export function createGitHubService(options: CreateGitHubServiceOptions = {}): G
             read: changeRequestSelectionReader(
               createCoDueGitHubPollReader(host),
               "PaseoChangeRequestRead",
+              "read",
               () => true,
               notFound,
             ),
@@ -1819,6 +2046,7 @@ export function createGitHubService(options: CreateGitHubServiceOptions = {}): G
             knownActivity: () => undefined,
             isObserved: () => true,
             details: true,
+            deployments: (url) => readOptions?.deployments?.has(url) === true,
           });
           for (const [url, result] of read) {
             results.set(
@@ -1862,7 +2090,7 @@ export function createGitHubService(options: CreateGitHubServiceOptions = {}): G
       watching.has(url) && watchedRequests.get(url) === watching.get(url);
     try {
       const results = await readGitHubChangeRequests(urls, {
-        read: changeRequestSelectionReader(read, "PaseoWatchedChangeRequests", isObserved),
+        read: changeRequestSelectionReader(read, "PaseoWatchedChangeRequests", "watch", isObserved),
         batchSize: GITHUB_POLL_BATCH_MAX,
         onChecks: (url, headSha, contexts) => checks.get(url)!({ headSha, contexts }),
         knownActivity: (url) => watching.get(url)?.callbacks.knownActivity?.(),
@@ -1874,8 +2102,12 @@ export function createGitHubService(options: CreateGitHubServiceOptions = {}): G
         [...watching].map(async ([url, watch]) => {
           if (!isObserved(url)) return;
           const result = results.get(url)!;
-          if (result instanceof Error) watch.callbacks.error(result);
-          else await watch.callbacks.snapshot(result);
+          if (result instanceof Error) {
+            watch.callbacks.error(result);
+            return;
+          }
+          emitObservedRead({ url, status: statusOf(result), purpose: "watch" });
+          await watch.callbacks.snapshot(result);
         }),
       );
     } catch (error) {
@@ -1987,6 +2219,7 @@ export function createGitHubService(options: CreateGitHubServiceOptions = {}): G
     host: string,
     query: () => Promise<string>,
     readReset: () => Promise<string>,
+    parts?: () => ChangeRequestQueryCost["parts"],
   ) {
     return queueHostPoll(host, async () => {
       let stdout: string;
@@ -2005,6 +2238,8 @@ export function createGitHubService(options: CreateGitHubServiceOptions = {}): G
         aliases = partial;
       }
       const rateLimit = parseGraphqlBatchRateLimit(stdout);
+      if (rateLimit?.cost !== undefined && parts)
+        emitQueryCost({ host, cost: rateLimit.cost, parts: parts() });
       const paused = rateLimit ? pauseGitHubPollsAtReserve(host, rateLimit) : false;
       return { stdout, aliases, rateLimit, paused };
     });
@@ -2015,12 +2250,13 @@ export function createGitHubService(options: CreateGitHubServiceOptions = {}): G
     if (resetAt !== null) pauseGitHubPollHostUntil(host, resetAt + GITHUB_GRAPHQL_RESET_GRACE_MS);
   }
 
-  function runWorkspacePollGraphql(entry: GitHubBatchPollEntry, args: string[]) {
+  function runWorkspacePollGraphql(entry: GitHubBatchPollEntry, args: string[], count: number) {
     const cwd = entry.target.cwd;
     return runPollGraphql(
       entry.host,
       () => run(args, { cwd }, entry.host),
       () => run(["api", "rate_limit"], { cwd }, entry.host),
+      () => [{ purpose: "workspace", urls: [], count }],
     );
   }
 
@@ -2308,10 +2544,12 @@ export function createGitHubService(options: CreateGitHubServiceOptions = {}): G
       })),
     );
     const args = ["api", "graphql", "-f", `query=${query}`];
-    const response = await runWorkspacePollGraphql(firstItem.entry, args).catch((error) => {
-      for (const item of pending) updatePollTargetAfterError(item.entry.target, error);
-      return undefined;
-    });
+    const response = await runWorkspacePollGraphql(firstItem.entry, args, pending.length).catch(
+      (error) => {
+        for (const item of pending) updatePollTargetAfterError(item.entry.target, error);
+        return undefined;
+      },
+    );
     if (!response) return;
     const aliasData = response.aliases;
 
@@ -3153,6 +3391,14 @@ export function createGitHubService(options: CreateGitHubServiceOptions = {}): G
         };
       },
       read: readChangeRequestsOnce,
+      resolveRepository: resolveGitHubRepository,
+      listForBranch: listPullRequestsForBranch,
+      observeReads(observer) {
+        readObservers.add(observer);
+        return () => {
+          readObservers.delete(observer);
+        };
+      },
     },
 
     dispose() {
@@ -3165,6 +3411,7 @@ export function createGitHubService(options: CreateGitHubServiceOptions = {}): G
       }
       pollTargets.clear();
       watchedRequests.clear();
+      readObservers.clear();
       pollRepositoryRedirects.clear();
       pollPausedUntilByHost.clear();
       rateLimitResetLoads.clear();

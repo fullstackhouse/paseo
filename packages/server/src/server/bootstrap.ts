@@ -134,7 +134,7 @@ import { VoiceAssistantWebSocketServer, isDaemonOriginAllowed } from "./websocke
 import { WorkspaceSetupRuntime } from "./workspace-setup-runtime.js";
 import { createWorkspaceLabelService } from "./workspace-labels/index.js";
 import { createChangeRequestRouter } from "../services/change-request-router.js";
-import { createChangeRequestReader } from "../services/change-request-reader.js";
+import { createPullRequestService } from "../services/pull-request-service.js";
 import { createForgeService } from "../services/forge-registry.js";
 import { createForgeResolver } from "../services/forge-resolver.js";
 import { createGitHubService } from "../services/github-service.js";
@@ -1606,7 +1606,12 @@ export async function createPaseoDaemon(
   });
 
   const changeRequestRouter = createChangeRequestRouter({ forgeResolver });
-  const changeRequestReader = createChangeRequestReader({ router: changeRequestRouter });
+  // The one owner of pull request data: plugin reads and subscriptions share its cache, and the
+  // workspace poller and watches feed it (docs/pr-service.md).
+  const pullRequestService = createPullRequestService({
+    router: changeRequestRouter,
+    logUsage: (usage) => logger.info({ usage }, "pull request usage"),
+  });
   const changeRequestWatches = createChangeRequestWatches({
     router: changeRequestRouter,
     backgroundWork: agentManager,
@@ -2006,7 +2011,8 @@ export async function createPaseoDaemon(
                 daemonStatusRpc: dependencies.serverFeatureOverrides?.daemonStatusRpc,
                 relayConfig: dependencies.serverFeatureOverrides?.relayConfig,
                 startPaused: true,
-                changeRequestReader,
+                changeRequestReader: pullRequestService,
+                pullRequestService,
               },
               workspaceAutoName,
               workspaceRuntimeStore,
@@ -2220,6 +2226,7 @@ export async function createPaseoDaemon(
     if (wsServer) {
       await wsServer.close();
     }
+    pullRequestService.dispose();
     forgeResolver.dispose();
     await serviceProxy.stopStandalone();
     // Force-drop remaining sockets so httpServer.close() resolves promptly.

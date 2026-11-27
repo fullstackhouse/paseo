@@ -1,4 +1,8 @@
 import type { ChangeRequestReader } from "../services/change-request-reader.js";
+import type {
+  PullRequestService,
+  PullRequestSubscription,
+} from "../services/pull-request-service.js";
 import type { ChangeRequestRead } from "@getpaseo/protocol/messages";
 import { DiffSession } from "./diff/index.js";
 import { type WorkspaceRuntimeStore } from "./workspace-runtime-store/index.js";
@@ -546,6 +550,8 @@ export interface SessionOptions {
     agentId?: string;
   }) => Promise<{ woke: boolean }>;
   changeRequestReader?: ChangeRequestReader;
+  /** Subscriptions and usage; the daemon passes the same service as `changeRequestReader`. */
+  pullRequestService?: PullRequestService;
   sendPluginNotification?: (
     pluginId: string,
     notification: import("./plugin-notifications.js").PluginNotificationInput,
@@ -950,6 +956,7 @@ export class Session {
   private readonly agentMessages: AgentMessageDelivery;
   private readonly sendPluginNotification: SessionOptions["sendPluginNotification"];
   private readonly changeRequestReader: SessionOptions["changeRequestReader"];
+  private readonly pullRequestService: SessionOptions["pullRequestService"];
   private readonly reportWorkspaceAttention: SessionOptions["reportWorkspaceAttention"];
   private readonly createAgentLifecycleDispatch: CreateAgentLifecycleDispatch;
   private readonly creationService: Pick<CreationService, "create" | "subscribe">;
@@ -1041,6 +1048,7 @@ export class Session {
     this.agentMessages = options.agentMessages;
     this.sendPluginNotification = options.sendPluginNotification;
     this.changeRequestReader = options.changeRequestReader;
+    this.pullRequestService = options.pullRequestService;
     this.reportWorkspaceAttention = options.reportWorkspaceAttention;
     this.creationService = options.creationService;
     this.projectIcons = new ProjectIconReader(paseoHome);
@@ -3602,6 +3610,10 @@ export class Session {
         return this.handleWorkspaceAttentionReportRequest(msg);
       case "forge.change_requests.read.request":
         return this.handleForgeChangeRequestsReadRequest(msg);
+      case "forge.change_requests.subscribe.request":
+        return this.subscribeForgeChangeRequests(msg);
+      case "forge.change_requests.usage.request":
+        return this.handleForgeChangeRequestsUsageRequest(msg);
       case "workspace.group.set.request":
         return this.handleWorkspaceGroupSetRequest(msg);
       case "workspace.appearance.set.request":
@@ -4816,7 +4828,10 @@ export class Session {
       return;
     }
     try {
-      emitResponse(await this.changeRequestReader.read(urls), null);
+      emitResponse(
+        await this.changeRequestReader.read(urls, { caller: this.changeRequestCaller() }),
+        null,
+      );
     } catch (error) {
       this.sessionLogger.error(
         { requestId, err: error },
@@ -4824,6 +4839,72 @@ export class Session {
       );
       emitResponse([], getErrorMessageOr(error, "Failed to read change requests"));
     }
+  }
+
+  /** Who a pull request read is for, from the connection: never from the request. */
+  private changeRequestCaller(): string {
+    const pluginId = parsePluginClientId(this.clientId);
+    return pluginId ? `plugin:${pluginId}` : "app";
+  }
+
+  private async subscribeForgeChangeRequests(
+    request: Extract<SessionInboundMessage, { type: "forge.change_requests.subscribe.request" }>,
+  ): Promise<void> {
+    const service = this.pullRequestService;
+    if (!service) throw new Error("Pull request subscriptions are unavailable");
+    let subscription: PullRequestSubscription | null = null;
+    let released = false;
+    const owner = this.delivery.begin("forge-change-requests", undefined, () => {
+      released = true;
+      subscription?.unsubscribe();
+    });
+    try {
+      subscription = await service.subscribe(
+        this.changeRequestCaller(),
+        {
+          ...(request.urls ? { urls: request.urls } : {}),
+          ...(request.branches ? { branches: request.branches } : {}),
+          ...(request.priority ? { priority: request.priority } : {}),
+          ...(request.include ? { include: request.include } : {}),
+        },
+        (update) =>
+          owner.emit({
+            type: "forge.change_requests.update",
+            payload: { subscriptionId: owner.responseId, ...update },
+          }),
+      );
+    } catch (error) {
+      await owner.release();
+      throw error;
+    }
+    if (released || owner.signal.aborted) {
+      subscription.unsubscribe();
+      return;
+    }
+    this.emit({
+      type: "forge.change_requests.subscribe.response",
+      payload: {
+        requestId: request.requestId,
+        subscriptionId: owner.responseId,
+        results: subscription.initial.results,
+        branches: subscription.initial.branches,
+        error: null,
+      },
+    });
+  }
+
+  private async handleForgeChangeRequestsUsageRequest(
+    request: Extract<SessionInboundMessage, { type: "forge.change_requests.usage.request" }>,
+  ): Promise<void> {
+    const usage = this.pullRequestService?.usage() ?? null;
+    this.emit({
+      type: "forge.change_requests.usage.response",
+      payload: {
+        requestId: request.requestId,
+        usage,
+        error: usage ? null : "Pull request usage is unavailable",
+      },
+    });
   }
 
   private async handleWorkspaceAttentionReportRequest(

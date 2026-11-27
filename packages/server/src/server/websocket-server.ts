@@ -1,4 +1,5 @@
 import type { ChangeRequestReader } from "../services/change-request-reader.js";
+import type { PullRequestService } from "../services/pull-request-service.js";
 import {
   ChunkedTransport,
   ChunkedTransportProtocolError,
@@ -226,6 +227,8 @@ interface WebSocketServerConfig {
   startPaused?: boolean;
   /** One-shot pull request reads for plugin servers. */
   changeRequestReader?: ChangeRequestReader;
+  /** Pull request subscriptions and usage; also serves `changeRequestReader`'s reads. */
+  pullRequestService?: PullRequestService;
 }
 
 type WebSocketRuntimeMetrics = SessionRuntimeMetrics & CheckoutDiffMetrics;
@@ -624,6 +627,7 @@ export class VoiceAssistantWebSocketServer {
   private readonly workspaceAutoName: WorkspaceAutoName;
   private readonly downloadTokenStore: DownloadTokenStore;
   private readonly changeRequestReader: ChangeRequestReader | undefined;
+  private readonly pullRequestService: PullRequestService | undefined;
   private readonly paseoHome: string;
   private readonly connectedHosts: ConnectedHosts;
 
@@ -757,6 +761,7 @@ export class VoiceAssistantWebSocketServer {
     this.advertiseDaemonStatusRpc = wsConfig.daemonStatusRpc !== false;
     this.advertiseRelayConfig = wsConfig.relayConfig !== false;
     this.changeRequestReader = wsConfig.changeRequestReader;
+    this.pullRequestService = wsConfig.pullRequestService;
     this.connectionLifecycle = wsConfig.startPaused === true ? "starting" : "accepting";
     this.serverId = serverId;
     if (typeof daemonVersion !== "string" || daemonVersion.trim().length === 0) {
@@ -1753,6 +1758,7 @@ export class VoiceAssistantWebSocketServer {
         this.sendPluginNotification(pluginId, notification),
       reportWorkspaceAttention: (input) => this.reportWorkspaceAttention(input),
       changeRequestReader: this.changeRequestReader,
+      pullRequestService: this.pullRequestService,
       downloadTokenStore: this.downloadTokenStore,
       pushNotifications: this.pushNotifications,
       paseoHome: this.paseoHome,
@@ -2204,6 +2210,8 @@ export class VoiceAssistantWebSocketServer {
         workspaceAttentionReport: true,
         // COMPAT(changeRequestsRead): FSH-only, added after v0.17.1, remove gate after 2027-05-26.
         ...(this.changeRequestReader ? { changeRequestsRead: true } : {}),
+        // COMPAT(changeRequestSubscriptions): FSH-only, added after v0.17.1, remove gate after 2027-05-27.
+        ...(this.pullRequestService ? { changeRequestSubscriptions: true } : {}),
         // COMPAT(workspaceManualGroup): FSH-only, added after v0.15.4, remove gate after 2027-05-21.
         workspaceManualGroup: true,
         // COMPAT(workspaceAppearance): FSH-only, added after v0.17.1, remove gate after 2027-05-23.
