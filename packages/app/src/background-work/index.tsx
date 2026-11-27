@@ -1,4 +1,12 @@
-import { useCallback, useMemo, useState, useSyncExternalStore, type ReactElement } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type ReactElement,
+} from "react";
 import { ScrollView, Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import { ChevronLeft, CircleStop } from "lucide-react-native";
@@ -77,7 +85,7 @@ export function BackgroundWorkTrack({ model, count }: { model: Model; count: num
         title: backgroundWorkText(
           entry.item,
           t(`message.backgroundWork.${kindKey(entry.item.kind)}`),
-        ).title,
+        ).detailTitle,
         content: <BackgroundWorkDetail entry={entry} model={model} ready={ready} onBack={null} />,
       })),
     [entries, model, ready, t],
@@ -116,22 +124,36 @@ function BackgroundWorkPanel({
   const { t } = useTranslation();
   const { presentation } = useMenuContext("BackgroundWorkPanel");
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  const rows = useRef(new Map<string, View>());
+  const rowRef = useCallback(
+    (key: string) => (node: View | null) => {
+      if (node) rows.current.set(key, node);
+      else rows.current.delete(key);
+    },
+    [],
+  );
+  // The list remounts when the detail closes, so the row to focus is a new element: focus it once
+  // it is there, or keyboard focus falls to the page.
+  const focusRow = useCallback((key: string | undefined) => {
+    if (!isWeb || !key) return;
+    requestAnimationFrame(() => rows.current.get(key)?.focus());
+  }, []);
   const back = useCallback(() => {
     setSelectedKey(null);
-    // The list remounts on Back, so the row that opened the detail is a new element: focus it
-    // once it is there, or keyboard focus falls to the page.
-    if (!isWeb || !selectedKey) return;
-    requestAnimationFrame(() => {
-      document
-        .querySelector<HTMLElement>(
-          `[data-testid="background-work-row-${CSS.escape(selectedKey)}"]`,
-        )
-        ?.focus();
-    });
-  }, [selectedKey]);
-  // A task that leaves the list (it finished, or its stop went through) takes its detail with it.
+    focusRow(selectedKey ?? undefined);
+  }, [focusRow, selectedKey]);
   const selected =
     presentation === "popover" ? entries.find((entry) => entry.key === selectedKey) : undefined;
+  // A task that leaves the list (it finished, or its stop went through) takes its detail with it.
+  // Forget it, so it can't reopen if it comes back after a reconnect, and give focus to the list
+  // if it went with the detail.
+  const selectionGone = selectedKey !== null && !selected;
+  const firstKey = entries[0]?.key;
+  useEffect(() => {
+    if (!selectionGone) return;
+    setSelectedKey(null);
+    if (isWeb && document.activeElement === document.body) focusRow(firstKey);
+  }, [firstKey, focusRow, selectionGone]);
   if (selected) {
     return (
       <BackgroundWorkDetail
@@ -171,6 +193,7 @@ function BackgroundWorkPanel({
           ready={status === "ready"}
           sheet={presentation === "sheet"}
           onSelect={setSelectedKey}
+          pressableRef={rowRef(entry.key)}
         />
       ))}
     </>
@@ -180,10 +203,10 @@ function BackgroundWorkPanel({
 function useTaskPresentation(entry: TaskEntry, ready: boolean) {
   const { t } = useTranslation();
   const kind = t(`message.backgroundWork.${kindKey(entry.item.kind)}`);
-  const { title } = backgroundWorkText(entry.item, kind);
+  const { title, detailTitle } = backgroundWorkText(entry.item, kind);
   const state = backgroundWorkState(entry);
   const canStop = entry.item.canStop && ready && entry.live;
-  return { kind, title, state, canStop };
+  return { kind, title, detailTitle, state, canStop };
 }
 
 function stateLabelKey(state: BackgroundWorkState): string {
@@ -198,12 +221,14 @@ function BackgroundWorkRow({
   ready,
   sheet,
   onSelect,
+  pressableRef,
 }: {
   entry: TaskEntry;
   model: Model;
   ready: boolean;
   sheet: boolean;
   onSelect: (key: string) => void;
+  pressableRef: (node: View | null) => void;
 }) {
   const { t } = useTranslation();
   const isCompact = useIsCompactFormFactor();
@@ -294,6 +319,7 @@ function BackgroundWorkRow({
       opensPage={sheet ? `${PAGE_PREFIX}${entry.key}` : undefined}
       onPress={select}
       closeOnSelect={false}
+      pressableRef={pressableRef}
     >
       {renderRow}
     </ComposerTrackRow>
@@ -318,7 +344,7 @@ function BackgroundWorkDetail({
 }): ReactElement {
   const { t } = useTranslation();
   const isCompact = useIsCompactFormFactor();
-  const { kind, title, state, canStop } = useTaskPresentation(entry, ready);
+  const { kind, title, detailTitle, state, canStop } = useTaskPresentation(entry, ready);
   const { item, stopStatus } = entry;
   const stop = useCallback(() => {
     void model.stopItem(item);
@@ -366,7 +392,7 @@ function BackgroundWorkDetail({
             <ThemedChevronLeft size={BACK_ICON_SIZE} uniProps={mutedIconColorMapping} />
           </ToolbarButton>
           <Text style={styles.detailTitle} numberOfLines={2}>
-            {title}
+            {detailTitle}
           </Text>
         </View>
       ) : null}
@@ -394,7 +420,11 @@ function BackgroundWorkDetail({
       {item.command ? (
         <View style={styles.commandSection}>
           <Text style={styles.sectionLabel}>{t("message.backgroundWork.command")}</Text>
-          <ScrollView style={styles.commandBlock} contentContainerStyle={styles.commandContent}>
+          <ScrollView
+            style={styles.commandBlock}
+            contentContainerStyle={styles.commandContent}
+            nestedScrollEnabled
+          >
             <Text
               style={styles.command}
               selectable

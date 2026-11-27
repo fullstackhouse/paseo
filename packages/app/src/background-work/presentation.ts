@@ -3,9 +3,14 @@ import type { SidebarStateBucket } from "@/utils/sidebar-agent-state";
 export function backgroundWorkText(
   item: { description: string | null; command?: string },
   kind: string,
-): { title: string; command: string | null } {
+): { title: string; detailTitle: string; command: string | null } {
   const title = item.description ?? item.command ?? kind;
-  return { title, command: item.command && item.command !== title ? item.command : null };
+  return {
+    title,
+    // The detail prints the command in full, so a task titled by its command is named by its kind.
+    detailTitle: item.command && title === item.command ? kind : title,
+    command: item.command && item.command !== title ? item.command : null,
+  };
 }
 
 export type BackgroundWorkState = "running" | "stopping" | "notRunning";
