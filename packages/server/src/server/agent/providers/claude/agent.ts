@@ -2727,7 +2727,9 @@ class ClaudeAgentSession implements AgentSession {
     }
 
     if (this.autonomousTurn) {
-      this.completeAutonomousTurn();
+      // Claude Code may still finish a compaction the autonomous turn started, so its marker
+      // stays open for the boundary or failed status, or for this turn's end.
+      this.completeAutonomousTurn("leave-open");
     }
 
     const sdkMessage = this.toSdkUserMessage(prompt);
@@ -2910,7 +2912,7 @@ class ClaudeAgentSession implements AgentSession {
 
     if (this.autonomousTurn) {
       this.flushPendingToolCalls();
-      this.completeAutonomousTurn();
+      this.completeAutonomousTurn("canceled");
     }
 
     await this.interruptActiveTurn();
@@ -4443,13 +4445,21 @@ class ClaudeAgentSession implements AgentSession {
     this.syncTurnState("autonomous turn started");
   }
 
-  private completeAutonomousTurn(): void {
+  /**
+   * `openCompaction` says what happens to a compaction marker still open: a stop cancels it,
+   * Claude Code going idle means it didn't finish, and a new foreground message leaves it open.
+   */
+  private completeAutonomousTurn(openCompaction: "canceled" | "failed" | "leave-open"): void {
     if (!this.autonomousTurn) {
       return;
     }
-    const completed: AgentStreamEvent = { type: "turn_completed", provider: "claude" };
-    this.closeCompactionMarkerBeforeTerminal(completed);
-    this.notifySubscribers(completed);
+    if (openCompaction !== "leave-open") {
+      const close = this.takeCompactionMarkerClose(openCompaction);
+      if (close) {
+        this.notifySubscribers(close);
+      }
+    }
+    this.notifySubscribers({ type: "turn_completed", provider: "claude" });
     this.autonomousTurn = null;
     this.activeForegroundQuery = null;
     this.activeForegroundInput = null;
@@ -4682,7 +4692,7 @@ class ClaudeAgentSession implements AgentSession {
     }
     if (message.state === "idle") {
       this.mainTurnInFlight = false;
-      this.completeAutonomousTurn();
+      this.completeAutonomousTurn("failed");
     }
     return true;
   }
