@@ -95,16 +95,48 @@ function unsupported(error: unknown): ChangeRequestReadError {
   return new ChangeRequestReadError(message, { reason: "unsupported", cause: error });
 }
 
+type ReadOutcome = ChangeRequestReadResult | Error;
+
 /**
  * Reads change requests once for plugin servers. Successful results are cached per canonical
  * address for `CHANGE_REQUEST_READ_TTL_MS`, so plugins that refresh on their own clocks share
- * one forge read; errors are not cached.
+ * one forge read; errors are not cached. A read already in flight for an address is shared:
+ * GitHub reads queue per host behind the workspace polls, and without this every plugin client
+ * refreshing meanwhile queued its own copy of the same batch, so reads waited minutes and spent
+ * the rate limit twice.
  */
 export function createChangeRequestReader({
   router,
   now = Date.now,
 }: CreateChangeRequestReaderOptions): ChangeRequestReader {
   const cache = new Map<string, { at: number; result: ChangeRequestReadResult }>();
+  const inflight = new Map<string, Promise<ReadOutcome>>();
+
+  async function readForge(forge: string, urls: string[]): Promise<Map<string, ReadOutcome>> {
+    const source = router.source(forge);
+    if (!source?.read) {
+      const error = new ChangeRequestReadError(
+        `Reading change requests is not supported for ${forge} yet.`,
+        { reason: "unsupported" },
+      );
+      return new Map(urls.map((url) => [url, error]));
+    }
+    let results: Map<string, ReadOutcome>;
+    try {
+      results = await source.read(urls);
+    } catch (error) {
+      const failed = error instanceof Error ? error : new Error(String(error));
+      return new Map(urls.map((url) => [url, failed]));
+    }
+    const at = now();
+    const outcomes = new Map<string, ReadOutcome>();
+    for (const url of urls) {
+      const result = results.get(url) ?? new Error(`Could not read ${url}.`);
+      outcomes.set(url, result);
+      if (!(result instanceof Error)) cache.set(`${forge}:${url}`, { at, result });
+    }
+    return outcomes;
+  }
 
   return {
     async read(urls) {
@@ -120,7 +152,8 @@ export function createChangeRequestReader({
           }
         }),
       );
-      const fresh = new Map<string, ChangeRequestReadResult | Error>();
+      const fresh = new Map<string, ReadOutcome>();
+      const pending = new Map<string, Promise<ReadOutcome>>();
       const missing = new Map<string, Set<string>>();
       for (const entry of resolved) {
         if (!entry.target) continue;
@@ -130,37 +163,33 @@ export function createChangeRequestReader({
           fresh.set(key, hit.result);
           continue;
         }
+        const shared = inflight.get(key);
+        if (shared) {
+          pending.set(key, shared);
+          continue;
+        }
         const set = missing.get(entry.target.forge) ?? new Set<string>();
         set.add(entry.target.url);
         missing.set(entry.target.forge, set);
       }
+      for (const [forge, set] of missing) {
+        const canonical = [...set];
+        const batch = readForge(forge, canonical);
+        for (const url of canonical) {
+          const key = `${forge}:${url}`;
+          const one = batch.then(
+            (outcomes) => outcomes.get(url) ?? new Error(`Could not read ${url}.`),
+          );
+          inflight.set(key, one);
+          pending.set(key, one);
+          void one.finally(() => {
+            if (inflight.get(key) === one) inflight.delete(key);
+          });
+        }
+      }
       await Promise.all(
-        [...missing].map(async ([forge, set]) => {
-          const canonical = [...set];
-          const source = router.source(forge);
-          if (!source?.read) {
-            const error = new ChangeRequestReadError(
-              `Reading change requests is not supported for ${forge} yet.`,
-              { reason: "unsupported" },
-            );
-            for (const url of canonical) fresh.set(`${forge}:${url}`, error);
-            return;
-          }
-          let results: Map<string, ChangeRequestReadResult | Error>;
-          try {
-            results = await source.read(canonical);
-          } catch (error) {
-            const failed = error instanceof Error ? error : new Error(String(error));
-            for (const url of canonical) fresh.set(`${forge}:${url}`, failed);
-            return;
-          }
-          const at = now();
-          for (const url of canonical) {
-            const key = `${forge}:${url}`;
-            const result = results.get(url) ?? new Error(`Could not read ${url}.`);
-            fresh.set(key, result);
-            if (!(result instanceof Error)) cache.set(key, { at, result });
-          }
+        [...pending].map(async ([key, outcome]) => {
+          fresh.set(key, await outcome);
         }),
       );
       return resolved.map((entry) => {

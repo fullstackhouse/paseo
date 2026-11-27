@@ -108,6 +108,26 @@ describe("createChangeRequestReader", () => {
     expect(read).toHaveBeenCalledTimes(2);
   });
 
+  it("shares a read already in flight instead of queueing another for the same PR", async () => {
+    const other = "https://github.com/acme/widgets/pull/42";
+    let finish: () => void = () => {};
+    const gate = new Promise<void>((resolve) => (finish = resolve));
+    const read = vi.fn(async (urls: string[]) => {
+      await gate;
+      return readAll(urls);
+    });
+    const { reader } = setup(read);
+
+    const first = reader.read([PR]);
+    const second = reader.read([PR, other]);
+    const third = reader.read([PR]);
+    finish();
+    const results = await Promise.all([first, second, third]);
+
+    expect(results.flat().every((entry) => entry.ok)).toBe(true);
+    expect(read.mock.calls).toEqual([[[PR]], [[other]]]);
+  });
+
   it("returns errors per URL without caching them", async () => {
     let fail = true;
     const read = vi.fn(async (urls: string[]) => readAll(urls, fail));
