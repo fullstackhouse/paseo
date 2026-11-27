@@ -591,6 +591,10 @@
           },
           "additionalProperties": false
         },
+        "chatTitles": {
+          "type": "string",
+          "enum": ["first-prompt", "generated", "agent"]
+        },
         "skills": {
           "type": "object",
           "properties": {

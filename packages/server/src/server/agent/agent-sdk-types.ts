@@ -787,6 +787,11 @@ export interface AgentSession {
   /** Null until a new provider process could resume this session; see docs/providers.md. */
   describePersistence(): AgentPersistenceHandle | null;
   /**
+   * FSH fork: the title the provider keeps for this session, for "From the agent" chat titles.
+   * Providers without their own session title leave it out; null means no title yet.
+   */
+  readProviderTitle?(): Promise<string | null>;
+  /**
    * Resolve once every foreground turn that predates this call can no longer run or become active.
    * Calling while already idle is a successful no-op. Reject only when foreground ownership is
    * still uncertain.

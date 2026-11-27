@@ -3224,6 +3224,21 @@ export const zhCN: TranslationResources = {
           edit: "编辑",
           editAccessibilityLabel: "编辑提示",
         },
+        chatTitles: {
+          title: "聊天标题",
+          updateFailed: "无法更新聊天标题",
+          renameWins: "手动重命名聊天后将停止自动标题。现有聊天保留原标题。",
+          options: {
+            "first-prompt": "首条消息",
+            generated: "生成一次",
+            agent: "来自智能体",
+          },
+          hints: {
+            "first-prompt": "新聊天以第一条消息的第一行命名。",
+            generated: "新聊天会根据第一条消息生成一次简短标题。",
+            agent: "新聊天跟随智能体为其会话设置的标题变化。没有自有标题的智能体会得到生成的标题。",
+          },
+        },
         idleRuntimeCleanup: {
           title: "释放空闲 Agent",
           hint: "空闲一小时后释放内存。",

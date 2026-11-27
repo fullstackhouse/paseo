@@ -1,5 +1,5 @@
 import pino from "pino";
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 import type { AgentManager } from "./agent/agent-manager.js";
 import type { StoredAgentRecord } from "./agent/agent-storage.js";
 import type { ProviderSnapshotManager } from "./agent/provider-snapshot-manager.js";
@@ -225,5 +225,99 @@ describe("single-agent workspaces share one name with their agent", () => {
     await harness.generate(PROMPT);
 
     expect(harness.agentTitle("agent-1")).toBe("Summarize release status");
+  });
+});
+
+describe("new chats are titled per the Chat titles setting", () => {
+  function createChatTitleHarness() {
+    const calls: string[] = [];
+    const settled = deferred();
+    const agentManager = {
+      followProviderTitle: async (agentId: string) => {
+        calls.push(`follow ${agentId}`);
+        return true;
+      },
+      replaceAutomaticTitle: async (agentId: string, expected: string, title: string) => {
+        calls.push(`title ${agentId}: ${expected} -> ${title}`);
+        settled.resolve();
+        return true;
+      },
+    } as unknown as AgentManager;
+    const prompts: Array<string | undefined> = [];
+    const autoName = new WorkspaceAutoName({
+      agentManager,
+      agentStorage: { listByWorkspace: async () => [] },
+      workspaceRegistry: { update: async () => null },
+      workspaceGitService: {} as WorkspaceGitService,
+      providerSnapshotManager: {} as ProviderSnapshotManager,
+      readDaemonConfig: () => ({}),
+      gitMutation: { notifyGitMutation: async () => {} },
+      emitWorkspaceUpdateForCwd: async () => {},
+      emitWorkspaceUpdateForWorkspaceId: async () => {},
+      logger: pino({ level: "silent" }),
+      generateWorkspaceName: async (options) => {
+        prompts.push(options.firstAgentContext?.prompt);
+        return { title: "Summarize release status", branch: "summarize-release-status" };
+      },
+    });
+
+    function schedule(mode: "first-prompt" | "generated" | "agent", agentId = "agent-1"): void {
+      autoName.scheduleForChat({
+        agentId,
+        cwd: "/workspace",
+        mode,
+        provisionalTitle: PROMPT,
+        firstAgentContext: { prompt: PROMPT },
+      });
+    }
+
+    return { schedule, settled: settled.promise, calls, prompts };
+  }
+
+  test("generated titles the chat once from its first prompt", async () => {
+    const harness = createChatTitleHarness();
+
+    harness.schedule("generated");
+    await harness.settled;
+
+    expect(harness.prompts).toEqual([PROMPT]);
+    expect(harness.calls).toEqual([`title agent-1: ${PROMPT} -> Summarize release status`]);
+  });
+
+  test("from the agent follows the agent's title and shows a generated one until it lands", async () => {
+    const harness = createChatTitleHarness();
+
+    harness.schedule("agent");
+    await harness.settled;
+
+    expect(harness.prompts).toEqual([PROMPT]);
+    expect(harness.calls).toEqual([
+      "follow agent-1",
+      `title agent-1: ${PROMPT} -> Summarize release status`,
+    ]);
+  });
+
+  test("jobs titled from the same prompt share one generation", async () => {
+    const harness = createChatTitleHarness();
+
+    harness.schedule("generated", "agent-1");
+    harness.schedule("generated", "agent-2");
+    await vi.waitFor(() => expect(harness.calls).toHaveLength(2));
+
+    expect(harness.prompts).toEqual([PROMPT]);
+    expect(harness.calls).toEqual([
+      `title agent-1: ${PROMPT} -> Summarize release status`,
+      `title agent-2: ${PROMPT} -> Summarize release status`,
+    ]);
+  });
+
+  test("first prompt leaves the chat's first-prompt title alone", async () => {
+    const harness = createChatTitleHarness();
+
+    harness.schedule("first-prompt");
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    expect(harness.prompts).toEqual([]);
+    expect(harness.calls).toEqual([]);
   });
 });

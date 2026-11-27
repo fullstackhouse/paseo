@@ -3322,6 +3322,25 @@ export const es: TranslationResources = {
           edit: "Editar",
           editAccessibilityLabel: "Editar mensaje",
         },
+        chatTitles: {
+          title: "Títulos de chat",
+          updateFailed: "No se pudieron actualizar los títulos de chat",
+          renameWins:
+            "Cambiar el nombre de un chat detiene los títulos automáticos. Los chats existentes conservan el suyo.",
+          options: {
+            "first-prompt": "Primer mensaje",
+            generated: "Generado una vez",
+            agent: "Del agente",
+          },
+          hints: {
+            "first-prompt":
+              "Los chats nuevos toman como nombre la primera línea del primer mensaje.",
+            generated:
+              "Los chats nuevos reciben un título corto generado una vez a partir del primer mensaje.",
+            agent:
+              "Los chats nuevos siguen el título que el agente da a su sesión cuando cambia. Los agentes sin título propio reciben uno generado.",
+          },
+        },
         idleRuntimeCleanup: {
           title: "Liberar agentes inactivos",
           hint: "Libera memoria tras una hora de inactividad.",

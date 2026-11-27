@@ -298,3 +298,50 @@ describe("importing a renamed Claude session", () => {
     expect(imported.config.title).toBe("Large attachment review");
   });
 });
+
+describe("the title a Claude session keeps for itself", () => {
+  test("is the latest generated ai-title", async () => {
+    const sessionId = "own-ai-title";
+    await writeSession({
+      sessionId,
+      records: [
+        userRecord({ sessionId, content: "fix the login redirect" }),
+        { type: "ai-title", aiTitle: "Login redirect fix", sessionId },
+        userRecord({ sessionId, content: "and the session expiry too" }),
+        { type: "ai-title", aiTitle: "Login redirect and session expiry", sessionId },
+      ],
+    });
+
+    const { session } = await importSession(sessionId);
+
+    expect(await session.readProviderTitle?.()).toBe("Login redirect and session expiry");
+  });
+
+  test("is a /rename saved after the generated title", async () => {
+    const sessionId = "own-title-renamed";
+    await writeSession({
+      sessionId,
+      records: [
+        userRecord({ sessionId, content: "fix the login redirect" }),
+        { type: "ai-title", aiTitle: "Login redirect fix", sessionId },
+        { type: "custom-title", customTitle: "Auth work", sessionId },
+      ],
+    });
+
+    const { session } = await importSession(sessionId);
+
+    expect(await session.readProviderTitle?.()).toBe("Auth work");
+  });
+
+  test("is null before Claude Code saved a title", async () => {
+    const sessionId = "own-title-pending";
+    await writeSession({
+      sessionId,
+      records: [userRecord({ sessionId, content: "fix the login redirect" })],
+    });
+
+    const { session } = await importSession(sessionId);
+
+    expect(await session.readProviderTitle?.()).toBeNull();
+  });
+});

@@ -194,7 +194,7 @@ import { setupWorkspaceSnoozeWaker } from "./workspace-snooze/index.js";
 import { setupWorkspaceManualGroupClearer } from "./workspace-manual-group/index.js";
 import { setupProjectLastAgentSetupRecorder } from "./project-last-agent-setup.js";
 import { continueSnoozedWorkspace } from "./workspace-snooze/continue.js";
-import type { SnoozedPermissionBehavior } from "@getpaseo/protocol/messages";
+import type { ChatTitleMode, SnoozedPermissionBehavior } from "@getpaseo/protocol/messages";
 import { wrapSessionMessage, type SessionOutboundMessage } from "./messages.js";
 import type { TerminalManager } from "../terminal/terminal-manager.js";
 import { startWorkerTerminalManager } from "../terminal/worker-terminal-manager.js";
@@ -497,6 +497,7 @@ export interface PaseoDaemonConfig {
       thinkingOptionId?: string;
     }>;
   };
+  chatTitles?: ChatTitleMode;
   providerOverrides?: Record<string, ProviderOverride>;
   log?: PersistedConfig["log"];
   onLifecycleIntent?: (intent: DaemonLifecycleIntent) => void;
@@ -631,6 +632,7 @@ function createInitialMutableDaemonConfig(config: ResolvedDaemonSettings): Mutab
     },
     autoArchiveAfterMerge: config.autoArchiveAfterMerge ?? false,
     snoozedPermission: config.snoozedPermission,
+    ...(config.chatTitles !== undefined ? { chatTitles: config.chatTitles } : {}),
     enableTerminalAgentHooks: config.enableTerminalAgentHooks ?? false,
     idleRuntimeCleanup: config.idleRuntimeCleanup !== false,
     resumeOnStartup: config.resumeOnStartup !== false,

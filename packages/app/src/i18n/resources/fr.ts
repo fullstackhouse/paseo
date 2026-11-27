@@ -3325,6 +3325,25 @@ export const fr: TranslationResources = {
           edit: "Modifier",
           editAccessibilityLabel: "Modifier le message",
         },
+        chatTitles: {
+          title: "Titres des chats",
+          updateFailed: "Impossible de mettre à jour les titres des chats",
+          renameWins:
+            "Renommer un chat arrête les titres automatiques. Les chats existants gardent le leur.",
+          options: {
+            "first-prompt": "Premier message",
+            generated: "Généré une fois",
+            agent: "Par l’agent",
+          },
+          hints: {
+            "first-prompt":
+              "Les nouveaux chats prennent pour nom la première ligne du premier message.",
+            generated:
+              "Les nouveaux chats reçoivent un titre court généré une seule fois à partir du premier message.",
+            agent:
+              "Les nouveaux chats suivent le titre que l’agent donne à sa session quand il change. Les agents sans titre propre reçoivent un titre généré.",
+          },
+        },
         idleRuntimeCleanup: {
           title: "Libérer les agents inactifs",
           hint: "Libère de la mémoire après une heure d’inactivité.",

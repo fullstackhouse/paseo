@@ -1,5 +1,5 @@
 import type pino from "pino";
-import type { FirstAgentContext } from "@getpaseo/protocol/messages";
+import type { ChatTitleMode, FirstAgentContext } from "@getpaseo/protocol/messages";
 
 import { resolveFirstAgentPromptTitle } from "./agent/create-agent-title.js";
 import type { AgentManager } from "./agent/agent-manager.js";
@@ -20,6 +20,8 @@ import {
 } from "./worktree-branch-name-generator.js";
 
 type WorkspaceNameGenerator = typeof generateBranchNameFromFirstAgentContext;
+
+const SHARED_GENERATION_TTL_MS = 60_000;
 
 type CurrentSelection = GenerateBranchNameFromFirstAgentContextOptions["currentSelection"] | null;
 
@@ -53,6 +55,7 @@ export class WorkspaceAutoName {
   private readonly emitWorkspaceUpdateForWorkspaceId: (workspaceId: string) => Promise<void>;
   private readonly logger: pino.Logger;
   private readonly generateWorkspaceName: WorkspaceNameGenerator;
+  private readonly recentGenerations = new Map<string, Promise<GeneratedWorkspaceName | null>>();
 
   constructor(options: WorkspaceAutoNameOptions) {
     this.agentManager = options.agentManager;
@@ -105,6 +108,50 @@ export class WorkspaceAutoName {
         }),
       { cwd: input.cwd, message: "Failed to auto-name directory workspace title" },
     );
+  }
+
+  /**
+   * FSH: titles a new chat per the host's "Chat titles" setting. "agent" follows the provider
+   * session's own title where the provider keeps one and otherwise generates once, like
+   * "generated". A generated title lands only while the chat still has its first-prompt title.
+   */
+  scheduleForChat(
+    input: {
+      agentId: string;
+      cwd: string;
+      mode: ChatTitleMode;
+      provisionalTitle: string;
+      firstAgentContext: FirstAgentContext;
+    },
+    context: ScheduleContext = {},
+  ): void {
+    if (input.mode === "first-prompt") return;
+    this.schedule(
+      () => this.autoTitleChat({ ...input, currentSelection: context.currentSelection ?? null }),
+      { cwd: input.cwd, message: "Failed to auto-title chat" },
+    );
+  }
+
+  private async autoTitleChat(input: {
+    agentId: string;
+    cwd: string;
+    mode: ChatTitleMode;
+    provisionalTitle: string;
+    firstAgentContext: FirstAgentContext;
+    currentSelection: CurrentSelection;
+  }): Promise<void> {
+    // From the agent still generates: a Claude binary that writes no ai-title in SDK sessions
+    // would otherwise leave the long first-prompt title. Whichever automatic title lands first
+    // stays only until the agent names its session.
+    if (input.mode === "agent") await this.agentManager.followProviderTitle(input.agentId);
+    const generated = await this.generateFromContext({
+      cwd: input.cwd,
+      firstAgentContext: input.firstAgentContext,
+      currentSelection: input.currentSelection,
+    });
+    const title = generated?.title?.trim();
+    if (!title) return;
+    await this.agentManager.replaceAutomaticTitle(input.agentId, input.provisionalTitle, title);
   }
 
   private async maybeAutoNameWorkspaceBranchForFirstAgent(input: {
@@ -226,7 +273,29 @@ export class WorkspaceAutoName {
     return records.filter((record) => !record.internal && !record.archivedAt);
   }
 
+  /**
+   * A new workspace and its first chat both title themselves from the same prompt, so the two jobs
+   * share one model call: a result is reused for a minute per working directory and prompt.
+   */
   private generateFromContext(input: {
+    cwd: string;
+    firstAgentContext: FirstAgentContext;
+    currentSelection: CurrentSelection;
+  }): Promise<GeneratedWorkspaceName | null> {
+    const key = `${input.cwd}\0${JSON.stringify(input.firstAgentContext)}`;
+    const shared = this.recentGenerations.get(key);
+    if (shared) return shared;
+    const generation = this.callGenerator(input);
+    this.recentGenerations.set(key, generation);
+    const forget = () => {
+      if (this.recentGenerations.get(key) === generation) this.recentGenerations.delete(key);
+    };
+    generation.catch(forget);
+    setTimeout(forget, SHARED_GENERATION_TTL_MS).unref();
+    return generation;
+  }
+
+  private callGenerator(input: {
     cwd: string;
     firstAgentContext: FirstAgentContext;
     currentSelection: CurrentSelection;

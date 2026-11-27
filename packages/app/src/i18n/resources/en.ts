@@ -3431,6 +3431,22 @@ export const en = {
           edit: "Edit",
           editAccessibilityLabel: "Edit prompt",
         },
+        chatTitles: {
+          title: "Chat titles",
+          updateFailed: "Unable to update chat titles",
+          renameWins: "Renaming a chat stops automatic titles. Existing chats keep theirs.",
+          options: {
+            "first-prompt": "First prompt",
+            generated: "Generated once",
+            agent: "From the agent",
+          },
+          hints: {
+            "first-prompt": "New chats are named after the first line of the first message.",
+            generated: "New chats get a short title generated once from the first message.",
+            agent:
+              "New chats follow the title the agent gives its session as it changes. Agents without one get a generated title.",
+          },
+        },
         idleRuntimeCleanup: {
           title: "Release idle agents",
           hint: "Free up memory after an hour of inactivity.",

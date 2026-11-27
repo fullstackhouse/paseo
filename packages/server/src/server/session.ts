@@ -5463,6 +5463,14 @@ export class Session {
       await this.agentUpdates.forwardLiveAgent(
         this.agentManager.getAgent(snapshot.id) ?? liveSnapshot,
       );
+      if (provisionalTitle && !config.title?.trim()) {
+        this.scheduleChatTitle({
+          agentId: snapshot.id,
+          cwd: resolvedIntent.config.cwd,
+          provisionalTitle,
+          firstAgentContext,
+        });
+      }
       if (resolvedIntent.createdDirectoryWorkspace && trimmedPrompt) {
         this.workspaceAutoName.scheduleForDirectory(
           {
@@ -9599,8 +9607,30 @@ export class Session {
     const stored = await this.agentStorage.get(agentId);
     if (stored && !stored.title && !stored.lastUserMessageAt) {
       const { provisionalTitle } = resolveCreateAgentTitles({ initialPrompt: text });
-      if (provisionalTitle) await this.agentManager.setTitle(agentId, provisionalTitle);
+      if (!provisionalTitle) return;
+      await this.agentManager.setTitle(agentId, provisionalTitle);
+      this.scheduleChatTitle({
+        agentId,
+        cwd: stored.cwd,
+        provisionalTitle,
+        firstAgentContext: { prompt: text },
+      });
     }
+  }
+
+  /** First prompt, the default, keeps the provisional title and schedules nothing. */
+  private scheduleChatTitle(input: {
+    agentId: string;
+    cwd: string;
+    provisionalTitle: string;
+    firstAgentContext: FirstAgentContext;
+  }): void {
+    const mode = this.daemonConfigStore.get().chatTitles ?? "first-prompt";
+    if (mode === "first-prompt") return;
+    this.workspaceAutoName.scheduleForChat(
+      { ...input, mode },
+      { currentSelection: this.getFocusedAgentSelectionForCwd(input.cwd) },
+    );
   }
 
   private async handleSendAgentMessageRequest(

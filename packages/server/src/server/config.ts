@@ -603,6 +603,7 @@ export type ResolvedDaemonSettings = Pick<
   | "resumePrompt"
   | "providerCatalogRefreshTimeoutMs"
   | "metadataGeneration"
+  | "chatTitles"
   | "providerOverrides"
 >;
 
@@ -663,6 +664,19 @@ export function resolveConfigFromPersisted(
   };
 }
 
+function resolveAgentGenerationConfig(
+  agents: PersistedConfig["agents"],
+): Pick<
+  ResolvedDaemonSettings,
+  "providerCatalogRefreshTimeoutMs" | "metadataGeneration" | "chatTitles"
+> {
+  return {
+    providerCatalogRefreshTimeoutMs: agents?.catalogRefreshTimeoutMs,
+    metadataGeneration: agents?.metadataGeneration,
+    chatTitles: agents?.chatTitles,
+  };
+}
+
 export function resolveReloadableConfig(
   persisted: PersistedConfig,
   options?: ResolveConfigFromPersistedOptions,
@@ -690,8 +704,7 @@ export function resolveReloadableConfig(
     relayRequireProtectedSecurity: relay.requireProtectedSecurity,
     idleRuntimeCleanup: persisted.agents?.idleRuntimeCleanup ?? true,
     ...resolveRestartRecoveryConfig(persisted.agents),
-    providerCatalogRefreshTimeoutMs: persisted.agents?.catalogRefreshTimeoutMs,
-    metadataGeneration: persisted.agents?.metadataGeneration,
+    ...resolveAgentGenerationConfig(persisted.agents),
     providerOverrides: extractProviderOverrides(
       persisted.agents?.providers as Record<string, unknown> | undefined,
     ),

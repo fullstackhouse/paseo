@@ -2908,7 +2908,7 @@ export class AgentManager {
 
     const nextRecord = {
       ...record,
-      ...(patch.title ? { title: patch.title } : {}),
+      ...(patch.title ? { title: patch.title, titleFollowsAgent: undefined } : {}),
       ...(patch.labels ? { labels: applyRecordPatch(record.labels, patch.labels) } : {}),
       ...(patch.metadata ? { metadata: applyRecordPatch(record.metadata, patch.metadata) } : {}),
       updatedAt: this.nextStoredUpdatedAt(record),
@@ -3168,6 +3168,8 @@ export class AgentManager {
     const liveAgent = this.getAgent(agentId);
     if (liveAgent) {
       if (updates.title) {
+        // A rename by hand wins over automatic titles for good.
+        await this.registry?.setTitleFollowsAgent(agentId, false);
         await this.setTitle(agentId, updates.title);
       }
       if (updates.labels) {
@@ -5756,6 +5758,44 @@ export class AgentManager {
       (agent as ActiveManagedAgent).lifecycle = "idle";
     }
     void this.refreshRuntimeInfo(agent);
+    void this.syncProviderTitle(agent).catch((error) => {
+      this.logger.warn({ err: error, agentId: agent.id }, "Failed to read the agent's own title");
+    });
+  }
+
+  /** FSH: "From the agent" chat titles take the provider session's title after each turn. */
+  private async syncProviderTitle(agent: ActiveManagedAgent): Promise<void> {
+    if (!agent.session.readProviderTitle || !this.registry) return;
+    if (!(await this.registry.get(agent.id))?.titleFollowsAgent) return;
+    const title = (await agent.session.readProviderTitle())?.trim();
+    if (!title) return;
+    await this.runLifecycleMutation(agent.id, async () => {
+      const record = await this.registry?.get(agent.id);
+      if (!record?.titleFollowsAgent || record.title === title || !this.getAgent(agent.id)) return;
+      await this.setTitle(agent.id, title);
+    });
+  }
+
+  /**
+   * FSH: the agent's title follows its provider session's own title from now on. False when the
+   * provider keeps no title of its own or the agent has no stored record to carry the flag.
+   */
+  async followProviderTitle(agentId: string): Promise<boolean> {
+    if (!this.agents.get(agentId)?.session.readProviderTitle) return false;
+    return this.requireRegistry().setTitleFollowsAgent(agentId, true);
+  }
+
+  /**
+   * FSH: sets an automatic title, unless the current one is no longer `expected` (a rename won).
+   * Runs in the lifecycle lane so a rename in flight lands first.
+   */
+  async replaceAutomaticTitle(agentId: string, expected: string, title: string): Promise<boolean> {
+    return this.runLifecycleMutation(agentId, async () => {
+      const record = await this.registry?.get(agentId);
+      if (!record || (record.title ?? null) !== expected || !this.getAgent(agentId)) return false;
+      await this.setTitle(agentId, title);
+      return true;
+    });
   }
 
   private async onStreamTurnFailed(params: {

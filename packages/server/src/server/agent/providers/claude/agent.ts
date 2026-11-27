@@ -3312,6 +3312,17 @@ class ClaudeAgentSession implements AgentSession {
     });
   }
 
+  /** The latest `/rename` or Claude Code's own generated title, whichever the transcript saved last. */
+  async readProviderTitle(): Promise<string | null> {
+    const sessionId = this.claudeSessionId;
+    const cwd = this.config.cwd;
+    if (!sessionId || !cwd) return null;
+    return readClaudeSessionTitle(
+      { cwd, sessionId, configDir: claudeConfigDir(this.harnessEnvironment) },
+      ["custom-title", "ai-title"],
+    );
+  }
+
   describePersistence(): AgentPersistenceHandle | null {
     if (this.persistence) {
       return this.persistence;
@@ -7377,15 +7388,23 @@ function normalizeClaudeSessionTitle(title: string | null): string | null {
   return normalized ? normalized : null;
 }
 
-const CLAUDE_CUSTOM_TITLE_TYPE = "custom-title";
-const CLAUDE_CUSTOM_TITLE_NEEDLE = Buffer.from(`"${CLAUDE_CUSTOM_TITLE_TYPE}"`);
+// `custom-title` is a `/rename`; `ai-title` is the title Claude Code generates for the session.
+const CLAUDE_TITLE_FIELDS = { "custom-title": "customTitle", "ai-title": "aiTitle" } as const;
+type ClaudeTitleRecordType = keyof typeof CLAUDE_TITLE_FIELDS;
+const CLAUDE_TITLE_NEEDLES: Record<ClaudeTitleRecordType, Buffer> = {
+  "custom-title": Buffer.from('"custom-title"'),
+  "ai-title": Buffer.from('"ai-title"'),
+};
 const CLAUDE_TITLE_SCAN_CHUNK_BYTES = 64 * 1024;
 
-function readClaudeCustomTitleFromRecord(record: Buffer): string | null {
+function readClaudeTitleFromRecord(
+  record: Buffer,
+  types: readonly ClaudeTitleRecordType[],
+): string | null {
   // The needle also matches a prompt that quotes it, so a record still has to
-  // parse as a `custom-title` entry carrying a usable name. Records without the
-  // needle are never decoded, so a long one costs a byte search and nothing more.
-  if (!record.includes(CLAUDE_CUSTOM_TITLE_NEEDLE)) {
+  // parse as a title entry carrying a usable name. Records without a needle are
+  // never decoded, so a long one costs a byte search and nothing more.
+  if (!types.some((type) => record.includes(CLAUDE_TITLE_NEEDLES[type]))) {
     return null;
   }
   let parsed: unknown;
@@ -7395,22 +7414,28 @@ function readClaudeCustomTitleFromRecord(record: Buffer): string | null {
     return null;
   }
   const entry = toObjectRecord(parsed);
-  if (!entry || entry.isSidechain || entry.type !== CLAUDE_CUSTOM_TITLE_TYPE) {
+  if (!entry || entry.isSidechain) {
     return null;
   }
-  return normalizeClaudeSessionTitle(
-    typeof entry.customTitle === "string" ? entry.customTitle : null,
-  );
+  const type = types.find((candidate) => entry.type === candidate);
+  if (!type) {
+    return null;
+  }
+  const title = entry[CLAUDE_TITLE_FIELDS[type]];
+  return normalizeClaudeSessionTitle(typeof title === "string" ? title : null);
 }
 
 /**
- * The `custom-title` record is re-emitted every time the session is saved, so
- * the current name is the last usable one in the file. Reading backwards a chunk
+ * Title records are re-emitted every time the session is saved, so the current
+ * one is the last usable record in the file. Reading backwards a chunk
  * at a time finds it without walking the transcript, which matters because
  * sessions reach tens of megabytes, and never holds the file as one string, so a
  * transcript past V8's maximum string length still imports.
  */
-async function readLastClaudeCustomTitle(filePath: string): Promise<string | null> {
+async function readLastClaudeTitle(
+  filePath: string,
+  types: readonly ClaudeTitleRecordType[],
+): Promise<string | null> {
   const handle = await fsPromises.open(filePath, "r");
   try {
     const stats = await handle.stat();
@@ -7438,7 +7463,7 @@ async function readLastClaudeCustomTitle(filePath: string): Promise<string | nul
       ) {
         pieces.push(chunk.subarray(at + 1, recordEnd));
         const record = Buffer.concat(pieces.toReversed());
-        const title = readClaudeCustomTitleFromRecord(record);
+        const title = readClaudeTitleFromRecord(record, types);
         if (title) return title;
         pieces = [];
         recordEnd = at;
@@ -7447,7 +7472,7 @@ async function readLastClaudeCustomTitle(filePath: string): Promise<string | nul
       end -= length;
     }
     // The first record in the file has no newline in front of it.
-    return readClaudeCustomTitleFromRecord(Buffer.concat(pieces.toReversed()));
+    return readClaudeTitleFromRecord(Buffer.concat(pieces.toReversed()), types);
   } finally {
     await handle.close();
   }
@@ -7462,8 +7487,15 @@ async function readClaudeRenamedSessionTitle(input: {
   sessionId: string;
   configDir: string;
 }): Promise<string | null> {
+  return readClaudeSessionTitle(input, ["custom-title"]);
+}
+
+async function readClaudeSessionTitle(
+  input: { cwd: string; sessionId: string; configDir: string },
+  types: readonly ClaudeTitleRecordType[],
+): Promise<string | null> {
   try {
-    return await readLastClaudeCustomTitle(await claudeTranscriptPath(input));
+    return await readLastClaudeTitle(await claudeTranscriptPath(input), types);
   } catch (error) {
     // A session with no transcript on disk has no rename to carry over. Every
     // other read failure is a real fault and stays explicit.

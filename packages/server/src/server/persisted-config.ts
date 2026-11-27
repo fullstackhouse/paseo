@@ -18,6 +18,7 @@ import {
 } from "./private-files.js";
 import { AgentProfileSchema, AgentSkillSelectionSchema } from "@getpaseo/protocol/agent-profile";
 import { PluginIdSchema, PluginSourceSchema } from "@getpaseo/protocol/plugin-config";
+import { ChatTitleModeSchema } from "@getpaseo/protocol/chat-title-mode";
 import { TerminalProfileSchema } from "@getpaseo/protocol/terminal-profile";
 import { PaseoServicePortAllocationSchema } from "@getpaseo/protocol/paseo-config-schema";
 
@@ -373,6 +374,8 @@ export const PersistedConfigSchema = z
         resumePrompt: z.string().optional(),
         catalogRefreshTimeoutMs: z.number().int().positive().max(2_147_483_647).optional(),
         metadataGeneration: AgentMetadataGenerationSchema.optional(),
+        // FSH-only: how a new chat gets its title (default first-prompt).
+        chatTitles: ChatTitleModeSchema.optional(),
         skills: z.object({ selection: AgentSkillSelectionSchema.optional() }).strict().optional(),
       })
       .strict()

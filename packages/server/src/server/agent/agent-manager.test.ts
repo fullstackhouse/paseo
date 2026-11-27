@@ -6275,6 +6275,106 @@ test("updateAgentMetadata bumps updatedAt for stored agents", async () => {
   expect(Date.parse(after!.updatedAt)).toBeGreaterThan(Date.parse(before!.updatedAt));
 });
 
+describe("chat titles", () => {
+  const providerTitle: { current: string | null } = { current: null };
+
+  class OwnTitleSession extends TestAgentSession {
+    async readProviderTitle(): Promise<string | null> {
+      return providerTitle.current;
+    }
+  }
+
+  class OwnTitleClient extends TestAgentClient {
+    override async createSession(config: AgentSessionConfig): Promise<AgentSession> {
+      this.createdConfigs.push(config);
+      return new OwnTitleSession(config);
+    }
+  }
+
+  async function createChat(client: TestAgentClient) {
+    const workdir = mkdtempSync(join(tmpdir(), "agent-manager-chat-titles-"));
+    const storage = new AgentStorage(join(workdir, "agents"), logger);
+    const manager = new AgentManager({ clients: { codex: client }, registry: storage, logger });
+    const addChat = async () => {
+      const agent = await manager.createAgent({ provider: "codex", cwd: workdir }, undefined, {
+        workspaceId: undefined,
+        initialTitle: "fix the login redirect",
+      });
+      const titleOf = async () => (await storage.get(agent.id))?.title ?? null;
+      return { agentId: agent.id, titleOf };
+    };
+    return { manager, storage, addChat, ...(await addChat()) };
+  }
+
+  beforeEach(() => {
+    providerTitle.current = null;
+  });
+
+  test("a followed chat takes the agent's own title after each turn", async () => {
+    const { manager, agentId, titleOf } = await createChat(new OwnTitleClient());
+    expect(await manager.followProviderTitle(agentId)).toBe(true);
+
+    providerTitle.current = "Login redirect fix";
+    await manager.runAgent(agentId, "first");
+    await vi.waitFor(async () => expect(await titleOf()).toBe("Login redirect fix"));
+
+    providerTitle.current = "Login redirect and session expiry";
+    await manager.runAgent(agentId, "second");
+    await vi.waitFor(async () => expect(await titleOf()).toBe("Login redirect and session expiry"));
+  });
+
+  test("a rename stops the chat from following the agent's title", async () => {
+    const { manager, storage, addChat, agentId, titleOf } = await createChat(new OwnTitleClient());
+    const witness = await addChat();
+    await manager.followProviderTitle(agentId);
+    await manager.followProviderTitle(witness.agentId);
+    providerTitle.current = "Login redirect fix";
+    await manager.runAgent(agentId, "first");
+    await vi.waitFor(async () => expect(await titleOf()).toBe("Login redirect fix"));
+
+    await manager.updateAgentMetadata(agentId, { title: "Auth work" });
+    providerTitle.current = "Something else entirely";
+    await manager.runAgent(agentId, "second");
+    await manager.runAgent(witness.agentId, "second");
+    // The witness still follows, so once it has taken the new title, a read after the renamed
+    // chat's turn would have landed too.
+    await vi.waitFor(async () => expect(await witness.titleOf()).toBe("Something else entirely"));
+
+    expect(await titleOf()).toBe("Auth work");
+    expect((await storage.get(agentId))?.titleFollowsAgent).toBeUndefined();
+  });
+
+  test("a chat whose agent keeps no title of its own is not followed", async () => {
+    const { manager, storage, agentId } = await createChat(new TestAgentClient());
+
+    expect(await manager.followProviderTitle(agentId)).toBe(false);
+    expect((await storage.get(agentId))?.titleFollowsAgent).toBeUndefined();
+  });
+
+  test("following a chat with no stored record reports that nothing was set", async () => {
+    const { storage } = await createChat(new OwnTitleClient());
+
+    expect(await storage.setTitleFollowsAgent("00000000-0000-4000-8000-0000000000ff", true)).toBe(
+      false,
+    );
+  });
+
+  test("an automatic title lands only while the chat keeps its first-prompt title", async () => {
+    const { manager, agentId, titleOf } = await createChat(new TestAgentClient());
+
+    expect(
+      await manager.replaceAutomaticTitle(agentId, "fix the login redirect", "Login redirect fix"),
+    ).toBe(true);
+    expect(await titleOf()).toBe("Login redirect fix");
+
+    await manager.updateAgentMetadata(agentId, { title: "Auth work" });
+    expect(
+      await manager.replaceAutomaticTitle(agentId, "Login redirect fix", "Generated later"),
+    ).toBe(false);
+    expect(await titleOf()).toBe("Auth work");
+  });
+});
+
 test("persists live mode, model, and thinking changes without an external snapshot subscriber", async () => {
   const workdir = mkdtempSync(join(tmpdir(), "agent-manager-live-persist-"));
   const storagePath = join(workdir, "agents");
