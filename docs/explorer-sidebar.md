@@ -190,7 +190,7 @@ is the storyboard in `.ai/prototypes/overview-v3/`; In progress and the Status a
   per-agent turns, so it counts a running workspace as live work: on such a row it never says "not moving". Pressing an agent or job line
   opens the agent; the subagents line opens the agent and its subagents list (`requestSubagentsTrackOpen`); an entry
   opens in place with the item's `EntryComponent`, which gets `nothingMoving`. One row is open across Your move and In
-  progress (`openMoveKey`, `pinOpenMove`); an In progress row never opens by itself. Hidden when nothing moves.
+  progress (`openMoveKey`, `pinOpenMove`): the first Your move entry that expands, even below a permission prompt, until the human picks another; an In progress row never opens by itself. Hidden when nothing moves.
 - **Context**: one-line facts the blocks above don't say, under a rule, and nothing when there are none: From (the
   nearest ancestor's workspace), Started (the workspaces the focused agent started), the PR or a branch with something
   to report, Agents when several root agents share the workspace, and plugin
