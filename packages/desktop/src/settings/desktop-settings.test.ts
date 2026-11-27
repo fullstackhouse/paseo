@@ -81,7 +81,7 @@ describe("desktop-settings", () => {
 
     expect(settings).toEqual({
       releaseChannel: "stable",
-      notifications: { playSound: true },
+      notifications: { playSound: true, sound: null },
       daemon: {
         manageBuiltInDaemon: true,
         keepRunningAfterQuit: false,
@@ -103,7 +103,7 @@ describe("desktop-settings", () => {
 
     expect(next).toEqual({
       releaseChannel: "beta",
-      notifications: { playSound: true },
+      notifications: { playSound: true, sound: null },
       daemon: {
         manageBuiltInDaemon: true,
         keepRunningAfterQuit: false,
@@ -149,6 +149,38 @@ describe("desktop-settings", () => {
     const settings = await createDesktopSettingsStore({ userDataPath }).get();
 
     expect(settings.notifications.playSound).toBe(false);
+  });
+
+  it("stores a chosen notification sound and resets it to the system default", async () => {
+    const userDataPath = await createTempUserDataDir();
+    directories.add(userDataPath);
+    const store = createDesktopSettingsStore({ userDataPath });
+
+    expect((await store.get()).notifications.sound).toBeNull();
+
+    await store.patch({ notifications: { sound: "Glass" } });
+    const restarted = await createDesktopSettingsStore({ userDataPath }).get();
+    expect(restarted.notifications).toEqual({ playSound: true, sound: "Glass" });
+
+    const reset = await store.patch({ notifications: { sound: null } });
+    expect(reset.notifications.sound).toBeNull();
+  });
+
+  it("ignores a notification sound that isn't a plain name", async () => {
+    const userDataPath = await createTempUserDataDir();
+    directories.add(userDataPath);
+    const store = createDesktopSettingsStore({ userDataPath });
+    await store.patch({ notifications: { sound: "Glass" } });
+
+    const next = await store.patch({ notifications: { sound: "../../etc/passwd" } });
+    expect(next.notifications.sound).toBe("Glass");
+
+    await writeFile(
+      settingsFilePath(userDataPath),
+      JSON.stringify({ version: 1, settings: { notifications: { playSound: true, sound: 7 } } }),
+    );
+    const repaired = await createDesktopSettingsStore({ userDataPath }).get();
+    expect(repaired.notifications).toEqual({ playSound: true, sound: null });
   });
 
   it("does not let stale legacy renderer settings override an explicit desktop patch", async () => {
@@ -270,7 +302,7 @@ describe("desktop-settings", () => {
 
     expect(migrated).toEqual({
       releaseChannel: "beta",
-      notifications: { playSound: true },
+      notifications: { playSound: true, sound: null },
       daemon: {
         manageBuiltInDaemon: false,
         keepRunningAfterQuit: false,
@@ -315,7 +347,7 @@ describe("desktop-settings", () => {
     expect(persisted.settings.releaseChannel).toBe("beta");
     expect(next).toEqual({
       releaseChannel: "beta",
-      notifications: { playSound: false },
+      notifications: { playSound: false, sound: null },
       daemon: { manageBuiltInDaemon: true, keepRunningAfterQuit: false },
     });
   });
