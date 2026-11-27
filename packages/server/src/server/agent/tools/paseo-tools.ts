@@ -2817,7 +2817,7 @@ function createToolCatalog(
       {
         title: "Watch change request",
         description:
-          "Watch a pull request or merge request for check failures, passing checks, new comments, reviews, approvals, and closure. Returns the current state and sends future updates after your current turn.",
+          "Watch a pull request or merge request for check failures, passing checks, new comments, reviews, approvals, and closure. Returns the current state and sends future updates after your current turn. Use this to wait for CI or a review instead of `gh pr checks --watch` or a sleep loop: the daemon reads each PR once for every watcher, under one rate limit, and wakes you when it changes.",
         inputSchema,
         outputSchema: {
           url: z.string(),

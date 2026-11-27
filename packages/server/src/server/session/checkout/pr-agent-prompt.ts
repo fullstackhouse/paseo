@@ -64,7 +64,7 @@ export function buildPrAgentPrompt(input: PrAgentPromptInput): string {
       [
         "## Merge",
         "",
-        `After the ${abbrev} is created, wait for CI. If checks fail or there are conflicts, fix them and push again. Merge the ${abbrev} once it's green and mergeable. If you can't get it there, stop and tell the user why.`,
+        `After the ${abbrev} is created, wait for CI with the subscribe_change_request tool, not \`gh pr checks --watch\`. If checks fail or there are conflicts, fix them and push again. Merge the ${abbrev} once it's green and mergeable. If you can't get it there, stop and tell the user why.`,
       ].join("\n"),
     );
   }
