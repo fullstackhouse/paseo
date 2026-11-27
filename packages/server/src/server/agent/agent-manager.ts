@@ -539,6 +539,10 @@ interface ManagedAgentBase {
   lastUserMessageAt: Date | null;
   activeTurnId: string | null;
   activeTurnStartedAt: Date | null;
+  /**
+   * Time in finished turns, without the open one. Absent when turns ran before this was recorded.
+   */
+  workedMs?: number;
   lastUsage?: AgentUsage;
   /** Provider-owned session metrics, replaced whole on every provider update. */
   sessionMetrics?: AgentMetric[];
@@ -919,6 +923,13 @@ const RETIRED_INTERNAL_AGENT_LIMIT = 500;
 export interface RetiredInternalAgent {
   record: ArchivedStoredAgentRecord;
   lastMessage: string | null;
+}
+
+function totalWorkedMs(
+  agent: Pick<ManagedAgentBase, "workedMs" | "activeTurnStartedAt">,
+): number | undefined {
+  if (agent.workedMs === undefined || !agent.activeTurnStartedAt) return agent.workedMs;
+  return agent.workedMs + Math.max(0, Date.now() - agent.activeTurnStartedAt.getTime());
 }
 
 export class AgentManager {
@@ -1774,6 +1785,7 @@ export class AgentManager {
     await this.requireExternalMcpSupport(session, providerLaunchConfig, launchContext);
     const agent = await this.registerSession(session, storedConfig, resolvedAgentId, {
       launchedOptions,
+      workedMs: 0,
       labels: options.labels,
       metadata: options.metadata,
       initialTitle: options.initialTitle,
@@ -1809,6 +1821,7 @@ export class AgentManager {
       createdAt?: Date;
       updatedAt?: Date;
       lastUserMessageAt?: Date | null;
+      workedMs?: number;
       labels?: Record<string, string>;
       metadata?: AgentMetadata;
       workspaceId?: string;
@@ -1855,6 +1868,7 @@ export class AgentManager {
       createdAt?: Date;
       updatedAt?: Date;
       lastUserMessageAt?: Date | null;
+      workedMs?: number;
       labels?: Record<string, string>;
       metadata?: AgentMetadata;
       workspaceId?: string;
@@ -2184,6 +2198,7 @@ export class AgentManager {
         createdAt: existing.createdAt,
         updatedAt: existing.updatedAt,
         lastUserMessageAt: existing.lastUserMessageAt,
+        workedMs: closedExisting.workedMs,
         historyPrimed: rehydrateFromDisk ? false : preservedHistoryPrimed,
         lastUsage: preservedLastUsage,
         sessionMetrics: preservedSessionMetrics,
@@ -2664,6 +2679,7 @@ export class AgentManager {
         activeForegroundTurnId: null,
         activeTurnId: null,
         activeTurnStartedAt: null,
+        workedMs: record.workedMs,
         foregroundTurnWaiters: new Set(),
         finalizedForegroundTurnIds: new Set(),
         unsubscribeSession: null,
@@ -3793,6 +3809,7 @@ export class AgentManager {
   }
 
   private openActiveTurn(agent: ActiveManagedAgent, turnId: string, startedAt: Date): void {
+    agent.workedMs = totalWorkedMs(agent);
     agent.activeTurnId = turnId;
     agent.activeTurnStartedAt = startedAt;
   }
@@ -3805,6 +3822,7 @@ export class AgentManager {
     if (fromHistory) return "stale";
     if (!agent.activeTurnId) return "untracked";
     if (turnId && agent.activeTurnId !== turnId) return "stale";
+    agent.workedMs = totalWorkedMs(agent);
     agent.activeTurnId = null;
     agent.activeTurnStartedAt = null;
     return "closed_current";
@@ -4697,6 +4715,7 @@ export class AgentManager {
       createdAt?: Date;
       updatedAt?: Date;
       lastUserMessageAt?: Date | null;
+      workedMs?: number;
       labels?: Record<string, string>;
       metadata?: AgentMetadata;
       timeline?: AgentTimelineItem[];
@@ -4914,6 +4933,7 @@ export class AgentManager {
           createdAt?: Date;
           updatedAt?: Date;
           lastUserMessageAt?: Date | null;
+          workedMs?: number;
           labels?: Record<string, string>;
           metadata?: AgentMetadata;
           historyPrimed?: boolean;
@@ -4962,6 +4982,7 @@ export class AgentManager {
       activeForegroundTurnId: null,
       activeTurnId: null,
       activeTurnStartedAt: null,
+      workedMs: options?.workedMs,
       foregroundTurnWaiters: new Set<ForegroundTurnWaiter>(),
       finalizedForegroundTurnIds: new Set<string>(),
       unsubscribeSession: null,
@@ -5019,6 +5040,7 @@ export class AgentManager {
       activeForegroundTurnId: null,
       activeTurnId: null,
       activeTurnStartedAt: null,
+      workedMs: totalWorkedMs(agent),
       pendingPermissions: new Map(),
       bufferedPermissionResolutions: new Map(),
       inFlightPermissionResponses: new Set(),

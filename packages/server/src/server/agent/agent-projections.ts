@@ -93,6 +93,7 @@ export function toStoredAgentRecord(
     updatedAt: agent.updatedAt.toISOString(),
     lastActivityAt: agent.updatedAt.toISOString(),
     lastUserMessageAt: agent.lastUserMessageAt ? agent.lastUserMessageAt.toISOString() : null,
+    workedMs: agent.workedMs,
     title: options?.title ?? null,
     labels: agent.labels,
     metadata: agent.metadata,
@@ -152,6 +153,7 @@ export function toAgentPayload(
           startedAt: agent.activeTurnStartedAt?.toISOString() ?? null,
         }
       : null,
+    ...(agent.workedMs === undefined ? {} : { workedMs: agent.workedMs }),
     capabilities: cloneCapabilities(agent.capabilities),
     currentModeId: agent.currentModeId,
     availableModes: cloneAvailableModes(agent.availableModes),
@@ -316,6 +318,7 @@ export function buildStoredAgentPayload(
     lastUserMessageAt: lastUserMessageAt ? lastUserMessageAt.toISOString() : null,
     status: record.lastStatus,
     backgroundWork: visibleStoredBackgroundWork(record, backgroundWork),
+    ...(record.workedMs === undefined ? {} : { workedMs: record.workedMs }),
     capabilities: defaultCapabilities,
     currentModeId: record.lastModeId ?? null,
     availableModes: [],

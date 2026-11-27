@@ -4,6 +4,7 @@ import type { PaseoSubagentRow, ProviderSubagentRow, SubagentRow } from "./selec
 import {
   buildSubagentPillPresentation,
   buildSubagentRowPresentationData,
+  buildSubagentRunTime,
   countFinishedSubagents,
   resolveRowLabel,
 } from "./track-presentation";
@@ -25,6 +26,7 @@ function row(
       (overrides.status === "running"
         ? { phase: "open", turnId: null, startedAt: null, cancellationRequestId: null }
         : { phase: "idle", cancellationRequestId: null }),
+    work: null,
     requiresAttention: overrides.requiresAttention ?? false,
     backgroundWork: overrides.backgroundWork,
     createdAt: overrides.createdAt ?? new Date("2026-04-20T00:00:00.000Z"),
@@ -112,6 +114,7 @@ describe("countFinishedSubagents", () => {
         description: null,
         subtitle: null,
         status: "running",
+        work: null,
         requiresAttention: false,
         createdAt: new Date("2026-04-20T00:00:00.000Z"),
       },
@@ -124,6 +127,7 @@ describe("countFinishedSubagents", () => {
         description: null,
         subtitle: null,
         status: "failed",
+        work: null,
         requiresAttention: true,
         createdAt: new Date("2026-04-20T00:00:01.000Z"),
       },
@@ -243,6 +247,7 @@ describe("buildSubagentRowPresentationData for provider rows", () => {
       description: overrides.description ?? null,
       subtitle: overrides.subtitle ?? null,
       status: overrides.status ?? "running",
+      work: null,
       requiresAttention: false,
       createdAt: overrides.createdAt ?? new Date("2026-07-26T00:00:00.000Z"),
     };
@@ -286,6 +291,31 @@ describe("buildSubagentRowPresentationData for provider rows", () => {
   });
 });
 
+describe("buildSubagentRunTime", () => {
+  it("counts a resumed child on from its earlier runs", () => {
+    expect(
+      buildSubagentRunTime({
+        workedMs: 5 * 60_000,
+        runStartedAt: new Date("2026-07-26T10:30:00.000Z"),
+      }),
+    ).toEqual({ kind: "running", since: new Date("2026-07-26T10:25:00.000Z") });
+  });
+
+  it("freezes at the total once the child finishes", () => {
+    expect(buildSubagentRunTime({ workedMs: 3_143_000, runStartedAt: null })).toEqual({
+      kind: "finished",
+      workedMs: 3_143_000,
+    });
+  });
+
+  it.each([
+    ["the host doesn't record it", null],
+    ["a finished child has under a second of work", { workedMs: 999, runStartedAt: null }],
+  ])("shows no time when %s", (_label, work) => {
+    expect(buildSubagentRunTime(work)).toBeNull();
+  });
+});
+
 describe("provider-owned row subtitles", () => {
   function providerRow(overrides: Partial<ProviderSubagentRow> = {}): ProviderSubagentRow {
     return {
@@ -297,6 +327,7 @@ describe("provider-owned row subtitles", () => {
       description: "Reply with banana",
       subtitle: null,
       status: "running",
+      work: null,
       requiresAttention: false,
       createdAt: new Date("2026-07-26T00:00:00.000Z"),
       ...overrides,
