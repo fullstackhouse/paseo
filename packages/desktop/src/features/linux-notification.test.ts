@@ -54,6 +54,17 @@ describe("linux notification with sound", () => {
     ]);
   });
 
+  it("asks for the chosen sound", () => {
+    const args = buildNotifySendArgs({
+      appName: "Paseo",
+      title: "Agent finished",
+      iconPath: null,
+      soundName: "complete",
+    });
+
+    expect(args).toContain("--hint=string:sound-name:complete");
+  });
+
   it("escapes markup in the body but not the title", () => {
     const args = buildNotifySendArgs({
       appName: "Paseo",

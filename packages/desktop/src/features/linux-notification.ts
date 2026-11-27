@@ -5,7 +5,7 @@ import { spawn, type ChildProcess } from "node:child_process";
 // option, so notifications that should chime go through notify-send instead.
 // The notification server plays the sound itself, which keeps Do Not Disturb,
 // per-app sound settings and the sound theme in charge.
-export const LINUX_NOTIFICATION_SOUND_NAME = "message-new-instant";
+export const DEFAULT_LINUX_NOTIFICATION_SOUND_NAME = "message-new-instant";
 
 const CLICK_ACTION = "default";
 
@@ -19,6 +19,8 @@ export interface LinuxNotificationInput {
   title: string;
   body?: string;
   iconPath: string | null;
+  /** A sound theme name; defaults to {@link DEFAULT_LINUX_NOTIFICATION_SOUND_NAME}. */
+  soundName?: string | null;
 }
 
 export interface LinuxNotificationHandlers {
@@ -51,7 +53,7 @@ export function buildNotifySendArgs(input: LinuxNotificationInput): string[] {
     `--app-name=${input.appName}`,
     "--urgency=normal",
     `--hint=string:desktop-entry:${input.appName}`,
-    `--hint=string:sound-name:${LINUX_NOTIFICATION_SOUND_NAME}`,
+    `--hint=string:sound-name:${input.soundName ?? DEFAULT_LINUX_NOTIFICATION_SOUND_NAME}`,
     `--action=${CLICK_ACTION}=Open`,
     ...(input.iconPath ? [`--icon=${input.iconPath}`] : []),
     "--",

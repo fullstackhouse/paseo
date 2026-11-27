@@ -5,11 +5,14 @@ import path from "node:path";
 import { z } from "zod";
 
 import type { AppReleaseChannel } from "../features/auto-updater.js";
+import { isNotificationSoundName } from "../features/notification-sounds.js";
 
 export interface DesktopSettings {
   releaseChannel: AppReleaseChannel;
   notifications: {
     playSound: boolean;
+    /** A sound name from `list_notification_sounds`; null plays the system default. */
+    sound: string | null;
   };
   daemon: {
     manageBuiltInDaemon: boolean;
@@ -33,6 +36,7 @@ export const DEFAULT_DESKTOP_SETTINGS: DesktopSettings = {
   releaseChannel: "stable",
   notifications: {
     playSound: true,
+    sound: null,
   },
   daemon: {
     manageBuiltInDaemon: true,
@@ -47,6 +51,11 @@ const ReleaseChannelSchema = z.enum(["stable", "beta"]);
 const NotificationsSchema = z
   .looseObject({
     playSound: z.boolean().catch(DEFAULT_DESKTOP_SETTINGS.notifications.playSound),
+    sound: z
+      .string()
+      .refine(isNotificationSoundName)
+      .nullable()
+      .catch(DEFAULT_DESKTOP_SETTINGS.notifications.sound),
   })
   .catch(() => ({ ...DEFAULT_DESKTOP_SETTINGS.notifications }));
 
@@ -125,7 +134,10 @@ function buildDefaultDocument(): PersistedDesktopSettingsDocument {
 function toDesktopSettings(stored: StoredDesktopSettings): DesktopSettings {
   return {
     releaseChannel: stored.releaseChannel,
-    notifications: { playSound: stored.notifications.playSound },
+    notifications: {
+      playSound: stored.notifications.playSound,
+      sound: stored.notifications.sound,
+    },
     daemon: {
       manageBuiltInDaemon: stored.daemon.manageBuiltInDaemon,
       keepRunningAfterQuit: stored.daemon.keepRunningAfterQuit,
@@ -145,9 +157,17 @@ function coerceDesktopSettingsPatch(input: unknown): DesktopSettingsPatch {
   }
 
   if (isRecord(input.notifications)) {
+    const notificationsPatch: Partial<DesktopSettings["notifications"]> = {};
     const playSound = coerceBoolean(input.notifications.playSound);
     if (playSound !== null) {
-      patch.notifications = { playSound };
+      notificationsPatch.playSound = playSound;
+    }
+    const sound = input.notifications.sound;
+    if (sound === null || isNotificationSoundName(sound)) {
+      notificationsPatch.sound = sound;
+    }
+    if (Object.keys(notificationsPatch).length > 0) {
+      patch.notifications = notificationsPatch;
     }
   }
 

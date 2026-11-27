@@ -97,12 +97,15 @@ function showElectronNotification(input: {
   body: string | undefined;
   iconPath: string | null;
   silent: boolean;
+  /** macOS only; Electron ignores it elsewhere. Unset plays the system default. */
+  sound?: string | null;
   onClick: () => void;
 }): void {
   const notification = new Notification({
     title: input.title,
     ...(input.body ? { body: input.body } : {}),
     ...(input.iconPath ? { icon: input.iconPath } : {}),
+    ...(input.sound && !input.silent ? { sound: input.sound } : {}),
     silent: input.silent,
   });
 
@@ -141,12 +144,12 @@ export function registerNotificationHandlers(): void {
     const data = toRecord(rawInput?.data);
     const iconPath = getNotificationIconPath();
     const settings = await getDesktopSettingsStore().get();
-    const playSound = settings.notifications.playSound;
+    const { playSound, sound } = settings.notifications;
     const onClick = () => deliverNotificationClick(event.sender, data);
 
     if (playSound && process.platform === "linux") {
       showLinuxNotificationWithSound(
-        { appName: app.name, title, body, iconPath },
+        { appName: app.name, title, body, iconPath, soundName: sound },
         {
           onClick,
           onFailed: () =>
@@ -156,7 +159,7 @@ export function registerNotificationHandlers(): void {
       return true;
     }
 
-    showElectronNotification({ title, body, iconPath, silent: !playSound, onClick });
+    showElectronNotification({ title, body, iconPath, silent: !playSound, sound, onClick });
     return true;
   });
 }

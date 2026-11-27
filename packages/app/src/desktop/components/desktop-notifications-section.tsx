@@ -6,9 +6,15 @@ import { RotateCw } from "lucide-react-native";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
+import { DropdownTrigger } from "@/components/ui/dropdown-trigger";
 import { DesktopPermissionRow } from "@/desktop/components/desktop-permission-row";
 import { useDesktopPermissions } from "@/desktop/permissions/use-desktop-permissions";
 import { useDesktopSettings } from "@/desktop/settings/desktop-settings";
+import {
+  previewNotificationSound,
+  useNotificationSounds,
+} from "@/desktop/settings/notification-sounds";
 import { SettingsSection } from "@/components/settings/headings/settings-section";
 import { settingsStyles } from "@/styles/settings";
 import { SettingsRevealText } from "@/components/settings/reveal-text";
@@ -43,6 +49,18 @@ export function DesktopNotificationsSection() {
   const handlePlaySoundChange = useCallback(
     (playSound: boolean) => {
       void updateSettings({ notifications: { playSound } }).catch(() => {
+        // useDesktopSettings owns the user-visible IPC error.
+      });
+    },
+    [updateSettings],
+  );
+
+  const handleSoundChange = useCallback(
+    (sound: string | null) => {
+      if (sound) {
+        previewNotificationSound(sound);
+      }
+      void updateSettings({ notifications: { sound } }).catch(() => {
         // useDesktopSettings owns the user-visible IPC error.
       });
     },
@@ -110,6 +128,11 @@ export function DesktopNotificationsSection() {
             testID="desktop-notifications-play-sound-switch"
           />
         </View>
+        <NotificationSoundRow
+          value={settings.notifications.sound}
+          disabled={isSaving || !settings.notifications.playSound}
+          onChange={handleSoundChange}
+        />
         <View style={[settingsStyles.row, settingsStyles.rowBorder]}>
           <View style={settingsStyles.rowContent}>
             <SettingsRevealText style={settingsStyles.rowTitle}>
@@ -151,5 +174,77 @@ export function DesktopNotificationsSection() {
         />
       ) : null}
     </SettingsSection>
+  );
+}
+
+function NotificationSoundRow({
+  value,
+  disabled,
+  onChange,
+}: {
+  value: string | null;
+  disabled: boolean;
+  onChange: (sound: string | null) => void;
+}) {
+  const { t } = useTranslation();
+  const sounds = useNotificationSounds();
+  if (sounds.length === 0) {
+    return null;
+  }
+  const label = t("settings.notifications.sound");
+  const selectedLabel = value ?? t("settings.notifications.soundDefault");
+  return (
+    <View style={[settingsStyles.row, settingsStyles.rowBorder]}>
+      <View style={settingsStyles.rowContent}>
+        <SettingsRevealText style={settingsStyles.rowTitle}>{label}</SettingsRevealText>
+        <Text style={settingsStyles.rowHint}>{t("settings.notifications.soundHint")}</Text>
+      </View>
+      <DropdownMenu>
+        <DropdownTrigger
+          disabled={disabled}
+          accessibilityRole="button"
+          accessibilityLabel={`${label}: ${selectedLabel}`}
+          testID="desktop-notifications-sound-trigger"
+        >
+          {selectedLabel}
+        </DropdownTrigger>
+        <DropdownMenuContent side="bottom" align="end" width={220} maxHeight={360} scrollable>
+          <SoundOption
+            sound={null}
+            label={t("settings.notifications.soundDefault")}
+            selected={value === null}
+            onSelect={onChange}
+          />
+          {sounds.map((sound) => (
+            <SoundOption
+              key={sound}
+              sound={sound}
+              label={sound}
+              selected={sound === value}
+              onSelect={onChange}
+            />
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </View>
+  );
+}
+
+function SoundOption({
+  sound,
+  label,
+  selected,
+  onSelect,
+}: {
+  sound: string | null;
+  label: string;
+  selected: boolean;
+  onSelect: (sound: string | null) => void;
+}) {
+  const select = useCallback(() => onSelect(sound), [onSelect, sound]);
+  return (
+    <DropdownMenuItem selected={selected} onSelect={select}>
+      {label}
+    </DropdownMenuItem>
   );
 }

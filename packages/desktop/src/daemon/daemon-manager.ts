@@ -45,6 +45,7 @@ import {
   runExternalCliJsonCommand,
   runExternalCliTextCommand,
 } from "./cli/external.js";
+import { createNotificationSoundCommandHandlers } from "../features/notification-sounds.js";
 import {
   createDesktopSettingsCommandHandlers,
   type DesktopCommandHandler,
@@ -498,6 +499,7 @@ export function createDaemonCommandHandlers(): Record<string, DesktopCommandHand
   });
   return {
     ...createDesktopSettingsCommandHandlers({ settingsStore: getDesktopSettingsStore() }),
+    ...createNotificationSoundCommandHandlers(),
     desktop_get_runtime_info: () => ({
       appVersion: resolveDesktopAppVersion(),
       runningUnderARM64Translation: isRunningUnderARM64Translation(),

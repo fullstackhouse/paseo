@@ -15,6 +15,8 @@ export interface DesktopSettings {
   releaseChannel: ReleaseChannel;
   notifications: {
     playSound: boolean;
+    /** A name from `useNotificationSounds`; null plays the system default. */
+    sound: string | null;
   };
   daemon: {
     manageBuiltInDaemon: boolean;
@@ -32,6 +34,7 @@ export const DEFAULT_DESKTOP_SETTINGS: DesktopSettings = {
   releaseChannel: "stable",
   notifications: {
     playSound: true,
+    sound: null,
   },
   daemon: {
     manageBuiltInDaemon: true,
@@ -161,6 +164,7 @@ function parseDesktopSettings(raw: unknown): DesktopSettings {
         typeof notifications.playSound === "boolean"
           ? notifications.playSound
           : DEFAULT_DESKTOP_SETTINGS.notifications.playSound,
+      sound: typeof notifications.sound === "string" ? notifications.sound : null,
     },
     daemon: {
       manageBuiltInDaemon:
