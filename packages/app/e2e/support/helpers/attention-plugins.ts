@@ -28,12 +28,12 @@ const run = promisify(execFile);
  * The real FSH plugins workspace attention is built from (docs/workspace-attention.md), pinned to
  * exact commits so the suite only changes when these pins do. Bump a pin to the plugin's current
  * main with `git ls-remote https://github.com/fullstackhouse/<repo>.git refs/heads/main`, run
- * `workspace-attention.spec.ts`, and commit the new pin with what it brings in. CI caches the
- * prepared checkouts keyed by this file, so a bump re-prepares them once.
+ * `workspace-attention.spec.ts` and `asks-pr-buttons.spec.ts`, and commit the new pin with what it
+ * brings in. CI caches the prepared checkouts keyed by this file, so a bump re-prepares them once.
  */
 export const ATTENTION_PLUGINS = {
   "paseo-status": { commit: "8215548e8bdfbe04961ac3cac1ca49eaa4f798c0", dataDir: "status" },
-  "paseo-asks": { commit: "d87fe2abb23157629c44aa0054970fc468a75299", dataDir: "asks" },
+  "paseo-asks": { commit: "7e3f87b850f456de0cbbe7b86d954d780be4d65b", dataDir: "asks" },
   "paseo-prs": { commit: "165fadc552e16d383592167f3315cb052b72b71b", dataDir: "prs" },
 } as const;
 
