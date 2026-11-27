@@ -4,8 +4,8 @@ import path from "node:path";
 
 /**
  * The worker's fake `gh` (e2e-worker.ts) answers the daemon's batched pull request reads
- * (`PaseoChangeRequestRead`) for PRs in `paseo-e2e/attention-fixture` from this state, so specs can drive PR
- * state and GitHub's GraphQL rate limit without the network.
+ * (`PaseoChangeRequestRead`) and paseo-asks' review-buttons read for PRs in `paseo-e2e/attention-fixture`
+ * from this state, so specs can drive PR state and GitHub's GraphQL rate limit without the network.
  */
 export interface FakeGitHubPullRequest {
   state: "OPEN" | "CLOSED" | "MERGED";
@@ -14,6 +14,10 @@ export interface FakeGitHubPullRequest {
   reviewDecision?: "APPROVED" | "CHANGES_REQUESTED" | "REVIEW_REQUIRED" | null;
   mergeable?: "MERGEABLE" | "CONFLICTING" | "UNKNOWN";
   headRefOid?: string;
+  /** For paseo-asks' review-buttons read: whether the human can merge past a required review. */
+  viewerCanMergeAsAdmin?: boolean;
+  /** For paseo-asks' review-buttons read; defaults to `pr-author`. */
+  author?: string;
 }
 
 export interface FakeGitHubState {
@@ -27,6 +31,8 @@ export interface FakeGitHubCall {
   at: number;
   /** `paseo-e2e/<repo>#<number>` for each PR the query asked for. */
   prs: string[];
+  /** Set on paseo-asks' review-buttons read; absent on the daemon's batched reads. */
+  read?: "review-buttons";
 }
 
 function fakeGitHubDir(): string {

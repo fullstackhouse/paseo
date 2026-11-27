@@ -123,11 +123,44 @@ if (queryArg && queryArg.includes("PaseoChangeRequestRead") && queryArg.includes
   process.exit(errors.length ? 1 : 0);
 }
 // Anything else plugins ask GitHub about paseo-e2e/attention-fixture stays local too: paseo-asks'
-// deployments lookup gets no deployments, and any other call fails instead of reaching github.com.
+// review-buttons read answers from the same state and is logged, its deployments lookup gets no
+// deployments, and any other call fails instead of reaching github.com.
 if (
   (args.includes("owner=paseo-e2e") && args.includes("name=attention-fixture")) ||
   args.some((arg) => arg.includes("paseo-e2e/attention-fixture"))
 ) {
+  const numberArg = args.find((arg) => arg.startsWith("number="));
+  if (queryArg && queryArg.includes("viewerCanMergeAsAdmin") && numberArg) {
+    const statePath = path.join(__dirname, "fake-github-state.json");
+    const state = fs.existsSync(statePath) ? JSON.parse(fs.readFileSync(statePath, "utf8")) : { prs: {} };
+    const number = Number(numberArg.slice("number=".length));
+    const key = "paseo-e2e/attention-fixture#" + number;
+    fs.appendFileSync(
+      path.join(__dirname, "fake-github-calls.jsonl"),
+      JSON.stringify({ at: Date.now(), prs: [key], read: "review-buttons" }) + "\\n"
+    );
+    const pr = state.prs[key];
+    if (!pr) {
+      process.stderr.write("Could not resolve " + key + "\\n");
+      process.exit(1);
+    }
+    process.stdout.write(JSON.stringify({
+      data: {
+        repository: {
+          pullRequest: {
+            number,
+            state: pr.state,
+            isDraft: pr.isDraft ?? false,
+            reviewDecision: pr.reviewDecision ?? null,
+            viewerCanMergeAsAdmin: pr.viewerCanMergeAsAdmin ?? false,
+            author: { login: pr.author ?? "pr-author" },
+            reviewRequests: { totalCount: 0 }
+          }
+        }
+      }
+    }));
+    process.exit(0);
+  }
   if (queryArg && queryArg.includes("deployments(")) {
     process.stdout.write(JSON.stringify({ data: { repository: { pullRequest: { commits: { nodes: [] } } } } }));
     process.exit(0);
