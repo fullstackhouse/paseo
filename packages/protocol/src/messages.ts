@@ -453,6 +453,8 @@ export const ProviderSnapshotEntrySchema = z.object({
   iconSvg: z.string().optional(),
   defaultModeId: z.string().nullable().optional(),
   supportsPlanApproval: z.boolean().optional(),
+  /** Whether agents on this provider can hold exact MCP tool grants (`toolPolicy.preapproved`). */
+  supportsToolPolicy: z.boolean().optional(),
   /** Plugin settings screen that configures this provider. */
   settingsScreen: z.object({ pluginId: z.string(), screenId: z.string() }).optional(),
 });
@@ -4592,6 +4594,10 @@ export const ServerInfoStatusPayloadSchema = z
         workspaceAppearance: z.boolean().optional(),
         // COMPAT(turnOrigin): FSH-only, added after v0.17.1, remove gate after 2027-05-26.
         turnOrigin: z.boolean().optional(),
+        // COMPAT(pluginToolGrants): FSH-only, added after v0.17.1, remove gate after 2027-05-31.
+        // Providers report `supportsToolPolicy`, plugin permission hooks carry `tool`, and plugin-added
+        // MCP servers and grants a provider can't take are dropped instead of failing the create.
+        pluginToolGrants: z.boolean().optional(),
         // COMPAT(usageReportUpdates): FSH-only, added after v0.17.1, remove gate after 2027-05-27.
         // Older hosts reject the `status.usage_report_changed` subscription, so subscribe only here.
         usageReportUpdates: z.boolean().optional(),

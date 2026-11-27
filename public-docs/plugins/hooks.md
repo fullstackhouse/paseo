@@ -63,7 +63,7 @@ Paseo only sees the returned promise, so detached work gets no error reporting a
 | `agent.archive.after`        | no    | `{ agent, archivedAt }`                   |                                                                |
 | `agent.turn.before`          | no    | `{ agent, turnId, origin? }`              |                                                                |
 | `agent.turn.after`           | no    | `{ agent, turnId, outcome }`              |                                                                |
-| `agent.permission.before`    | no    | `{ agent, request }`                      |                                                                |
+| `agent.permission.before`    | no    | `{ agent, request, tool? }`               |                                                                |
 | `agent.permission.after`     | no    | `{ agent, requestId, resolution }`        |                                                                |
 | `schedule.run.finish.before` | yes   | `{ request }`                             | `attention` only                                               |
 
@@ -240,6 +240,11 @@ Receives `{ request: { config, env?, metadata } }`. Config and `metadata` change
 | `mcpServers`, `toolPolicy`   | MCP configuration and exact-tool preapprovals                              |
 | `cwd`                        | Cannot change                                                              |
 
+Servers and preapprovals a hook adds are recorded as that plugin's. When the provider can't take
+them, Paseo drops them with a warning that names the plugin, and creates the agent; the same entries
+sent by the caller still fail. Only providers whose snapshot entry has `supportsToolPolicy: true`
+hold preapprovals (`paseo.providers.snapshot()`), and only sessions with MCP support take servers.
+
 ### Change saved configuration
 
 Add this callback inside `contribute(server)` to set the saved options for new Codex agents:
@@ -387,8 +392,9 @@ or remove this plugin's entries; returning `undefined` preserves it. Paseo merge
 final maps in plugin-ID order.
 
 A name colliding with a saved server, Paseo's internal `paseo` server, or another plugin's server
-fails the session open and names the server and both sources. A provider without MCP support fails
-with `does not support MCP servers`, naming the plugin. Opens with `purpose: "history"` ignore
+fails the session open and names the server and both sources. On a provider session without MCP
+support, Paseo drops these servers with a warning that names the plugin; a saved server fails with
+`does not support MCP servers`. Opens with `purpose: "history"` ignore
 these servers. Install, disable, and reload changes reach existing agents through the
 [session reopen behavior](#attach-tools-to-agents).
 
@@ -598,7 +604,9 @@ add limits or delays in your plugin when needed. Attachments and tool effects ar
 
 ## agent.permission.before
 
-A permission or question becomes pending. Receives `{ agent, request }`; `request` is an `AgentPermissionRequest`. Send the answer through the SDK.
+A permission or question becomes pending. Receives `{ agent, request, tool? }`; `request` is an `AgentPermissionRequest`. Send the answer through the SDK.
+
+`tool` is `{ kind: "mcp", server, tool }` when the request is for one of the agent's MCP tools, whatever the provider calls it (`mcp__prs__prs_link`, `prs.prs_link`, `prs_prs_link`). Match your own tools on `tool.server`, not on `request.name`.
 
 ### Answer a permission request
 

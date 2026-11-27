@@ -509,6 +509,13 @@ owns payloads, ordering, failure behavior, and examples. `agent.create.before` e
 configuration; `agent.open.before` contributes launch-only `env`, `tools`, and `mcpServers` on
 every open. Executable tool definitions stay in the plugin process; only metadata crosses the boundary.
 
+The runtime records which plugin added each MCP server and tool preapproval
+(`PluginConfigAdditions` from `agent.create.before`, `mcpServerOwners` from `agent.open.before`).
+Plugins attach their servers to every agent, without knowing whether the provider takes them, so a
+provider that can't is no reason to fail the create: those entries are dropped with a warning per
+plugin, and only what the caller sent fails. Ownership stays in the daemon; the plugin's
+`agent.permission.before` gets the provider-neutral `tool` instead.
+
 Worktree placement is resolved before Git source planning, so a hook can change the branch and base
 without undoing fetched refs. Restores use the recorded destination and bypass creation hooks.
 Workspace records decide ownership, including explicit non-ownership after recovery. Without a record,
@@ -973,8 +980,9 @@ Plugin servers get pull request data from the daemon instead of calling `gh`: su
 `paseo.changeRequests.subscribe` (pushed changes, gated on
 `server_info.features.changeRequestSubscriptions`), read once with `paseo.changeRequests.read`
 (gated on `changeRequestsRead`), or list a repository's open PRs with
-`paseo.changeRequests.listOpen` (gated on `changeRequestList`). Both share one cache, one poller per PR and the daemon's rate-limit
-pause. On `reason: "paused"`, keep the last known state, mark it stale, and log once, not per PR. See
+`paseo.changeRequests.listOpen` (gated on `changeRequestList`). `subscribe` and `read` share one
+cache and one poller per PR; `listOpen` keeps its own cache per repository. All three share the
+daemon's rate-limit pause. On `reason: "paused"`, keep the last known state, mark it stale, and log once, not per PR. See
 [Pull request service](pr-service.md).
 
 ## Contribute client slash commands

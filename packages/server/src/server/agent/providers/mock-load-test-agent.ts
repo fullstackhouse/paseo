@@ -58,7 +58,9 @@ const CAPABILITIES: AgentCapabilityFlags = {
   supportsSessionPersistence: true,
   supportsSessionListing: true,
   supportsDynamicModes: false,
-  supportsMcpServers: false,
+  // Accepted and ignored: the mock never calls tools, so plugins that attach MCP servers to every
+  // agent (paseo-status, paseo-asks, paseo-prs) can still run mock agents in e2e.
+  supportsMcpServers: true,
   supportsReasoningStream: true,
   supportsToolInvocations: true,
   supportsRewindConversation: true,

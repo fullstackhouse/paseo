@@ -5,7 +5,7 @@ import type { AgentToolResult } from "@getpaseo/plugin/server";
 import type { RuntimeCleanupCandidate } from "./idle-runtime-cleanup/index.js";
 import { AgentNotFoundError, ensureAgentLoaded } from "./agent-loading.js";
 import { continuesAssistantMessage, projectTimelineRows } from "./timeline-projection.js";
-import type { PluginLifecycle } from "../plugins/lifecycle/index.js";
+import type { PluginConfigAdditions, PluginLifecycle } from "../plugins/lifecycle/index.js";
 import { describeHookAgent, publishAgentStream } from "../plugins/lifecycle/index.js";
 import { applyRecordPatch } from "../record-patch.js";
 import type { PluginSessionOpenRequest } from "@getpaseo/plugin/server";
@@ -372,6 +372,8 @@ interface ProviderEnabledFlag {
     config: AgentSessionConfig,
     toolPolicy: ToolPolicy | undefined,
   ) => AgentSessionConfig;
+  /** Whether the provider can hold an exact MCP tool grant (`toolPolicy`). */
+  supportsExactMcpPreapproval?: boolean;
 }
 type ProviderEnabledMap = Partial<Record<AgentProvider, ProviderEnabledFlag>>;
 type ProviderClientMap = Partial<Record<AgentProvider, AgentClient>>;
@@ -958,6 +960,8 @@ export class AgentManager {
   private readonly sessionOpenGenerations = new Map<string, number>();
   private readonly deferredPluginReloadGenerations = new Map<string, number>();
   private readonly attachedPluginTools = new Map<string, AttachedAgentTool[]>();
+  /** Plugin MCP servers attached at the agent's last open, to name tools in permission requests. */
+  private readonly pluginMcpServerNames = new Map<string, string[]>();
   private readonly pluginAgentTools: PluginAgentToolsRuntime | undefined;
   private paseoToolsEnabled = true;
   private paseoToolCatalogFactory: PaseoToolCatalogFactory | null = null;
@@ -1171,6 +1175,7 @@ export class AgentManager {
 
   private detachPluginTools(agentId: string): void {
     this.attachedPluginTools.delete(agentId);
+    this.pluginMcpServerNames.delete(agentId);
     this.sessionOpenGenerations.delete(agentId);
     this.deferredPluginReloadGenerations.delete(agentId);
     this.pluginAgentTools?.detachTools(agentId);
@@ -1707,6 +1712,7 @@ export class AgentManager {
   ): Promise<ManagedAgent> {
     this.assertAcceptingAgentRegistrations();
     config = this.withConvertedOptions(config);
+    let pluginAdditions: PluginConfigAdditions | undefined;
     if (this.pluginLifecycle && !config.internal) {
       const sent = exposeFeatureValuesToHook(config);
       const request = await this.pluginLifecycle.before("agent.create.before", {
@@ -1725,13 +1731,15 @@ export class AgentManager {
         internal: config.internal,
       };
       options = { ...options, env: request.env, metadata: request.metadata ?? options.metadata };
+      pluginAdditions = request.pluginAdditions;
+      config = this.dropUnsupportedPluginGrants(config, pluginAdditions);
     }
     await this.deleteAgentState(resolvedAgentId);
-    const { storedConfig, launchConfig, paseoToolPolicy } = await this.prepareSessionConfig(
-      config,
-      resolvedAgentId,
-      { env: options?.env },
-    );
+    const prepared = await this.prepareSessionConfig(config, resolvedAgentId, {
+      env: options?.env,
+    });
+    const { launchConfig, paseoToolPolicy } = prepared;
+    let { storedConfig } = prepared;
     this.requireEnabledProvider(storedConfig.provider);
     const client = await this.requireAvailableClient({
       provider: storedConfig.provider,
@@ -1757,7 +1765,13 @@ export class AgentManager {
     const createOptions = this.buildCreateSessionOptions(options);
     const launchedOptions = this.launchOptionsFor({ client, own: storedConfig.providerOptions });
     const session = await client.createSession(providerLaunchConfig, launchContext, createOptions);
-    await this.requireExternalMcpSupport(session, providerLaunchConfig, launchContext);
+    const droppedServers = await this.requireExternalMcpSupport(
+      session,
+      providerLaunchConfig,
+      launchContext,
+      pluginAdditions?.mcpServers,
+    );
+    storedConfig = withoutMcpServers(storedConfig, droppedServers);
     const agent = await this.registerSession(session, storedConfig, resolvedAgentId, {
       launchedOptions,
       workedMs: 0,
@@ -2083,11 +2097,8 @@ export class AgentManager {
       },
     );
     const providerLaunchConfig = this.resolveProviderLaunchConfig(launchConfig, launchContext);
-    if (
-      Object.keys(stripInternalPaseoMcpServer(providerLaunchConfig).mcpServers ?? {}).length > 0 &&
-      existing.session.capabilities.supportsMcpServers !== true
-    ) {
-      throw this.unsupportedMcpError(providerLaunchConfig, launchContext);
+    if (existing.session.capabilities.supportsMcpServers !== true) {
+      this.dropPluginMcpServers(providerLaunchConfig, launchContext.mcpServerOwners ?? {});
     }
 
     let session: AgentSession | undefined;
@@ -4802,25 +4813,84 @@ export class AgentManager {
     }
   }
 
+  /**
+   * MCP servers a session without MCP support can't take. Servers plugins added (at create or open)
+   * are dropped with a warning per plugin, and their names returned so the caller keeps them out of
+   * the stored config; any other server fails the open, since the caller asked for it.
+   */
   private async requireExternalMcpSupport(
     session: AgentSession,
     launchConfig: AgentSessionConfig,
     launchContext: AgentLaunchContext,
-  ): Promise<void> {
-    if (
-      Object.keys(stripInternalPaseoMcpServer(launchConfig).mcpServers ?? {}).length === 0 ||
-      session.capabilities.supportsMcpServers === true
-    ) {
-      return;
+    createAdditions?: Record<string, string>,
+  ): Promise<string[]> {
+    if (session.capabilities.supportsMcpServers === true) return [];
+    try {
+      return this.dropPluginMcpServers(launchConfig, {
+        ...createAdditions,
+        ...launchContext.mcpServerOwners,
+      });
+    } catch (error) {
+      await this.closeUnregisteredSession(session);
+      throw error;
     }
-    await this.closeUnregisteredSession(session);
-    throw this.unsupportedMcpError(launchConfig, launchContext);
   }
 
-  private unsupportedMcpError(config: AgentSessionConfig, context: AgentLaunchContext): Error {
-    const owners = [...new Set(Object.values(context.mcpServerOwners ?? {}))];
-    const source = owners.length ? ` (plugin ${owners.join(", ")})` : "";
-    return new Error(`Provider '${config.provider}' does not support MCP servers${source}`);
+  /**
+   * For a session without MCP support: throws when the caller asked for an MCP server, otherwise
+   * warns once per plugin and returns the plugin servers to leave out.
+   */
+  private dropPluginMcpServers(
+    config: AgentSessionConfig,
+    owners: Record<string, string>,
+  ): string[] {
+    const servers = Object.keys(stripInternalPaseoMcpServer(config).mcpServers ?? {});
+    const requested = servers.filter((name) => !owners[name]);
+    if (requested.length > 0) {
+      throw new Error(
+        `Provider '${config.provider}' does not support MCP servers (${requested.join(", ")})`,
+      );
+    }
+    for (const [plugin, names] of groupByOwner(servers, owners)) {
+      this.logger.warn(
+        { provider: config.provider, plugin, servers: names },
+        "Dropped plugin MCP servers: this provider session doesn't support MCP",
+      );
+    }
+    return servers;
+  }
+
+  /**
+   * Tool preapprovals that `agent.create.before` hooks added, on a provider that can't hold exact MCP
+   * tool grants: dropped with a warning per plugin, so the plugin's tools still attach and prompt.
+   * Grants the caller sent stay and fail in `applyProviderConfiguration`.
+   */
+  private dropUnsupportedPluginGrants(
+    config: AgentSessionConfig,
+    additions: PluginConfigAdditions | undefined,
+  ): AgentSessionConfig {
+    if (!config.toolPolicy || !additions) return config;
+    const definition = this.providerDefinitions.get(config.provider);
+    if (definition?.applyToolPolicy && definition.supportsExactMcpPreapproval !== false) {
+      return config;
+    }
+    const owners: Record<string, string> = {};
+    const kept = config.toolPolicy.preapproved.filter((grant) => {
+      const owner = additions.toolGrants[`${grant.server}.${grant.tool}`];
+      if (owner) owners[`${grant.server}.${grant.tool}`] = owner;
+      return !owner;
+    });
+    if (kept.length === config.toolPolicy.preapproved.length) return config;
+    for (const [plugin, grants] of groupByOwner(Object.keys(owners), owners)) {
+      this.logger.warn(
+        { provider: config.provider, plugin, grants },
+        "Dropped plugin tool preapprovals: this provider can't hold exact MCP tool grants",
+      );
+    }
+    return {
+      ...config,
+      toolPolicy: kept.length > 0 ? { ...config.toolPolicy, preapproved: kept } : undefined,
+    };
   }
 
   private async initializeAgentTimelineForRegister(params: {
@@ -6473,6 +6543,10 @@ export class AgentManager {
         this.pluginLifecycle,
         describeHookAgent({ ...agent, title: agent.config.title }),
         event,
+        [
+          ...Object.keys(agent.config.mcpServers ?? {}),
+          ...(this.pluginMcpServerNames.get(agentId) ?? []),
+        ],
       );
     }
   }
@@ -6724,6 +6798,7 @@ export class AgentManager {
       env = transformed.env;
       if (request.purpose === "interactive") {
         this.attachedPluginTools.set(agentId, transformed.tools as AttachedAgentTool[]);
+        this.pluginMcpServerNames.set(agentId, Object.keys(transformed.mcpServers ?? {}));
         appendSystemPrompt = transformed.appendSystemPrompt;
         mcpServers = transformed.mcpServers;
         mcpServerOwners = transformed.mcpServerOwners;
@@ -6921,4 +6996,32 @@ function pluginPromptContext(
   appendSystemPrompt: string[] | undefined,
 ): Pick<AgentLaunchContext, "appendSystemPrompt"> {
   return appendSystemPrompt?.length ? { appendSystemPrompt } : {};
+}
+
+function groupByOwner(names: string[], owners: Record<string, string>): Map<string, string[]> {
+  const grouped = new Map<string, string[]>();
+  for (const name of names) {
+    const owner = owners[name];
+    if (!owner) continue;
+    grouped.set(owner, [...(grouped.get(owner) ?? []), name]);
+  }
+  return grouped;
+}
+
+/** The config without these MCP servers or the tool grants that point at them. */
+function withoutMcpServers(config: AgentSessionConfig, names: string[]): AgentSessionConfig {
+  if (names.length === 0 || !config.mcpServers) return config;
+  const dropped = new Set(names);
+  const mcpServers = Object.fromEntries(
+    Object.entries(config.mcpServers).filter(([name]) => !dropped.has(name)),
+  );
+  const preapproved = config.toolPolicy?.preapproved.filter((grant) => !dropped.has(grant.server));
+  return {
+    ...config,
+    mcpServers: Object.keys(mcpServers).length > 0 ? mcpServers : undefined,
+    toolPolicy:
+      config.toolPolicy && preapproved && preapproved.length > 0
+        ? { ...config.toolPolicy, preapproved }
+        : undefined,
+  };
 }

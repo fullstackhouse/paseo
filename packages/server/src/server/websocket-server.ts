@@ -2220,6 +2220,8 @@ export class VoiceAssistantWebSocketServer {
         workspaceAppearance: true,
         // COMPAT(turnOrigin): FSH-only, added after v0.17.1, remove gate after 2027-05-26.
         turnOrigin: true,
+        // COMPAT(pluginToolGrants): FSH-only, added after v0.17.1, remove gate after 2027-05-31.
+        pluginToolGrants: true,
         // COMPAT(usageReportUpdates): FSH-only, added after v0.17.1, remove gate after 2027-05-27.
         usageReportUpdates: true,
         // COMPAT(scheduleRunAttention): FSH-only, added after v0.15.4, remove gate after 2027-05-16.

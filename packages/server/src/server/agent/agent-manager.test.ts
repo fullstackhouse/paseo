@@ -4123,6 +4123,166 @@ test("createAgent closes and rejects a provider session that cannot honor MCP se
   }
 });
 
+test("createAgent drops plugin-added MCP servers and grants a session can't take, and warns per plugin", async () => {
+  const workdir = mkdtempSync(join(tmpdir(), "agent-manager-test-"));
+  const storage = new AgentStorage(join(workdir, "agents"), logger);
+  const warnings: Array<{ plugin?: string; servers?: string[] }> = [];
+  const warnLogger = createTestLogger();
+  const warn = warnLogger.warn.bind(warnLogger);
+  warnLogger.warn = ((object: unknown, ...rest: unknown[]) => {
+    if (typeof object === "object" && object && "plugin" in object) {
+      warnings.push(object as { plugin?: string; servers?: string[] });
+    }
+    return (warn as (...args: unknown[]) => void)(object, ...rest);
+  }) as typeof warnLogger.warn;
+  const manager = new AgentManager({
+    clients: { codex: new TestAgentClient() },
+    registry: storage,
+    logger: warnLogger,
+    pluginLifecycle: {
+      emit: () => {},
+      before: async (name, request) =>
+        name === "agent.create.before"
+          ? {
+              ...request,
+              config: {
+                ...request.config,
+                mcpServers: { prs: { type: "http", url: "http://127.0.0.1:1/mcp" } },
+              },
+              pluginAdditions: { mcpServers: { prs: "paseo-prs" }, toolGrants: {} },
+            }
+          : request,
+    },
+  });
+
+  try {
+    const created = await manager.createAgent({ provider: "codex", cwd: workdir }, undefined, {
+      workspaceId: undefined,
+    });
+
+    expect(manager.getAgent(created.id)?.config.mcpServers).toBeUndefined();
+    expect(warnings).toEqual([expect.objectContaining({ plugin: "paseo-prs", servers: ["prs"] })]);
+  } finally {
+    rmSync(workdir, { recursive: true, force: true });
+  }
+});
+
+test("createAgent still rejects a caller's MCP server next to a plugin's on a session without MCP", async () => {
+  const workdir = mkdtempSync(join(tmpdir(), "agent-manager-test-"));
+  const manager = new AgentManager({
+    clients: { codex: new TestAgentClient() },
+    registry: new AgentStorage(join(workdir, "agents"), logger),
+    logger,
+    pluginLifecycle: {
+      emit: () => {},
+      before: async (name, request) =>
+        name === "agent.create.before"
+          ? {
+              ...request,
+              config: {
+                ...request.config,
+                mcpServers: {
+                  ...request.config.mcpServers,
+                  prs: { type: "http", url: "http://127.0.0.1:1/mcp" },
+                },
+              },
+              pluginAdditions: { mcpServers: { prs: "paseo-prs" }, toolGrants: {} },
+            }
+          : request,
+    },
+  });
+
+  try {
+    await expect(
+      manager.createAgent(
+        {
+          provider: "codex",
+          cwd: workdir,
+          mcpServers: { hub: { type: "http", url: "https://hub.test/mcp" } },
+        },
+        undefined,
+        { workspaceId: undefined },
+      ),
+    ).rejects.toThrow("Provider 'codex' does not support MCP servers (hub)");
+  } finally {
+    rmSync(workdir, { recursive: true, force: true });
+  }
+});
+
+test("createAgent drops plugin-added tool grants on a provider without exact grants, keeps the caller's failing", async () => {
+  const workdir = mkdtempSync(join(tmpdir(), "agent-manager-test-"));
+  class McpClient extends TestAgentClient {
+    override readonly capabilities = { ...TEST_CAPABILITIES, supportsMcpServers: true };
+    override async createSession(config: AgentSessionConfig): Promise<AgentSession> {
+      const session = new TestAgentSession(config);
+      Object.defineProperty(session, "capabilities", { value: this.capabilities });
+      return session;
+    }
+  }
+  const prs = { type: "http" as const, url: "http://127.0.0.1:1/mcp" };
+  const manager = new AgentManager({
+    clients: { codex: new McpClient() },
+    registry: new AgentStorage(join(workdir, "agents"), logger),
+    logger,
+    providerDefinitions: {
+      codex: {
+        enabled: true,
+        supportsExactMcpPreapproval: false,
+        applyToolPolicy: (config, toolPolicy) => {
+          if (toolPolicy) throw new Error("Provider 'codex' cannot preapprove exact MCP tools");
+          return config;
+        },
+      },
+    },
+    pluginLifecycle: {
+      emit: () => {},
+      before: async (name, request) =>
+        name === "agent.create.before"
+          ? {
+              ...request,
+              config: {
+                ...request.config,
+                mcpServers: { ...request.config.mcpServers, prs },
+                toolPolicy: {
+                  preapproved: [
+                    ...(request.config.toolPolicy?.preapproved ?? []),
+                    { kind: "mcp" as const, server: "prs", tool: "prs_link" },
+                  ],
+                },
+              },
+              pluginAdditions: {
+                mcpServers: { prs: "paseo-prs" },
+                toolGrants: { "prs.prs_link": "paseo-prs" },
+              },
+            }
+          : request,
+    },
+  });
+
+  try {
+    const created = await manager.createAgent({ provider: "codex", cwd: workdir }, undefined, {
+      workspaceId: undefined,
+    });
+    expect(manager.getAgent(created.id)?.config.toolPolicy).toBeUndefined();
+    expect(manager.getAgent(created.id)?.config.mcpServers).toEqual({ prs });
+
+    await expect(
+      manager.createAgent(
+        {
+          provider: "codex",
+          cwd: workdir,
+          mcpServers: { hub: { type: "http", url: "https://hub.test/mcp" } },
+          toolPolicy: { preapproved: [{ kind: "mcp", server: "hub", tool: "run" }] },
+        },
+        undefined,
+        { workspaceId: undefined },
+      ),
+    ).rejects.toThrow("cannot preapprove exact MCP tools");
+  } finally {
+    rmSync(workdir, { recursive: true, force: true });
+  }
+});
+
 test("resumeAgentFromPersistence closes and rejects a session that cannot honor external MCP", async () => {
   const workdir = mkdtempSync(join(tmpdir(), "agent-manager-test-"));
   const storage = new AgentStorage(join(workdir, "agents"), logger);
