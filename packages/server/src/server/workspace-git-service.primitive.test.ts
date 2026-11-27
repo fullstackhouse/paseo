@@ -1270,11 +1270,12 @@ describe("WorkspaceGitServiceImpl primitive refresh entrypoint", () => {
     await vi.advanceTimersByTimeAsync(480_000);
     await flushPromises();
 
+    // Not checked here: git reads over these 10 minutes. The 3-minute background fetch and, where file watching is
+    // unavailable (CI), degraded git polling read git on their own; the 20 s check above covers the self-heal read.
     expect(githubReadCalls).toContainEqual({
       reason: "self-heal-github",
       tickMs: 600_000,
     });
-    expect(getCheckoutStatus).toHaveBeenCalledTimes(gitReadsAfterInitialSnapshot);
 
     subscription.unsubscribe();
     service.dispose();
