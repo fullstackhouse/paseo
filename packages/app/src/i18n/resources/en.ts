@@ -499,6 +499,8 @@ export const en = {
       manual: "Context manually compacted",
       withTokens: "Context compacted ({{tokens}}K tokens)",
       completed: "Context compacted",
+      failed: "Compaction failed",
+      canceled: "Compaction canceled",
     },
   },
   importSession: {

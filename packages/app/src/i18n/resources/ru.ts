@@ -504,6 +504,8 @@ export const ru: TranslationResources = {
       manual: "Контекст сжат вручную",
       withTokens: "Контекст сжат ({{tokens}} тыс. токенов)",
       completed: "Контекст сжат",
+      failed: "Не удалось сжать контекст",
+      canceled: "Сжатие контекста отменено",
     },
   },
   importSession: {

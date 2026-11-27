@@ -505,6 +505,8 @@ export const ptBR: TranslationResources = {
       manual: "Contexto compactado manualmente",
       withTokens: "Contexto compactado ({{tokens}}K tokens)",
       completed: "Contexto compactado",
+      failed: "Falha na compactação",
+      canceled: "Compactação cancelada",
     },
   },
   importSession: {
