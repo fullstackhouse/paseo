@@ -100,6 +100,11 @@ export interface ChangeRequestObservedRead {
   url: string;
   status: ChangeRequestStatus & Partial<ChangeRequestDetails>;
   purpose: ChangeRequestReadPurpose;
+  /**
+   * The head branch a workspace poll found this PR for. The poller tracks that branch's PR itself, so the pull request
+   * service treats the poll as the branch's lookup too.
+   */
+  headRef?: string;
 }
 
 /** Who a forge query was for, for per-caller budget accounting. */

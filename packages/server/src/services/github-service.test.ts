@@ -22,6 +22,7 @@ import { CheckoutPrStatusResponseSchema } from "@getpaseo/protocol/messages";
 
 const EXPECTED_GITHUB_FAST_POLL_MS = 20_000;
 const EXPECTED_GITHUB_SLOW_POLL_MS = 120_000;
+const EXPECTED_GITHUB_IDLE_POLL_MS = 600_000;
 const EXPECTED_GITHUB_ERROR_BACKOFF_CAP_MS = 300_000;
 const CURRENT_PR_STATUS_BASE_FIELDS =
   "number,url,title,state,isDraft,baseRefName,headRefName,headRefOid,updatedAt,mergedAt,reviewDecision,mergeable,headRepositoryOwner";
@@ -812,17 +813,24 @@ describe("ForgeService", () => {
     ]);
   });
 
-  it("computes fast cadence for pending and slow cadence for stable PR states", () => {
+  it("polls pending PRs fast, branches without a PR slow, and settled PRs at the idle pace", () => {
     const pendingStatus = createCurrentPullRequestStatus({ checksStatus: "pending" });
     const runningCheckStatus = createCurrentPullRequestStatus({
       checksStatus: "success",
       checks: [{ name: "ci", status: "pending", url: null }],
     });
     const stableStatus = createCurrentPullRequestStatus({ checksStatus: "success" });
+    const mergedStatus = createCurrentPullRequestStatus({
+      checksStatus: "success",
+      state: "merged",
+      isMerged: true,
+    });
 
     expect(computeGithubNextInterval(pendingStatus, 0)).toBe(EXPECTED_GITHUB_FAST_POLL_MS);
     expect(computeGithubNextInterval(runningCheckStatus, 0)).toBe(EXPECTED_GITHUB_FAST_POLL_MS);
-    expect(computeGithubNextInterval(stableStatus, 0)).toBe(EXPECTED_GITHUB_SLOW_POLL_MS);
+    expect(computeGithubNextInterval(stableStatus, 0)).toBe(EXPECTED_GITHUB_IDLE_POLL_MS);
+    expect(computeGithubNextInterval(mergedStatus, 0)).toBe(EXPECTED_GITHUB_IDLE_POLL_MS);
+    // No PR on the branch yet: an agent may be about to open one.
     expect(computeGithubNextInterval(null, 0)).toBe(EXPECTED_GITHUB_SLOW_POLL_MS);
   });
 
@@ -973,6 +981,7 @@ describe("ForgeService", () => {
       {
         url: "https://github.com/parentowner/parentrepo/pull/42",
         purpose: "workspace",
+        headRef: "feature/fork",
         status: {
           state: "open",
           headSha: "1111111111111111111111111111111111111111",
@@ -1030,7 +1039,7 @@ describe("ForgeService", () => {
     service.dispose?.();
   });
 
-  it("polls PR status at slow cadence after stable checks", async () => {
+  it("polls a settled PR at the idle pace after its checks finish", async () => {
     let now = 0;
     const runner = createRunner([
       currentPullRequestJson({
@@ -1058,8 +1067,13 @@ describe("ForgeService", () => {
     await vi.advanceTimersByTimeAsync(EXPECTED_GITHUB_FAST_POLL_MS);
     expect(currentPullRequestStatusCalls(runner.calls)).toHaveLength(1);
 
+    // Not at the old 2-minute pace: a settled PR waits for the idle interval.
     now = EXPECTED_GITHUB_SLOW_POLL_MS;
     await vi.advanceTimersByTimeAsync(EXPECTED_GITHUB_SLOW_POLL_MS - EXPECTED_GITHUB_FAST_POLL_MS);
+    expect(currentPullRequestStatusCalls(runner.calls)).toHaveLength(1);
+
+    now = EXPECTED_GITHUB_IDLE_POLL_MS;
+    await vi.advanceTimersByTimeAsync(EXPECTED_GITHUB_IDLE_POLL_MS - EXPECTED_GITHUB_SLOW_POLL_MS);
     await vi.advanceTimersByTimeAsync(0);
     expect(currentPullRequestStatusCalls(runner.calls)).toHaveLength(2);
     expect(reads.map((read) => read.reason)).toEqual([undefined, "self-heal-github"]);
@@ -1106,8 +1120,8 @@ describe("ForgeService", () => {
     await vi.advanceTimersByTimeAsync(EXPECTED_GITHUB_FAST_POLL_MS);
     now += EXPECTED_GITHUB_FAST_POLL_MS * 2;
     await vi.advanceTimersByTimeAsync(EXPECTED_GITHUB_FAST_POLL_MS * 2);
-    now += EXPECTED_GITHUB_SLOW_POLL_MS;
-    await vi.advanceTimersByTimeAsync(EXPECTED_GITHUB_SLOW_POLL_MS);
+    now += EXPECTED_GITHUB_IDLE_POLL_MS;
+    await vi.advanceTimersByTimeAsync(EXPECTED_GITHUB_IDLE_POLL_MS);
 
     expect(currentPullRequestStatusCalls(runner.calls)).toHaveLength(5);
     expect(reads.map((read) => read.reason)).toEqual([
@@ -1324,8 +1338,8 @@ describe("ForgeService", () => {
 
     // Merged PR checks are frozen: the second cycle reuses the cached rollup
     // and issues only the discovery request.
-    now = EXPECTED_GITHUB_SLOW_POLL_MS;
-    await vi.advanceTimersByTimeAsync(EXPECTED_GITHUB_SLOW_POLL_MS);
+    now = EXPECTED_GITHUB_IDLE_POLL_MS;
+    await vi.advanceTimersByTimeAsync(EXPECTED_GITHUB_IDLE_POLL_MS);
     await flushMicrotasks();
 
     expect(runner.calls).toHaveLength(3);
@@ -1651,8 +1665,8 @@ describe("ForgeService", () => {
       expect.objectContaining({ number: 42, repoOwner: "upstream", checksStatus: "success" }),
     ]);
 
-    now = EXPECTED_GITHUB_SLOW_POLL_MS;
-    await vi.advanceTimersByTimeAsync(EXPECTED_GITHUB_SLOW_POLL_MS);
+    now = EXPECTED_GITHUB_IDLE_POLL_MS;
+    await vi.advanceTimersByTimeAsync(EXPECTED_GITHUB_IDLE_POLL_MS);
     await flushMicrotasks();
 
     expect(runner.calls[3]?.args[3]).toContain(

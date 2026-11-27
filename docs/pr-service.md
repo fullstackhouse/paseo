@@ -19,9 +19,10 @@ flowchart LR
   C -- pushed changes --> SUB[app + plugin subscribers]
 ```
 
-- A subscription's due read for a PR the workspace poller or a watch read a few seconds ago is skipped: the service takes that status instead.
+- A subscription's due read for a PR the workspace poller or a watch read within the last 30 s is skipped: the service takes that status instead.
+- A workspace poll also stands in for the lookup of its branch: the poller finds the branch's PR on every poll, so a followed lookup of the same repository and head branch is pushed back to its next due time instead of asking the forge again. A PR the poll finds that the branch list doesn't have yet is added to it.
 - `changeRequests.read` is a one-shot over the same cache (30-second TTL, in-flight reads shared). It stays for plugins that only need a value once.
-- The workspace poller keeps its own query: it reads merge policy and auto-merge facts per checkout that no subscriber needs. It feeds the cache; it doesn't read from it.
+- The workspace poller keeps its own query: it reads merge policy and auto-merge facts per checkout (merge methods, auto-merge, merge queue, `viewerCanUpdateBranch`) that no subscriber needs, and moving those into the service's query would make every plugin read heavier. It feeds the cache; it doesn't read from it. Its own cadence follows the same tiers (`computeGithubNextInterval` in `services/github-service.ts`): 20 s while checks run, 120 s while the branch has no PR yet, 10 minutes otherwise. Every client observes every workspace in its sidebar, so an observed workspace is not one someone is looking at.
 
 ## Subscriptions
 
@@ -76,15 +77,18 @@ Not provided: files, review threads, comments, timeline events. Those stay with 
 
 Per PR, from all its subscribers:
 
-| PR is                                                        | Next read                                                                            |
-| ------------------------------------------------------------ | ------------------------------------------------------------------------------------ |
-| Open, checks or a deployment pending, a `visible` subscriber | 20 s                                                                                 |
-| Open, otherwise                                              | 120 s                                                                                |
-| Merged or closed                                             | never again after one read with that state (a new subscriber gets the cached result) |
-| Read failed                                                  | doubling from 120 s, capped at 300 s                                                 |
-| Paused                                                       | at `retryAt`                                                                         |
+| PR is                                                           | Next read                                                                            |
+| --------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| Open, checks or a deployment pending, a `visible` subscriber    | 20 s                                                                                 |
+| Open, a `visible` subscriber, or checks or a deployment pending | 120 s                                                                                |
+| Open, idle, only `background` subscribers                       | 10 minutes                                                                           |
+| Merged or closed                                                | never again after one read with that state (a new subscriber gets the cached result) |
+| Read failed                                                     | doubling from 120 s, capped at 300 s                                                 |
+| Paused                                                          | at `retryAt`                                                                         |
 
-Branch lookups run every 120 s, and whenever a subscribed PR on that branch changes state. All due reads in a tick go out in the forge's shared batches (25 PRs per GitHub query), behind the same reserve pause as the workspace poller.
+Branch lookups run every 120 s while a `visible` subscriber follows a branch with no open PR yet (an agent is about to open one), every 10 minutes otherwise, and whenever a subscribed PR on that branch changes state. A lookup only finds new PRs on the branch; the open PR's own reads keep its state current.
+
+Use `visible` only for what a person is looking at. At 120 s each, ~300 followed PRs and branches cost about 1,100 GraphQL points an hour on their own; at 10 minutes they cost a fifth of that. All due reads in a tick go out in the forge's shared batches (25 PRs per GitHub query), behind the same reserve pause as the workspace poller.
 
 ## Rate-limit pause
 

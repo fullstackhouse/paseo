@@ -136,6 +136,13 @@ const ACTIONS_JOB_PAGE_MAX = 100;
 const FAILED_CHECK_JOB_LIMIT = 5;
 export const GITHUB_POLL_FAST_INTERVAL_MS = 20_000;
 export const GITHUB_POLL_SLOW_INTERVAL_MS = 120_000;
+/**
+ * A workspace's PR with nothing pending (open and idle, merged or closed). Every client observes every workspace in its
+ * sidebar, so an observed workspace is not one someone is looking at; polling all of them at the slow pace cost ~700
+ * GraphQL points an hour. Branches with no PR yet keep the slow pace so a PR an agent opens shows up within minutes.
+ * Same value as the pull request service's background interval (docs/pr-service.md).
+ */
+export const GITHUB_POLL_IDLE_INTERVAL_MS = 10 * 60_000;
 export const GITHUB_POLL_ERROR_BACKOFF_CAP_MS = 300_000;
 // The PR status poller batches every due target into aliased GraphQL queries
 // instead of one `gh pr view` + facts query per workspace. Cost scales with the
@@ -1223,6 +1230,7 @@ function observedWorkspaceRead(status: CurrentPullRequestStatus): ChangeRequestO
   return {
     url,
     purpose: "workspace",
+    ...(status.headRefName ? { headRef: status.headRefName } : {}),
     status: {
       state,
       headSha: status.headSha,
@@ -3598,14 +3606,15 @@ export function computeGithubNextInterval(
   status: CurrentPullRequestStatus | null,
   consecutiveErrors: number,
 ): number {
-  const baseInterval = isGitHubStatusPending(status)
-    ? GITHUB_POLL_FAST_INTERVAL_MS
-    : GITHUB_POLL_SLOW_INTERVAL_MS;
-  if (consecutiveErrors <= 1) {
-    return baseInterval;
+  if (consecutiveErrors >= 1) {
+    const base = isGitHubStatusPending(status)
+      ? GITHUB_POLL_FAST_INTERVAL_MS
+      : GITHUB_POLL_SLOW_INTERVAL_MS;
+    return Math.min(base * 2 ** (consecutiveErrors - 1), GITHUB_POLL_ERROR_BACKOFF_CAP_MS);
   }
-
-  return Math.min(baseInterval * 2 ** (consecutiveErrors - 1), GITHUB_POLL_ERROR_BACKOFF_CAP_MS);
+  if (isGitHubStatusPending(status)) return GITHUB_POLL_FAST_INTERVAL_MS;
+  if (status === null) return GITHUB_POLL_SLOW_INTERVAL_MS;
+  return GITHUB_POLL_IDLE_INTERVAL_MS;
 }
 
 function isGitHubStatusPending(status: CurrentPullRequestStatus | null): boolean {

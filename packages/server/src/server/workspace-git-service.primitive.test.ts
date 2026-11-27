@@ -1205,7 +1205,7 @@ describe("WorkspaceGitServiceImpl primitive refresh entrypoint", () => {
     service.dispose();
   });
 
-  test("settled GitHub self-heal reads stay on the slow poll window without refreshing git", async () => {
+  test("settled GitHub self-heal reads wait for the idle poll window without refreshing git", async () => {
     let nowMs = 0;
     const githubReadCalls: Array<{ reason: string | undefined; tickMs: number }> = [];
     const runner = vi.fn(async () => ({
@@ -1257,13 +1257,24 @@ describe("WorkspaceGitServiceImpl primitive refresh entrypoint", () => {
     });
     expect(getCheckoutStatus).toHaveBeenCalledTimes(gitReadsAfterInitialSnapshot);
 
+    // A settled PR isn't polled at the old 2-minute pace any more.
     nowMs = 120_000;
     await vi.advanceTimersByTimeAsync(100_000);
     await flushPromises();
-
-    expect(githubReadCalls).toContainEqual({
+    expect(githubReadCalls).not.toContainEqual({
       reason: "self-heal-github",
       tickMs: 120_000,
+    });
+
+    nowMs = 600_000;
+    await vi.advanceTimersByTimeAsync(480_000);
+    await flushPromises();
+
+    // Not checked here: git reads over these 10 minutes. The 3-minute background fetch and, where file watching is
+    // unavailable (CI), degraded git polling read git on their own; the 20 s check above covers the self-heal read.
+    expect(githubReadCalls).toContainEqual({
+      reason: "self-heal-github",
+      tickMs: 600_000,
     });
 
     subscription.unsubscribe();
