@@ -1343,6 +1343,7 @@ export const ptBR: TranslationResources = {
       projectUnavailable: "O projeto não está mais disponível",
     },
     statusGroupAccessibility: "Grupo {{label}}",
+    unsentDraftAccessibility: "Mensagem não enviada",
     statusBucket: {
       needsInput: "Precisa de resposta",
       failed: "Com falha",

@@ -1326,6 +1326,7 @@ export const en = {
       projectUnavailable: "Project is no longer available",
     },
     statusGroupAccessibility: "{{label}} group",
+    unsentDraftAccessibility: "Unsent message",
     statusBucket: {
       needsInput: "Needs input",
       failed: "Failed",

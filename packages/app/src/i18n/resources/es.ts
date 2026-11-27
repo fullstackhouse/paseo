@@ -1353,6 +1353,7 @@ export const es: TranslationResources = {
       projectUnavailable: "El proyecto ya no está disponible",
     },
     statusGroupAccessibility: "Grupo {{label}}",
+    unsentDraftAccessibility: "Mensaje sin enviar",
     statusBucket: {
       needsInput: "Necesita datos",
       failed: "Con error",
