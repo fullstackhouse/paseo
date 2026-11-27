@@ -1,5 +1,5 @@
-import { useCallback, useMemo, useState, type ReactElement, type ReactNode } from "react";
-import { Pressable, Text, View } from "react-native";
+import { useCallback, useMemo, useState, type ReactElement, type ReactNode, type Ref } from "react";
+import { Pressable, Text, View, type NativeSyntheticEvent } from "react-native";
 import { ChevronRight } from "lucide-react-native";
 import { GestureDetector } from "react-native-gesture-handler";
 import Animated from "react-native-reanimated";
@@ -310,6 +310,19 @@ export interface ComposerTrackRowProps {
   disabled?: boolean;
   accessibilityLabel?: string;
   testID?: string;
+  /** The row's pressable, for a panel that hands focus back to the row that opened a view. */
+  pressableRef?: Ref<View>;
+}
+
+/**
+ * Whether a focus event came from the keyboard. On web a popover focuses its first row when it
+ * opens and a clicked row keeps focus, and neither should look hovered; `:focus-visible` tells
+ * those apart from Tab. Native has no pointer focus to rule out.
+ */
+function isKeyboardFocus(event: NativeSyntheticEvent<unknown>): boolean {
+  if (!isWeb) return true;
+  const target = event.target as unknown as Element | null;
+  return target?.matches?.(":focus-visible") ?? false;
 }
 
 /**
@@ -332,12 +345,20 @@ export function ComposerTrackRow({
   disabled = false,
   accessibilityLabel,
   testID,
+  pressableRef,
 }: ComposerTrackRowProps): ReactElement {
   const { selectItem, openSub } = useMenuContext("ComposerTrackRow");
   const depth = useMenuDepth();
   const [hovered, setHovered] = useState(false);
   const handlePointerEnter = useCallback(() => setHovered(true), []);
   const handlePointerLeave = useCallback(() => setHovered(false), []);
+  // Keyboard focus anywhere in the row counts as hover, so Tab never lands on a hidden action.
+  const [focused, setFocused] = useState(false);
+  const handleFocus = useCallback(
+    (event: NativeSyntheticEvent<unknown>) => setFocused(isKeyboardFocus(event)),
+    [],
+  );
+  const handleBlur = useCallback(() => setFocused(false), []);
   const handleSelect = useCallback(() => {
     if (opensPage) {
       selectItem(() => openSub({ id: opensPage, depth }), false);
@@ -360,8 +381,8 @@ export function ComposerTrackRow({
     [children],
   );
   const renderPressed = useCallback(
-    ({ pressed }: { pressed: boolean }) => renderRow(hovered || pressed),
-    [hovered, renderRow],
+    ({ pressed }: { pressed: boolean }) => renderRow(hovered || focused || pressed),
+    [focused, hovered, renderRow],
   );
 
   if (!onPress && !opensPage) {
@@ -369,8 +390,14 @@ export function ComposerTrackRow({
   }
 
   return (
-    <View onPointerEnter={handlePointerEnter} onPointerLeave={handlePointerLeave}>
+    <View
+      onPointerEnter={handlePointerEnter}
+      onPointerLeave={handlePointerLeave}
+      onFocus={handleFocus}
+      onBlur={handleBlur}
+    >
       <Pressable
+        ref={pressableRef}
         accessibilityRole="menuitem"
         dataSet={itemDataSet}
         accessibilityLabel={accessibilityLabel}

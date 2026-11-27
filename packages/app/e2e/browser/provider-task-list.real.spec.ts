@@ -152,6 +152,11 @@ async function expectBackgroundItems(
 
 async function stopBackgroundItem(panel: Locator, selected: string): Promise<void> {
   const escaped = selected.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  // Stop shows on row hover in the wide popover; the compact sheet always shows it.
+  await panel
+    .getByTestId(/^background-work-row-/)
+    .filter({ hasText: new RegExp(escaped) })
+    .hover();
   await panel.getByRole("button", { name: new RegExp(`Stop .*${escaped}`) }).click();
 }
 
@@ -531,12 +536,17 @@ test("Claude shows monitor description and command in the wide track", async ({ 
       timeout: 30_000,
     });
     await expect(panel).toContainText("Watch the build");
-    await expect(panel).toContainText("sleep 150");
     await expect(panel.getByRole("button", { name: "Stop Watch the build" })).toBeVisible();
     await page.screenshot({
       path: path.resolve("../../.artifacts/refinement-monitor-wide.png"),
       animations: "disabled",
     });
+    // The list shows the description; the command is in the task's detail.
+    await panel
+      .getByTestId(/^background-work-row-/)
+      .filter({ hasText: "Watch the build" })
+      .click();
+    await expect(panel.getByTestId("background-work-detail")).toContainText("sleep 150");
   } finally {
     await cleanupRewindFlow({ handle, cwd });
   }
