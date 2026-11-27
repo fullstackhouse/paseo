@@ -949,24 +949,58 @@ test.each([
   60_000,
 );
 
-test("session-open MCP servers fail on unsupported providers and leave saved config untouched", async () => {
+test("plugin MCP servers are dropped on unsupported providers instead of failing the open", async () => {
   const h = await setup(false, mcpSource, undefined, { supportsMcpServers: false });
   try {
     await h.client.disablePlugin("tools-test");
     const a = await h.create();
     await h.client.enablePlugin("tools-test");
-    await expect(h.daemon.daemon.agentManager.reloadAgentSession(a.id)).rejects.toThrow(
-      /does not support MCP servers.*plugin tools-test/,
-    );
+    await h.daemon.daemon.agentManager.reloadAgentSession(a.id);
     expect(a.config.mcpServers?.company).toBeUndefined();
-    await expect(h.create()).rejects.toThrow(/does not support MCP servers.*plugin tools-test/);
-    const imported = h.daemon.daemon.agentManager.importProviderSession({
+    const b = await h.create();
+    expect(b.config.mcpServers?.company).toBeUndefined();
+    await h.daemon.daemon.agentManager.importProviderSession({
       provider: "codex",
       providerHandleId: "unsupported-import",
       cwd: h.directory,
       workspaceId: "import-workspace",
     });
-    await expect(imported).rejects.toThrow(/does not support MCP servers.*plugin tools-test/);
+  } finally {
+    await h.close();
+  }
+}, 60_000);
+
+const createMcpSource = `
+export default function contribute(server) {
+  server.addHook("agent.create.before", async ({ request }) => ({
+    ...request,
+    config: {
+      ...request.config,
+      mcpServers: { ...request.config.mcpServers, company: ${JSON.stringify(companyServer)} },
+      toolPolicy: { preapproved: [{ kind: "mcp", server: "company", tool: "lookup" }] },
+    },
+  }));
+  return () => {};
+}
+`;
+
+test("create-hook MCP servers and grants are dropped on a session without MCP; the caller's still fail", async () => {
+  const h = await setup(false, createMcpSource, undefined, { supportsMcpServers: false });
+  try {
+    const a = await h.create();
+    expect(a.config.mcpServers?.company).toBeUndefined();
+    expect(a.config.toolPolicy).toBeUndefined();
+    await expect(
+      h.daemon.daemon.agentManager.createAgent(
+        {
+          provider: "codex",
+          cwd: h.directory,
+          mcpServers: { mine: { type: "http", url: "https://mine.example.com/mcp" } },
+        },
+        undefined,
+        {},
+      ),
+    ).rejects.toThrow("does not support MCP servers (mine)");
   } finally {
     await h.close();
   }

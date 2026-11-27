@@ -65,7 +65,77 @@ if (recordPath) {
   const fakeGhPath = path.join(binDir, "gh");
   const fakeGhSource = `#!/usr/bin/env node
 const { spawnSync } = require("child_process");
+const fs = require("fs");
+const path = require("path");
 const args = process.argv.slice(2);
+
+// Pull request reads the daemon batches for plugins (PaseoChangeRequestRead) answer from
+// fake-github-state.json beside this script for PRs in paseo-e2e/attention-fixture, and every such
+// call is appended to fake-github-calls.jsonl. See fake-github.ts. Other repos, including the
+// paseo-e2e/local-fixture checkout fixture below, are untouched.
+const queryArg = args[0] === "api" && args[1] === "graphql"
+  ? args.find((arg) => arg.startsWith("query="))
+  : undefined;
+const attentionRepo = 'owner: "paseo-e2e", name: "attention-fixture"';
+if (queryArg && queryArg.includes("PaseoChangeRequestRead") && queryArg.includes(attentionRepo)) {
+  const statePath = path.join(__dirname, "fake-github-state.json");
+  const state = fs.existsSync(statePath)
+    ? JSON.parse(fs.readFileSync(statePath, "utf8"))
+    : { prs: {}, rateLimit: null };
+  const pattern = /(\\w+): repository\\(owner: "([^"]+)", name: "([^"]+)"\\) \\{\\s*pullRequest\\(number: (\\d+)\\)/g;
+  const data = {
+    rateLimit: state.rateLimit ?? {
+      limit: 5000,
+      remaining: 4900,
+      resetAt: new Date(Date.now() + 3600000).toISOString()
+    }
+  };
+  const errors = [];
+  const requested = [];
+  for (const match of queryArg.matchAll(pattern)) {
+    const [, alias, owner, repo, number] = match;
+    const key = owner + "/" + repo + "#" + number;
+    requested.push(key);
+    const pr = state.prs[key];
+    if (!pr) {
+      data[alias] = { pullRequest: null };
+      errors.push({ type: "NOT_FOUND", path: [alias, "pullRequest"], message: "Could not resolve" });
+      continue;
+    }
+    data[alias] = {
+      pullRequest: {
+        state: pr.state,
+        headRefOid: pr.headRefOid ?? "0000000000000000000000000000000000000000",
+        reviewDecision: pr.reviewDecision ?? null,
+        statusCheckRollup: null,
+        number: Number(number),
+        title: pr.title,
+        isDraft: pr.isDraft ?? false,
+        mergeable: pr.mergeable ?? "MERGEABLE"
+      }
+    };
+  }
+  fs.appendFileSync(
+    path.join(__dirname, "fake-github-calls.jsonl"),
+    JSON.stringify({ at: Date.now(), prs: requested }) + "\\n"
+  );
+  process.stdout.write(JSON.stringify(errors.length ? { data, errors } : { data }));
+  process.exit(errors.length ? 1 : 0);
+}
+// Anything else plugins ask GitHub about paseo-e2e/attention-fixture stays local too: paseo-asks'
+// deployments lookup gets no deployments, and any other call fails instead of reaching github.com.
+if (
+  (args.includes("owner=paseo-e2e") && args.includes("name=attention-fixture")) ||
+  args.some((arg) => arg.includes("paseo-e2e/attention-fixture"))
+) {
+  if (queryArg && queryArg.includes("deployments(")) {
+    process.stdout.write(JSON.stringify({ data: { repository: { pullRequest: { commits: { nodes: [] } } } } }));
+    process.exit(0);
+  }
+  process.stderr.write("Unsupported fake GitHub command: " + args.join(" ") + "\\n");
+  process.exit(1);
+}
+
 const fixtureRemote = "https://github.com/paseo-e2e/local-fixture.git";
 const origin = spawnSync("git", ["config", "--get", "remote.origin.url"], {
   encoding: "utf8",
@@ -204,6 +274,7 @@ export async function startE2EWorker(
     process.env.E2E_SERVER_ID = daemon.serverId;
     process.env.E2E_PASEO_HOME = daemon.paseoHome;
     process.env.E2E_EDITOR_RECORD_PATH = editorRecordPath;
+    process.env.E2E_FAKE_GITHUB_DIR = fakeEditorBin;
     delete process.env.E2E_RELAY_PORT;
     delete process.env.E2E_RELAY_DAEMON_PUBLIC_KEY;
 

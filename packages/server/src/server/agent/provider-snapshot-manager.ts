@@ -186,7 +186,10 @@ export interface AgentManagerProviderState {
   providerDefinitions: Partial<
     Record<
       AgentProvider,
-      Pick<ProviderDefinition, "enabled" | "derivedFromProviderId" | "applyToolPolicy">
+      Pick<
+        ProviderDefinition,
+        "enabled" | "derivedFromProviderId" | "applyToolPolicy" | "supportsExactMcpPreapproval"
+      >
     >
   >;
   clients: Partial<Record<AgentProvider, AgentClient>>;
@@ -382,6 +385,7 @@ export class ProviderSnapshotManager {
         enabled: definition.enabled,
         derivedFromProviderId: definition.derivedFromProviderId,
         applyToolPolicy: definition.applyToolPolicy,
+        supportsExactMcpPreapproval: definition.supportsExactMcpPreapproval,
       };
       if (definition.enabled) {
         clients[provider] = this.ensureClient(provider, definition, providerClients);
@@ -888,6 +892,9 @@ export class ProviderSnapshotManager {
           iconSvg: definition.iconSvg,
           defaultModeId: definition.defaultModeId ?? null,
           ...(definition.supportsPlanApproval ? { supportsPlanApproval: true } : {}),
+          // COMPAT(pluginToolGrants): FSH-only, added after v0.17.1, remove gate after 2027-05-31. Hosts before it
+          // omit the field; plugins keep their own provider list for them.
+          supportsToolPolicy: definition.supportsExactMcpPreapproval === true,
           ...(definition.settingsScreen ? { settingsScreen: definition.settingsScreen } : {}),
         }),
       });

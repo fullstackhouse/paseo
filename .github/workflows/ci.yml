@@ -454,6 +454,13 @@ jobs:
       - name: Install agent CLIs for provider tests
         run: node scripts/npm-retry.mjs install -g @anthropic-ai/claude-code @openai/codex@0.105.0 opencode-ai
 
+      # workspace-attention.spec.ts clones and prepares the pinned FSH plugins once; reuse them until a pin moves.
+      - name: Cache workspace attention plugins
+        uses: actions/cache@v4
+        with:
+          path: .dev/e2e-attention-plugins
+          key: e2e-attention-plugins-${{ runner.os }}-${{ hashFiles('packages/app/e2e/support/helpers/attention-plugins.ts') }}
+
       - name: Run Playwright E2E tests
         run: npm run test:e2e --workspace=@getpaseo/app -- --shard=${{ env.PLAYWRIGHT_SHARD }}
         env:

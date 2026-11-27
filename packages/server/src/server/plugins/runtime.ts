@@ -1,6 +1,10 @@
 import { validateWorktreePath } from "../../utils/worktree-path.js";
 import type { PluginHookPayload } from "@getpaseo/plugin/server";
-import type { PluginWireBeforeRequests, PluginBeforeResults } from "./lifecycle/index.js";
+import type {
+  PluginWireBeforeRequests,
+  PluginBeforeResults,
+  PluginConfigAdditions,
+} from "./lifecycle/index.js";
 import type { SessionOpenWireRequest, AttachedAgentTool } from "./agent-tools.js";
 import type { UsageScope } from "@getpaseo/plugin/server/usage";
 import {
@@ -763,10 +767,15 @@ export class PluginRuntime {
     const attached: AttachedAgentTool[] = [];
     const mcpServers: SessionOpenWireRequest["mcpServers"] = {};
     const mcpServerOwners: Record<string, string> = {};
+    const additions: PluginConfigAdditions = { mcpServers: {}, toolGrants: {} };
     for (const loaded of plugins) {
       if (!loaded.hooks.includes(name)) {
         continue;
       }
+      const before =
+        name === "agent.create.before"
+          ? configEntries((request as PluginWireBeforeRequests["agent.create.before"]).config)
+          : null;
       try {
         const output = await this.request(loaded, {
           type: "hook",
@@ -787,6 +796,14 @@ export class PluginRuntime {
           this.collectMcpServers(mcpServers, mcpServerOwners, loaded, opened.mcpServers);
           this.collectAgentTools(attached, loaded, opened.tools);
         }
+        if (before) {
+          recordAdditions(
+            additions,
+            loaded.id,
+            before,
+            configEntries((request as PluginWireBeforeRequests["agent.create.before"]).config),
+          );
+        }
       } catch (error) {
         if (name === "agent.open.before")
           this.detachTools((request as SessionOpenWireRequest).agentId);
@@ -802,6 +819,9 @@ export class PluginRuntime {
         mcpServers,
         mcpServerOwners,
       } as PluginBeforeResults[Name];
+    }
+    if (name === "agent.create.before") {
+      return { ...request, pluginAdditions: additions } as PluginBeforeResults[Name];
     }
     return request;
   }
@@ -1766,4 +1786,34 @@ function wireEvent<Name extends keyof PluginHookEvents>(
   event: PluginHookEvents[Name],
 ): PluginHookEvents[Name] {
   return name === "agent.turn.after" ? { ...event, timeline: [] } : event;
+}
+
+/** The MCP server names and `server.tool` grants in an agent config, to diff what a create hook added. */
+function configEntries(config: PluginWireBeforeRequests["agent.create.before"]["config"]): {
+  mcpServers: Set<string>;
+  toolGrants: Set<string>;
+} {
+  return {
+    mcpServers: new Set(Object.keys(config.mcpServers ?? {})),
+    toolGrants: new Set(
+      (config.toolPolicy?.preapproved ?? []).map((grant) => `${grant.server}.${grant.tool}`),
+    ),
+  };
+}
+
+type ConfigEntries = ReturnType<typeof configEntries>;
+
+/** Credits `pluginId` with every server and grant in `after` that wasn't in `before`. */
+function recordAdditions(
+  additions: PluginConfigAdditions,
+  pluginId: string,
+  before: ConfigEntries,
+  after: ConfigEntries,
+): void {
+  for (const server of after.mcpServers) {
+    if (!before.mcpServers.has(server)) additions.mcpServers[server] = pluginId;
+  }
+  for (const grant of after.toolGrants) {
+    if (!before.toolGrants.has(grant)) additions.toolGrants[grant] = pluginId;
+  }
 }
