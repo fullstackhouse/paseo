@@ -12,6 +12,7 @@ import {
   type ChangeRequestStatus,
 } from "./change-request-source.js";
 import type { ChangeRequestRouter } from "./change-request-router.js";
+import { createOpenPullRequestLists, type OpenPullRequestList } from "./open-pull-request-lists.js";
 
 /** How long a read result is served again to one-shot reads before the forge is asked again. */
 export const CHANGE_REQUEST_READ_TTL_MS = 30_000;
@@ -57,6 +58,14 @@ export interface PullRequestService {
    * `CHANGE_REQUEST_READ_TTL_MS`; reads already in flight are shared.
    */
   read(urls: string[], options?: { caller?: string }): Promise<ChangeRequestRead[]>;
+  /**
+   * A repository's open pull requests, most recently updated first (default 50, at most 100).
+   * Served from a per-repository cache within 30 s; lists already in flight are shared.
+   */
+  listOpen(
+    repo: string,
+    options?: { caller?: string; limit?: number },
+  ): Promise<OpenPullRequestList>;
   /** Follow PRs and branches; `onUpdate` gets only what changed, batched per tick. */
   subscribe(
     caller: string,
@@ -310,6 +319,7 @@ export function createPullRequestService({
     number,
     { results: Map<string, ChangeRequestRead>; branches: Map<string, ChangeRequestBranchRead> }
   >();
+  const openLists = createOpenPullRequestLists({ router, now });
   const startedAt = now();
   const totals = new Map<string, { points: number; reads: number }>();
   let recent: UsageEvent[] = [];
@@ -377,14 +387,20 @@ export function createPullRequestService({
         credit(CORE_WATCH_CALLER, points, part.count);
         continue;
       }
+      if (part.purpose === "list") {
+        creditShared(
+          part.urls.map((repo) => openLists.demand(forge, repo)),
+          points,
+          part.count,
+        );
+        continue;
+      }
       if (part.purpose === "branch") {
-        if (!part.urls.length) credit("unattributed", points, part.count);
-        for (const id of part.urls) {
-          const callers = branchDemand(forge, id);
-          if (!callers.length) credit("unattributed", points / part.urls.length, 1);
-          for (const caller of callers)
-            credit(caller, points / part.urls.length / callers.length, 1 / callers.length);
-        }
+        creditShared(
+          part.urls.map((id) => branchDemand(forge, id)),
+          points,
+          part.count,
+        );
         continue;
       }
       if (!part.urls.length) {
@@ -401,6 +417,19 @@ export function createPullRequestService({
         }
         for (const caller of callers) credit(caller, share / callers.length, 1 / callers.length);
       }
+    }
+  }
+
+  /** Splits points evenly across targets, and each target's share across its callers. */
+  function creditShared(targets: string[][], points: number, count: number): void {
+    if (!targets.length) {
+      credit("unattributed", points, count);
+      return;
+    }
+    for (const callers of targets) {
+      if (!callers.length) credit("unattributed", points / targets.length, 1);
+      for (const caller of callers)
+        credit(caller, points / targets.length / callers.length, 1 / callers.length);
     }
   }
 
@@ -1034,6 +1063,10 @@ export function createPullRequestService({
       });
     },
 
+    listOpen(repo, options) {
+      return openLists.list(repo, options);
+    },
+
     async subscribe(caller, target, onUpdate) {
       const subscriber: Subscriber = {
         id: nextSubscriberId++,
@@ -1109,6 +1142,7 @@ export function createPullRequestService({
       subscribers.clear();
       entries.clear();
       branches.clear();
+      openLists.clear();
     },
   };
 

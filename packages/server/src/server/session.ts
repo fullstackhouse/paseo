@@ -3614,6 +3614,8 @@ export class Session {
         return this.subscribeForgeChangeRequests(msg);
       case "forge.change_requests.usage.request":
         return this.handleForgeChangeRequestsUsageRequest(msg);
+      case "forge.change_requests.list.request":
+        return this.handleForgeChangeRequestsListRequest(msg);
       case "workspace.group.set.request":
         return this.handleWorkspaceGroupSetRequest(msg);
       case "workspace.appearance.set.request":
@@ -4890,6 +4892,28 @@ export class Session {
         branches: subscription.initial.branches,
         error: null,
       },
+    });
+  }
+
+  private async handleForgeChangeRequestsListRequest(
+    request: Extract<SessionInboundMessage, { type: "forge.change_requests.list.request" }>,
+  ): Promise<void> {
+    const service = this.pullRequestService;
+    const list = service
+      ? await service.listOpen(request.repo, {
+          caller: this.changeRequestCaller(),
+          ...(request.limit !== undefined ? { limit: request.limit } : {}),
+        })
+      : {
+          repo: request.repo,
+          ok: false as const,
+          items: [] as [],
+          error: "Pull request lists are unavailable",
+          reason: "unsupported" as const,
+        };
+    this.emit({
+      type: "forge.change_requests.list.response",
+      payload: { requestId: request.requestId, ...list },
     });
   }
 

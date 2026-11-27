@@ -2212,6 +2212,8 @@ export class VoiceAssistantWebSocketServer {
         ...(this.changeRequestReader ? { changeRequestsRead: true } : {}),
         // COMPAT(changeRequestSubscriptions): FSH-only, added after v0.17.1, remove gate after 2027-05-27.
         ...(this.pullRequestService ? { changeRequestSubscriptions: true } : {}),
+        // COMPAT(changeRequestList): FSH-only, added after v0.17.1, remove gate after 2027-05-27.
+        ...(this.pullRequestService ? { changeRequestList: true } : {}),
         // COMPAT(workspaceManualGroup): FSH-only, added after v0.15.4, remove gate after 2027-05-21.
         workspaceManualGroup: true,
         // COMPAT(workspaceAppearance): FSH-only, added after v0.17.1, remove gate after 2027-05-23.

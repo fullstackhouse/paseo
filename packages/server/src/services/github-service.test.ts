@@ -5677,6 +5677,89 @@ it("lists a branch's open pull requests, or all of them with includeClosed", asy
   }
 });
 
+it("lists a repository's open pull requests, most recently updated first", async () => {
+  const resetAt = new Date(Date.now() + 100_000).toISOString();
+  const runner = createRunner([
+    batchPollStatusJson({
+      rateLimit: { limit: 5000, remaining: 4900, resetAt, cost: 1 },
+      request0: {
+        pullRequests: {
+          nodes: [
+            {
+              url: "https://github.com/Acme/Widgets/pull/12",
+              number: 12,
+              title: "Add the login page",
+              isDraft: true,
+              headRefName: "feat/login",
+              author: { login: "octocat" },
+              updatedAt: "2026-11-27T10:00:00Z",
+            },
+            null,
+            {
+              url: "https://github.com/acme/widgets/pull/9",
+              number: 9,
+              title: "Remove the old banner",
+              isDraft: false,
+              headRefName: "chore/banner",
+              author: null,
+              updatedAt: "2026-11-26T09:00:00Z",
+            },
+          ],
+        },
+      },
+    }),
+  ]);
+  const service = createGitHubService({ runner: runner.runner, resolveGhPath: async () => "gh" });
+  const costs: unknown[] = [];
+  service.changeRequests.observeReads!({ cost: (cost) => costs.push(cost) });
+  try {
+    const repo = "https://github.com/acme/widgets";
+    await expect(service.changeRequests.listOpen!({ repo, limit: 500 })).resolves.toEqual([
+      {
+        url: "https://github.com/acme/widgets/pull/12",
+        number: 12,
+        title: "Add the login page",
+        isDraft: true,
+        headRef: "feat/login",
+        author: "octocat",
+        updatedAt: "2026-11-27T10:00:00Z",
+      },
+      {
+        url: "https://github.com/acme/widgets/pull/9",
+        number: 9,
+        title: "Remove the old banner",
+        isDraft: false,
+        headRef: "chore/banner",
+        author: null,
+        updatedAt: "2026-11-26T09:00:00Z",
+      },
+    ]);
+    expect(runner.calls[0]?.args.at(-1)).toContain(
+      "pullRequests(first: 100, states: [OPEN], orderBy: { field: UPDATED_AT, direction: DESC })",
+    );
+    expect(costs).toEqual([
+      { host: "github.com", cost: 1, parts: [{ purpose: "list", urls: [repo], count: 1 }] },
+    ]);
+  } finally {
+    service.dispose?.();
+  }
+});
+
+it("answers a repository list as not found when GitHub has no such repository", async () => {
+  const resetAt = new Date(Date.now() + 100_000).toISOString();
+  const runner = createRunner([
+    batchPollStatusJson({ rateLimit: { limit: 5000, remaining: 4900, resetAt }, request0: null }),
+  ]);
+  const service = createGitHubService({ runner: runner.runner, resolveGhPath: async () => "gh" });
+  try {
+    await expect(
+      service.changeRequests.listOpen!({ repo: "https://github.com/acme/gone", limit: 20 }),
+    ).rejects.toMatchObject({ reason: "not_found" });
+  } finally {
+    service.dispose?.();
+  }
+});
+
 it("answers a branch lookup paused while reads are held at the reserve", async () => {
   const resetAt = new Date(Date.now() + 100_000).toISOString();
   const runner = createRunner([

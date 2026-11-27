@@ -74,6 +74,24 @@ export interface ChangeRequestBranchQuery {
   includeClosed?: boolean;
 }
 
+/** An open change request from a repository list. */
+export interface ChangeRequestListEntry {
+  url: string;
+  number: number;
+  title: string;
+  isDraft: boolean;
+  headRef: string;
+  author: string | null;
+  /** ISO 8601. */
+  updatedAt: string;
+}
+
+export interface ChangeRequestListQuery {
+  /** Canonical repository address, such as https://github.com/acme/widgets. */
+  repo: string;
+  limit: number;
+}
+
 /**
  * A status the forge read on its own (a workspace poll, a watch), for the pull request service's
  * cache. Details are present when that read had them.
@@ -85,7 +103,7 @@ export interface ChangeRequestObservedRead {
 }
 
 /** Who a forge query was for, for per-caller budget accounting. */
-export type ChangeRequestReadPurpose = "workspace" | "watch" | "read" | "branch";
+export type ChangeRequestReadPurpose = "workspace" | "watch" | "read" | "branch" | "list";
 
 /** What one forge query cost, split across the change requests it read. */
 export interface ChangeRequestQueryCost {
@@ -143,6 +161,11 @@ export interface ChangeRequestSource {
   resolveRepository?(url: string): string;
   /** Change requests whose head is the branch, newest first. Throws `ChangeRequestReadError`. */
   listForBranch?(query: ChangeRequestBranchQuery): Promise<ChangeRequestBranchEntry[]>;
+  /**
+   * A repository's open change requests, most recently updated first, at most `limit`. Its query
+   * cost reports `purpose: "list"` with the repository address. Throws `ChangeRequestReadError`.
+   */
+  listOpen?(query: ChangeRequestListQuery): Promise<ChangeRequestListEntry[]>;
   /**
    * Hears every change request status the forge reads for its own callers (workspace polls,
    * watches) and what each query cost. Returns the unsubscribe.

@@ -126,6 +126,46 @@ describe("plugin protocol compatibility", () => {
     expect(SessionInboundMessageSchema.parse(usage)).toEqual(usage);
   });
 
+  it("round-trips open pull request lists", () => {
+    const request = {
+      type: "forge.change_requests.list.request",
+      requestId: "list",
+      repo: "https://github.com/acme/widgets",
+      limit: 20,
+    };
+    expect(SessionInboundMessageSchema.parse(request)).toEqual(request);
+    for (const payload of [
+      {
+        requestId: "list",
+        repo: "https://github.com/acme/widgets",
+        ok: true,
+        items: [
+          {
+            url: "https://github.com/acme/widgets/pull/12",
+            number: 12,
+            title: "Add the login page",
+            isDraft: false,
+            headRef: "feat/login",
+            author: null,
+            updatedAt: "2026-11-27T10:00:00Z",
+          },
+        ],
+      },
+      {
+        requestId: "list",
+        repo: "https://github.com/acme/widgets",
+        ok: false,
+        items: [],
+        error: "Paused",
+        reason: "paused",
+        retryAt: 1_700_000_000_000,
+      },
+    ]) {
+      const response = { type: "forge.change_requests.list.response", payload };
+      expect(SessionOutboundMessageSchema.parse(response)).toEqual(response);
+    }
+  });
+
   it.each([undefined, { paseo: ">=0.8.0" }])(
     "parses plugin catalogs with requirements %j",
     (requirements) => {

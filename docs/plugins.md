@@ -971,8 +971,9 @@ whole config. Dedupe and the rate limit live in daemon memory and reset on resta
 
 Plugin servers get pull request data from the daemon instead of calling `gh`: subscribe with
 `paseo.changeRequests.subscribe` (pushed changes, gated on
-`server_info.features.changeRequestSubscriptions`) or read once with `paseo.changeRequests.read`
-(gated on `changeRequestsRead`). Both share one cache, one poller per PR and the daemon's rate-limit
+`server_info.features.changeRequestSubscriptions`), read once with `paseo.changeRequests.read`
+(gated on `changeRequestsRead`), or list a repository's open PRs with
+`paseo.changeRequests.listOpen` (gated on `changeRequestList`). Both share one cache, one poller per PR and the daemon's rate-limit
 pause. On `reason: "paused"`, keep the last known state, mark it stale, and log once, not per PR. See
 [Pull request service](pr-service.md).
 

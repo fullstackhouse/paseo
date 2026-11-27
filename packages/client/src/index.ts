@@ -41,11 +41,13 @@ import type {
   WorkspaceCreateRequest,
   ChangeRequestBranchRead,
   ChangeRequestDeploymentRead,
+  ChangeRequestListItem,
   ChangeRequestRead,
   ChangeRequestUsage,
 } from "@getpaseo/protocol/messages";
 import {
   DaemonClient,
+  type ChangeRequestList,
   type ChangeRequestSubscriptionTarget,
   type ChangeRequestSubscriptionUpdate,
   type CreateAgentRequestOptions,
@@ -86,6 +88,8 @@ export type { WorkspaceAppearance, WorkspaceAppearanceInput };
 export type {
   ChangeRequestBranchRead,
   ChangeRequestDeploymentRead,
+  ChangeRequestList,
+  ChangeRequestListItem,
   ChangeRequestRead,
   ChangeRequestSubscriptionTarget,
   ChangeRequestSubscriptionUpdate,
@@ -744,6 +748,15 @@ export interface PaseoChangeRequestActions {
   ): Promise<{ initial: ChangeRequestSubscriptionUpdate; unsubscribe(): Promise<void> }>;
   /** Forge points and reads per caller, since start and in the last hour. */
   usage(options?: { requestId?: string }): Promise<ChangeRequestUsage>;
+  /**
+   * A repository's open pull requests, most recently updated first (default 50, at most 100).
+   * `ok: false` with a `reason` when it can't be read; on `paused`, keep the last list until
+   * `retryAt`. Needs `server_info.features.changeRequestList`. See docs/pr-service.md.
+   */
+  listOpen(
+    repo: string,
+    options?: { limit?: number; requestId?: string },
+  ): Promise<ChangeRequestList>;
 }
 
 export interface PaseoApi {
@@ -1073,6 +1086,7 @@ export function createPaseoApi(
       subscribe: (target, onUpdate, options) =>
         daemonClient.subscribeChangeRequests(target, onUpdate, options),
       usage: (options) => daemonClient.getChangeRequestUsage(options),
+      listOpen: (repo, options) => daemonClient.listOpenChangeRequests(repo, options),
     },
   };
 }

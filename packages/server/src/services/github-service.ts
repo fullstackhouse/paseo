@@ -2,6 +2,8 @@ import {
   ChangeRequestReadError,
   type ChangeRequestBranchEntry,
   type ChangeRequestBranchQuery,
+  type ChangeRequestListEntry,
+  type ChangeRequestListQuery,
   type ChangeRequestObservedRead,
   type ChangeRequestQueryCost,
   type ChangeRequestReadObserver,
@@ -1271,6 +1273,27 @@ const BranchPullRequestsSchema = z.object({
   }),
 });
 
+/** GraphQL's page cap: an open-PR list reads one page. */
+export const OPEN_PULL_REQUEST_LIST_MAX = 100;
+
+const OpenPullRequestsSchema = z.object({
+  pullRequests: z.object({
+    nodes: z.array(
+      z
+        .object({
+          url: z.string(),
+          number: z.number(),
+          title: z.string(),
+          isDraft: z.boolean(),
+          headRefName: z.string(),
+          author: z.object({ login: z.string() }).nullable(),
+          updatedAt: z.string(),
+        })
+        .nullable(),
+    ),
+  }),
+});
+
 export function createGitHubService(options: CreateGitHubServiceOptions = {}): GitHubService {
   const ttlMs = options.ttlMs ?? DEFAULT_GITHUB_CACHE_TTL_MS;
   const deps: GitHubServiceDependencies = {
@@ -1937,15 +1960,21 @@ export function createGitHubService(options: CreateGitHubServiceOptions = {}): G
   }
 
   /**
-   * Pull requests whose head is a branch of a repository, newest first. Shares the poll's batching,
-   * rate-limit reserve and pause. Same-named branches in forks are not told apart.
+   * Reads one repository's `pullRequests(...)` connection. Shares the poll's batching, rate-limit
+   * reserve and pause; `costId` names who the query was for in its reported cost.
    */
-  async function listPullRequestsForBranch(
-    query: ChangeRequestBranchQuery,
-  ): Promise<ChangeRequestBranchEntry[]> {
-    const { host, pathname } = new URL(query.repo);
+  async function readRepositoryPullRequests<T>(input: {
+    repo: string;
+    name: string;
+    purpose: "branch" | "list";
+    costId: string;
+    args: string;
+    fields: string;
+    parse: (repository: unknown) => T;
+  }): Promise<T> {
+    const { host, pathname } = new URL(input.repo);
     const [, owner, name] = pathname.split("/");
-    if (!owner || !name) throw new Error(`Not a repository address: ${query.repo}`);
+    if (!owner || !name) throw new Error(`Not a repository address: ${input.repo}`);
     const pausedUntil = pollPausedUntilByHost.get(host) ?? 0;
     if (pausedUntil > deps.now()) throw pausedReadError(pausedUntil);
     try {
@@ -1957,48 +1986,101 @@ export function createGitHubService(options: CreateGitHubServiceOptions = {}): G
         );
         authenticatedWatchHosts.add(host);
       }
-      const states = query.includeClosed ? "" : ", states: [OPEN]";
       const selection = `request0: repository(owner: ${graphqlString(owner)}, name: ${graphqlString(name)}) {
-    pullRequests(headRefName: ${graphqlString(query.headRef)}, first: 20${states}, orderBy: { field: CREATED_AT, direction: DESC }) {
-      nodes { url number state }
+    pullRequests(${input.args}) {
+      nodes { ${input.fields} }
     }
   }`;
       const response = await createCoDueGitHubPollReader(host)({
-        name: "PaseoBranchPullRequests",
+        name: input.name,
         cwd: process.cwd(),
         targetCount: 1,
-        purpose: "branch",
-        // The branch identity, so the pull request service can credit its subscribers.
-        urls: () => [`${query.repo}#${query.headRef}`],
+        purpose: input.purpose,
+        urls: () => [input.costId],
         selections: () => [selection],
       });
       const repository = response.aliases.request0;
       if (repository === null || repository === undefined) {
-        throw new ChangeRequestReadError(`${query.repo} was not found on GitHub.`, {
+        throw new ChangeRequestReadError(`${input.repo} was not found on GitHub.`, {
           reason: "not_found",
         });
       }
-      const parsed = BranchPullRequestsSchema.parse(repository);
-      return parsed.pullRequests.nodes.flatMap((node) => {
-        if (!node) return [];
-        try {
-          return [
-            {
-              url: resolveGitHubChangeRequest(node.url),
-              number: node.number,
-              state: BRANCH_PR_STATES[node.state],
-            } satisfies ChangeRequestBranchEntry,
-          ];
-        } catch {
-          return [];
-        }
-      });
+      return input.parse(repository);
     } catch (error) {
       if (error instanceof ChangeRequestReadError) throw error;
       if (error instanceof GitHubAuthenticationError) authenticatedWatchHosts.delete(host);
       const failed = error instanceof Error ? error : new Error(String(error));
-      throw classifyReadError(query.repo, failed, new Set());
+      throw classifyReadError(input.repo, failed, new Set());
     }
+  }
+
+  /**
+   * Pull requests whose head is a branch of a repository, newest first. Same-named branches in
+   * forks are not told apart.
+   */
+  async function listPullRequestsForBranch(
+    query: ChangeRequestBranchQuery,
+  ): Promise<ChangeRequestBranchEntry[]> {
+    const states = query.includeClosed ? "" : ", states: [OPEN]";
+    return readRepositoryPullRequests({
+      repo: query.repo,
+      name: "PaseoBranchPullRequests",
+      purpose: "branch",
+      // The branch identity, so the pull request service can credit its subscribers.
+      costId: `${query.repo}#${query.headRef}`,
+      args: `headRefName: ${graphqlString(query.headRef)}, first: 20${states}, orderBy: { field: CREATED_AT, direction: DESC }`,
+      fields: "url number state",
+      parse: (repository) =>
+        BranchPullRequestsSchema.parse(repository).pullRequests.nodes.flatMap((node) => {
+          if (!node) return [];
+          try {
+            return [
+              {
+                url: resolveGitHubChangeRequest(node.url),
+                number: node.number,
+                state: BRANCH_PR_STATES[node.state],
+              } satisfies ChangeRequestBranchEntry,
+            ];
+          } catch {
+            return [];
+          }
+        }),
+    });
+  }
+
+  /** A repository's open pull requests, most recently updated first. */
+  async function listOpenPullRequests(
+    query: ChangeRequestListQuery,
+  ): Promise<ChangeRequestListEntry[]> {
+    const first = Math.max(1, Math.min(Math.floor(query.limit), OPEN_PULL_REQUEST_LIST_MAX));
+    return readRepositoryPullRequests({
+      repo: query.repo,
+      name: "PaseoOpenPullRequests",
+      purpose: "list",
+      // The repository, so the pull request service can credit whoever listed it.
+      costId: query.repo,
+      args: `first: ${first}, states: [OPEN], orderBy: { field: UPDATED_AT, direction: DESC }`,
+      fields: "url number title isDraft headRefName author { login } updatedAt",
+      parse: (repository) =>
+        OpenPullRequestsSchema.parse(repository).pullRequests.nodes.flatMap((node) => {
+          if (!node) return [];
+          try {
+            return [
+              {
+                url: resolveGitHubChangeRequest(node.url),
+                number: node.number,
+                title: node.title,
+                isDraft: node.isDraft,
+                headRef: node.headRefName,
+                author: node.author?.login ?? null,
+                updatedAt: node.updatedAt,
+              } satisfies ChangeRequestListEntry,
+            ];
+          } catch {
+            return [];
+          }
+        }),
+    });
   }
 
   /** One-shot reads share the poll's batching, rate-limit reserve and pause; they never watch. */
@@ -3393,6 +3475,7 @@ export function createGitHubService(options: CreateGitHubServiceOptions = {}): G
       read: readChangeRequestsOnce,
       resolveRepository: resolveGitHubRepository,
       listForBranch: listPullRequestsForBranch,
+      listOpen: listOpenPullRequests,
       observeReads(observer) {
         readObservers.add(observer);
         return () => {
