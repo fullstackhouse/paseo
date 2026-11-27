@@ -1240,6 +1240,35 @@ export const ForgeChangeRequestsReadRequestSchema = z.object({
   requestId: z.string(),
 });
 
+// COMPAT(changeRequestSubscriptions): FSH-only, added after v0.17.1, remove gate after 2027-05-27.
+// Follows pull requests and branches through the daemon's pull request service (docs/pr-service.md).
+// Updates arrive as forge.change_requests.update; release with subscription.release.request.
+export const ForgeChangeRequestsSubscribeRequestSchema = z.object({
+  type: z.literal("forge.change_requests.subscribe.request"),
+  urls: z.array(z.string()).optional(),
+  branches: z
+    .array(
+      z.object({
+        // A repository URL, such as https://github.com/acme/widgets.
+        repo: z.string(),
+        headRef: z.string(),
+        includeClosed: z.boolean().optional(),
+      }),
+    )
+    .optional(),
+  // "visible" reads moving PRs every 20 s; "background" (the default) every 2 minutes.
+  priority: z.enum(["visible", "background"]).optional(),
+  // Facts that cost extra points, read only for subscriptions that ask.
+  include: z.array(z.enum(["deployments"])).optional(),
+  requestId: z.string(),
+});
+
+// COMPAT(changeRequestSubscriptions): FSH-only, added after v0.17.1, remove gate after 2027-05-27.
+export const ForgeChangeRequestsUsageRequestSchema = z.object({
+  type: z.literal("forge.change_requests.usage.request"),
+  requestId: z.string(),
+});
+
 // COMPAT(workspaceAttentionReport): FSH-only, added after v0.15.4, remove gate after 2027-05-17.
 // A plugin says the workspace needs the human (an ask waits on them, the agent's work is done).
 // A snoozed workspace treats it like a permission prompt; an awake one ignores it.
@@ -2586,6 +2615,15 @@ export const WorkspaceAppearanceSetResponseSchema = z.object({
   payload: WorkspaceAppearanceSetResponsePayloadSchema,
 });
 
+export const ChangeRequestDeploymentSchema = z.object({
+  environment: z.string().nullable(),
+  // The forge's own state of the latest status, such as GitHub's SUCCESS or IN_PROGRESS.
+  state: z.string().nullable(),
+  createdAt: z.string(),
+  url: z.string().optional(),
+  logUrl: z.string().optional(),
+});
+
 export const ChangeRequestReadCheckSchema = z.object({
   name: z.string(),
   state: z.enum(["passing", "failing", "pending", "skipped"]),
@@ -2606,6 +2644,12 @@ export const ChangeRequestReadSchema = z.union([
     checksState: z.enum(["passing", "failing", "pending", "none"]),
     checks: z.array(ChangeRequestReadCheckSchema),
     headSha: z.string(),
+    // FSH-only, COMPAT(changeRequestSubscriptions): absent from older daemons.
+    author: z.string().nullable().optional(),
+    reviewRequestCount: z.number().optional(),
+    viewerCanMergeAsAdmin: z.boolean().optional(),
+    // Only for subscriptions that include "deployments"; newest first.
+    deployments: z.array(ChangeRequestDeploymentSchema).optional(),
   }),
   z.object({
     url: z.string(),
@@ -2618,6 +2662,69 @@ export const ChangeRequestReadSchema = z.union([
     retryAt: z.number().optional(),
   }),
 ]);
+
+// The pull requests whose head is a branch, newest first; each is followed and its result arrives
+// in `results`. ok: false with a reason when the lookup failed (paused carries retryAt).
+export const ChangeRequestBranchReadSchema = z.object({
+  repo: z.string(),
+  headRef: z.string(),
+  ok: z.boolean(),
+  urls: z.array(z.string()),
+  error: z.string().optional(),
+  reason: z.enum(["paused", "not_found", "unsupported", "error"]).optional(),
+  retryAt: z.number().optional(),
+});
+
+export const ChangeRequestUsageSchema = z.object({
+  // Epoch ms the daemon started counting.
+  since: z.number(),
+  // Pull requests at least one subscriber follows.
+  followed: z.number(),
+  callers: z.array(
+    z.object({
+      // plugin:<id>, app, core:workspace-polls, core:change-request-watches, unattributed.
+      caller: z.string(),
+      // Forge points (GitHub GraphQL cost) and pull request reads, split across the callers that
+      // wanted each PR.
+      points: z.number(),
+      reads: z.number(),
+      pointsLastHour: z.number(),
+      readsLastHour: z.number(),
+      subscriptions: z.number(),
+    }),
+  ),
+});
+
+export const ForgeChangeRequestsSubscribeResponseSchema = z.object({
+  type: z.literal("forge.change_requests.subscribe.response"),
+  payload: z.object({
+    requestId: z.string(),
+    subscriptionId: z.string(),
+    // Every result and branch at subscribe time.
+    results: z.array(ChangeRequestReadSchema),
+    branches: z.array(ChangeRequestBranchReadSchema),
+    error: z.string().nullable(),
+  }),
+});
+
+// Only what changed since the last update or the response.
+export const ForgeChangeRequestsUpdateSchema = z.object({
+  type: z.literal("forge.change_requests.update"),
+  payload: z.object({
+    subscriptionId: z.string(),
+    results: z.array(ChangeRequestReadSchema),
+    branches: z.array(ChangeRequestBranchReadSchema),
+  }),
+});
+
+export const ForgeChangeRequestsUsageResponseSchema = z.object({
+  type: z.literal("forge.change_requests.usage.response"),
+  payload: z.object({
+    requestId: z.string(),
+    usage: ChangeRequestUsageSchema.nullable(),
+    error: z.string().nullable(),
+  }),
+});
 
 export const ForgeChangeRequestsReadResponseSchema = z.object({
   type: z.literal("forge.change_requests.read.response"),
@@ -3950,6 +4057,8 @@ export const SessionInboundMessageSchema = z.discriminatedUnion("type", [
   WorkspaceAppearanceSetRequestSchema,
   WorkspaceAttentionReportRequestSchema,
   ForgeChangeRequestsReadRequestSchema,
+  ForgeChangeRequestsSubscribeRequestSchema,
+  ForgeChangeRequestsUsageRequestSchema,
   WorkspaceLabelListRequestSchema,
   WorkspaceLabelAssignmentSetRequestSchema,
   WorkspaceLabelUpdateRequestSchema,
@@ -4435,6 +4544,8 @@ export const ServerInfoStatusPayloadSchema = z
         workspaceAttentionReport: z.boolean().optional(),
         // COMPAT(changeRequestsRead): FSH-only, added after v0.17.1, remove gate after 2027-05-26.
         changeRequestsRead: z.boolean().optional(),
+        // COMPAT(changeRequestSubscriptions): FSH-only, added after v0.17.1, remove gate after 2027-05-27.
+        changeRequestSubscriptions: z.boolean().optional(),
         // COMPAT(workspaceManualGroup): FSH-only, added after v0.15.4, remove gate after 2027-05-21.
         workspaceManualGroup: z.boolean().optional(),
         // COMPAT(workspaceAppearance): FSH-only, added after v0.17.1, remove gate after 2027-05-23.
@@ -8309,6 +8420,9 @@ export const SessionOutboundMessageSchema = z.discriminatedUnion("type", [
   WorkspaceAppearanceSetResponseSchema,
   WorkspaceAttentionReportResponseSchema,
   ForgeChangeRequestsReadResponseSchema,
+  ForgeChangeRequestsSubscribeResponseSchema,
+  ForgeChangeRequestsUpdateSchema,
+  ForgeChangeRequestsUsageResponseSchema,
   WorkspaceRecoveryInspectResponseSchema,
   WorkspaceRecoveryRestoreResponseSchema,
   WorkspaceArchiveUndoResponseSchema,
@@ -8748,6 +8862,12 @@ export type WorkspaceAttentionReportRequest = z.infer<typeof WorkspaceAttentionR
 export type ForgeChangeRequestsReadRequest = z.infer<typeof ForgeChangeRequestsReadRequestSchema>;
 export type ForgeChangeRequestsReadResponse = z.infer<typeof ForgeChangeRequestsReadResponseSchema>;
 export type ChangeRequestRead = z.infer<typeof ChangeRequestReadSchema>;
+export type ChangeRequestDeploymentRead = z.infer<typeof ChangeRequestDeploymentSchema>;
+export type ChangeRequestBranchRead = z.infer<typeof ChangeRequestBranchReadSchema>;
+export type ChangeRequestUsage = z.infer<typeof ChangeRequestUsageSchema>;
+export type ForgeChangeRequestsSubscribeRequest = z.infer<
+  typeof ForgeChangeRequestsSubscribeRequestSchema
+>;
 export type WorkspaceRecoveryInspectRequest = z.infer<typeof WorkspaceRecoveryInspectRequestSchema>;
 export type WorkspaceRecoveryRestoreRequest = z.infer<typeof WorkspaceRecoveryRestoreRequestSchema>;
 export type WorkspaceArchiveUndoRequest = z.infer<typeof WorkspaceArchiveUndoRequestSchema>;

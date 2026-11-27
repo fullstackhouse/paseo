@@ -23,6 +23,30 @@ function createFakeForgeService(changeRequests?: ChangeRequestSource): ForgeServ
 }
 
 describe("createChangeRequestRouter", () => {
+  it("routes a repository URL to its forge for branch lookups, when the forge has them", async () => {
+    const githubSource: ChangeRequestSource = {
+      ...createFakeSource("github", (url) => url),
+      resolveRepository: (url) => url.toLowerCase().replace(/\.git$/, ""),
+    };
+    const gitlabSource = createFakeSource("gitlab", (url) => url);
+    const resolver = createForgeResolver({
+      probeForge: async () => null,
+      createService: (forge) => {
+        if (forge === "github") return createFakeForgeService(githubSource);
+        if (forge === "gitlab") return createFakeForgeService(gitlabSource);
+        return null;
+      },
+    });
+    const router = createChangeRequestRouter({ forgeResolver: resolver });
+
+    await expect(router.resolveRepository!("https://github.com/Acme/Widgets.git")).resolves.toEqual(
+      { forge: "github", repo: "https://github.com/acme/widgets" },
+    );
+    await expect(router.resolveRepository!("https://gitlab.com/acme/widgets")).rejects.toThrow(
+      "Branch lookups are not supported for gitlab yet.",
+    );
+  });
+
   it("routes cloud hosts without probing and delegates canonicalization to the matched forge", async () => {
     const probeForge = vi.fn(async () => {
       throw new Error("cloud host must not trigger a probe");

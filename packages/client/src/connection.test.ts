@@ -1,4 +1,4 @@
-import { expect, test } from "vitest";
+import { expect, test, vi } from "vitest";
 import { CLIENT_CAPS } from "@getpaseo/protocol/client-capabilities";
 import { DaemonClient, type DaemonTransport } from "./daemon-client";
 
@@ -12,6 +12,7 @@ function connection(
     browserHost?: { hostKind: string; supportedCommands: string[] };
     acknowledgeTimelineReads?: boolean;
     timelineFreshnessCheck?: boolean;
+    changeRequestSubscriptions?: boolean;
   } = {},
 ) {
   const sent: Array<{
@@ -49,6 +50,7 @@ function connection(
                   selectiveAgentTimeline: !options.broadcasts,
                   explicitEventSubscriptions: !options.broadcasts,
                   timelineFreshnessCheck: options.timelineFreshnessCheck === true,
+                  changeRequestSubscriptions: options.changeRequestSubscriptions === true,
                 },
               },
             },
@@ -1011,6 +1013,67 @@ test("delivery follows the negotiated client capability as well as the server fe
       type: "session.events.set_subscription.request",
       events: [],
     });
+  } finally {
+    await h.client.close();
+  }
+});
+
+test("subscribeChangeRequests returns its initial results and routes only its updates", async () => {
+  const h = connection({ changeRequestSubscriptions: true });
+  try {
+    const connected = h.client.connect();
+    h.open();
+    await connected;
+    const updates: unknown[] = [];
+    const subscribing = h.client.subscribeChangeRequests(
+      { urls: ["https://github.com/acme/widgets/pull/1"], priority: "visible" },
+      (update) => updates.push(update),
+    );
+    await vi.waitFor(() =>
+      expect(h.sent.at(-1)?.message).toMatchObject({
+        type: "forge.change_requests.subscribe.request",
+        urls: ["https://github.com/acme/widgets/pull/1"],
+        priority: "visible",
+      }),
+    );
+    const failed = { url: "https://github.com/acme/widgets/pull/1", ok: false, error: "x" };
+    h.receive({
+      type: "forge.change_requests.subscribe.response",
+      payload: {
+        requestId: h.sent.at(-1)!.message!.requestId,
+        subscriptionId: "prs-owner",
+        results: [failed],
+        branches: [],
+        error: null,
+      },
+    });
+    const subscription = await subscribing;
+    expect(subscription.initial).toEqual({ results: [failed], branches: [] });
+    expect(updates).toEqual([]);
+    h.receive({
+      type: "forge.change_requests.update",
+      payload: { subscriptionId: "prs-owner", results: [], branches: [] },
+    });
+    h.receive({
+      type: "forge.change_requests.update",
+      payload: { subscriptionId: "someone-else", results: [failed], branches: [] },
+    });
+    expect(updates).toEqual([{ results: [], branches: [] }]);
+    await subscription.unsubscribe();
+  } finally {
+    await h.client.close();
+  }
+});
+
+test("subscribeChangeRequests asks to update a host without the feature", async () => {
+  const h = connection();
+  try {
+    const connected = h.client.connect();
+    h.open();
+    await connected;
+    await expect(h.client.subscribeChangeRequests({ urls: [] }, () => {})).rejects.toThrow(
+      "Update the host to follow pull requests through Paseo.",
+    );
   } finally {
     await h.client.close();
   }

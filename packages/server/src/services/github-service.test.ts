@@ -948,6 +948,49 @@ describe("ForgeService", () => {
     service.dispose?.();
   });
 
+  it("hands each workspace poll's status to read observers", async () => {
+    const runner = createRunner([
+      currentPullRequestJson({
+        reviewDecision: "APPROVED",
+        statusCheckRollup: [{ __typename: "StatusContext", context: "ci", state: "PENDING" }],
+      }),
+    ]);
+    const service = createGitHubService({
+      ttlMs: 0,
+      runner: runner.runner,
+      resolveGhPath: async () => "/usr/bin/gh",
+    });
+    const observed: unknown[] = [];
+    service.changeRequests.observeReads!({ read: (read) => observed.push(read) });
+
+    const subscription = service.retainCurrentPullRequestStatusPoll?.({
+      cwd: "/repo",
+      headRef: "feature/fork",
+    });
+    await service.getCurrentPullRequestStatus({ cwd: "/repo", headRef: "feature/fork" });
+
+    expect(observed).toEqual([
+      {
+        url: "https://github.com/parentowner/parentrepo/pull/42",
+        purpose: "workspace",
+        status: {
+          state: "open",
+          headSha: "1111111111111111111111111111111111111111",
+          checksState: "pending",
+          checks: [{ id: "ci", name: "ci", state: "pending" }],
+          reviewDecision: "APPROVED",
+          number: 42,
+          title: "Fork PR",
+          isDraft: false,
+          mergeable: "UNKNOWN",
+        },
+      },
+    ]);
+
+    subscription?.unsubscribe();
+    service.dispose?.();
+  });
+
   it("retained fork PR status polls keep the head repository owner", async () => {
     const runner = createRunner([
       currentPullRequestJson({
@@ -5486,6 +5529,170 @@ it("reads a PR once with details and no activity", async () => {
       isDraft: true,
       mergeable: "CONFLICTING",
     });
+  } finally {
+    service.dispose?.();
+  }
+});
+
+it("reads review facts for every PR, deployments only where asked, and reports the cost", async () => {
+  const pageInfo = { hasNextPage: false, endCursor: null };
+  const pullRequest = (number: number, extra: Record<string, unknown> = {}) => ({
+    pullRequest: {
+      state: "OPEN",
+      headRefOid: "abc",
+      reviewDecision: "REVIEW_REQUIRED",
+      number,
+      title: `PR ${number}`,
+      isDraft: false,
+      mergeable: "MERGEABLE",
+      author: { login: "jacek" },
+      viewerCanMergeAsAdmin: true,
+      reviewRequests: { totalCount: 2 },
+      statusCheckRollup: { state: "SUCCESS", contexts: { nodes: [], pageInfo } },
+      ...extra,
+    },
+  });
+  const runner = createRunner([
+    batchPollStatusJson({
+      rateLimit: {
+        limit: 5000,
+        remaining: 4900,
+        resetAt: new Date(Date.now() + 100_000).toISOString(),
+        cost: 3,
+      },
+      request0: pullRequest(41, {
+        commits: {
+          nodes: [
+            {
+              commit: {
+                deployments: {
+                  nodes: [
+                    {
+                      environment: "preview",
+                      createdAt: "2026-11-27T10:00:00Z",
+                      latestStatus: { state: "IN_PROGRESS", logUrl: "https://ci.example/log" },
+                      statuses: { nodes: [{ environmentUrl: null }] },
+                    },
+                    {
+                      environment: "preview",
+                      createdAt: "2026-11-27T11:00:00Z",
+                      latestStatus: { state: "SUCCESS", logUrl: null },
+                      statuses: { nodes: [{ environmentUrl: "https://pr-41.example" }] },
+                    },
+                  ],
+                },
+              },
+            },
+          ],
+        },
+      }),
+      request1: pullRequest(42),
+    }),
+  ]);
+  const service = createGitHubService({ runner: runner.runner, resolveGhPath: async () => "gh" });
+  const costs: unknown[] = [];
+  service.changeRequests.observeReads!({ cost: (cost) => costs.push(cost) });
+  try {
+    const a = "https://github.com/acme/widgets/pull/41";
+    const b = "https://github.com/acme/widgets/pull/42";
+    const results = await service.changeRequests.read!([a, b], { deployments: new Set([a]) });
+    const query = runner.calls[0]?.args.at(-1) ?? "";
+    expect(query).toContain("rateLimit { limit remaining resetAt cost }");
+    expect(query).toContain("author { login } viewerCanMergeAsAdmin reviewRequests { totalCount }");
+    expect(query.match(/deployments\(last: 20\)/g)).toHaveLength(1);
+    expect(results.get(a)).toMatchObject({
+      author: "jacek",
+      viewerCanMergeAsAdmin: true,
+      reviewRequestCount: 2,
+      deployments: [
+        {
+          environment: "preview",
+          state: "SUCCESS",
+          createdAt: "2026-11-27T11:00:00Z",
+          url: "https://pr-41.example",
+        },
+        {
+          environment: "preview",
+          state: "IN_PROGRESS",
+          createdAt: "2026-11-27T10:00:00Z",
+          logUrl: "https://ci.example/log",
+        },
+      ],
+    });
+    expect(results.get(b)).not.toHaveProperty("deployments");
+    expect(costs).toEqual([
+      { host: "github.com", cost: 3, parts: [{ purpose: "read", urls: [a, b], count: 2 }] },
+    ]);
+  } finally {
+    service.dispose?.();
+  }
+});
+
+it("lists a branch's open pull requests, or all of them with includeClosed", async () => {
+  const resetAt = new Date(Date.now() + 100_000).toISOString();
+  const nodes = [
+    { url: "https://github.com/Acme/Widgets/pull/7", number: 7, state: "OPEN" },
+    { url: "https://github.com/acme/widgets/pull/3", number: 3, state: "MERGED" },
+  ];
+  const runner = createRunner([
+    batchPollStatusJson({
+      rateLimit: { limit: 5000, remaining: 4900, resetAt, cost: 1 },
+      request0: { pullRequests: { nodes: [nodes[0]] } },
+    }),
+    batchPollStatusJson({
+      rateLimit: { limit: 5000, remaining: 4900, resetAt },
+      request0: { pullRequests: { nodes } },
+    }),
+  ]);
+  const service = createGitHubService({ runner: runner.runner, resolveGhPath: async () => "gh" });
+  const costs: unknown[] = [];
+  service.changeRequests.observeReads!({ cost: (cost) => costs.push(cost) });
+  try {
+    const repo = service.changeRequests.resolveRepository!("https://github.com/Acme/Widgets.git");
+    expect(repo).toBe("https://github.com/acme/widgets");
+    await expect(
+      service.changeRequests.listForBranch!({ repo, headRef: "feat/login" }),
+    ).resolves.toEqual([
+      { url: "https://github.com/acme/widgets/pull/7", number: 7, state: "open" },
+    ]);
+    expect(runner.calls[0]?.args.at(-1)).toContain(
+      'pullRequests(headRefName: "feat/login", first: 20, states: [OPEN]',
+    );
+    expect(costs).toEqual([
+      {
+        host: "github.com",
+        cost: 1,
+        parts: [{ purpose: "branch", urls: [`${repo}#feat/login`], count: 1 }],
+      },
+    ]);
+    await expect(
+      service.changeRequests.listForBranch!({ repo, headRef: "feat/login", includeClosed: true }),
+    ).resolves.toEqual([
+      { url: "https://github.com/acme/widgets/pull/7", number: 7, state: "open" },
+      { url: "https://github.com/acme/widgets/pull/3", number: 3, state: "merged" },
+    ]);
+    expect(runner.calls[1]?.args.at(-1)).not.toContain("states:");
+  } finally {
+    service.dispose?.();
+  }
+});
+
+it("answers a branch lookup paused while reads are held at the reserve", async () => {
+  const resetAt = new Date(Date.now() + 100_000).toISOString();
+  const runner = createRunner([
+    batchPollStatusJson({
+      rateLimit: { limit: 5000, remaining: 100, resetAt },
+      request0: { pullRequests: { nodes: [] } },
+    }),
+  ]);
+  const service = createGitHubService({ runner: runner.runner, resolveGhPath: async () => "gh" });
+  try {
+    const query = { repo: "https://github.com/acme/widgets", headRef: "main" };
+    await service.changeRequests.listForBranch!(query);
+    await expect(service.changeRequests.listForBranch!(query)).rejects.toMatchObject({
+      reason: "paused",
+    });
+    expect(runner.calls).toHaveLength(1);
   } finally {
     service.dispose?.();
   }

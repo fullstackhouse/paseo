@@ -7,11 +7,19 @@ export interface ResolvedChangeRequest {
   url: string;
 }
 
+export interface ResolvedRepository {
+  forge: string;
+  /** Canonical repository address, such as https://github.com/acme/widgets. */
+  repo: string;
+}
+
 export interface ChangeRequestRouter {
   /** Route a user-supplied URL host-first through registered forges and canonicalize it. */
   resolve(url: string): Promise<ResolvedChangeRequest>;
   /** Return the watch source for a known forge id without probing the network. */
   source(forge: string): ChangeRequestSource | null;
+  /** Route a repository URL host-first and canonicalize it, for branch lookups. */
+  resolveRepository?(url: string): Promise<ResolvedRepository>;
 }
 
 export interface CreateChangeRequestRouterOptions {
@@ -75,6 +83,23 @@ export function createChangeRequestRouter({
 
     source(forge: string): ChangeRequestSource | null {
       return forgeResolver.getService(forge)?.changeRequests ?? null;
+    },
+
+    async resolveRepository(input: string): Promise<ResolvedRepository> {
+      const { trimmed, host, authority } = extractUrlHost(input);
+      const resolution =
+        (await forgeResolver.resolveHost(authority)) ??
+        (authority === host ? null : await forgeResolver.resolveHost(host));
+      if (!resolution) {
+        throw new Error(
+          `Could not recognize a supported forge for host ${host}. Authenticate the forge CLI for this host first.`,
+        );
+      }
+      const source = resolution.service.changeRequests;
+      if (!source?.resolveRepository) {
+        throw new Error(`Branch lookups are not supported for ${resolution.forge} yet.`);
+      }
+      return { forge: resolution.forge, repo: source.resolveRepository(trimmed) };
     },
   };
 }

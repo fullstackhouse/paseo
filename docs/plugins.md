@@ -969,14 +969,12 @@ event names. The per-plugin mute is top-level `pluginNotifications` in daemon co
 the plugin's source entry: that entry is a strict schema, and older apps would fail to parse the
 whole config. Dedupe and the rate limit live in daemon memory and reset on restart.
 
-Plugin servers read pull request state with `paseo.changeRequests.read(urls)` (FSH-only, gated on
-`server_info.features.changeRequestsRead`) instead of calling `gh`. It goes through the reader behind
-`subscribe_change_request`, so reads share the daemon's GraphQL batching, rate-limit reserve and pause,
-and a 30-second cache. Only GitHub implements `ChangeRequestSource.read` today; other forges answer
-`ok: false` with `reason: "unsupported"`. On `reason: "paused"` the daemon is holding reads to stay
-under the rate limit until `retryAt`: keep the last known state, mark it stale, and log once, not per
-PR. Which PRs belong to a workspace stays the plugin's business. See
-[Workspace attention](workspace-attention.md#pull-requests).
+Plugin servers get pull request data from the daemon instead of calling `gh`: subscribe with
+`paseo.changeRequests.subscribe` (pushed changes, gated on
+`server_info.features.changeRequestSubscriptions`) or read once with `paseo.changeRequests.read`
+(gated on `changeRequestsRead`). Both share one cache, one poller per PR and the daemon's rate-limit
+pause. On `reason: "paused"`, keep the last known state, mark it stale, and log once, not per PR. See
+[Pull request service](pr-service.md).
 
 ## Contribute client slash commands
 

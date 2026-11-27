@@ -178,6 +178,51 @@ const SourceSchema = z.discriminatedUnion("ok", [
     expect(validateWSOutboundMessage(message)).toMatchObject({ success: true, data: message });
   });
 
+  it("validates pull request subscription updates with the facts plugins read", () => {
+    const update = {
+      type: "forge.change_requests.update",
+      payload: {
+        subscriptionId: "s1",
+        results: [
+          {
+            url: "https://github.com/acme/widgets/pull/41",
+            ok: true,
+            number: 41,
+            title: "Fix the login redirect",
+            state: "open",
+            isDraft: false,
+            reviewDecision: null,
+            checksState: "pending",
+            checks: [{ name: "build", state: "pending", url: "https://ci.example/1" }],
+            headSha: "abc",
+            author: "jacek",
+            reviewRequestCount: 0,
+            viewerCanMergeAsAdmin: false,
+            deployments: [
+              {
+                environment: null,
+                state: "IN_PROGRESS",
+                createdAt: "2026-11-27T10:00:00Z",
+                logUrl: "https://ci.example/log",
+              },
+            ],
+          },
+        ],
+        branches: [
+          {
+            repo: "https://github.com/acme/widgets",
+            headRef: "feat/login",
+            ok: true,
+            urls: ["https://github.com/acme/widgets/pull/41"],
+          },
+        ],
+      },
+    };
+    const message = { type: "session", message: update };
+    expect(validateWSOutboundMessage(message)).toMatchObject({ success: true, data: message });
+    expect(WSOutboundMessageSchema.parse(message)).toEqual(message);
+  });
+
   it("keeps a turn's origin on turn_started and on the user message", () => {
     const stream = (event: unknown) => ({
       type: "session",

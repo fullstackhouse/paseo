@@ -1,5 +1,9 @@
 import { z } from "zod";
-import type { ChangeRequestDetails, ChangeRequestSnapshot } from "./change-request-source.js";
+import type {
+  ChangeRequestDeployment,
+  ChangeRequestDetails,
+  ChangeRequestSnapshot,
+} from "./change-request-source.js";
 
 const PAGE_SIZE = 100;
 // GitHub charges GraphQL points for requested nested connections, even on quiet PRs.
@@ -109,7 +113,78 @@ const detailsSchema = z.object({
   title: z.string(),
   isDraft: z.boolean(),
   mergeable: z.string().nullable(),
+  author: z.object({ login: z.string() }).nullish(),
+  viewerCanMergeAsAdmin: z.boolean().nullish(),
+  reviewRequests: z.object({ totalCount: z.number() }).nullish(),
 });
+const deploymentNodeSchema = z.object({
+  environment: z.string().nullish(),
+  createdAt: z.string(),
+  latestStatus: z.object({ state: z.string().nullish(), logUrl: z.string().nullish() }).nullish(),
+  statuses: z
+    .object({ nodes: z.array(z.object({ environmentUrl: z.string().nullish() }).nullable()) })
+    .nullish(),
+});
+const deploymentsSchema = z.object({
+  commits: z.object({
+    nodes: z.array(
+      z
+        .object({
+          commit: z.object({
+            deployments: z.object({ nodes: z.array(deploymentNodeSchema.nullable()) }).nullish(),
+          }),
+        })
+        .nullable(),
+    ),
+  }),
+});
+const DETAILS_FIELDS =
+  "number title isDraft mergeable author { login } viewerCanMergeAsAdmin reviewRequests { totalCount }";
+// The head commit's last 20 deployments: nested connections, so only for reads that ask.
+const DEPLOYMENT_FIELDS = `commits(last: 1) { nodes { commit {
+  deployments(last: 20) { nodes {
+    environment createdAt latestStatus { state logUrl } statuses(first: 10) { nodes { environmentUrl } }
+  } }
+} } }`;
+
+function parseDetails(raw: unknown, withDeployments: boolean): ChangeRequestDetails {
+  const details = detailsSchema.parse(raw);
+  return {
+    number: details.number,
+    title: details.title,
+    isDraft: details.isDraft,
+    mergeable: details.mergeable,
+    // Only what GitHub answered: a missing field is unknown, not "no".
+    ...(details.author !== undefined ? { author: details.author?.login ?? null } : {}),
+    ...(details.viewerCanMergeAsAdmin != null
+      ? { viewerCanMergeAsAdmin: details.viewerCanMergeAsAdmin }
+      : {}),
+    ...(details.reviewRequests != null
+      ? { reviewRequestCount: details.reviewRequests.totalCount }
+      : {}),
+    ...(withDeployments ? { deployments: parseDeployments(raw) } : {}),
+  };
+}
+
+function parseDeployments(raw: unknown): ChangeRequestDeployment[] {
+  const commit = deploymentsSchema.parse(raw).commits.nodes[0]?.commit;
+  const nodes = (commit?.deployments?.nodes ?? []).filter(
+    (node): node is z.infer<typeof deploymentNodeSchema> => node !== null,
+  );
+  return nodes
+    .map((node): ChangeRequestDeployment => {
+      const deployment: ChangeRequestDeployment = {
+        environment: node.environment ?? null,
+        state: node.latestStatus?.state ?? null,
+        createdAt: node.createdAt,
+      };
+      const url = node.statuses?.nodes.find((status) => status?.environmentUrl)?.environmentUrl;
+      if (url) deployment.url = url;
+      if (node.latestStatus?.logUrl) deployment.logUrl = node.latestStatus.logUrl;
+      return deployment;
+    })
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
 const prSchema = z.object({
   state: z.enum(["OPEN", "CLOSED", "MERGED"]),
   headRefOid: z.string(),
@@ -165,6 +240,8 @@ interface ReadOptions {
   isObserved(url: string): boolean;
   /** One-shot reads: add `ChangeRequestDetails` and skip comments, reviews and threads. */
   details?: boolean;
+  /** With `details`: also read the head commit's deployments for these addresses. */
+  deployments?(url: string): boolean;
 }
 
 export type GitHubChangeRequestRead = ChangeRequestSnapshot & Partial<ChangeRequestDetails>;
@@ -179,7 +256,16 @@ const threadFields = `id ${connection("comments", inlineFields, undefined, 10)}`
 
 export async function readGitHubChangeRequests(
   urls: string[],
-  { read, batchSize, firstBatchSize, onChecks, knownActivity, isObserved, details }: ReadOptions,
+  {
+    read,
+    batchSize,
+    firstBatchSize,
+    onChecks,
+    knownActivity,
+    isObserved,
+    details,
+    deployments,
+  }: ReadOptions,
 ): Promise<Map<string, GitHubChangeRequestRead | Error>> {
   const snapshots = new Map<string, GitHubChangeRequestRead>();
   const failed = new Map<string, Error>();
@@ -232,7 +318,7 @@ export async function readGitHubChangeRequests(
         statusCheckRollup { state ${connection("contexts", GITHUB_POLL_CHECK_CONTEXT_FIELDS)} }
         ${
           details
-            ? "number title isDraft mergeable"
+            ? `${DETAILS_FIELDS} ${deployments?.(url) ? DEPLOYMENT_FIELDS : ""}`
             : `${conversation()}
         ${connection("reviews", reviewFields)}
         ${connection("reviewThreads", threadFields, undefined, REVIEW_THREAD_PAGE_SIZE)}`
@@ -250,7 +336,7 @@ export async function readGitHubChangeRequests(
           checks: [],
           reviewDecision: pr.reviewDecision,
           activity: [],
-          ...(details ? detailsSchema.parse(raw) : {}),
+          ...(details ? parseDetails(raw, deployments?.(url) === true) : {}),
         };
         snapshots.set(url, snapshot);
         if (pr.statusCheckRollup) {

@@ -28,14 +28,29 @@ import {
 } from "./connection/index.js";
 import { CreationClient } from "./creation/index.js";
 import type {
+  ChangeRequestBranchRead,
   ChangeRequestRead,
+  ChangeRequestUsage,
   CreationSnapshot,
+  ForgeChangeRequestsSubscribeRequest,
   WorkspaceAppearance,
   WorkspaceAppearanceSetRequest,
   WorkspaceManualGroup,
   WorkspaceManualGroupName,
 } from "@getpaseo/protocol/messages";
 import type { JsonValue } from "@getpaseo/protocol/agent-types";
+
+/** What to follow: PR URLs and branches, how closely, and which costly facts. */
+export type ChangeRequestSubscriptionTarget = Omit<
+  ForgeChangeRequestsSubscribeRequest,
+  "type" | "requestId"
+>;
+
+/** Results and branch lookups; in updates, only what changed. */
+export interface ChangeRequestSubscriptionUpdate {
+  results: ChangeRequestRead[];
+  branches: ChangeRequestBranchRead[];
+}
 
 /** What a plugin sets: `avatar` is base64 image bytes, `titleIcon` a Lucide icon name. */
 export type WorkspaceAppearanceInput = Pick<WorkspaceAppearanceSetRequest, "avatar" | "titleIcon">;
@@ -4278,6 +4293,63 @@ export class DaemonClient {
     });
     if (payload.error !== null) throw new Error(payload.error);
     return payload.results;
+  }
+
+  /**
+   * Follows pull requests and branches through the host's pull request service. `onUpdate` gets
+   * only what changed; after a reconnect it gets every result again.
+   */
+  async subscribeChangeRequests(
+    target: ChangeRequestSubscriptionTarget,
+    onUpdate: (update: ChangeRequestSubscriptionUpdate) => void,
+    options?: { signal?: AbortSignal },
+  ): Promise<{
+    initial: ChangeRequestSubscriptionUpdate;
+    unsubscribe: () => Promise<void>;
+  }> {
+    // COMPAT(changeRequestSubscriptions): FSH-only, added after v0.17.1, remove gate after 2027-05-27.
+    if (this.lastServerInfoMessage?.features?.changeRequestSubscriptions !== true) {
+      throw new Error("Update the host to follow pull requests through Paseo.");
+    }
+    const subscription = this.observe(
+      "forge.change_requests.subscribe.response",
+      { type: "forge.change_requests.subscribe.request", ...target },
+      { signal: options?.signal },
+    );
+    let initial = true;
+    subscription.subscribe({
+      snapshot: (snapshot) => {
+        // The first snapshot is returned below; later ones resync after a reconnect.
+        if (!initial) onUpdate({ results: snapshot.results, branches: snapshot.branches });
+        initial = false;
+      },
+      update: (message) => {
+        if (message.type !== "forge.change_requests.update") return;
+        onUpdate({ results: message.payload.results, branches: message.payload.branches });
+      },
+    });
+    const snapshot = await subscription.ready;
+    return {
+      initial: { results: snapshot.results, branches: snapshot.branches },
+      unsubscribe: subscription.release,
+    };
+  }
+
+  /** What each caller spent on pull request reads, from the host's pull request service. */
+  async getChangeRequestUsage(options?: { requestId?: string }): Promise<ChangeRequestUsage> {
+    // COMPAT(changeRequestSubscriptions): FSH-only, added after v0.17.1, remove gate after 2027-05-27.
+    if (this.lastServerInfoMessage?.features?.changeRequestSubscriptions !== true) {
+      throw new Error("Update the host to see pull request usage.");
+    }
+    const requestId = this.createRequestId(options?.requestId);
+    const payload = await this.sendCorrelatedSessionRequest({
+      requestId,
+      message: { type: "forge.change_requests.usage.request", requestId },
+      responseType: "forge.change_requests.usage.response",
+    });
+    if (payload.error !== null || payload.usage === null)
+      throw new Error(payload.error ?? "Pull request usage is unavailable");
+    return payload.usage;
   }
 
   async searchAgentTimeline({

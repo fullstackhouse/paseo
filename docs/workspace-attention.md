@@ -54,39 +54,7 @@ Live state still wins over all of this: a running agent, a permission prompt or 
 
 ## Pull requests
 
-Plugin servers read pull request state from the daemon, not from `gh`. Before this, core, paseo-prs and paseo-asks each polled GitHub for the same PRs on their own clocks and rate-limit handling, so a PR could read merged in one place and open in another.
-
-```ts
-paseo.changeRequests.read(urls: string[]): Promise<ChangeRequestRead[]>;
-
-type ChangeRequestRead =
-  | {
-      url: string;
-      ok: true;
-      number: number;
-      title: string;
-      state: "open" | "merged" | "closed";
-      isDraft: boolean;
-      mergeable?: "mergeable" | "conflicting" | "unknown";
-      reviewDecision: "approved" | "changes_requested" | "review_required" | null;
-      checksState: "passing" | "failing" | "pending" | "none";
-      checks: { name: string; state: "passing" | "failing" | "pending" | "skipped" }[];
-      headSha: string;
-    }
-  | {
-      url: string;
-      ok: false;
-      error: string;
-      /** Missing means "error". */
-      reason?: "paused" | "not_found" | "unsupported" | "error";
-      /** For `paused`: when reads resume, epoch ms. */
-      retryAt?: number;
-    };
-```
-
-It uses the reader behind `subscribe_change_request` (`services/change-request-source.ts`): batched, sharing one rate-limit pause, cached for 30 seconds. Only GitHub implements `ChangeRequestSource.read` so far; a URL on another forge comes back `ok: false` with `reason: "unsupported"`. While the daemon pauses GitHub reads at the rate-limit reserve, every read answers `reason: "paused"` with `retryAt`: plugins keep their last state and mark it stale rather than showing the PR as unknown. Each check may also carry its `url`. Plugins keep their own refresh intervals; repeated reads inside the cache window cost nothing.
-
-What stays in plugins: finding which PRs belong to a workspace (paseo-prs' branch and stack lookups), deployments (paseo-asks), and paseo-inbox's review runs, which need files, threads and timeline events no other surface uses.
+Plugins get pull request data from the daemon, not from `gh`: a one-shot `paseo.changeRequests.read`, or a `paseo.changeRequests.subscribe` that pushes changes. See [Pull request service](pr-service.md).
 
 ## Rollout
 
