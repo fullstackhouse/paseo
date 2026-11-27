@@ -1694,6 +1694,46 @@ describe("create_agent MCP tool", () => {
     );
   });
 
+  it("starts the child's first turn as coming from the calling agent", async () => {
+    const workdir = await mkdtemp(join(tmpdir(), "mcp-create-origin-"));
+    const storage = new AgentStorage(join(workdir, "agents"), logger);
+    const agentManager = new AgentManager({
+      clients: createTestAgentClients(),
+      registry: storage,
+      logger,
+    });
+    const origins: unknown[] = [];
+    const unsubscribe = agentManager.subscribe((event) => {
+      if (event.type === "agent_stream" && event.event.type === "turn_started")
+        origins.push(event.event.origin);
+    });
+    try {
+      const parent = await agentManager.createAgent(
+        { provider: "codex", cwd: existingCwd },
+        undefined,
+        { workspaceId: "wks_parent" },
+      );
+      const server = await createAgentMcpServer({
+        agentManager,
+        agentStorage: storage,
+        callerAgentId: parent.id,
+        providerSnapshotManager: createOpenCodeManager().manager,
+        logger,
+      });
+      await registeredTool(server, "create_agent").handler({
+        ...subagentCurrentWorkspace(),
+        title: "Child",
+        provider: "codex/gpt-5.4",
+        initialPrompt: "Do the child's work",
+        notifyOnFinish: false,
+      });
+      expect(origins).toEqual([{ kind: "agent", agentId: parent.id }]);
+    } finally {
+      unsubscribe();
+      await removeAgentStateDir(agentManager, storage, workdir);
+    }
+  });
+
   it("rejects public internal helpers", async () => {
     const workdir = await mkdtemp(join(tmpdir(), "mcp-public-helper-removal-"));
     const storage = new AgentStorage(join(workdir, "agents"), logger);

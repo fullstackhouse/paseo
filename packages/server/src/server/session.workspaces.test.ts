@@ -10676,6 +10676,33 @@ describe("a message to an agent in a snoozed workspace", () => {
     const { session } = setup(clientId, hub);
     expect((session as unknown as { promptOrigin(): unknown }).promptOrigin()).toEqual(origin);
   });
+
+  test.each([
+    ["a person", undefined, undefined, { kind: "human" }],
+    ["a person naming no caller", undefined, null, { kind: "human" }],
+    [
+      "the CLI in an agent's shell",
+      undefined,
+      "agent-parent",
+      { kind: "agent", agentId: "agent-parent" },
+    ],
+    [
+      "a plugin naming a caller",
+      "plugin:paseo-asks",
+      "agent-parent",
+      { kind: "plugin", pluginId: "paseo-asks" },
+    ],
+  ] as const)(
+    "creating an agent from %s stamps its initial prompt",
+    (_l, clientId, caller, origin) => {
+      const { session } = setup(clientId);
+      expect(
+        (session as unknown as { createOrigin(id?: string): unknown }).createOrigin(
+          caller ?? undefined,
+        ),
+      ).toEqual(origin);
+    },
+  );
 });
 
 test("workspace.group.set.request moves a workspace to a group and clears the move", async () => {

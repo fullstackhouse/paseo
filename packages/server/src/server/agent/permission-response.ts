@@ -1,6 +1,10 @@
 import type { Logger } from "pino";
 
-import type { AgentPermissionResponse, AgentPermissionResult } from "./agent-sdk-types.js";
+import type {
+  AgentPermissionResponse,
+  AgentPermissionResult,
+  AgentTurnOrigin,
+} from "./agent-sdk-types.js";
 import { startAgentRun, type AgentRunController } from "./agent-prompt.js";
 
 export interface PermissionResponseAgentManager extends AgentRunController {
@@ -17,12 +21,14 @@ export interface RespondToAgentPermissionParams {
   requestId: string;
   response: AgentPermissionResponse;
   logger: Logger;
+  /** Who answered; the follow-up turn the answer may start carries it. */
+  origin?: AgentTurnOrigin;
 }
 
 export async function respondToAgentPermission(
   params: RespondToAgentPermissionParams,
 ): Promise<void> {
-  const { agentManager, agentId, requestId, response, logger } = params;
+  const { agentManager, agentId, requestId, response, logger, origin } = params;
   logger.debug(
     { agentId, requestId },
     `Handling permission response for agent ${agentId}, request ${requestId}`,
@@ -35,6 +41,7 @@ export async function respondToAgentPermission(
     logger.debug({ agentId }, "Permission response requires follow-up turn, starting agent stream");
     await startAgentRun(agentManager, agentId, result.followUpPrompt, logger, {
       replaceRunning: true,
+      ...(origin ? { runOptions: { origin } } : {}),
     });
   }
 }

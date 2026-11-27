@@ -531,7 +531,7 @@ server.addHook("agent.archive.after", async ({ agent, archivedAt }) => {
 | `plugin`      | 通过 Paseo API 发送的插件；`pluginId` 是守护进程接纳的插件                               |
 | `system`      | 守护进程本身：定时任务、重启恢复、拉取请求更新、Hub                                      |
 
-主机没有 `server_info.features.turnOrigin`，或轮次由提供方自行开启时，没有该字段。本轮次的 `user_message` 时间线条目带有相同的 `origin`。
+新代理的第一个轮次带有创建者的 `origin`；回应权限请求后开启的轮次带有回应者的 `origin`。主机没有 `server_info.features.turnOrigin`，或轮次由提供方自行开启时，没有该字段。本轮次的 `user_message` 时间线条目带有相同的 `origin`。
 
 ```ts
 server.addHook("agent.turn.before", async ({ agent, turnId, origin }) => {

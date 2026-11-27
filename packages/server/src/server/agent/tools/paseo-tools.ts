@@ -1706,6 +1706,7 @@ function createToolCatalog(
           provider: parsedArgs.provider,
           title: parsedArgs.title,
           initialPrompt: parsedArgs.initialPrompt,
+          origin: agentOrigin(callerAgentId),
           config: inheritedConfig,
           cwd: resolvedArgs.cwd,
           workspaceId: resolvedArgs.workspaceId,
@@ -3439,6 +3440,7 @@ function createToolCatalog(
         requestId,
         response,
         logger: childLogger,
+        origin: agentOrigin(callerAgentId),
       });
       return {
         content: [],

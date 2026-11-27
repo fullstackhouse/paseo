@@ -4977,6 +4977,17 @@ export class Session {
   }
 
   /**
+   * Who a new agent's initial prompt comes from. Plugin and Hub sessions are identified by the
+   * daemon; otherwise an agent that names itself as the caller (the CLI run from its shell) created
+   * it, else a person did.
+   */
+  private createOrigin(callerAgentId: string | undefined): AgentTurnOrigin {
+    const origin = this.promptOrigin();
+    if (origin.kind === "human" && callerAgentId) return { kind: "agent", agentId: callerAgentId };
+    return origin;
+  }
+
+  /**
    * Handle text message to agent (with optional image attachments)
    */
   private async handleSendAgentMessage(
@@ -5447,6 +5458,7 @@ export class Session {
           source: msg.callerAgentId
             ? { kind: "agent-message", agentId: msg.callerAgentId }
             : undefined,
+          origin: this.createOrigin(msg.callerAgentId),
           clientMessageId,
           outputSchema,
           images,
@@ -6139,6 +6151,7 @@ export class Session {
         requestId,
         response,
         logger: this.sessionLogger,
+        origin: this.promptOrigin(),
       });
       // COMPAT(ownedSubscriptions): added in v0.8.0, remove after 2027-03-09.
       // Legacy clients consume the single domain resolution; modern request outcomes

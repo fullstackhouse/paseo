@@ -12,7 +12,12 @@ import type {
 } from "../../worktree-session.js";
 import type { AgentAttachment, FirstAgentContext } from "../../messages.js";
 import type { AgentManager, CreateAgentOptions, ManagedAgent } from "../agent-manager.js";
-import type { AgentPromptInput, AgentRunOptions, AgentSessionConfig } from "../agent-sdk-types.js";
+import type {
+  AgentPromptInput,
+  AgentRunOptions,
+  AgentSessionConfig,
+  AgentTurnOrigin,
+} from "../agent-sdk-types.js";
 import type { AgentStorage } from "../agent-storage.js";
 import type { AgentOwner } from "../agent-owner.js";
 import type { ProviderSnapshotManager } from "../provider-snapshot-manager.js";
@@ -66,6 +71,8 @@ export interface CreateAgentFromSessionInput {
   background: boolean;
   initialPrompt?: string;
   source?: AgentPromptSource;
+  /** Who the initial prompt comes from; stamped on its turn and user message. */
+  origin?: AgentTurnOrigin;
   clientMessageId?: string;
   outputSchema?: Record<string, unknown>;
   images?: Array<{ data: string; mimeType: string }>;
@@ -82,6 +89,8 @@ export interface CreateAgentFromMcpInput {
   provider: string;
   title: string;
   initialPrompt?: string;
+  /** Who the initial prompt comes from; stamped on its turn and user message. */
+  origin?: AgentTurnOrigin;
   config?: Partial<AgentSessionConfig>;
   cwd?: string;
   workspaceId?: string;
@@ -259,10 +268,11 @@ async function resolveSessionCreateAgent(
   const hasPromptContent = Array.isArray(prompt) ? prompt.length > 0 : prompt.length > 0;
   const clientMessageId = normalizeClientMessageId(input.clientMessageId);
   const runOptions: AgentRunOptions | undefined =
-    input.outputSchema || clientMessageId
+    input.outputSchema || clientMessageId || input.origin
       ? {
           ...(input.outputSchema ? { outputSchema: input.outputSchema } : {}),
           ...(clientMessageId ? { clientMessageId } : {}),
+          ...(input.origin ? { origin: input.origin } : {}),
         }
       : undefined;
   const workspaceId = input.workspaceId;
@@ -365,6 +375,7 @@ async function resolveMcpCreateAgent(
     source: input.callerAgentId
       ? { kind: "agent-message", agentId: input.callerAgentId }
       : undefined,
+    ...(input.origin ? { runOptions: { origin: input.origin } } : {}),
     createdWorktree,
     promptFailure: input.promptFailure ?? "log",
   };
