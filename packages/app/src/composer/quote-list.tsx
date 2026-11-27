@@ -86,6 +86,8 @@ interface ComposerQuoteListProps {
   onRemove: (id: string) => void;
   /** Enter in a comment field, or removing the first quote, moves on to the message. */
   onFocusMessage: () => void;
+  /** Whether any quote or comment field has focus; the composer frame shows it as its own. */
+  onFocusChange?: (focused: boolean) => void;
 }
 
 interface RowFields {
@@ -114,11 +116,28 @@ function QuoteListBody({
   onChangeQuote,
   onRemove,
   onFocusMessage,
+  onFocusChange,
   handleRef,
 }: ComposerQuoteListProps & {
   handleRef: ForwardedRef<ComposerQuoteListHandle>;
 }): ReactElement | null {
   const rows = useRef(new Map<string, RowFields>());
+  // A focused field that unmounts with its row may never blur, so its row clears the focus.
+  const focusedRowId = useRef<string | null>(null);
+  const onFocusChangeRef = useRef(onFocusChange);
+  onFocusChangeRef.current = onFocusChange;
+  const setFocusedRow = useCallback((id: string | null) => {
+    if (focusedRowId.current === id) return;
+    focusedRowId.current = id;
+    onFocusChangeRef.current?.(id !== null);
+  }, []);
+  const handleFieldFocus = useCallback((id: string) => setFocusedRow(id), [setFocusedRow]);
+  const handleFieldBlur = useCallback(
+    (id: string) => {
+      if (focusedRowId.current === id) setFocusedRow(null);
+    },
+    [setFocusedRow],
+  );
   const ids = useMemo(() => quotes.map((quote) => quote.id), [quotes]);
   useImperativeHandle(
     handleRef,
@@ -131,10 +150,17 @@ function QuoteListBody({
     [ids],
   );
 
-  const register = useCallback((id: string, fields: RowFields | null) => {
-    if (fields) rows.current.set(id, fields);
-    else rows.current.delete(id);
-  }, []);
+  const register = useCallback(
+    (id: string, fields: RowFields | null) => {
+      if (fields) {
+        rows.current.set(id, fields);
+        return;
+      }
+      rows.current.delete(id);
+      handleFieldBlur(id);
+    },
+    [handleFieldBlur],
+  );
 
   const removeAndFocusPrevious = useCallback(
     (id: string) => {
@@ -158,6 +184,8 @@ function QuoteListBody({
           onChangeQuote={onChangeQuote}
           onRemove={removeAndFocusPrevious}
           onSubmitComment={onFocusMessage}
+          onFieldFocus={handleFieldFocus}
+          onFieldBlur={handleFieldBlur}
         />
       ))}
     </View>
@@ -172,6 +200,8 @@ interface QuoteRowProps {
   onChangeQuote: (id: string, update: { text?: string; comment?: string }) => void;
   onRemove: (id: string) => void;
   onSubmitComment: () => void;
+  onFieldFocus: (id: string) => void;
+  onFieldBlur: (id: string) => void;
 }
 
 function QuoteRow({
@@ -182,6 +212,8 @@ function QuoteRow({
   onChangeQuote,
   onRemove,
   onSubmitComment,
+  onFieldFocus,
+  onFieldBlur,
 }: QuoteRowProps): ReactElement {
   const { t } = useTranslation();
   const quoteRef = useRef<EditingTextInputHandle | null>(null);
@@ -206,6 +238,8 @@ function QuoteRow({
     [id, onChangeQuote],
   );
   const handleRemove = useCallback(() => onRemove(id), [id, onRemove]);
+  const handleFocus = useCallback(() => onFieldFocus(id), [id, onFieldFocus]);
+  const handleBlur = useCallback(() => onFieldBlur(id), [id, onFieldBlur]);
 
   // Backspace in an empty quote removes the row, like deleting an emptied paragraph, but
   // only once its comment is empty too, so a written comment is never thrown away.
@@ -244,6 +278,8 @@ function QuoteRow({
             initialValue={quote.text}
             onChangeText={handleQuoteChange}
             onKeyPress={handleQuoteKeyPress}
+            onFocus={handleFocus}
+            onBlur={handleBlur}
             editable={!disabled}
             accessibilityLabel={t("composer.attachments.quoteText", { number })}
           />
@@ -256,6 +292,8 @@ function QuoteRow({
           initialValue={quote.comment ?? ""}
           onChangeText={handleCommentChange}
           onKeyPress={handleCommentKeyPress}
+          onFocus={handleFocus}
+          onBlur={handleBlur}
           onSubmitEditing={onSubmitComment}
           blurOnSubmit={false}
           editable={!disabled}

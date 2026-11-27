@@ -2500,6 +2500,7 @@ function ComposerContentImpl({
   );
 
   const quoteListRef = useRef<ComposerQuoteListHandle | null>(null);
+  const [isQuoteFieldFocused, setIsQuoteFieldFocused] = useState(false);
   const quotes = useMemo(
     () =>
       selectedAttachments.filter(
@@ -2569,6 +2570,7 @@ function ComposerContentImpl({
             onChangeQuote={handleChangeQuote}
             onRemove={handleRemoveQuote}
             onFocusMessage={focusInput}
+            onFocusChange={setIsQuoteFieldFocused}
           />
           {attachmentTray}
         </View>
@@ -2735,6 +2737,7 @@ function ComposerContentImpl({
                   onHeightChange={onComposerHeightChange}
                   inputWrapperStyle={inputWrapperStyle}
                   attachmentSlot={attachmentSlot}
+                  isAttachmentSlotFocused={isQuoteFieldFocused && quotes.length > 0}
                   inputMode={inputMode}
                   readOnly={readOnly}
                   textReplacement={textReplacement}

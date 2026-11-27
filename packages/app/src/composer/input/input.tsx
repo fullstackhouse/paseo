@@ -213,6 +213,8 @@ export interface MessageInputProps {
   inputWrapperStyle?: import("react-native").ViewStyle;
   /** Content rendered inside the bordered input surface, above the text input (e.g. attachment pills). */
   attachmentSlot?: React.ReactNode;
+  /** A field inside `attachmentSlot` has focus, so the frame shows focus as if the input had it. */
+  isAttachmentSlotFocused?: boolean;
   /** What this composer is for. See `@/composer/input-mode` for what each mode implies. */
   inputMode?: ComposerInputMode;
   /** Renders `value` as static text on the same surface, for content there is nothing to type into. */
@@ -1216,6 +1218,7 @@ interface ResolvedMessageInputProps {
   onHeightChange: ((height: number) => void) | undefined;
   inputWrapperStyle: import("react-native").ViewStyle | undefined;
   attachmentSlot: React.ReactNode;
+  isAttachmentSlotFocused: boolean;
   inputMode: ComposerInputMode;
   readOnly: boolean;
   textReplacement: TextReplacement;
@@ -1264,6 +1267,7 @@ function resolveMessageInputProps(props: MessageInputProps): ResolvedMessageInpu
     onHeightChange: props.onHeightChange,
     inputWrapperStyle: props.inputWrapperStyle,
     attachmentSlot: props.attachmentSlot,
+    isAttachmentSlotFocused: props.isAttachmentSlotFocused ?? false,
     inputMode: props.inputMode ?? "chat",
     readOnly: props.readOnly ?? false,
     textReplacement: props.textReplacement,
@@ -1346,6 +1350,7 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
       onHeightChange,
       inputWrapperStyle,
       attachmentSlot,
+      isAttachmentSlotFocused,
       inputMode,
       readOnly,
       textReplacement,
@@ -2045,7 +2050,7 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
     const handleInputWrapperPointerLeave = useCallback(() => setIsInputHovered(false), []);
     const framePhase = resolveComposerFramePhase({
       hovered: isInputHovered,
-      focused: isInputFocused,
+      focused: isInputFocused || isAttachmentSlotFocused,
       readOnly,
       disabled,
     });
@@ -2216,7 +2221,9 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
             fullscreen={isFullscreen}
             compact={isCompact}
             onRenderedLinesChange={setRenderedLines}
-            focusHintVisible={!isFullscreen && isWeb && !isInputFocused && !hasLiveText}
+            focusHintVisible={
+              !isFullscreen && isWeb && !isInputFocused && !isAttachmentSlotFocused && !hasLiveText
+            }
             focusInputKeys={focusInputKeys}
             focusHintLabel={t("composer.input.focusHint", {
               shortcut: focusInputKeys ? formatShortcut(focusInputKeys[0], getShortcutOs()) : "",
@@ -2248,6 +2255,7 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
         isFullscreen,
         isCompact,
         isInputFocused,
+        isAttachmentSlotFocused,
         hasLiveText,
         value,
         focusInputKeys,
