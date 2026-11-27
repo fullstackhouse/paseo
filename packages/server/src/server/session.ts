@@ -155,6 +155,7 @@ import {
   archiveAgentCommand,
   cancelAgentRunCommand,
   closeAgentCommand,
+  attachAgentCommand,
   detachAgentCommand,
   setAgentModeCommand,
   updateAgentCommand,
@@ -3274,6 +3275,8 @@ export class Session {
     switch (msg.type) {
       case "agent.detach.request":
         return this.handleDetachAgentRequest(msg.agentId, msg.requestId);
+      case "agent.attach.request":
+        return this.handleAttachAgentRequest(msg.agentId, msg.parentAgentId, msg.requestId);
       default:
         return undefined;
     }
@@ -3975,6 +3978,45 @@ export class Session {
     }
 
     return { agentId, archivedAt };
+  }
+
+  private async handleAttachAgentRequest(
+    agentId: string,
+    parentAgentId: string,
+    requestId: string,
+  ): Promise<void> {
+    this.sessionLogger.info({ agentId, parentAgentId, requestId }, "Attaching agent to parent");
+
+    try {
+      const result = await attachAgentCommand(
+        { agentManager: this.agentManager },
+        { agentId, parentAgentId },
+      );
+      if (result.changed) {
+        const affectedWorkspaceIds = new Set<string>();
+        if (!result.live) {
+          const payload = await this.agentUpdates.emitStoredRecord(result.record);
+          if (payload.workspaceId) affectedWorkspaceIds.add(payload.workspaceId);
+        } else if (result.record.workspaceId) {
+          affectedWorkspaceIds.add(result.record.workspaceId);
+        }
+        const rootWorkspaceId = await this.resolveDelegationRootWorkspaceId(parentAgentId);
+        if (rootWorkspaceId) affectedWorkspaceIds.add(rootWorkspaceId);
+        await this.emitWorkspaceUpdatesForWorkspaceIds(affectedWorkspaceIds);
+      }
+
+      this.emit({
+        type: "agent.attach.response",
+        payload: { requestId, agentId, accepted: true, error: null },
+      });
+    } catch (error) {
+      const message = getErrorMessageOr(error, "Failed to attach agent");
+      this.sessionLogger.error({ err: error, agentId, requestId }, "Failed to attach agent");
+      this.emit({
+        type: "agent.attach.response",
+        payload: { requestId, agentId, accepted: false, error: message },
+      });
+    }
   }
 
   private async handleDetachAgentRequest(agentId: string, requestId: string): Promise<void> {

@@ -24,6 +24,10 @@ export interface LifecycleAgentManager {
     live: boolean;
     previousParentAgentId: string | null;
   }>;
+  attachAgent(
+    agentId: string,
+    parentAgentId: string,
+  ): Promise<{ record: StoredAgentRecord; live: boolean; changed: boolean }>;
   notifyAgentState(agentId: string): void;
   setAgentMode(agentId: string, modeId: string): Promise<AgentProviderNotice | null>;
   updateAgentMetadata(
@@ -205,6 +209,22 @@ export async function detachAgentCommand(
     agentId,
     ...result,
   };
+}
+
+export interface AttachAgentResult {
+  agentId: string;
+  parentAgentId: string;
+  record: StoredAgentRecord;
+  live: boolean;
+  changed: boolean;
+}
+
+export async function attachAgentCommand(
+  dependencies: Pick<AgentLifecycleCommandDependencies, "agentManager">,
+  input: { agentId: string; parentAgentId: string },
+): Promise<AttachAgentResult> {
+  const result = await dependencies.agentManager.attachAgent(input.agentId, input.parentAgentId);
+  return { ...input, ...result };
 }
 
 export async function setAgentModeCommand(

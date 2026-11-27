@@ -8,6 +8,7 @@ import {
 } from "@/hooks/use-sidebar-workspaces-list";
 import { useSidebarWorkspaceEntries } from "@/hooks/use-sidebar-workspace-entries";
 import { usePinnedSidebarKeys, type PinnedSidebarGroups } from "@/hooks/use-sidebar-pins";
+import { useDelegatedSidebarKeys } from "@/hooks/use-delegated-sidebar-keys";
 import { useSnoozedSidebarKeys } from "@/hooks/use-sidebar-snoozes";
 import { useSidebarCollapsedSectionsStore } from "@/stores/sidebar-collapsed-sections-store";
 import {
@@ -126,6 +127,7 @@ export function SidebarModelProvider({
     list.workspacePlacements,
     modelActive || needsWorkspaceEntries,
   );
+  const delegatedKeys = useDelegatedSidebarKeys(list.projects);
   const filteredWorkspaceEntriesByKey = useMemo(() => {
     const byProject = filterWorkspacesByProjects({
       workspaces: [...workspaceEntriesByKey.values()],
@@ -134,11 +136,15 @@ export function SidebarModelProvider({
       (workspace) => !matchesProjectCategory || matchesProjectCategory(workspace.projectViewKey),
     );
     const filtered = filterWorkspacesByLabels({
-      workspaces: byProject.filter((workspace) => showBackground || !workspace.background),
+      workspaces: byProject.filter(
+        (workspace) =>
+          (showBackground || !workspace.background) && !delegatedKeys.has(workspace.workspaceKey),
+      ),
       ...labelFilter,
     });
     return new Map(filtered.map((workspace) => [workspace.workspaceKey, workspace]));
   }, [
+    delegatedKeys,
     showBackground,
     labelFilter,
     resolvedProjectFilters,
@@ -162,7 +168,8 @@ export function SidebarModelProvider({
     if (matchesProjectCategory) {
       projects = projects.filter((project) => matchesProjectCategory(project.viewKey));
     }
-    if (hasActiveLabelFilter || !showBackground) {
+    // Delegated workspaces are hidden like background ones: a project they empty goes too.
+    if (hasActiveLabelFilter || !showBackground || delegatedKeys.size > 0) {
       projects = projects.flatMap((project) => {
         const workspaces = project.workspaces.filter((workspace) =>
           visibleWorkspaceKeys.has(workspace.workspaceKey),
@@ -174,6 +181,7 @@ export function SidebarModelProvider({
     }
     return projects;
   }, [
+    delegatedKeys.size,
     showBackground,
     hasActiveLabelFilter,
     hasActiveProjectFilter,

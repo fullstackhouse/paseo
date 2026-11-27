@@ -1926,6 +1926,119 @@ describe("agent detach RPC", () => {
   });
 });
 
+describe("agent attach RPC", () => {
+  function createAttachSession(attachAgent: ReturnType<typeof vi.fn>, messages: unknown[]) {
+    const workspace = {
+      workspaceId: "workspace-child",
+      projectId: "project-child",
+      cwd: "/tmp/child",
+      kind: "worktree" as const,
+      displayName: "Child workspace",
+      title: null,
+      branch: "child",
+      baseBranch: null,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+      archivedAt: null,
+    };
+    const project = {
+      projectId: "project-child",
+      rootPath: "/tmp/child",
+      kind: "git" as const,
+      displayName: "Project",
+      customName: null,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+      archivedAt: null,
+    };
+    return createSessionForTest({
+      messages,
+      agentManager: { getAgent: vi.fn(() => null), attachAgent },
+      agentStorage: {
+        list: vi.fn().mockResolvedValue([]),
+        get: vi.fn().mockResolvedValue(null),
+      },
+      workspaceRegistry: {
+        get: vi.fn().mockResolvedValue(workspace),
+        list: vi.fn().mockResolvedValue([workspace]),
+      },
+      projectRegistry: {
+        get: vi.fn().mockResolvedValue(project),
+        list: vi.fn().mockResolvedValue([project]),
+      },
+    });
+  }
+
+  test("attaches a stored root agent and emits it with its new parent", async () => {
+    const messages: unknown[] = [];
+    const childAfter = createStoredAgentRecord({
+      id: "child-agent",
+      cwd: "/tmp/child",
+      workspaceId: "workspace-child",
+      title: "Child",
+      labels: { [PARENT_AGENT_ID_LABEL]: "parent-agent" },
+    });
+    const attachAgent = vi
+      .fn()
+      .mockResolvedValue({ record: childAfter, live: false, changed: true });
+    const session = createAttachSession(attachAgent, messages);
+    await session.handleMessage({
+      type: "fetch_agents_request",
+      requestId: "subscribe-agents",
+      subscribe: { subscriptionId: "agents-sub" },
+    });
+    messages.splice(0);
+
+    await session.handleMessage({
+      type: "agent.attach.request",
+      agentId: "child-agent",
+      parentAgentId: "parent-agent",
+      requestId: "attach-1",
+    });
+
+    expect(attachAgent).toHaveBeenCalledWith("child-agent", "parent-agent");
+    expect(messages).toContainEqual({
+      type: "agent_update",
+      payload: expect.objectContaining({
+        kind: "upsert",
+        agent: expect.objectContaining({
+          id: "child-agent",
+          labels: { [PARENT_AGENT_ID_LABEL]: "parent-agent" },
+        }),
+      }),
+    });
+    expect(messages).toContainEqual({
+      type: "agent.attach.response",
+      payload: { requestId: "attach-1", agentId: "child-agent", accepted: true, error: null },
+    });
+  });
+
+  test("reports a rejected attach", async () => {
+    const messages: unknown[] = [];
+    const attachAgent = vi
+      .fn()
+      .mockRejectedValue(new Error("An agent can't be attached to one of its own subagents"));
+    const session = createAttachSession(attachAgent, messages);
+
+    await session.handleMessage({
+      type: "agent.attach.request",
+      agentId: "root-agent",
+      parentAgentId: "grandchild-agent",
+      requestId: "attach-2",
+    });
+
+    expect(messages).toContainEqual({
+      type: "agent.attach.response",
+      payload: {
+        requestId: "attach-2",
+        agentId: "root-agent",
+        accepted: false,
+        error: "An agent can't be attached to one of its own subagents",
+      },
+    });
+  });
+});
+
 function createProjectRecord(rootPath: string, archivedAt: string | null = null) {
   return {
     projectId: `project:${rootPath}`,

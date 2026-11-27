@@ -62,6 +62,7 @@ import {
 } from "@/command-center/agent-control-registration";
 import { useShortcutKeys } from "@/hooks/use-shortcut-keys";
 import { useComposerKeyboardScope } from "@/composer/keyboard-scope";
+import { useAttachAgentCommandCenterActions } from "@/subagents/use-attach-agent-command-center";
 import {
   composerToolbarGeometry,
   resolveComposerControlDensity,
@@ -199,6 +200,24 @@ function AgentControlCommandCenterRegistration({
     sourceId,
     enabled: enabled && isCommandCenterTarget,
     controls,
+  });
+  return null;
+}
+
+function AttachAgentCommandCenterRegistration({
+  serverId,
+  agentId,
+  enabled,
+}: {
+  serverId: string;
+  agentId: string;
+  enabled: boolean;
+}) {
+  const { isCommandCenterTarget } = useComposerKeyboardScope();
+  useAttachAgentCommandCenterActions({
+    serverId,
+    agentId,
+    enabled: enabled && isCommandCenterTarget,
   });
   return null;
 }
@@ -1241,11 +1260,18 @@ export const AgentControls = memo(function AgentControls({
   );
 
   const commandCenterRegistration = (
-    <AgentControlCommandCenterRegistration
-      sourceId={`agent:${serverId}:${agentId}`}
-      enabled={Boolean(client)}
-      controls={commandCenterControls}
-    />
+    <>
+      <AgentControlCommandCenterRegistration
+        sourceId={`agent:${serverId}:${agentId}`}
+        enabled={Boolean(client)}
+        controls={commandCenterControls}
+      />
+      <AttachAgentCommandCenterRegistration
+        serverId={serverId}
+        agentId={agentId}
+        enabled={Boolean(client)}
+      />
+    </>
   );
 
   const handleModelSelectorOpen = useCallback(() => {

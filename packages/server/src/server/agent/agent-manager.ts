@@ -885,6 +885,25 @@ function detachedAgentLabelPatch(labels: Record<string, string>): AgentLabelPatc
   return patch;
 }
 
+/** Attach makes the agent a subagent of `parentAgentId` on this host and clears detach lineage. */
+function attachedAgentLabelPatch(
+  labels: Record<string, string>,
+  parentAgentId: string,
+): AgentLabelPatch {
+  const patch: AgentLabelPatch = { [PARENT_AGENT_ID_LABEL]: parentAgentId };
+  for (const label of [
+    PARENT_SERVER_ID_LABEL,
+    DETACHED_FROM_AGENT_ID_LABEL,
+    DETACHED_FROM_SERVER_ID_LABEL,
+  ]) {
+    if (labels[label] !== undefined) patch[label] = null;
+  }
+  return patch;
+}
+
+// Longer than any real delegation chain; stops the ancestry walk on corrupt labels.
+const MAX_ATTACH_ANCESTRY_DEPTH = 64;
+
 /**
  * How long an archived internal agent stays readable by id. Storage plays this
  * role for public agents; internal agents never reach it, and a one-shot helper
@@ -2989,6 +3008,79 @@ export class AgentManager {
       throw new Error(`Agent not found in storage after detach: ${agentId}`);
     }
     return { record: result.record, live: false, previousParentAgentId };
+  }
+
+  /**
+   * Makes a root agent a subagent of another agent on this host. Placement is unchanged: the agent
+   * keeps its workspace and cwd. Attaching to the current parent is a no-op.
+   */
+  async attachAgent(
+    agentId: string,
+    parentAgentId: string,
+  ): Promise<{ record: StoredAgentRecord; live: boolean; changed: boolean }> {
+    return this.runLifecycleMutation(agentId, () =>
+      this.attachAgentUnlocked(agentId, parentAgentId),
+    );
+  }
+
+  private async attachAgentUnlocked(
+    agentId: string,
+    parentAgentId: string,
+  ): Promise<{ record: StoredAgentRecord; live: boolean; changed: boolean }> {
+    if (agentId === parentAgentId) {
+      throw new Error("An agent can't be attached to itself");
+    }
+    const registry = this.requireRegistry();
+    const record = await registry.get(agentId);
+    if (!record || record.internal) {
+      throw new Error(`Agent not found: ${agentId}`);
+    }
+    if (record.archivedAt) {
+      throw new Error("Archived agents can't be attached");
+    }
+    const live = this.agents.has(agentId);
+    const labels = this.agents.get(agentId)?.labels ?? record.labels;
+    const currentParentAgentId = getParentAgentIdFromLabels(labels);
+    const currentParentServerId = labels[PARENT_SERVER_ID_LABEL];
+    if (currentParentAgentId === parentAgentId && currentParentServerId === undefined) {
+      return { record, live, changed: false };
+    }
+    if (currentParentAgentId) {
+      throw new Error("This agent is already a subagent. Detach it first.");
+    }
+
+    await this.assertAttachableParent(agentId, parentAgentId);
+
+    const result = await this.writeLabels(agentId, attachedAgentLabelPatch(labels, parentAgentId));
+    if (!result.record) {
+      throw new Error(`Agent not found in storage after attach: ${agentId}`);
+    }
+    return { record: result.record, live: result.live, changed: true };
+  }
+
+  /** The parent must be a live record on this host, and must not descend from the agent. */
+  private async assertAttachableParent(agentId: string, parentAgentId: string): Promise<void> {
+    const registry = this.requireRegistry();
+    const parent = await registry.get(parentAgentId);
+    if (!parent || parent.internal) {
+      throw new Error(`Parent agent not found: ${parentAgentId}`);
+    }
+    if (parent.archivedAt) {
+      throw new Error("Agents can't be attached to an archived agent");
+    }
+    const seen = new Set<string>();
+    let ancestorId: string | null = parentAgentId;
+    while (ancestorId && seen.size < MAX_ATTACH_ANCESTRY_DEPTH) {
+      if (ancestorId === agentId) {
+        throw new Error("An agent can't be attached to one of its own subagents");
+      }
+      if (seen.has(ancestorId)) return;
+      seen.add(ancestorId);
+      const ancestorLabels: Record<string, string> | undefined =
+        this.agents.get(ancestorId)?.labels ?? (await registry.get(ancestorId))?.labels;
+      if (!ancestorLabels || ancestorLabels[PARENT_SERVER_ID_LABEL] !== undefined) return;
+      ancestorId = getParentAgentIdFromLabels(ancestorLabels);
+    }
   }
 
   notifyAgentState(agentId: string): void {

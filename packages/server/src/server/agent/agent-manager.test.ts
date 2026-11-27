@@ -7069,6 +7069,105 @@ test("archiveAgent does not cascade to a detached former child", async () => {
   expect((await storage.get(child.id))?.archivedAt).toBeFalsy();
 });
 
+function createAttachTestManager(prefix: string) {
+  const workdir = mkdtempSync(join(tmpdir(), prefix));
+  const storage = new AgentStorage(join(workdir, "agents"), logger);
+  const manager = new AgentManager({
+    clients: { codex: new TestAgentClient() },
+    registry: storage,
+    logger,
+  });
+  const create = (title: string, labels?: Record<string, string>) =>
+    manager.createAgent({ provider: "codex", cwd: workdir, title }, undefined, {
+      ...(labels ? { labels } : {}),
+      workspaceId: undefined,
+    });
+  return { manager, storage, create };
+}
+
+test("attachAgent makes a live root agent a subagent, clears detach lineage and emits state", async () => {
+  const { manager, storage, create } = createAttachTestManager("agent-manager-attach-live-");
+  const parent = await create("Parent");
+  const child = await create("Child", {
+    [DETACHED_FROM_AGENT_ID_LABEL]: "former-parent",
+    team: "infra",
+  });
+  const emittedLabels: Array<Record<string, string>> = [];
+  const unsubscribe = manager.subscribe(
+    (event) => {
+      if (event.type === "agent_state" && event.agent.id === child.id) {
+        emittedLabels.push(event.agent.labels);
+      }
+    },
+    { agentId: child.id, replayState: false },
+  );
+
+  const result = await manager.attachAgent(child.id, parent.id);
+  await manager.flush();
+  unsubscribe();
+
+  const attachedLabels = { team: "infra", [PARENT_AGENT_ID_LABEL]: parent.id };
+  expect(result).toMatchObject({ live: true, changed: true });
+  expect(result.record.labels).toEqual(attachedLabels);
+  expect(manager.getAgent(child.id)?.labels).toEqual(attachedLabels);
+  expect((await storage.get(child.id))?.labels).toEqual(attachedLabels);
+  expect(emittedLabels).toContainEqual(attachedLabels);
+});
+
+test("attachAgent attaches a stored-only agent", async () => {
+  const { manager, storage, create } = createAttachTestManager("agent-manager-attach-stored-");
+  const parent = await create("Parent");
+  const child = await create("Stored child");
+  await manager.closeAgent(child.id);
+
+  const result = await manager.attachAgent(child.id, parent.id);
+
+  expect(result).toMatchObject({ live: false, changed: true });
+  expect((await storage.get(child.id))?.labels).toEqual({ [PARENT_AGENT_ID_LABEL]: parent.id });
+});
+
+test("attachAgent to the current parent changes nothing", async () => {
+  const { manager, create } = createAttachTestManager("agent-manager-attach-noop-");
+  const parent = await create("Parent");
+  const child = await create("Child", { [PARENT_AGENT_ID_LABEL]: parent.id });
+
+  const result = await manager.attachAgent(child.id, parent.id);
+
+  expect(result.changed).toBe(false);
+});
+
+test("attachAgent rejects a subagent, itself, a descendant and an archived parent", async () => {
+  const { manager, create } = createAttachTestManager("agent-manager-attach-reject-");
+  const root = await create("Root");
+  const other = await create("Other");
+  const child = await create("Child", { [PARENT_AGENT_ID_LABEL]: root.id });
+  const grandchild = await create("Grandchild", { [PARENT_AGENT_ID_LABEL]: child.id });
+  const archived = await create("Archived");
+  await manager.archiveAgent(archived.id);
+
+  await expect(manager.attachAgent(child.id, other.id)).rejects.toThrow("already a subagent");
+  await expect(manager.attachAgent(root.id, root.id)).rejects.toThrow("itself");
+  await expect(manager.attachAgent(root.id, grandchild.id)).rejects.toThrow(
+    "one of its own subagents",
+  );
+  await expect(manager.attachAgent(other.id, archived.id)).rejects.toThrow("archived agent");
+  await expect(manager.attachAgent(other.id, "missing-agent")).rejects.toThrow(
+    "Parent agent not found",
+  );
+  expect(manager.getAgent(root.id)?.labels).toEqual({});
+});
+
+test("archiveAgent cascades to an attached child in the same workspace", async () => {
+  const { manager, storage, create } = createAttachTestManager("agent-manager-attach-cascade-");
+  const parent = await create("Parent");
+  const child = await create("Child");
+
+  await manager.attachAgent(child.id, parent.id);
+  await manager.archiveAgent(parent.id);
+
+  expect((await storage.get(child.id))?.archivedAt).toEqual(expect.any(String));
+});
+
 test("runAgent persists finished attention and idle status without an external snapshot subscriber", async () => {
   const workdir = mkdtempSync(join(tmpdir(), "agent-manager-finished-attention-"));
   const storagePath = join(workdir, "agents");

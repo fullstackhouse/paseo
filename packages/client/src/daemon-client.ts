@@ -3689,6 +3689,20 @@ export class DaemonClient {
     }
   }
 
+  /** Makes a root agent a subagent of `parentAgentId` on the same host. */
+  async attachAgent(agentId: string, parentAgentId: string): Promise<void> {
+    const payload = await this.sendNamespacedCorrelatedSessionRequest<"agent.attach.response">({
+      message: {
+        type: "agent.attach.request",
+        agentId,
+        parentAgentId,
+      },
+    });
+    if (!payload.accepted) {
+      throw new Error(payload.error ?? "attachAgent rejected");
+    }
+  }
+
   async updateAgent(
     agentId: string,
     updates: { name?: string; labels?: Record<string, string> },

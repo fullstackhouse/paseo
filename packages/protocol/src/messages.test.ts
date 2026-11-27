@@ -288,6 +288,32 @@ describe("diagnostics message contract", () => {
   });
 });
 
+describe("agent attach RPC", () => {
+  test("parses the attach request and response", () => {
+    const request = {
+      type: "agent.attach.request",
+      agentId: "child-agent",
+      parentAgentId: "parent-agent",
+      requestId: "req-attach",
+    };
+    expect(SessionInboundMessageSchema.parse(request)).toEqual(request);
+    const response = SessionOutboundMessageSchema.parse({
+      type: "agent.attach.response",
+      payload: { requestId: "req-attach", agentId: "child-agent", accepted: true, error: null },
+    });
+    expect(response.type).toBe("agent.attach.response");
+  });
+
+  test("parses the agentAttach server feature gate", () => {
+    const parsed = parseServerInfoStatusPayload({
+      status: "server_info",
+      serverId: "srv-test",
+      features: { agentAttach: true },
+    });
+    expect(parsed?.features?.agentAttach).toBe(true);
+  });
+});
+
 describe("agent detach RPC", () => {
   test("parses the namespaced detach request", () => {
     const parsed = SessionInboundMessageSchema.parse({

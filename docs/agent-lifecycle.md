@@ -155,6 +155,8 @@ The parent pill and the subagents track show a relationship from inside one chat
 
 Users can also detach an existing subagent from the subagents track. Detach is deliberately a manual lifecycle gesture, not an agent-facing MCP tool. It removes the parent and open-tab lifecycle labels, keeping the former parent only as `paseo.detached-from`: it does not stop, archive, move, or restart the agent. The agent keeps its current `cwd` and `workspaceId`, leaves the former parent's track, and behaves like a root agent for tab close, workspace activity, and future parent archive.
 
+**Attach** is the reverse. Search for "Attach to agent" in the command center while a root agent is focused, then pick its new parent. `agent.attach.request` (gated on `features.agentAttach`) sets `paseo.parent-agent-id`, clears `paseo.detached-from`, and moves nothing: the agent keeps its `cwd`, `workspaceId` and runtime. The daemon rejects attaching a subagent (detach it first), an archived agent, an agent on another host, and a parent that descends from the agent. Attach registers no finish notification: the parent hears about the child once it sends the child a prompt.
+
 `notifyOnFinish` defaults to `true` for agent-scoped creation and prompt follow-ups because most delegated work needs to report back to the creating agent. Set it to `false` for explicit reporting or no completion callback.
 
 Agent-originated messages and automatic notifications share a recipient-daemon delivery module. A queued receipt acknowledges admission before provider dispatch. The module keeps one ordered queue per recipient, and the recipient reads its prompts in the order the daemon admitted them. Nothing overtakes an older queued message. A prompt takes its place when the daemon admits it, even while the provider is still starting an earlier turn, and a message stays in the queue until the turn that carries it starts. The turn has started when the agent manager acknowledges the run start; a turn that fails after that point is not delivered again.
@@ -227,6 +229,10 @@ and would otherwise miss the flip.
   works.
 - **Workspace.** `workspace.background` hides the workspace from the sidebar unless **Show
   background** is on.
+- **Delegated workspace.** The sidebar also hides a workspace when every live agent in it is a
+  subagent of an agent in another workspace, whether `create_agent` placed it there or you
+  attached it. Its parent's subagents track and the Lineage tab still open it. An agent whose
+  parent is archived or not loaded counts as a root, so its workspace stays listed.
 - **Inheritance.** When `background` is omitted, an agent created by a caller agent takes the
   caller's own `background`. A new workspace takes the caller's effective background. A request
   that creates its workspace applies `background` to both the agent and the workspace. Explicit
@@ -428,7 +434,7 @@ The asymmetry is intentional: a subagent's persistent relationship lives in the 
 
 Agent lifecycle status stays literal: a parent agent is `idle` when its own turn is idle, even if a child is running.
 
-Workspace status is an aggregate activity signal computed **per `workspaceId`**. Ownership is never derived from `cwd` — many workspaces may share one directory, and same-`cwd` siblings do not clump under one status. Root agents and cross-workspace subagents contribute their normal state bucket to their own workspace. Same-workspace descendants contribute `running` to the nearest ancestor in that workspace; their non-running attention, permission, and error states stay in the parent's subagents track. This makes a cross-workspace subagent behave like a detached agent for workspace visibility and status without removing its parent relationship.
+Workspace status is an aggregate activity signal computed **per `workspaceId`**. Ownership is never derived from `cwd` — many workspaces may share one directory, and same-`cwd` siblings do not clump under one status. Root agents and cross-workspace subagents contribute their normal state bucket to their own workspace. Same-workspace descendants contribute `running` to the nearest ancestor in that workspace; their non-running attention, permission, and error states stay in the parent's subagents track. This makes a cross-workspace subagent behave like a detached agent for its workspace's status without removing its parent relationship; the sidebar still hides a workspace that only has such subagents (see delegated workspace above).
 
 Running provider-native subagents contribute `running` to the workspace owned by their parent agent. Their completed, failed, and canceled states stay in the parent's subagents track.
 
