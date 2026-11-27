@@ -54,15 +54,21 @@ export function createExternalCommandProcessEnv(
   return buildExternalProcessEnv(baseEnv, overlays);
 }
 
+/**
+ * `baseEnv` defaults to the daemon's own env. A caller that already built the child's whole env
+ * passes it here: as an overlay it can't remove a var, so anything it stripped (such as the
+ * parent Claude Code session's `CLAUDECODE`) would come back from `process.env`.
+ */
 export function buildSelfNodeCommand(
   args: string[],
   envOverlay?: ProcessEnvRecord,
+  baseEnv: ProcessEnvRecord = process.env,
 ): {
   command: string;
   args: string[];
   env: ExternalProcessEnv;
 } {
-  const env = buildExternalProcessEnv(process.env, []);
+  const env = buildExternalProcessEnv(baseEnv, []);
   Object.assign(env, { [ELECTRON_RUN_AS_NODE]: "1" }, envOverlay);
   for (const [key, value] of Object.entries(env)) {
     if (value === undefined) {

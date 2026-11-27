@@ -78,7 +78,7 @@ function applyRuntimeSettingsToClaudeOptions(
       providerEnvSpec.envOverlay.CLAUDE_CODE_ENTRYPOINT = launchEnv?.CLAUDE_CODE_ENTRYPOINT;
       const providerEnv = createExternalProcessEnv(spawnOptions.env, providerEnvSpec.envOverlay);
       const selfNodeCommand = isDefaultRuntime
-        ? buildSelfNodeCommand(resolved.args, providerEnv)
+        ? buildSelfNodeCommand(resolved.args, undefined, providerEnv)
         : null;
       const command = selfNodeCommand?.command ?? resolved.command;
       const args = selfNodeCommand?.args ?? resolved.args;
