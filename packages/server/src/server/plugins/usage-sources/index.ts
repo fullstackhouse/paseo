@@ -122,10 +122,15 @@ export class UsageSourceRegistry {
    * announces each one changed. Windows the observation does not name (per-model weekly limits)
    * keep their fetched values, and the cache keeps its fetch time, so the next refresh still
    * fetches them. With no windows, or no successful report to merge into, the report is
-   * refetched instead, at most once a minute.
+   * refetched instead, at most once a minute. With no app listening, only reports a client already
+   * listed take the observation: nothing is discovered or fetched, so a busy host doesn't spend the
+   * vendor's rate limit in the background.
    */
   async observeUsage(agentId: string, observation: UsageObservation): Promise<void> {
-    const reports = await this.observedReports(agentId);
+    const listening = this.listeners.size > 0;
+    const reports = listening
+      ? await this.observedReports(agentId)
+      : (this.byAgent.get(agentId) ?? new Map<string, KnownReport>());
     for (const [id, report] of reports) {
       if (
         report.source.id !== observation.sourceId ||
@@ -134,7 +139,7 @@ export class UsageSourceRegistry {
         continue;
       if (observation.windows.length > 0 && this.mergeObservation(id, observation.windows))
         continue;
-      this.refetchObserved(id, this.known.get(id) ?? report);
+      if (listening) this.refetchObserved(id, this.known.get(id) ?? report);
     }
   }
 

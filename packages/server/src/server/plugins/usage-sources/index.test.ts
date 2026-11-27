@@ -1090,6 +1090,33 @@ test("an observation without usage refetches its account at most once a minute a
   ]);
 });
 
+test("with no app listening, an observation neither fetches nor discovers reports", async () => {
+  let now = 0;
+  const { registry, fetched } = observedUsageRegistry(() => now);
+  await registry.listReports();
+  now = 10_000;
+  await registry.observeUsage("working", { sourceId: "claude", windows: [] });
+  await new Promise((resolve) => setImmediate(resolve));
+  expect(fetched).toEqual(["work"]);
+
+  // Once an app listens, the same observation refetches the account.
+  const stop = registry.subscribe(() => {});
+  await registry.observeUsage("working", { sourceId: "claude", windows: [] });
+  await new Promise((resolve) => setImmediate(resolve));
+  expect(fetched).toEqual(["work", "work"]);
+  stop();
+});
+
+test("with no app listening, usage from an agent no client listed fetches nothing", async () => {
+  const { registry, fetched } = observedUsageRegistry(() => 0);
+  await registry.observeUsage("working", {
+    sourceId: "claude",
+    windows: [{ id: "weekly", usedPct: 91, resetsAt: null }],
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  expect(fetched).toEqual([]);
+});
+
 test("usage observed before any report was fetched fetches the account once", async () => {
   let now = 0;
   const { registry, fetched } = observedUsageRegistry(() => now);
