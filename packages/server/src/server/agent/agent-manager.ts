@@ -5762,12 +5762,11 @@ export class AgentManager {
 
   /**
    * FSH: the agent's title follows its provider session's own title from now on. False when the
-   * provider keeps no title of its own.
+   * provider keeps no title of its own or the agent has no stored record to carry the flag.
    */
   async followProviderTitle(agentId: string): Promise<boolean> {
     if (!this.agents.get(agentId)?.session.readProviderTitle) return false;
-    await this.requireRegistry().setTitleFollowsAgent(agentId, true);
-    return true;
+    return this.requireRegistry().setTitleFollowsAgent(agentId, true);
   }
 
   /**

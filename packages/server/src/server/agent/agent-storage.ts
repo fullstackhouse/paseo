@@ -460,13 +460,18 @@ export class AgentStorage {
     );
   }
 
-  /** FSH: whether the agent's title follows the one its provider session keeps. */
-  async setTitleFollowsAgent(agentId: string, follows: boolean): Promise<void> {
+  /**
+   * FSH: whether the agent's title follows the one its provider session keeps. False when the
+   * agent has no stored record yet, so nothing was set.
+   */
+  async setTitleFollowsAgent(agentId: string, follows: boolean): Promise<boolean> {
     await this.load();
     await this.waitForPendingWrite(agentId);
     const record = await this.get(agentId);
-    if (!record || Boolean(record.titleFollowsAgent) === follows) return;
+    if (!record) return false;
+    if (Boolean(record.titleFollowsAgent) === follows) return true;
     await this.upsert({ ...record, titleFollowsAgent: follows ? true : undefined });
+    return true;
   }
 
   async setTitle(agentId: string, title: string): Promise<void> {

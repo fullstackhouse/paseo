@@ -21,6 +21,8 @@ import {
 
 type WorkspaceNameGenerator = typeof generateBranchNameFromFirstAgentContext;
 
+const SHARED_GENERATION_TTL_MS = 60_000;
+
 type CurrentSelection = GenerateBranchNameFromFirstAgentContextOptions["currentSelection"] | null;
 
 interface WorkspaceAutoNameOptions {
@@ -53,6 +55,7 @@ export class WorkspaceAutoName {
   private readonly emitWorkspaceUpdateForWorkspaceId: (workspaceId: string) => Promise<void>;
   private readonly logger: pino.Logger;
   private readonly generateWorkspaceName: WorkspaceNameGenerator;
+  private readonly recentGenerations = new Map<string, Promise<GeneratedWorkspaceName | null>>();
 
   constructor(options: WorkspaceAutoNameOptions) {
     this.agentManager = options.agentManager;
@@ -270,7 +273,29 @@ export class WorkspaceAutoName {
     return records.filter((record) => !record.internal && !record.archivedAt);
   }
 
+  /**
+   * A new workspace and its first chat both title themselves from the same prompt, so the two jobs
+   * share one model call: a result is reused for a minute per working directory and prompt.
+   */
   private generateFromContext(input: {
+    cwd: string;
+    firstAgentContext: FirstAgentContext;
+    currentSelection: CurrentSelection;
+  }): Promise<GeneratedWorkspaceName | null> {
+    const key = `${input.cwd}\0${JSON.stringify(input.firstAgentContext)}`;
+    const shared = this.recentGenerations.get(key);
+    if (shared) return shared;
+    const generation = this.callGenerator(input);
+    this.recentGenerations.set(key, generation);
+    const forget = () => {
+      if (this.recentGenerations.get(key) === generation) this.recentGenerations.delete(key);
+    };
+    generation.catch(forget);
+    setTimeout(forget, SHARED_GENERATION_TTL_MS).unref();
+    return generation;
+  }
+
+  private callGenerator(input: {
     cwd: string;
     firstAgentContext: FirstAgentContext;
     currentSelection: CurrentSelection;

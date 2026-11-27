@@ -6295,12 +6295,15 @@ describe("chat titles", () => {
     const workdir = mkdtempSync(join(tmpdir(), "agent-manager-chat-titles-"));
     const storage = new AgentStorage(join(workdir, "agents"), logger);
     const manager = new AgentManager({ clients: { codex: client }, registry: storage, logger });
-    const agent = await manager.createAgent({ provider: "codex", cwd: workdir }, undefined, {
-      workspaceId: undefined,
-      initialTitle: "fix the login redirect",
-    });
-    const titleOf = async () => (await storage.get(agent.id))?.title ?? null;
-    return { manager, storage, agentId: agent.id, titleOf };
+    const addChat = async () => {
+      const agent = await manager.createAgent({ provider: "codex", cwd: workdir }, undefined, {
+        workspaceId: undefined,
+        initialTitle: "fix the login redirect",
+      });
+      const titleOf = async () => (await storage.get(agent.id))?.title ?? null;
+      return { agentId: agent.id, titleOf };
+    };
+    return { manager, storage, addChat, ...(await addChat()) };
   }
 
   beforeEach(() => {
@@ -6321,8 +6324,10 @@ describe("chat titles", () => {
   });
 
   test("a rename stops the chat from following the agent's title", async () => {
-    const { manager, storage, agentId, titleOf } = await createChat(new OwnTitleClient());
+    const { manager, storage, addChat, agentId, titleOf } = await createChat(new OwnTitleClient());
+    const witness = await addChat();
     await manager.followProviderTitle(agentId);
+    await manager.followProviderTitle(witness.agentId);
     providerTitle.current = "Login redirect fix";
     await manager.runAgent(agentId, "first");
     await vi.waitFor(async () => expect(await titleOf()).toBe("Login redirect fix"));
@@ -6330,9 +6335,10 @@ describe("chat titles", () => {
     await manager.updateAgentMetadata(agentId, { title: "Auth work" });
     providerTitle.current = "Something else entirely";
     await manager.runAgent(agentId, "second");
-    await manager.runAgent(agentId, "third");
-    // Give a title read after the last turn time to land, were the chat still following.
-    await new Promise((resolve) => setTimeout(resolve, 20));
+    await manager.runAgent(witness.agentId, "second");
+    // The witness still follows, so once it has taken the new title, a read after the renamed
+    // chat's turn would have landed too.
+    await vi.waitFor(async () => expect(await witness.titleOf()).toBe("Something else entirely"));
 
     expect(await titleOf()).toBe("Auth work");
     expect((await storage.get(agentId))?.titleFollowsAgent).toBeUndefined();
@@ -6343,6 +6349,14 @@ describe("chat titles", () => {
 
     expect(await manager.followProviderTitle(agentId)).toBe(false);
     expect((await storage.get(agentId))?.titleFollowsAgent).toBeUndefined();
+  });
+
+  test("following a chat with no stored record reports that nothing was set", async () => {
+    const { storage } = await createChat(new OwnTitleClient());
+
+    expect(await storage.setTitleFollowsAgent("00000000-0000-4000-8000-0000000000ff", true)).toBe(
+      false,
+    );
   });
 
   test("an automatic title lands only while the chat keeps its first-prompt title", async () => {

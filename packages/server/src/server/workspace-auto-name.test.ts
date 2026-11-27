@@ -1,5 +1,5 @@
 import pino from "pino";
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 import type { AgentManager } from "./agent/agent-manager.js";
 import type { StoredAgentRecord } from "./agent/agent-storage.js";
 import type { ProviderSnapshotManager } from "./agent/provider-snapshot-manager.js";
@@ -261,9 +261,9 @@ describe("new chats are titled per the Chat titles setting", () => {
       },
     });
 
-    function schedule(mode: "first-prompt" | "generated" | "agent"): void {
+    function schedule(mode: "first-prompt" | "generated" | "agent", agentId = "agent-1"): void {
       autoName.scheduleForChat({
-        agentId: "agent-1",
+        agentId,
         cwd: "/workspace",
         mode,
         provisionalTitle: PROMPT,
@@ -294,6 +294,20 @@ describe("new chats are titled per the Chat titles setting", () => {
     expect(harness.calls).toEqual([
       "follow agent-1",
       `title agent-1: ${PROMPT} -> Summarize release status`,
+    ]);
+  });
+
+  test("jobs titled from the same prompt share one generation", async () => {
+    const harness = createChatTitleHarness();
+
+    harness.schedule("generated", "agent-1");
+    harness.schedule("generated", "agent-2");
+    await vi.waitFor(() => expect(harness.calls).toHaveLength(2));
+
+    expect(harness.prompts).toEqual([PROMPT]);
+    expect(harness.calls).toEqual([
+      `title agent-1: ${PROMPT} -> Summarize release status`,
+      `title agent-2: ${PROMPT} -> Summarize release status`,
     ]);
   });
 

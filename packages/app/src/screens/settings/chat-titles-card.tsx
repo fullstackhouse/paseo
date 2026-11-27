@@ -9,7 +9,8 @@ import { useHostRuntimeIsConnected } from "@/runtime/host-runtime";
 
 const MODES: readonly ChatTitleMode[] = ["first-prompt", "generated", "agent"];
 
-// Host-wide: the daemon titles a chat when it is created, whichever client created it.
+// Host-wide: the daemon titles chats started from the app or CLI. Agents, schedules and the Hub
+// name the chats they start themselves.
 export function ChatTitlesCard({ serverId }: { serverId: string }) {
   const { t } = useTranslation();
   const isConnected = useHostRuntimeIsConnected(serverId);
