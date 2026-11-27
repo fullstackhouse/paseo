@@ -4647,17 +4647,19 @@ class ClaudeAgentSession implements AgentSession {
   /**
    * Claude Code sends a `rate_limit_event` with the account's utilization once per query, after
    * its first API response, so it shows usage as the turn starts. The turn's result asks for a
-   * refetch to show what the turn itself used; the usage registry limits those to one a minute.
+   * refetch to show what the turn itself used, after the turn's own events; the usage registry
+   * limits those to one a minute.
    */
-  private observeUsage(message: SDKMessage): void {
-    if (message.type === "rate_limit_event") {
-      const windows = readClaudeRateLimitUsage(message.rate_limit_info);
-      if (!windows?.length) return;
-      this.dispatchEvents([
-        { type: "usage_observed", provider: "claude", sourceId: CLAUDE_USAGE_SOURCE_ID, windows },
-      ]);
-      return;
-    }
+  private observeRateLimitUsage(message: SDKMessage): void {
+    if (message.type !== "rate_limit_event") return;
+    const windows = readClaudeRateLimitUsage(message.rate_limit_info);
+    if (!windows?.length) return;
+    this.dispatchEvents([
+      { type: "usage_observed", provider: "claude", sourceId: CLAUDE_USAGE_SOURCE_ID, windows },
+    ]);
+  }
+
+  private requestUsageRefetchAfterResult(message: SDKMessage): void {
     if (message.type === "result")
       this.dispatchEvents([
         {
@@ -4756,7 +4758,15 @@ class ClaudeAgentSession implements AgentSession {
   }
 
   private async routeSdkMessageFromPump(message: SDKMessage): Promise<void> {
-    this.observeUsage(message);
+    this.observeRateLimitUsage(message);
+    try {
+      await this.routeSdkMessage(message);
+    } finally {
+      this.requestUsageRefetchAfterResult(message);
+    }
+  }
+
+  private async routeSdkMessage(message: SDKMessage): Promise<void> {
     if (this.consumeSessionStateChange(message)) {
       return;
     }

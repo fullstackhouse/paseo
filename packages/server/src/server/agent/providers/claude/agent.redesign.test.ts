@@ -1455,6 +1455,8 @@ test("a rate-limit event reports the account's usage, and each turn's result ask
   expect(usageEvents()).toEqual([
     expect.objectContaining({ type: "usage_observed", sourceId: "claude", windows: [] }),
   ]);
+  // The refetch request follows the turn's own events, so consumers see the turn end first.
+  expect(events.map((event) => event.type).slice(-2)).toEqual(["turn_completed", "usage_observed"]);
   await internal.routeSdkMessageFromPump(claudeTurnInit(), queryMock);
   await internal.routeSdkMessageFromPump(successResult(), queryMock);
   expect(usageEvents()).toHaveLength(2);
