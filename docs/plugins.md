@@ -509,6 +509,13 @@ owns payloads, ordering, failure behavior, and examples. `agent.create.before` e
 configuration; `agent.open.before` contributes launch-only `env`, `tools`, and `mcpServers` on
 every open. Executable tool definitions stay in the plugin process; only metadata crosses the boundary.
 
+The runtime records which plugin added each MCP server and tool preapproval
+(`PluginConfigAdditions` from `agent.create.before`, `mcpServerOwners` from `agent.open.before`).
+Plugins attach their servers to every agent, without knowing whether the provider takes them, so a
+provider that can't is no reason to fail the create: those entries are dropped with a warning per
+plugin, and only what the caller sent fails. Ownership stays in the daemon; the plugin's
+`agent.permission.before` gets the provider-neutral `tool` instead.
+
 Worktree placement is resolved before Git source planning, so a hook can change the branch and base
 without undoing fetched refs. Restores use the recorded destination and bypass creation hooks.
 Workspace records decide ownership, including explicit non-ownership after recovery. Without a record,

@@ -61,7 +61,7 @@ Paseo 只观察返回的 Promise，因此独立任务没有错误报告，也没
 | `agent.archive.after`        | 否   | `{ agent, archivedAt }`                   |                                                                 |
 | `agent.turn.before`          | 否   | `{ agent, turnId, origin? }`              |                                                                 |
 | `agent.turn.after`           | 否   | `{ agent, turnId, outcome }`              |                                                                 |
-| `agent.permission.before`    | 否   | `{ agent, request }`                      |                                                                 |
+| `agent.permission.before`    | 否   | `{ agent, request, tool? }`               |                                                                 |
 | `agent.permission.after`     | 否   | `{ agent, requestId, resolution }`        |                                                                 |
 | `schedule.run.finish.before` | 是   | `{ request }`                             | 仅 `attention`                                                  |
 
@@ -237,6 +237,8 @@ server.addHook("worktree.create.after", async ({ worktree }) => {
 | `mcpServers`, `toolPolicy`   | MCP 配置和精确的工具预批准                               |
 | `cwd`                        | 不能修改                                                 |
 
+钩子添加的服务器和预批准会记在该插件名下。Provider 无法接收它们时，Paseo 会丢弃它们并记录一条指出插件名称的警告，照常创建 Agent；调用方自己发来的同样条目仍会报错。只有快照条目中 `supportsToolPolicy: true` 的 Provider 才能保留预批准（`paseo.providers.snapshot()`），只有支持 MCP 的会话才能接收服务器。
+
 ### 修改已保存的配置 {#change-saved-configuration}
 
 在 `contribute(server)` 中添加这个回调，为新的 Codex Agent 设置已保存的选项：
@@ -380,7 +382,7 @@ server.addHook("agent.open.before", async ({ request }) => {
 Paseo 按插件 ID 顺序合并各插件的最终映射。
 
 名称与已保存的服务器、Paseo 内部的 `paseo` 服务器或其他插件的服务器冲突时，会话打开失败，错误会指出服务器名称及双方来源。
-不支持 MCP 的 Provider 会报 `does not support MCP servers` 错误，并指出插件名称。
+在不支持 MCP 的 Provider 会话上，Paseo 会丢弃这些服务器，并记录一条指出插件名称的警告；已保存的服务器会报 `does not support MCP servers` 错误。
 `purpose: "history"` 的会话打开会忽略这些服务器。安装、停用和重新加载插件后，现有 Agent
 通过[会话重新打开行为](#attach-tools-to-agents)获取变化。
 
@@ -581,7 +583,9 @@ Turn ends: "out of credits"
 
 ## agent.permission.before {#agentpermissionbefore}
 
-权限或问题进入待处理状态后触发，收到 `{ agent, request }`；`request` 为 `AgentPermissionRequest`。通过 SDK 回应。
+权限或问题进入待处理状态后触发，收到 `{ agent, request, tool? }`；`request` 为 `AgentPermissionRequest`。通过 SDK 回应。
+
+当请求针对 Agent 的某个 MCP 工具时，`tool` 为 `{ kind: "mcp", server, tool }`，与 Provider 如何命名无关（`mcp__prs__prs_link`、`prs.prs_link`、`prs_prs_link`）。请用 `tool.server` 匹配你自己的工具，而不是 `request.name`。
 
 ### 回应权限请求 {#answer-a-permission-request}
 

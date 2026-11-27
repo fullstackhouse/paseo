@@ -1,3 +1,4 @@
+import { mcpToolOfPermission } from "../../agent/permission-tool-ref.js";
 import { validateBranchSlug } from "@getpaseo/protocol/branch-slug";
 import {
   createLifecycleRegistration,
@@ -38,7 +39,21 @@ export type PluginWireBeforeRequests = Omit<PluginHookRequests, "agent.open.befo
 /** Daemon-only results; ownership never crosses the plugin process boundary. */
 export type PluginBeforeResults = PluginWireBeforeRequests & {
   "agent.open.before": SessionOpenWireRequest & { mcpServerOwners?: Record<string, string> };
+  "agent.create.before": PluginWireBeforeRequests["agent.create.before"] & {
+    pluginAdditions?: PluginConfigAdditions;
+  };
 };
+
+/**
+ * What `agent.create.before` hooks added to an agent's config, by plugin id. The daemon drops these,
+ * with a warning, when the provider can't take them; anything the caller sent still fails loudly.
+ */
+export interface PluginConfigAdditions {
+  /** MCP server name → plugin id. */
+  mcpServers: Record<string, string>;
+  /** `server.tool` → plugin id. */
+  toolGrants: Record<string, string>;
+}
 
 const worktreeRequestFields = {
   repoRoot: z.string(),
@@ -218,6 +233,8 @@ export function publishAgentStream(
   lifecycle: PluginLifecycle,
   agent: PluginHookAgent,
   event: AgentStreamEvent,
+  /** The agent's MCP server names, to name the tool a permission request is for. */
+  mcpServers: Iterable<string> = [],
 ): void {
   if (event.type === "turn_started") {
     lifecycle.emit("agent.turn.before", {
@@ -244,7 +261,12 @@ export function publishAgentStream(
       outcome: { kind: "canceled", reason: event.reason },
     });
   } else if (event.type === "permission_requested") {
-    lifecycle.emit("agent.permission.before", { agent, request: event.request });
+    const tool = mcpToolOfPermission(event.request.name, mcpServers);
+    lifecycle.emit("agent.permission.before", {
+      agent,
+      request: event.request,
+      ...(tool ? { tool } : {}),
+    });
   } else if (event.type === "permission_resolved") {
     lifecycle.emit("agent.permission.after", {
       agent,
