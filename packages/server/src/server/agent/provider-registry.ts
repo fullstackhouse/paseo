@@ -164,6 +164,9 @@ const PROVIDER_CONTRACTS: Record<string, ProviderContract> = {
   claude: { supportsExactMcpPreapproval: true, supportsPlanApproval: true },
   codex: { supportsExactMcpPreapproval: true, supportsPlanApproval: true },
   opencode: { supportsExactMcpPreapproval: true },
+  // Dev-only and never asks for tool permission. Accepting grants lets e2e mock agents stand in for
+  // Claude/Codex under plugins that preapprove their MCP tools (paseo-status, paseo-asks, paseo-prs).
+  mock: { supportsExactMcpPreapproval: true },
 };
 
 const UNSUPPORTED_PROVIDER_CONTRACT: ProviderContract = {
