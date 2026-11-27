@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "url";
-import { concurrently } from "concurrently";
+import { type Command, concurrently } from "concurrently";
 import dotenv from "dotenv";
 
 dotenv.config({
@@ -25,6 +25,30 @@ const watchers = args.includes("--watch-dependencies")
       },
     )
   : null;
+
+// The worker imports the protocol and client dist that these watchers emit. Started before their first
+// build finishes, it loads the previous dist; after a branch switch or pull, that dist's generated
+// validators no longer match the protocol schemas and the worker crashes on import.
+function firstBuildFinished(watcher: Command): Promise<void> {
+  return new Promise((resolve) => {
+    watcher.stdout.subscribe((chunk) => {
+      if (chunk.toString().includes("Watching for file changes")) resolve();
+    });
+  });
+}
+
+if (watchers) {
+  const built = Promise.all(watchers.commands.map(firstBuildFinished)).then(() => "built" as const);
+  const stopped = watchers.result.then(
+    () => "stopped" as const,
+    () => "stopped" as const,
+  );
+  if ((await Promise.race([built, stopped])) === "stopped") {
+    process.stderr.write("Dependency watchers stopped before their first build finished\n");
+    process.exit(1);
+  }
+}
+
 const supervisorArgs = [
   ...process.execArgv,
   daemonRunnerEntry,
