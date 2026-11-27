@@ -1,4 +1,5 @@
 import { AgentMessageSchema } from "./agent-message.js";
+import { ChatTitleModeSchema } from "./chat-title-mode.js";
 import {
   HostsListRequestSchema,
   HostsAddRequestSchema,
@@ -217,11 +218,7 @@ const MutableRelayConfigSchema = z
 export const SnoozedPermissionBehaviorSchema = z.enum(["wake", "badge", "silent"]);
 export type SnoozedPermissionBehavior = z.infer<typeof SnoozedPermissionBehaviorSchema>;
 
-// How a new chat gets its title. first-prompt: the first line of the first message. generated:
-// a short title generated once from the first message. agent: follows the title the agent gives
-// its own session, for providers that keep one; others fall back to generated.
-export const ChatTitleModeSchema = z.enum(["first-prompt", "generated", "agent"]);
-export type ChatTitleMode = z.infer<typeof ChatTitleModeSchema>;
+export { ChatTitleModeSchema, type ChatTitleMode } from "./chat-title-mode.js";
 
 export const MutableDaemonConfigSchema = z
   .object({
