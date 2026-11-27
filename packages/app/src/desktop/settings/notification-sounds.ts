@@ -18,7 +18,8 @@ export function useNotificationSounds(): string[] {
     },
     enabled: getIsElectron(),
     dataShape: "value",
-    staleTimeMs: Infinity,
+    // Refetch now and then so sounds added to ~/Library/Sounds show up.
+    staleTimeMs: 60_000,
     retry: false,
   });
   return data ?? [];
