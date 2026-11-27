@@ -373,6 +373,7 @@ test.each(["agent", "workspace"] as const)(
           text: agent.initialPrompt,
           clientMessageId: agent.clientMessageId,
           messageId: agent.clientMessageId,
+          origin: { kind: "human" },
         },
         { type: "assistant_message", text: `[System Error] ${rejection}` },
       ];
