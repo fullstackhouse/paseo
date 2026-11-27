@@ -681,7 +681,11 @@ function YourMove({
   // The first row that expands opens by default, even below a permission prompt or failed agent.
   const firstOpenable = rows.find(canOpenMove)?.key;
   return (
-    <Section title="panels.overview.yourMove" count={rows.length > 1 ? rows.length : undefined}>
+    <Section
+      title="panels.overview.yourMove"
+      count={rows.length > 1 ? rows.length : undefined}
+      testID="overview-your-move"
+    >
       {rows.map((row, index) => {
         const lead = index === 0;
         const move = (

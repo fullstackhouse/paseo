@@ -135,6 +135,13 @@ export async function openChangesPanel(page: Page, timeout = 30_000): Promise<vo
   });
 }
 
+export async function openOverviewPanel(page: Page): Promise<void> {
+  await openExplorerView(page, {
+    tabTestId: "workspace-tab-overview",
+    contentTestId: "overview-panel",
+  });
+}
+
 export async function openFilesPanel(page: Page): Promise<void> {
   await openExplorerView(page, {
     tabTestId: "workspace-tab-files",

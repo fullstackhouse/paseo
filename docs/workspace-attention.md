@@ -52,6 +52,8 @@ The sidebar reads it through `createReportedWorkLookup` (`workspace-status/repor
 
 Live state still wins over all of this: a running agent, a permission prompt or a failure decides the sidebar group (`isStatusDecidedByReport`).
 
+`packages/app/e2e/browser/workspace-attention.spec.ts` runs these rules against the real paseo-status, paseo-asks and paseo-prs at pinned commits, with mock agents and a fake GitHub. Bump the pins in `e2e/support/helpers/attention-plugins.ts` when a plugin change should be covered.
+
 ## Pull requests
 
 Plugin servers read pull request state from the daemon, not from `gh`. Before this, core, paseo-prs and paseo-asks each polled GitHub for the same PRs on their own clocks and rate-limit handling, so a PR could read merged in one place and open in another.
