@@ -46,6 +46,9 @@ const PERSISTENCE_HANDLE_SCHEMA = z
   .nullable()
   .optional();
 
+const AgentTitleSourceSchema = z.enum(["manual", "automatic", "plugin"]);
+export type AgentTitleSource = z.infer<typeof AgentTitleSourceSchema>;
+
 const RAW_STORED_AGENT_SCHEMA = z.object({
   id: z.string(),
   provider: z.string(),
@@ -64,6 +67,12 @@ const RAW_STORED_AGENT_SCHEMA = z.object({
    * titles). Set at creation; a manual rename clears it for good.
    */
   titleFollowsAgent: z.boolean().optional(),
+  /**
+   * FSH fork: where the title came from. `manual`: renamed by hand or passed by whoever created
+   * the chat; no automatic title replaces it. `automatic`: the first prompt, a generated title or
+   * the agent's own. `plugin`: set by a plugin. Absent on older records, whose origin is unknown.
+   */
+  titleSource: AgentTitleSourceSchema.optional(),
   labels: z.record(z.string(), z.string()).default({}),
   metadata: z.record(z.string(), z.custom<JsonValue>()).default({}),
   lastStatus: AgentStatusSchema.default("closed"),
@@ -107,6 +116,17 @@ const RAW_STORED_AGENT_SCHEMA = z.object({
  * interruption until its next turn starts. FSH fork: an idle agent whose background work a stop
  * killed (`interruptedWork`) keeps its resume, since idle is how it waited on that work.
  */
+/** FSH: a snapshot keeps where the title came from unless it says so itself. */
+function carryTitleOrigin(
+  record: StoredAgentRecord,
+  existing: StoredAgentRecord | null | undefined,
+  titleSource: AgentTitleSource | undefined,
+): void {
+  if (existing?.titleFollowsAgent) record.titleFollowsAgent = true;
+  const source = titleSource ?? existing?.titleSource;
+  if (source) record.titleSource = source;
+}
+
 function carryInterruption(
   record: StoredAgentRecord,
   existing: StoredAgentRecord | null | undefined,
@@ -421,7 +441,7 @@ export class AgentStorage {
 
   async applySnapshot(
     agent: ManagedAgent,
-    options?: { title?: string | null; internal?: boolean },
+    options?: { title?: string | null; titleSource?: AgentTitleSource; internal?: boolean },
   ): Promise<void> {
     await this.load();
     const hasTitleOverride =
@@ -443,7 +463,7 @@ export class AgentStorage {
       }
       // Background is fixed at creation; a runtime opened without it cannot clear it.
       if (existing?.background) record.background = true;
-      if (existing?.titleFollowsAgent) record.titleFollowsAgent = true;
+      carryTitleOrigin(record, existing, options?.titleSource);
       carryInterruption(record, existing, agent.lifecycle);
       return record;
     });
@@ -473,6 +493,20 @@ export class AgentStorage {
     if (!record) return false;
     if (Boolean(record.titleFollowsAgent) === follows) return true;
     await this.upsert({ ...record, titleFollowsAgent: follows ? true : undefined });
+    return true;
+  }
+
+  /**
+   * FSH: records where the title came from; the title stops following the agent's own one.
+   * False when the agent has no stored record yet, so nothing was set.
+   */
+  async setTitleSource(agentId: string, source: "manual" | "plugin"): Promise<boolean> {
+    await this.load();
+    await this.waitForPendingWrite(agentId);
+    const record = await this.get(agentId);
+    if (!record) return false;
+    if (record.titleSource === source && !record.titleFollowsAgent) return true;
+    await this.upsert({ ...record, titleSource: source, titleFollowsAgent: undefined });
     return true;
   }
 

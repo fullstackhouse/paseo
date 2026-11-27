@@ -265,7 +265,12 @@ export class WorkspaceAutoName {
     ) {
       return;
     }
-    await this.agentManager.setTitle(soleAgent.id, workspaceTitle);
+    // Only while the agent still has the title read above: a rename or plugin title in between wins.
+    await this.agentManager.replaceAutomaticTitle(
+      soleAgent.id,
+      soleAgent.title ?? null,
+      workspaceTitle,
+    );
   }
 
   private async listWorkspaceAgents(workspaceId: string): Promise<StoredAgentRecord[]> {

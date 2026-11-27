@@ -80,7 +80,7 @@ import {
   foldHookFeatureValues,
   type ProviderOptionsPatch,
 } from "./option-controls.js";
-import type { StoredAgentRecord, AgentStorage } from "./agent-storage.js";
+import type { AgentStorage, AgentTitleSource, StoredAgentRecord } from "./agent-storage.js";
 import type { AgentOwner } from "./agent-owner.js";
 import {
   InMemoryAgentTimelineStore,
@@ -822,6 +822,15 @@ function buildImportedTimelineRows(entries: readonly ImportedTimelineEntry[]): A
     }
   }
   return rows;
+}
+
+/**
+ * FSH: whether an automatic title may replace this one. An older record doesn't say where its
+ * title came from, so only one that follows the agent's own title, or has none yet, counts.
+ */
+function hasAutomaticTitle(record: StoredAgentRecord): boolean {
+  if (record.titleSource) return record.titleSource !== "manual";
+  return record.titleFollowsAgent === true || !record.title;
 }
 
 function resolveImportedAgentTitle(
@@ -2076,7 +2085,7 @@ export class AgentManager {
         reason: "refresh",
         purpose: "interactive",
         workspaceId: existing.workspaceId,
-        title: await this.resolveInitialPersistedTitle(agentId, existing.config, null),
+        title: (await this.resolveInitialPersistedTitle(agentId, existing.config, null)).title,
         background: existing.background,
         labels: existing.labels,
         metadata: existing.metadata,
@@ -2823,7 +2832,12 @@ export class AgentManager {
     }
   }
 
-  async setTitle(agentId: string, title: string): Promise<void> {
+  /** `source` records where the title came from; without it the stored source stays. */
+  async setTitle(
+    agentId: string,
+    title: string,
+    options?: { source?: AgentTitleSource },
+  ): Promise<void> {
     const agent = this.requireAgent(agentId);
     const normalizedTitle = title.trim();
     if (!normalizedTitle) {
@@ -2837,7 +2851,10 @@ export class AgentManager {
       return;
     }
     this.touchUpdatedAt(agent);
-    await this.persistSnapshot(agent, { title: normalizedTitle });
+    await this.persistSnapshot(agent, {
+      title: normalizedTitle,
+      ...(options?.source ? { titleSource: options.source } : {}),
+    });
     this.emitState(agent, { persist: false });
   }
 
@@ -2924,6 +2941,7 @@ export class AgentManager {
   private async writeStoredMetadata(
     agentId: string,
     patch: AgentMetadataPatch,
+    titleSource: "manual" | "plugin" = "manual",
   ): Promise<StoredAgentRecord> {
     const registry = this.requireRegistry();
     const record = await registry.get(agentId);
@@ -2933,7 +2951,7 @@ export class AgentManager {
 
     const nextRecord = {
       ...record,
-      ...(patch.title ? { title: patch.title, titleFollowsAgent: undefined } : {}),
+      ...(patch.title ? { title: patch.title, titleFollowsAgent: undefined, titleSource } : {}),
       ...(patch.labels ? { labels: applyRecordPatch(record.labels, patch.labels) } : {}),
       ...(patch.metadata ? { metadata: applyRecordPatch(record.metadata, patch.metadata) } : {}),
       updatedAt: this.nextStoredUpdatedAt(record),
@@ -3194,7 +3212,7 @@ export class AgentManager {
     if (liveAgent) {
       if (updates.title) {
         // A rename by hand wins over automatic titles for good.
-        await this.registry?.setTitleFollowsAgent(agentId, false);
+        await this.registry?.setTitleSource(agentId, "manual");
         await this.setTitle(agentId, updates.title);
       }
       if (updates.labels) {
@@ -4694,7 +4712,7 @@ export class AgentManager {
       if (this.agents.has(resolvedAgentId)) {
         throw new Error(`Agent with id ${resolvedAgentId} already exists`);
       }
-      const initialPersistedTitle = await this.resolveInitialPersistedTitle(
+      const initialTitle = await this.resolveInitialPersistedTitle(
         resolvedAgentId,
         config,
         options?.initialTitle ?? null,
@@ -4751,7 +4769,8 @@ export class AgentManager {
       await this.refreshRuntimeInfo(managed, { emit: false });
       this.assertAgentRegistrationActive(managed);
       await this.persistSnapshot(managed, {
-        title: initialPersistedTitle,
+        title: initialTitle.title,
+        titleSource: initialTitle.source,
       });
       this.assertAgentRegistrationActive(managed);
       if (!options?.publishWhenReady) {
@@ -5162,25 +5181,31 @@ export class AgentManager {
     );
   }
 
+  /**
+   * A known agent keeps its stored title and source. A new one's title is `manual` when its
+   * creator passed it (a schedule, the Hub, `create_agent`, `--title`) and `automatic` when it
+   * came from the first prompt.
+   */
   private async resolveInitialPersistedTitle(
     agentId: string,
     config: AgentSessionConfig,
     fallbackTitle: string | null,
-  ): Promise<string | null> {
+  ): Promise<{ title: string | null; source?: AgentTitleSource }> {
     const existing = await this.registry?.get(agentId);
     if (existing) {
-      return existing.title ?? null;
+      return { title: existing.title ?? null };
     }
     const explicitTitle =
       typeof config.title === "string" && config.title.trim().length > 0
         ? config.title.trim()
         : null;
-    return explicitTitle ?? fallbackTitle;
+    if (explicitTitle) return { title: explicitTitle, source: "manual" };
+    return fallbackTitle ? { title: fallbackTitle, source: "automatic" } : { title: null };
   }
 
   private async persistSnapshot(
     agent: ManagedAgent,
-    options?: { title?: string | null; internal?: boolean },
+    options?: { title?: string | null; titleSource?: AgentTitleSource; internal?: boolean },
   ): Promise<void> {
     if (!this.registry) {
       return;
@@ -5799,7 +5824,8 @@ export class AgentManager {
     if (!title) return;
     await this.runLifecycleMutation(agent.id, async () => {
       const record = await this.registry?.get(agent.id);
-      if (!record?.titleFollowsAgent || record.title === title || !this.getAgent(agent.id)) return;
+      if (!record?.titleFollowsAgent || record.titleSource === "manual") return;
+      if (record.title === title || !this.getAgent(agent.id)) return;
       await this.setTitle(agent.id, title);
     });
   }
@@ -5810,17 +5836,63 @@ export class AgentManager {
    */
   async followProviderTitle(agentId: string): Promise<boolean> {
     if (!this.agents.get(agentId)?.session.readProviderTitle) return false;
-    return this.requireRegistry().setTitleFollowsAgent(agentId, true);
+    const registry = this.requireRegistry();
+    // In the lifecycle lane, so a rename or plugin title that landed first keeps the chat's title.
+    return this.runLifecycleMutation(agentId, async () => {
+      const source = (await registry.get(agentId))?.titleSource;
+      if (source === "manual" || source === "plugin") return false;
+      return registry.setTitleFollowsAgent(agentId, true);
+    });
+  }
+
+  /**
+   * FSH: a plugin names the chat. It replaces an automatic title (the first prompt, a generated
+   * title, the agent's own, or an earlier plugin title) and stops the chat following the agent's
+   * own title. False when the title is blank or someone chose the current one: renamed by hand or
+   * passed by whoever created the chat.
+   */
+  async setPluginTitle(agentId: string, title: string): Promise<boolean> {
+    const normalizedTitle = title.trim();
+    return this.runLifecycleMutation(agentId, async () => {
+      const registry = this.requireRegistry();
+      const record = await registry.get(agentId);
+      const liveAgent = this.getAgent(agentId);
+      if (!record) {
+        // A live chat whose first snapshot is still being written has no title to replace yet.
+        if (liveAgent) return false;
+        throw new Error(`Agent not found: ${agentId}`);
+      }
+      if (!normalizedTitle || !hasAutomaticTitle(record)) return false;
+      if (record.title === normalizedTitle && record.titleSource === "plugin") return true;
+      if (!liveAgent) {
+        const nextRecord = await this.writeStoredMetadata(
+          agentId,
+          { title: normalizedTitle },
+          "plugin",
+        );
+        if (!nextRecord.internal) this.dispatchStoredAgentState(nextRecord);
+        return true;
+      }
+      // The stored source goes first: a live snapshot flush keeps it.
+      await registry.setTitleSource(agentId, "plugin");
+      if (record.title !== normalizedTitle) await this.setTitle(agentId, normalizedTitle);
+      return true;
+    });
   }
 
   /**
    * FSH: sets an automatic title, unless the current one is no longer `expected` (a rename won).
    * Runs in the lifecycle lane so a rename in flight lands first.
    */
-  async replaceAutomaticTitle(agentId: string, expected: string, title: string): Promise<boolean> {
+  async replaceAutomaticTitle(
+    agentId: string,
+    expected: string | null,
+    title: string,
+  ): Promise<boolean> {
     return this.runLifecycleMutation(agentId, async () => {
       const record = await this.registry?.get(agentId);
       if (!record || (record.title ?? null) !== expected || !this.getAgent(agentId)) return false;
+      if (record.titleSource === "manual" || record.titleSource === "plugin") return false;
       await this.setTitle(agentId, title);
       return true;
     });

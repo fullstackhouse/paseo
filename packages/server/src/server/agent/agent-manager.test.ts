@@ -6420,6 +6420,141 @@ describe("chat titles", () => {
     ).toBe(false);
     expect(await titleOf()).toBe("Auth work");
   });
+
+  test("a plugin title replaces the agent's own title and stops the chat following it", async () => {
+    const { manager, storage, addChat, agentId, titleOf } = await createChat(new OwnTitleClient());
+    const witness = await addChat();
+    expect((await storage.get(agentId))?.titleSource).toBe("automatic");
+    await manager.followProviderTitle(agentId);
+    await manager.followProviderTitle(witness.agentId);
+
+    providerTitle.current = "Login redirect fix";
+    await manager.runAgent(agentId, "first");
+    await vi.waitFor(async () => expect(await titleOf()).toBe("Login redirect fix"));
+
+    expect(await manager.setPluginTitle(agentId, "  Reviewing the login fix  ")).toBe(true);
+    expect(await titleOf()).toBe("Reviewing the login fix");
+
+    providerTitle.current = "Login redirect and session expiry";
+    await manager.runAgent(agentId, "second");
+    await manager.runAgent(witness.agentId, "second");
+    // The witness still follows, so once it has taken the new title, a read after the
+    // plugin-titled chat's turn would have landed too.
+    await vi.waitFor(async () =>
+      expect(await witness.titleOf()).toBe("Login redirect and session expiry"),
+    );
+
+    expect(await titleOf()).toBe("Reviewing the login fix");
+    const record = await storage.get(agentId);
+    expect(record?.titleSource).toBe("plugin");
+    expect(record?.titleFollowsAgent).toBeUndefined();
+    expect(await manager.followProviderTitle(agentId)).toBe(false);
+    expect((await storage.get(agentId))?.titleFollowsAgent).toBeUndefined();
+  });
+
+  test("a plugin title replaces the first-prompt, a generated or an earlier plugin title", async () => {
+    const { manager, addChat, agentId, titleOf } = await createChat(new TestAgentClient());
+
+    expect(await manager.setPluginTitle(agentId, "Reviewing the login fix")).toBe(true);
+    expect(await manager.setPluginTitle(agentId, "Merging the login fix")).toBe(true);
+    expect(await titleOf()).toBe("Merging the login fix");
+    expect(
+      await manager.replaceAutomaticTitle(agentId, "Merging the login fix", "Generated later"),
+    ).toBe(false);
+
+    const generated = await addChat();
+    await manager.replaceAutomaticTitle(
+      generated.agentId,
+      "fix the login redirect",
+      "Login redirect fix",
+    );
+    expect(await manager.setPluginTitle(generated.agentId, "Reviewing the login fix")).toBe(true);
+    expect(await generated.titleOf()).toBe("Reviewing the login fix");
+  });
+
+  test("a rename by hand wins over plugin titles", async () => {
+    const { manager, storage, agentId, titleOf } = await createChat(new OwnTitleClient());
+    await manager.setPluginTitle(agentId, "Reviewing the login fix");
+
+    await manager.updateAgentMetadata(agentId, { title: "Auth work" });
+
+    expect((await storage.get(agentId))?.titleSource).toBe("manual");
+    expect(await manager.setPluginTitle(agentId, "Merging the login fix")).toBe(false);
+    expect(await manager.followProviderTitle(agentId)).toBe(false);
+    expect(await titleOf()).toBe("Auth work");
+  });
+
+  test("a title passed at creation is never replaced", async () => {
+    const workdir = mkdtempSync(join(tmpdir(), "agent-manager-creator-title-"));
+    const storage = new AgentStorage(join(workdir, "agents"), logger);
+    const manager = new AgentManager({
+      clients: { codex: new OwnTitleClient() },
+      registry: storage,
+      logger,
+    });
+    const agent = await manager.createAgent(
+      { provider: "codex", cwd: workdir, title: "Nightly triage" },
+      undefined,
+      { workspaceId: undefined, initialTitle: "Nightly triage" },
+    );
+
+    expect((await storage.get(agent.id))?.titleSource).toBe("manual");
+    expect(await manager.setPluginTitle(agent.id, "Reviewing the login fix")).toBe(false);
+    expect(await manager.followProviderTitle(agent.id)).toBe(false);
+    expect(await manager.replaceAutomaticTitle(agent.id, "Nightly triage", "Generated")).toBe(
+      false,
+    );
+    expect((await storage.get(agent.id))?.title).toBe("Nightly triage");
+  });
+
+  test("an older record keeps its title unless it follows the agent or has none", async () => {
+    const { manager, storage, addChat, agentId, titleOf } = await createChat(new TestAgentClient());
+    const withoutSource = async (id: string, patch: Partial<StoredAgentRecord>) => {
+      const record = await storage.get(id);
+      await storage.upsert({ ...record!, titleSource: undefined, ...patch });
+    };
+    await withoutSource(agentId, {});
+    expect(await manager.setPluginTitle(agentId, "Reviewing the login fix")).toBe(false);
+    expect(await titleOf()).toBe("fix the login redirect");
+
+    const following = await addChat();
+    await withoutSource(following.agentId, { titleFollowsAgent: true });
+    expect(await manager.setPluginTitle(following.agentId, "Reviewing the login fix")).toBe(true);
+
+    const untitled = await addChat();
+    await withoutSource(untitled.agentId, { title: null });
+    expect(await manager.setPluginTitle(untitled.agentId, "Reviewing the login fix")).toBe(true);
+    expect(await untitled.titleOf()).toBe("Reviewing the login fix");
+  });
+
+  test("a closed chat takes a plugin title, and a rename of it wins too", async () => {
+    const { manager, storage, agentId, titleOf } = await createChat(new TestAgentClient());
+    await manager.closeAgent(agentId);
+
+    expect(await manager.setPluginTitle(agentId, "Reviewing the login fix")).toBe(true);
+    expect(await titleOf()).toBe("Reviewing the login fix");
+    expect((await storage.get(agentId))?.titleSource).toBe("plugin");
+
+    await manager.updateAgentMetadata(agentId, { title: "Auth work" });
+    expect((await storage.get(agentId))?.titleSource).toBe("manual");
+    expect(await manager.setPluginTitle(agentId, "Merging the login fix")).toBe(false);
+    expect(await titleOf()).toBe("Auth work");
+  });
+
+  test("a blank plugin title changes nothing", async () => {
+    const { manager, agentId, titleOf } = await createChat(new TestAgentClient());
+
+    expect(await manager.setPluginTitle(agentId, "   ")).toBe(false);
+    expect(await titleOf()).toBe("fix the login redirect");
+  });
+
+  test("a plugin title for an unknown chat fails", async () => {
+    const { manager } = await createChat(new TestAgentClient());
+
+    await expect(
+      manager.setPluginTitle("00000000-0000-4000-8000-0000000000ff", "Reviewing"),
+    ).rejects.toThrow("Agent not found");
+  });
 });
 
 test("persists live mode, model, and thinking changes without an external snapshot subscriber", async () => {
