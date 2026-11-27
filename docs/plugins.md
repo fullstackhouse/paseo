@@ -973,8 +973,9 @@ Plugin servers get pull request data from the daemon instead of calling `gh`: su
 `paseo.changeRequests.subscribe` (pushed changes, gated on
 `server_info.features.changeRequestSubscriptions`), read once with `paseo.changeRequests.read`
 (gated on `changeRequestsRead`), or list a repository's open PRs with
-`paseo.changeRequests.listOpen` (gated on `changeRequestList`). Both share one cache, one poller per PR and the daemon's rate-limit
-pause. On `reason: "paused"`, keep the last known state, mark it stale, and log once, not per PR. See
+`paseo.changeRequests.listOpen` (gated on `changeRequestList`). `subscribe` and `read` share one
+cache and one poller per PR; `listOpen` keeps its own cache per repository. All three share the
+daemon's rate-limit pause. On `reason: "paused"`, keep the last known state, mark it stale, and log once, not per PR. See
 [Pull request service](pr-service.md).
 
 ## Contribute client slash commands
