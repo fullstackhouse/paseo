@@ -18,11 +18,20 @@ import { createOpenPullRequestLists, type OpenPullRequestList } from "./open-pul
 export const CHANGE_REQUEST_READ_TTL_MS = 30_000;
 /** Open, checks or a deployment pending, someone looking. */
 export const PULL_REQUEST_FAST_INTERVAL_MS = 20_000;
-/** Open, otherwise; also how often branch lookups run. */
+/** Open and someone looking, or checks or a deployment pending; also a looked-at branch's lookup while it has no open PR. */
 export const PULL_REQUEST_SLOW_INTERVAL_MS = 120_000;
+/**
+ * Open and idle with only background subscribers (no one looking), and a branch lookup once the branch has an open PR
+ * or no one looks at it. Most followed PRs are here: paseo-prs alone followed ~290 at a 2-minute pace (~1,100
+ * GraphQL points an hour) before this tier existed.
+ */
+export const PULL_REQUEST_BACKGROUND_INTERVAL_MS = 10 * 60_000;
 export const PULL_REQUEST_ERROR_BACKOFF_CAP_MS = 300_000;
-/** A status the workspace poller or a watch read this recently stands in for a due read. */
-const OBSERVED_READ_REUSE_MS = 5_000;
+/**
+ * A status the workspace poller or a watch read this recently stands in for a due read. Wide enough that a poll and a
+ * due read landing in the same moment from different timers don't both go to the forge.
+ */
+const OBSERVED_READ_REUSE_MS = 30_000;
 /** One-shot readers count toward a PR's demand this long, for budget accounting. */
 const READER_DEMAND_MS = 60_000;
 const USAGE_WINDOW_MS = 60 * 60_000;
@@ -208,6 +217,8 @@ interface Entry {
   /** The last failure, cleared by a successful read. */
   failure: Error | null;
   readAt: number | null;
+  /** When a workspace poll or a watch last supplied this entry's status, if the latest read came from one. */
+  observedAt: number | null;
   nextDueAt: number;
   consecutiveErrors: number;
   /** Direct subscribers. */
@@ -476,6 +487,7 @@ export function createPullRequestService({
         result: null,
         failure: null,
         readAt: null,
+        observedAt: null,
         nextDueAt: 0,
         consecutiveErrors: 0,
         subscribers: new Set(),
@@ -500,11 +512,24 @@ export function createPullRequestService({
       PENDING_DEPLOYMENT_STATES.has(deployment.state ?? ""),
     );
     const moving = result.checksState === "pending" || deploying === true;
+    const visible = hasVisibleSubscriber(subscribersOf(entry));
+    if (moving && visible) return from + PULL_REQUEST_FAST_INTERVAL_MS;
+    if (moving || visible) return from + PULL_REQUEST_SLOW_INTERVAL_MS;
+    return from + PULL_REQUEST_BACKGROUND_INTERVAL_MS;
+  }
+
+  /**
+   * When a branch is next looked up. A lookup only finds new PRs on the branch; its open PR is read on its own cadence.
+   * So someone looking at a branch with no open PR yet (an agent about to open one) gets the 2-minute pace, and
+   * everything else the background one.
+   */
+  function nextBranchLookup(branch: BranchEntry, from: number): number {
+    const hasOpen = branch.entries.some((key) => entries.get(key)?.result?.state === "open");
     return (
       from +
-      (moving && hasVisibleSubscriber(subscribersOf(entry))
-        ? PULL_REQUEST_FAST_INTERVAL_MS
-        : PULL_REQUEST_SLOW_INTERVAL_MS)
+      (!hasOpen && hasVisibleSubscriber(branch.subscribers)
+        ? PULL_REQUEST_SLOW_INTERVAL_MS
+        : PULL_REQUEST_BACKGROUND_INTERVAL_MS)
     );
   }
 
@@ -526,6 +551,7 @@ export function createPullRequestService({
       entry.failure = null;
       entry.consecutiveErrors = 0;
       entry.readAt = at;
+      entry.observedAt = null;
     }
     entry.nextDueAt = nextDue(entry, at);
     queuePush(entry);
@@ -713,9 +739,42 @@ export function createPullRequestService({
       },
       now(),
     );
+    entry.observedAt = entry.readAt;
     // A deployment-following PR whose head moved needs its deployments read again.
     if (wantsDeployments(entry) && !entry.result?.deployments) entry.nextDueAt = now();
+    if (read.purpose === "workspace" && read.headRef) coverBranches(forge, entry, read.headRef);
     armTimer();
+  }
+
+  /**
+   * A workspace poll found `entry` as the PR of `headRef`: the poller looks that branch up on every poll, so followed
+   * lookups of the same branch take the poll as their own instead of asking the forge again.
+   */
+  function coverBranches(forge: string, entry: Entry, headRef: string): void {
+    let repo: string;
+    try {
+      const resolved = router.source(forge)?.resolveRepository?.(entry.url);
+      if (!resolved) return;
+      repo = resolved;
+    } catch {
+      return;
+    }
+    const at = now();
+    for (const branch of branches.values()) {
+      if (branch.forge !== forge || branch.repo !== repo || branch.headRef !== headRef) continue;
+      if (branch.subscribers.size === 0) continue;
+      if (!branch.entries.includes(entry.key)) {
+        branch.entries = [entry.key, ...branch.entries];
+        entry.branches.add(branch.key);
+        for (const id of branch.subscribers)
+          updatesFor(id).results.set(entry.url, readOf(entry, entry.url));
+        scheduleFlush();
+        queueBranchPush(branch);
+      }
+      // Never earlier than already planned: an in-flight lookup (Infinity) schedules itself.
+      if (Number.isFinite(branch.nextDueAt))
+        branch.nextDueAt = Math.max(branch.nextDueAt, nextBranchLookup(branch, at));
+    }
   }
 
   // ---- scheduling ----
@@ -762,13 +821,15 @@ export function createPullRequestService({
     );
     const toRead: Entry[] = [];
     for (const entry of dueEntries) {
-      // The workspace poller or a watch read it moments ago: take that instead of reading again.
+      // The workspace poller or a watch read it moments ago: take that instead of reading again. Counted from now, so
+      // a reuse window wider than the fast pace can't leave the entry due again at once.
       if (
-        entry.readAt !== null &&
-        at - entry.readAt < OBSERVED_READ_REUSE_MS &&
+        entry.observedAt !== null &&
+        entry.readAt === entry.observedAt &&
+        at - entry.observedAt < OBSERVED_READ_REUSE_MS &&
         !(wantsDeployments(entry) && !entry.result?.deployments)
       ) {
-        entry.nextDueAt = nextDue(entry, entry.readAt);
+        entry.nextDueAt = nextDue(entry, at);
         continue;
       }
       entry.nextDueAt = Infinity;
@@ -812,7 +873,6 @@ export function createPullRequestService({
       branch.failure = null;
       branch.consecutiveErrors = 0;
       branch.readAt = at;
-      branch.nextDueAt = at + PULL_REQUEST_SLOW_INTERVAL_MS;
       const keys = found.map((url) => getEntry(branch.forge, url).key);
       for (const key of branch.entries) {
         if (!keys.includes(key)) entries.get(key)?.branches.delete(branch.key);
@@ -832,6 +892,7 @@ export function createPullRequestService({
           updatesFor(id).results.set(entry.url, readOf(entry, entry.url));
       }
       if (joined.length) scheduleFlush();
+      branch.nextDueAt = nextBranchLookup(branch, at);
     }
     queueBranchPush(branch);
   }
@@ -1003,6 +1064,8 @@ export function createPullRequestService({
         for (const entryKeyValue of branch.entries)
           entries.get(entryKeyValue)?.branches.delete(key);
         branches.delete(key);
+      } else if (branch.readAt !== null && Number.isFinite(branch.nextDueAt)) {
+        branch.nextDueAt = nextBranchLookup(branch, branch.readAt);
       }
     }
     // The last visible subscriber left: a fast cadence no longer applies. Not while a read is in
@@ -1087,8 +1150,18 @@ export function createPullRequestService({
         refresh(urls.followed.filter((entry) => needsInitialRead(entry, subscriber, at))),
         ...followedBranches.followed.filter((branch) => branch.readAt === null).map(lookupBranch),
       ]);
+      // A subscriber that looks (visible) speeds up what it follows; one that doesn't changes nothing.
       for (const entry of urls.followed)
         entry.nextDueAt = Math.min(entry.nextDueAt, nextDue(entry, entry.readAt ?? at));
+      for (const branch of followedBranches.followed) {
+        if (branch.readAt !== null && Number.isFinite(branch.nextDueAt))
+          branch.nextDueAt = Math.min(branch.nextDueAt, nextBranchLookup(branch, branch.readAt));
+        for (const key of branch.entries) {
+          const entry = entries.get(key);
+          if (entry?.readAt != null && Number.isFinite(entry.nextDueAt))
+            entry.nextDueAt = Math.min(entry.nextDueAt, nextDue(entry, entry.readAt));
+        }
+      }
       // These were already pushed to others; this subscriber gets them as `initial`.
       pendingUpdates.delete(subscriber.id);
       armTimer();

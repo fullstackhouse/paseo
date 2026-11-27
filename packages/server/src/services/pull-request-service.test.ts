@@ -13,6 +13,7 @@ import {
 } from "./change-request-source.js";
 import {
   CORE_WORKSPACE_CALLER,
+  PULL_REQUEST_BACKGROUND_INTERVAL_MS,
   PULL_REQUEST_FAST_INTERVAL_MS,
   PULL_REQUEST_SLOW_INTERVAL_MS,
   branchCostId,
@@ -62,7 +63,7 @@ function harness() {
         urls.map((url) => [url, results.get(url) ?? new Error(`Could not read ${url}.`)]),
       );
     },
-    resolveRepository: (url) => url.toLowerCase(),
+    resolveRepository: (url) => url.toLowerCase().replace(/\/pull\/\d+$/, ""),
     async listForBranch(query) {
       branchReads.push(query);
       const list = branchLists.get(query.headRef) ?? [];
@@ -165,7 +166,7 @@ describe("createPullRequestService", () => {
     expect(first.initial.results[0]).toMatchObject({ url: PR_A, ok: true, state: "open" });
     expect(second.initial.results[0]).toMatchObject({ url: PR_A, ok: true, state: "open" });
 
-    await h.advance(PULL_REQUEST_SLOW_INTERVAL_MS);
+    await h.advance(PULL_REQUEST_BACKGROUND_INTERVAL_MS);
     expect(h.reads).toHaveLength(2);
     expect(h.reads[1]!.urls).toEqual([PR_A]);
   });
@@ -209,7 +210,7 @@ describe("createPullRequestService", () => {
     const { updates, onUpdate } = collect();
     await h.service.subscribe(
       "app",
-      { urls: ["https://github.com/ACME/widgets/pull/1", PR_B] },
+      { urls: ["https://github.com/ACME/widgets/pull/1", PR_B], priority: "visible" },
       onUpdate,
     );
 
@@ -231,7 +232,7 @@ describe("createPullRequestService", () => {
     const h = harness();
     h.results.set(PR_A, result());
     const { updates, onUpdate } = collect();
-    await h.service.subscribe("app", { urls: [PR_A] }, onUpdate);
+    await h.service.subscribe("app", { urls: [PR_A], priority: "visible" }, onUpdate);
 
     const retryAt = h.now + PULL_REQUEST_SLOW_INTERVAL_MS + 600_000;
     h.results.set(PR_A, new ChangeRequestReadError("paused", { reason: "paused", retryAt }));
@@ -322,13 +323,119 @@ describe("createPullRequestService", () => {
       { url: PR_B, number: 2, state: "open" },
       { url: PR_A, number: 1, state: "open" },
     ]);
+    // The branch already has an open PR, so its next lookup is at the background pace.
     await h.advance(PULL_REQUEST_SLOW_INTERVAL_MS);
+    expect(h.branchReads).toHaveLength(1);
+    await h.advance(PULL_REQUEST_BACKGROUND_INTERVAL_MS - PULL_REQUEST_SLOW_INTERVAL_MS);
     const last = updates.at(-1)!;
     expect(last.branches).toEqual([
       { repo: REPO, headRef: "feat/login", ok: true, urls: [PR_B, PR_A] },
     ]);
     expect(last.results).toEqual([expect.objectContaining({ url: PR_B, number: 2 })]);
     expect(h.branchReads).toHaveLength(2);
+  });
+
+  it("reads idle PRs nobody looks at every 10 minutes, and pending ones every 2", async () => {
+    const h = harness();
+    h.results.set(PR_A, result());
+    h.results.set(PR_B, result({ number: 2, checksState: "pending" }));
+    await h.service.subscribe("plugin:paseo-prs", { urls: [PR_A, PR_B] }, () => {});
+    expect(h.reads).toHaveLength(1);
+
+    await h.advance(PULL_REQUEST_SLOW_INTERVAL_MS);
+    expect(h.reads.slice(1).flatMap((read) => read.urls)).toEqual([PR_B]);
+
+    await h.advance(PULL_REQUEST_BACKGROUND_INTERVAL_MS - PULL_REQUEST_SLOW_INTERVAL_MS);
+    expect(h.reads.flatMap((read) => read.urls).filter((url) => url === PR_A)).toHaveLength(2);
+  });
+
+  it("looks up a branch someone looks at every 2 minutes only until it has an open PR", async () => {
+    const h = harness();
+    h.results.set(PR_A, result());
+    await h.service.subscribe(
+      "plugin:paseo-prs",
+      { branches: [{ repo: REPO, headRef: "feat/login" }], priority: "visible" },
+      () => {},
+    );
+    await h.advance(PULL_REQUEST_SLOW_INTERVAL_MS);
+    expect(h.branchReads).toHaveLength(2);
+
+    h.branchLists.set("feat/login", [{ url: PR_A, number: 1, state: "open" }]);
+    await h.advance(PULL_REQUEST_SLOW_INTERVAL_MS);
+    expect(h.branchReads).toHaveLength(3);
+    await h.advance(PULL_REQUEST_SLOW_INTERVAL_MS * 2);
+    expect(h.branchReads).toHaveLength(3);
+    await h.advance(PULL_REQUEST_BACKGROUND_INTERVAL_MS);
+    expect(h.branchReads).toHaveLength(4);
+  });
+
+  it("fetches a branch PR once when the workspace poller and a plugin both follow it", async () => {
+    const h = harness();
+    h.results.set(PR_A, result());
+    h.branchLists.set("feat/login", [{ url: PR_A, number: 1, state: "open" }]);
+    const { updates, onUpdate } = collect();
+    await h.service.subscribe(
+      "plugin:paseo-prs",
+      { branches: [{ repo: REPO, headRef: "feat/login" }], priority: "visible" },
+      onUpdate,
+    );
+    expect(h.branchReads).toHaveLength(1);
+    expect(h.reads).toHaveLength(1);
+
+    // The workspace poller reads the same PR for its branch every time it is due.
+    const poll = (headSha: string) => {
+      for (const observer of h.observers)
+        observer.read?.({
+          url: PR_A,
+          purpose: "workspace",
+          headRef: "feat/login",
+          status: {
+            state: "open",
+            headSha,
+            checksState: "passed",
+            checks: [],
+            reviewDecision: null,
+          },
+        });
+    };
+    for (let i = 0; i < 6; i += 1) {
+      await h.advance(PULL_REQUEST_SLOW_INTERVAL_MS - 1_000);
+      poll(`sha-${i}`);
+      await settle();
+    }
+    expect(h.reads).toHaveLength(1);
+    expect(h.branchReads).toHaveLength(1);
+    expect(updates.at(-1)!.results[0]).toMatchObject({ url: PR_A, headSha: "sha-5" });
+  });
+
+  it("adds a PR a workspace poll finds to a followed branch's list", async () => {
+    const h = harness();
+    h.results.set(PR_A, result());
+    const { updates, onUpdate } = collect();
+    await h.service.subscribe(
+      "plugin:paseo-prs",
+      { branches: [{ repo: REPO, headRef: "feat/login" }], priority: "visible" },
+      onUpdate,
+    );
+    // Not in the branch list yet, but someone follows the PR so the poll's status is kept.
+    await h.service.subscribe("app", { urls: [PR_A] }, () => {});
+    for (const observer of h.observers)
+      observer.read?.({
+        url: PR_A,
+        purpose: "workspace",
+        headRef: "feat/login",
+        status: {
+          state: "open",
+          headSha: "abc",
+          checksState: "passed",
+          checks: [],
+          reviewDecision: null,
+        },
+      });
+    await settle();
+    expect(updates.at(-1)!.branches).toEqual([
+      { repo: REPO, headRef: "feat/login", ok: true, urls: [PR_A] },
+    ]);
   });
 
   it("splits each query's cost across the callers that wanted its PRs", async () => {
