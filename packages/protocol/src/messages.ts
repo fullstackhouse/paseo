@@ -1271,6 +1271,18 @@ export const ForgeChangeRequestsUsageRequestSchema = z.object({
   requestId: z.string(),
 });
 
+// COMPAT(changeRequestList): FSH-only, added after v0.17.1, remove gate after 2027-05-27.
+// A repository's open pull requests, most recently updated first, from the daemon's pull request
+// service (docs/pr-service.md).
+export const ForgeChangeRequestsListRequestSchema = z.object({
+  type: z.literal("forge.change_requests.list.request"),
+  // A repository URL, such as https://github.com/acme/widgets.
+  repo: z.string(),
+  // How many to return; the daemon caps it at 100 and defaults to 50.
+  limit: z.number().optional(),
+  requestId: z.string(),
+});
+
 // COMPAT(workspaceAttentionReport): FSH-only, added after v0.15.4, remove gate after 2027-05-17.
 // A plugin says the workspace needs the human (an ask waits on them, the agent's work is done).
 // A snoozed workspace treats it like a permission prompt; an awake one ignores it.
@@ -2728,6 +2740,31 @@ export const ForgeChangeRequestsUsageResponseSchema = z.object({
   }),
 });
 
+export const ChangeRequestListItemSchema = z.object({
+  url: z.string(),
+  number: z.number(),
+  title: z.string(),
+  isDraft: z.boolean(),
+  headRef: z.string(),
+  author: z.string().nullable(),
+  // ISO 8601.
+  updatedAt: z.string(),
+});
+
+// ok: false with a reason when the list could not be read (paused carries retryAt).
+export const ForgeChangeRequestsListResponseSchema = z.object({
+  type: z.literal("forge.change_requests.list.response"),
+  payload: z.object({
+    requestId: z.string(),
+    repo: z.string(),
+    ok: z.boolean(),
+    items: z.array(ChangeRequestListItemSchema),
+    error: z.string().optional(),
+    reason: z.enum(["paused", "not_found", "unsupported", "error"]).optional(),
+    retryAt: z.number().optional(),
+  }),
+});
+
 export const ForgeChangeRequestsReadResponseSchema = z.object({
   type: z.literal("forge.change_requests.read.response"),
   payload: z.object({
@@ -4061,6 +4098,7 @@ export const SessionInboundMessageSchema = z.discriminatedUnion("type", [
   ForgeChangeRequestsReadRequestSchema,
   ForgeChangeRequestsSubscribeRequestSchema,
   ForgeChangeRequestsUsageRequestSchema,
+  ForgeChangeRequestsListRequestSchema,
   WorkspaceLabelListRequestSchema,
   WorkspaceLabelAssignmentSetRequestSchema,
   WorkspaceLabelUpdateRequestSchema,
@@ -4548,6 +4586,8 @@ export const ServerInfoStatusPayloadSchema = z
         changeRequestsRead: z.boolean().optional(),
         // COMPAT(changeRequestSubscriptions): FSH-only, added after v0.17.1, remove gate after 2027-05-27.
         changeRequestSubscriptions: z.boolean().optional(),
+        // COMPAT(changeRequestList): FSH-only, added after v0.17.1, remove gate after 2027-05-27.
+        changeRequestList: z.boolean().optional(),
         // COMPAT(workspaceManualGroup): FSH-only, added after v0.15.4, remove gate after 2027-05-21.
         workspaceManualGroup: z.boolean().optional(),
         // COMPAT(workspaceAppearance): FSH-only, added after v0.17.1, remove gate after 2027-05-23.
@@ -8429,6 +8469,7 @@ export const SessionOutboundMessageSchema = z.discriminatedUnion("type", [
   ForgeChangeRequestsSubscribeResponseSchema,
   ForgeChangeRequestsUpdateSchema,
   ForgeChangeRequestsUsageResponseSchema,
+  ForgeChangeRequestsListResponseSchema,
   WorkspaceRecoveryInspectResponseSchema,
   WorkspaceRecoveryRestoreResponseSchema,
   WorkspaceArchiveUndoResponseSchema,
@@ -8871,6 +8912,8 @@ export type ChangeRequestRead = z.infer<typeof ChangeRequestReadSchema>;
 export type ChangeRequestDeploymentRead = z.infer<typeof ChangeRequestDeploymentSchema>;
 export type ChangeRequestBranchRead = z.infer<typeof ChangeRequestBranchReadSchema>;
 export type ChangeRequestUsage = z.infer<typeof ChangeRequestUsageSchema>;
+export type ChangeRequestListItem = z.infer<typeof ChangeRequestListItemSchema>;
+export type ForgeChangeRequestsListResponse = z.infer<typeof ForgeChangeRequestsListResponseSchema>;
 export type ForgeChangeRequestsSubscribeRequest = z.infer<
   typeof ForgeChangeRequestsSubscribeRequestSchema
 >;

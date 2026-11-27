@@ -23,7 +23,7 @@ function createFakeForgeService(changeRequests?: ChangeRequestSource): ForgeServ
 }
 
 describe("createChangeRequestRouter", () => {
-  it("routes a repository URL to its forge for branch lookups, when the forge has them", async () => {
+  it("routes a repository URL to its forge, when the forge has repository lookups", async () => {
     const githubSource: ChangeRequestSource = {
       ...createFakeSource("github", (url) => url),
       resolveRepository: (url) => url.toLowerCase().replace(/\.git$/, ""),
@@ -43,7 +43,7 @@ describe("createChangeRequestRouter", () => {
       { forge: "github", repo: "https://github.com/acme/widgets" },
     );
     await expect(router.resolveRepository!("https://gitlab.com/acme/widgets")).rejects.toThrow(
-      "Branch lookups are not supported for gitlab yet.",
+      "Repository lookups are not supported for gitlab yet.",
     );
   });
 

@@ -18,7 +18,7 @@ export interface ChangeRequestRouter {
   resolve(url: string): Promise<ResolvedChangeRequest>;
   /** Return the watch source for a known forge id without probing the network. */
   source(forge: string): ChangeRequestSource | null;
-  /** Route a repository URL host-first and canonicalize it, for branch lookups. */
+  /** Route a repository URL host-first and canonicalize it, for branch lookups and lists. */
   resolveRepository?(url: string): Promise<ResolvedRepository>;
 }
 
@@ -97,7 +97,7 @@ export function createChangeRequestRouter({
       }
       const source = resolution.service.changeRequests;
       if (!source?.resolveRepository) {
-        throw new Error(`Branch lookups are not supported for ${resolution.forge} yet.`);
+        throw new Error(`Repository lookups are not supported for ${resolution.forge} yet.`);
       }
       return { forge: resolution.forge, repo: source.resolveRepository(trimmed) };
     },

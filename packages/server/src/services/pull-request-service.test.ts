@@ -4,6 +4,8 @@ import {
   ChangeRequestReadError,
   type ChangeRequestBranchEntry,
   type ChangeRequestBranchQuery,
+  type ChangeRequestListEntry,
+  type ChangeRequestListQuery,
   type ChangeRequestReadObserver,
   type ChangeRequestReadOptions,
   type ChangeRequestReadResult,
@@ -46,6 +48,9 @@ function harness() {
   const reads: { urls: string[]; options?: ChangeRequestReadOptions }[] = [];
   const branchLists = new Map<string, ChangeRequestBranchEntry[] | Error>();
   const branchReads: ChangeRequestBranchQuery[] = [];
+  /** What the next list of a repository returns; `listReads` records each forge list. */
+  const openLists = new Map<string, ChangeRequestListEntry[] | Error>();
+  const listReads: ChangeRequestListQuery[] = [];
   const observers = new Set<ChangeRequestReadObserver>();
   const source: ChangeRequestSource = {
     resolve: (url) => url.toLowerCase(),
@@ -63,6 +68,12 @@ function harness() {
       const list = branchLists.get(query.headRef) ?? [];
       if (list instanceof Error) throw list;
       return list;
+    },
+    async listOpen(query) {
+      listReads.push(query);
+      const list = openLists.get(query.repo) ?? [];
+      if (list instanceof Error) throw list;
+      return list.slice(0, query.limit);
     },
     observeReads(observer) {
       observers.add(observer);
@@ -112,6 +123,8 @@ function harness() {
     reads,
     branchLists,
     branchReads,
+    openLists,
+    listReads,
     observers,
     advance,
     get now() {
@@ -122,6 +135,18 @@ function harness() {
 
 async function settle() {
   for (let i = 0; i < 10; i++) await new Promise((resolve) => setImmediate(resolve));
+}
+
+function openPullRequest(number: number): ChangeRequestListEntry {
+  return {
+    url: `${REPO}/pull/${number}`,
+    number,
+    title: `Change ${number}`,
+    isDraft: false,
+    headRef: `feat/change-${number}`,
+    author: "octocat",
+    updatedAt: "2026-11-27T10:00:00Z",
+  };
 }
 
 function collect() {
@@ -358,5 +383,105 @@ describe("createPullRequestService", () => {
       }),
       expect.objectContaining({ url: PR_A, ok: true }),
     ]);
+  });
+
+  it("lists a repository's open PRs once for every caller within 30 s", async () => {
+    const h = harness();
+    h.openLists.set(REPO, [openPullRequest(12), openPullRequest(7)]);
+    const [first, second] = await Promise.all([
+      h.service.listOpen(REPO, { caller: "app" }),
+      h.service.listOpen(REPO, { caller: "plugin:paseo-prs" }),
+    ]);
+    expect(first).toEqual({
+      repo: REPO,
+      ok: true,
+      items: [
+        expect.objectContaining({ number: 12, headRef: "feat/change-12", author: "octocat" }),
+        expect.objectContaining({ number: 7 }),
+      ],
+    });
+    expect(second).toEqual(first);
+    await h.advance(29_000);
+    await h.service.listOpen(REPO, { caller: "app" });
+    expect(h.listReads).toEqual([{ repo: REPO, limit: 50 }]);
+    await h.advance(1_000);
+    await h.service.listOpen(REPO, { caller: "app" });
+    expect(h.listReads).toHaveLength(2);
+  });
+
+  it("serves a smaller limit from the cache and reads again for a larger one", async () => {
+    const h = harness();
+    h.openLists.set(REPO, [1, 2, 3, 4, 5].map(openPullRequest));
+    await h.service.listOpen(REPO, { limit: 3 });
+    const smaller = await h.service.listOpen(REPO, { limit: 2 });
+    expect(smaller.items.map((item) => item.number)).toEqual([1, 2]);
+    const larger = await h.service.listOpen(REPO, { limit: 10 });
+    expect(larger.items).toHaveLength(5);
+    // That list came back shorter than its limit, so it is the whole list.
+    await h.service.listOpen(REPO, { limit: 100 });
+    expect(h.listReads).toEqual([
+      { repo: REPO, limit: 3 },
+      { repo: REPO, limit: 10 },
+    ]);
+  });
+
+  it("answers a pause with retryAt and asks the forge again afterwards", async () => {
+    const h = harness();
+    h.openLists.set(
+      REPO,
+      new ChangeRequestReadError("Paused", { reason: "paused", retryAt: h.now + 60_000 }),
+    );
+    expect(await h.service.listOpen(REPO)).toEqual({
+      repo: REPO,
+      ok: false,
+      items: [],
+      error: "Paused",
+      reason: "paused",
+      retryAt: h.now + 60_000,
+    });
+    h.openLists.set(REPO, [openPullRequest(3)]);
+    expect(await h.service.listOpen(REPO)).toMatchObject({ ok: true, items: [{ number: 3 }] });
+    expect(h.listReads).toHaveLength(2);
+  });
+
+  it("answers a repository no forge recognizes as unsupported", async () => {
+    const h = harness();
+    const router: ChangeRequestRouter = {
+      resolve: async () => {
+        throw new Error("unused");
+      },
+      source: () => null,
+      async resolveRepository() {
+        throw new Error("Could not recognize a supported forge for host example.com.");
+      },
+    };
+    const service = createPullRequestService({ router, forges: [] });
+    expect(await service.listOpen("https://example.com/x/y")).toMatchObject({
+      repo: "https://example.com/x/y",
+      ok: false,
+      items: [],
+      reason: "unsupported",
+    });
+    service.dispose();
+    h.service.dispose();
+  });
+
+  it("credits a list's cost to the callers that listed the repository", async () => {
+    const h = harness();
+    h.openLists.set(REPO, [openPullRequest(1)]);
+    await h.service.listOpen(REPO, { caller: "app" });
+    await h.service.listOpen(REPO, { caller: "plugin:paseo-prs" });
+    for (const observer of h.observers) {
+      observer.cost?.({
+        host: "github.com",
+        cost: 1,
+        parts: [{ purpose: "list", urls: [REPO], count: 1 }],
+      });
+    }
+    const byCaller = Object.fromEntries(
+      h.service.usage().callers.map((caller) => [caller.caller, caller]),
+    );
+    expect(byCaller.app).toMatchObject({ points: 0.5, reads: 0.5 });
+    expect(byCaller["plugin:paseo-prs"]).toMatchObject({ points: 0.5, reads: 0.5 });
   });
 });

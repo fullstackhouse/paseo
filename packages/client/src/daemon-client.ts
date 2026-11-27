@@ -31,6 +31,7 @@ import type {
   ChangeRequestBranchRead,
   ChangeRequestRead,
   ChangeRequestUsage,
+  ForgeChangeRequestsListResponse,
   CreationSnapshot,
   ForgeChangeRequestsSubscribeRequest,
   WorkspaceAppearance,
@@ -51,6 +52,9 @@ export interface ChangeRequestSubscriptionUpdate {
   results: ChangeRequestRead[];
   branches: ChangeRequestBranchRead[];
 }
+
+/** A repository's open pull requests, or `ok: false` with why (`paused` carries `retryAt`). */
+export type ChangeRequestList = Omit<ForgeChangeRequestsListResponse["payload"], "requestId">;
 
 /** What a plugin sets: `avatar` is base64 image bytes, `titleIcon` a Lucide icon name. */
 export type WorkspaceAppearanceInput = Pick<WorkspaceAppearanceSetRequest, "avatar" | "titleIcon">;
@@ -4333,6 +4337,32 @@ export class DaemonClient {
       initial: { results: snapshot.results, branches: snapshot.branches },
       unsubscribe: subscription.release,
     };
+  }
+
+  /**
+   * A repository's open pull requests, most recently updated first, through the host's pull
+   * request service (cached for 30 s, at most 100).
+   */
+  async listOpenChangeRequests(
+    repo: string,
+    options?: { limit?: number; requestId?: string },
+  ): Promise<ChangeRequestList> {
+    // COMPAT(changeRequestList): FSH-only, added after v0.17.1, remove gate after 2027-05-27.
+    if (this.lastServerInfoMessage?.features?.changeRequestList !== true) {
+      throw new Error("Update the host to list pull requests through Paseo.");
+    }
+    const requestId = this.createRequestId(options?.requestId);
+    const { requestId: _requestId, ...list } = await this.sendCorrelatedSessionRequest({
+      requestId,
+      message: {
+        type: "forge.change_requests.list.request",
+        repo,
+        ...(options?.limit !== undefined ? { limit: options.limit } : {}),
+        requestId,
+      },
+      responseType: "forge.change_requests.list.response",
+    });
+    return list;
   }
 
   /** What each caller spent on pull request reads, from the host's pull request service. */

@@ -14,6 +14,7 @@ flowchart LR
   W[subscribe_change_request watches] -- statuses --> C
   S[subscriptions: URL / branch] -- due reads --> C
   R["changeRequests.read (one-shot)"] --> C
+  L["changeRequests.listOpen (one-shot)"] -- own 30 s cache per repo --> GH
   C["PR service cache<br/>one entry per PR"] -- one batched read per due PR --> GH[(GitHub GraphQL<br/>shared batches + reserve pause)]
   C -- pushed changes --> SUB[app + plugin subscribers]
 ```
@@ -49,6 +50,17 @@ await sub.unsubscribe();
 The daemon names the caller from the connection, not from the request: `plugin:<id>` for a plugin server, `app` for app and CLI sessions. Subscriptions end with the connection; a reconnecting client resubscribes and gets a fresh `initial`.
 
 Gate on `server_info.features.changeRequestSubscriptions` (`COMPAT(changeRequestSubscriptions)`). Without it, keep the plugin's old path or tell the user to update Paseo; no other fallback.
+
+## Open pull requests of a repository
+
+```ts
+const list = await paseo.changeRequests.listOpen("https://github.com/acme/widgets", { limit: 50 });
+if (list.ok) list.items; // { url, number, title, isDraft, headRef, author, updatedAt }[]
+```
+
+One-shot, most recently updated first, default 50, at most 100 (GitHub's page size; there is no paging). The answer is cached per repository for 30 seconds and shared while in flight, and a cached list serves any smaller `limit`. Items carry no checks or review state: subscribe to the URLs you need those for. On `ok: false` the `reason` and `retryAt` mean what they mean for a read.
+
+The cost goes to whoever listed the repository in the last minute. Gate on `server_info.features.changeRequestList` (`COMPAT(changeRequestList)`); the RPC is `forge.change_requests.list.request`.
 
 ## Facts
 
@@ -87,7 +99,7 @@ GitHub returns the points each query cost (`rateLimit.cost`). The daemon splits 
 ## Rollout
 
 1. **Core (this spec):** the service, `changeRequests.subscribe` and `usage`, workspace polls and watches feeding the cache, cost accounting.
-2. **paseo-prs:** replace the `gh pr list --head` lookups with `branches` subscriptions (one per checkout branch, `includeClosed` only when the UI shows history), linked PRs with `urls`, and drop the plugin's own refresh timer and cache. Keep the repo-wide open-PR list for stacks until the service can list a repo's open PRs.
+2. **paseo-prs:** replace the `gh pr list --head` lookups with `branches` subscriptions (one per checkout branch, `includeClosed` only when the UI shows history), linked PRs with `urls`, and drop the plugin's own refresh timer and cache. Read the repo-wide open-PR list for stacks with `changeRequests.listOpen`.
 3. **paseo-asks:** subscribe each watched ask's PR with `include: ["deployments"]`; build `waitingOn` and deployments from the pushed results; read `author`, `reviewRequestCount` and `viewerCanMergeAsAdmin` from the result instead of the review-button GraphQL call; drop the 2-minute watcher pass.
 4. **paseo-inbox:** subscribe the PRs of its review runs for state and checks (`priority: "visible"` while its screen is open). Search, files, threads and timeline stay its own `gh` calls.
 5. **Agents:** tell agents to use `subscribe_change_request` instead of `gh pr checks --watch`, which polls every 10 seconds per watcher.

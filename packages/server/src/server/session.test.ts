@@ -747,6 +747,56 @@ test("follows pull requests for the connection's caller, pushes updates and rele
   expect(unsubscribe).toHaveBeenCalledOnce();
 });
 
+test("lists a repository's open pull requests for the connection's caller", async () => {
+  const messages: SessionOutboundMessage[] = [];
+  const list = {
+    repo: "https://github.com/acme/widgets",
+    ok: true as const,
+    items: [
+      {
+        url: "https://github.com/acme/widgets/pull/12",
+        number: 12,
+        title: "Add the login page",
+        isDraft: false,
+        headRef: "feat/login",
+        author: null,
+        updatedAt: "2026-11-27T10:00:00Z",
+      },
+    ],
+  };
+  const listOpen = vi.fn(async () => list);
+  const pullRequestService = {
+    listOpen,
+    subscribe: vi.fn(),
+    read: vi.fn(),
+    usage: vi.fn(),
+    dispose: vi.fn(),
+  } as unknown as NonNullable<SessionOptions["pullRequestService"]>;
+  const session = createSessionForTest({
+    messages,
+    clientId: "plugin:paseo-prs",
+    pullRequestService,
+  });
+
+  await session.handleMessage(
+    {
+      type: "forge.change_requests.list.request",
+      requestId: "list",
+      repo: "https://github.com/acme/widgets",
+      limit: 20,
+    },
+    {},
+  );
+  expect(listOpen).toHaveBeenCalledWith("https://github.com/acme/widgets", {
+    caller: "plugin:paseo-prs",
+    limit: 20,
+  });
+  expect(messages.at(-1)).toEqual({
+    type: "forge.change_requests.list.response",
+    payload: { requestId: "list", ...list },
+  });
+});
+
 test("losing daemon.manage during a plugin RPC withholds its JSON and binary results", async () => {
   const messages: SessionOutboundMessage[] = [];
   const binaryMessages: Uint8Array[] = [];
