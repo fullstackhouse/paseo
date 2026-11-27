@@ -1,7 +1,8 @@
 import { spawn } from "node:child_process";
 import { readdir } from "node:fs/promises";
 import os from "node:os";
-import path from "node:path";
+// macOS and Linux paths only, so they stay POSIX when tests run on Windows.
+import { posix as path } from "node:path";
 
 // The notification server plays the sound, so only platforms that let us name
 // one list sounds. Windows toasts take no sound name from Electron; it keeps the
