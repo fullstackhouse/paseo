@@ -133,6 +133,9 @@ describe("buildPrAgentPrompt", () => {
 
     expect(prompt).toContain("## Merge");
     expect(prompt).toContain("Merge the PR once it's green and mergeable.");
+    expect(prompt).toContain(
+      "wait for CI with the subscribe_change_request tool, not `gh pr checks --watch`",
+    );
   });
 });
 
