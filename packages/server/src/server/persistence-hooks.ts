@@ -1,5 +1,5 @@
 import type { AgentManager } from "./agent/agent-manager.js";
-import { storedReplyAt } from "./agent/agent-storage.js";
+import { storedReplyAt } from "./agent/stored-reply-at.js";
 import { stripInternalPaseoMcpServer } from "./agent/runtime-mcp-config.js";
 import type {
   AgentPersistenceHandle,

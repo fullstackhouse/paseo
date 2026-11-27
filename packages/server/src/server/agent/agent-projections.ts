@@ -1,5 +1,5 @@
 import { isSameOrDescendantPath } from "../path-utils.js";
-import { storedReplyAt } from "./agent-storage.js";
+import { storedReplyAt } from "./stored-reply-at.js";
 import type {
   AgentListItemPayload,
   AgentSnapshotPayload,

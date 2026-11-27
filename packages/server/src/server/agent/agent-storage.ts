@@ -649,12 +649,3 @@ function projectDirNameFromCwd(cwd: string): string {
 }
 
 /** FSH: an interruption stays until the agent's next turn starts. */
-
-/** Records written before `lastReplyAt` existed didn't tell prompts apart: every prompt was a reply. */
-export function storedReplyAt(record: {
-  lastReplyAt?: string | null;
-  lastUserMessageAt?: string | null;
-}) {
-  const at = record.lastReplyAt !== undefined ? record.lastReplyAt : record.lastUserMessageAt;
-  return at ? new Date(at) : null;
-}
