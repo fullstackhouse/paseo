@@ -650,25 +650,38 @@ describe("permissions on Overview", () => {
 });
 
 describe("openMoveKey", () => {
-  const rows = [
-    { kind: "failed", key: "a", agentId: "x" },
-    { kind: "archive", key: "b" },
-  ] as const;
+  const ask = (id: string) =>
+    ({
+      kind: "entry",
+      key: `asks:${id}`,
+      item: summaryItem({ EntryComponent: () => null }),
+      entry: { id, title: id },
+    }) as const;
+  const failed = { kind: "failed", key: "f", agentId: "x" } as const;
+  const rows = [ask("a"), ask("b")];
 
-  it("opens the lead row until the human chooses", () => {
-    expect(openMoveKey(rows, undefined)).toBe("a");
+  it("opens the first row that can expand until the human chooses", () => {
+    expect(openMoveKey(rows, undefined)).toBe("asks:a");
+  });
+
+  it("opens the first ask below a row that can't expand", () => {
+    expect(openMoveKey([failed, ask("a"), ask("b")], undefined)).toBe("asks:a");
+  });
+
+  it("opens nothing when no row can expand", () => {
+    expect(openMoveKey([failed], undefined)).toBeNull();
   });
 
   it("keeps only the row the human opened open", () => {
-    expect(openMoveKey(rows, "b")).toBe("b");
+    expect(openMoveKey(rows, "asks:b")).toBe("asks:b");
   });
 
   it("keeps every row closed after the human closes the open one", () => {
     expect(openMoveKey(rows, null)).toBeNull();
   });
 
-  it("falls back to the lead row once the chosen row is gone", () => {
-    expect(openMoveKey(rows, "answered")).toBe("a");
+  it("falls back to the first ask once the chosen row is gone", () => {
+    expect(openMoveKey(rows, "answered")).toBe("asks:a");
   });
 
   it("has nothing to open without rows", () => {
@@ -678,8 +691,8 @@ describe("openMoveKey", () => {
   it("keeps an In progress row open instead of the lead, but never opens one by itself", () => {
     expect(openMoveKey(rows, "progress:x", ["progress:x"])).toBe("progress:x");
     expect(openMoveKey([], undefined, ["progress:x"])).toBeNull();
-    // The ask left In progress: back to the lead move.
-    expect(openMoveKey(rows, "progress:x", [])).toBe("a");
+    // The ask left In progress: back to the first ask.
+    expect(openMoveKey(rows, "progress:x", [])).toBe("asks:a");
   });
 });
 

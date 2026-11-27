@@ -190,7 +190,8 @@ export function isWorkStillOpen(input: {
  * The one row shown open across Your move and In progress. `chosen` is the row last shown open (the
  * host pins it), or null after the human closed it. `progressKeys` are the In progress rows that can
  * open; they never open by themselves. With nothing pinned, and once the pinned row is gone
- * (answered, or the ask left In progress), the lead Your move row is open.
+ * (answered, or the ask left In progress), the first Your move row that can open is open, so an ask
+ * below a permission prompt or a failed agent still shows its actions.
  */
 export function openMoveKey(
   rows: readonly YourMoveRow[],
@@ -201,7 +202,12 @@ export function openMoveKey(
   if (chosen !== undefined) {
     if (rows.some((row) => row.key === chosen) || progressKeys.includes(chosen)) return chosen;
   }
-  return rows[0]?.key ?? null;
+  return rows.find(canOpenMove)?.key ?? null;
+}
+
+/** A Your move row that expands in place: a plugin entry the plugin renders itself (an ask). */
+export function canOpenMove(row: YourMoveRow): boolean {
+  return row.kind === "entry" && Boolean(row.item.EntryComponent);
 }
 
 /**
@@ -218,7 +224,7 @@ export function pinOpenMove(
   const key = openMoveKey(rows, chosen, progressKeys);
   if (key !== null && progressKeys.includes(key)) return key;
   const open = rows.find((row) => row.key === key);
-  return open?.kind === "entry" && open.item.EntryComponent ? key : chosen;
+  return open && canOpenMove(open) ? key : chosen;
 }
 
 /** In progress rows listed before "Show all". */

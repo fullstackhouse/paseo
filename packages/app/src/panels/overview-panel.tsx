@@ -89,6 +89,7 @@ import {
   deriveInProgress,
   hasInProgressEntries,
   VISIBLE_IN_PROGRESS,
+  canOpenMove,
   openMoveKey,
   pinOpenMove,
   isStatusDone,
@@ -677,6 +678,8 @@ function YourMove({
   gitActions: GitActions | null;
 }): ReactElement | null {
   if (rows.length === 0) return null;
+  // The first row that expands opens by default, even below a permission prompt or failed agent.
+  const firstOpenable = rows.find(canOpenMove)?.key;
   return (
     <Section title="panels.overview.yourMove" count={rows.length > 1 ? rows.length : undefined}>
       {rows.map((row, index) => {
@@ -698,7 +701,7 @@ function YourMove({
           <EntryMove
             key={row.key}
             row={row}
-            lead={lead}
+            lead={row.key === firstOpenable}
             open={row.key === openKey}
             onOpenChange={onOpenChange}
           >
