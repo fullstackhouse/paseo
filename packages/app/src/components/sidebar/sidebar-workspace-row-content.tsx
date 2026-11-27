@@ -1,7 +1,8 @@
 import { memo, useMemo, useCallback, useState, type ReactNode } from "react";
 import { Text, View, type ViewStyle } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
-import { CircleAlert, CirclePause, Folder, FolderGit2, Monitor } from "lucide-react-native";
+import { useTranslation } from "react-i18next";
+import { CircleAlert, CirclePause, Folder, FolderGit2, Monitor, Pencil } from "lucide-react-native";
 import { ProjectStatusIndicator } from "@/components/sidebar/project-leading-visual";
 import type { SidebarSurfaceBackdrop } from "@/styles/surface-backdrop";
 import {
@@ -37,6 +38,7 @@ import {
 import { useWorkspaceLabelDefinitions } from "@/workspace-labels";
 import { WorkspaceTitleIcon, WORKSPACE_TITLE_LINE_HEIGHT } from "./workspace-title-icon";
 import { workspaceLeadingVisualKind } from "./workspace-leading-visual-kind";
+import { useWorkspaceHasUnsentDraft } from "@/composer/draft/workspace-unsent-draft";
 
 const needsInputColorMapping = (theme: Theme) => ({
   color: theme.colors.surface0,
@@ -51,6 +53,9 @@ const blockedColorMapping = (theme: Theme) => ({
 
 const ThemedCircleAlert = withUnistyles(CircleAlert);
 const ThemedCirclePause = withUnistyles(CirclePause);
+const ThemedPencil = withUnistyles(Pencil);
+
+const unsentDraftColorMapping = (theme: Theme) => ({ color: theme.colors.foregroundMuted });
 
 export function SidebarWorkspaceRowFrame({
   workspace,
@@ -174,6 +179,7 @@ export const SidebarWorkspaceRowContent = memo(function SidebarWorkspaceRowConte
         />
         <View style={styles.workspaceContentColumn}>
           <View style={styles.workspaceTitleRow}>
+            <UnsentDraftIcon serverId={workspace.serverId} workspaceId={workspace.workspaceId} />
             <WorkspaceTitleIcon name={titleIcon} />
             {titleEditor ? (
               <View style={styles.workspaceTitleEditorSlot}>{titleEditor}</View>
@@ -208,6 +214,27 @@ export const SidebarWorkspaceRowContent = memo(function SidebarWorkspaceRowConte
     </View>
   );
 });
+
+/**
+ * A pencil before the title while a chat open in the workspace holds a message the user started
+ * and did not send, so a half-written prompt is not lost behind a workspace switch. It sits beside
+ * the leading visual rather than on it: that icon's corner already carries the status badge, which
+ * must stay visible while the workspace is working.
+ */
+function UnsentDraftIcon({ serverId, workspaceId }: { serverId: string; workspaceId: string }) {
+  const { t } = useTranslation();
+  const hasUnsentDraft = useWorkspaceHasUnsentDraft(serverId, workspaceId);
+  if (!hasUnsentDraft) return null;
+  return (
+    <View
+      style={styles.unsentDraftIcon}
+      accessibilityLabel={t("sidebar.unsentDraftAccessibility")}
+      testID="sidebar-row-unsent-draft"
+    >
+      <ThemedPencil size={12} uniProps={unsentDraftColorMapping} />
+    </View>
+  );
+}
 
 function WorkspaceLeadingVisual({
   workspace,
@@ -652,6 +679,12 @@ const styles = StyleSheet.create((theme) => ({
     opacity: 0.76,
     flex: 1,
     minWidth: 0,
+  },
+  // Pulled toward the title like the plugin title icon, so it reads as part of the title.
+  unsentDraftIcon: {
+    height: TITLE_LINE_HEIGHT,
+    justifyContent: "center",
+    marginRight: -theme.spacing[1],
   },
   workspaceTitleEditorSlot: {
     height: TITLE_LINE_HEIGHT,

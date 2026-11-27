@@ -1310,6 +1310,7 @@ export const ar: TranslationResources = {
       projectUnavailable: "لم يعد المشروع متاحًا",
     },
     statusGroupAccessibility: "مجموعة {{label}}",
+    unsentDraftAccessibility: "رسالة غير مرسلة",
     statusBucket: {
       needsInput: "تحتاج إدخالاً",
       failed: "فشل",

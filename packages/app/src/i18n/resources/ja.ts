@@ -1326,6 +1326,7 @@ export const ja: TranslationResources = {
       projectUnavailable: "このプロジェクトは利用できなくなりました",
     },
     statusGroupAccessibility: "{{label}} グループ",
+    unsentDraftAccessibility: "未送信のメッセージ",
     statusBucket: {
       needsInput: "入力待ち",
       failed: "失敗",

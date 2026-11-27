@@ -1301,6 +1301,7 @@ export const zhCN: TranslationResources = {
       projectUnavailable: "此项目已不可用",
     },
     statusGroupAccessibility: "{{label}} 分组",
+    unsentDraftAccessibility: "未发送的消息",
     statusBucket: {
       needsInput: "需要输入",
       failed: "失败",

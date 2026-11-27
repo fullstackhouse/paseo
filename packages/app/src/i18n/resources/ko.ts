@@ -1317,6 +1317,7 @@ export const ko: TranslationResources = {
       projectUnavailable: "프로젝트를 더 이상 사용할 수 없습니다",
     },
     statusGroupAccessibility: "{{label}} 그룹",
+    unsentDraftAccessibility: "보내지 않은 메시지",
     statusBucket: {
       needsInput: "입력 필요",
       failed: "실패",

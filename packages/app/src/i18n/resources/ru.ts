@@ -1329,6 +1329,7 @@ export const ru: TranslationResources = {
       projectUnavailable: "Проект больше недоступен",
     },
     statusGroupAccessibility: "Группа «{{label}}»",
+    unsentDraftAccessibility: "Неотправленное сообщение",
     statusBucket: {
       needsInput: "Ожидает ввода",
       failed: "Ошибка",
