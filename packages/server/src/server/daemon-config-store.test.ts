@@ -1327,6 +1327,31 @@ describe("DaemonConfigStore", () => {
     expect(loadConfig(paseoHome, { env: {} }).snoozedPermission).toBe("badge");
   });
 
+  test("patch persists how new chats get their titles", async () => {
+    const paseoHome = mkdtempSync(path.join(tmpdir(), "paseo-daemon-config-store-"));
+    tempDirs.push(paseoHome);
+    writeFileSync(path.join(paseoHome, "config.json"), `${JSON.stringify({ version: 1 })}\n`);
+    const store = new DaemonConfigStore(
+      paseoHome,
+      {
+        mcp: { injectIntoAgents: false },
+        browserTools: { enabled: false },
+        providers: {},
+        autoArchiveAfterMerge: false,
+        enableTerminalAgentHooks: false,
+        appendSystemPrompt: "",
+        metadataGeneration: { providers: [] },
+      },
+      undefined,
+    );
+    expect(store.get().chatTitles).toBeUndefined();
+
+    expect((await store.patch({ chatTitles: "agent" })).chatTitles).toBe("agent");
+
+    expect(loadPersistedConfig(paseoHome).agents?.chatTitles).toBe("agent");
+    expect(loadConfig(paseoHome, { env: {} }).chatTitles).toBe("agent");
+  });
+
   test("patch persists custom ACP provider overrides into config.json", async () => {
     const paseoHome = mkdtempSync(path.join(tmpdir(), "paseo-daemon-config-store-"));
     tempDirs.push(paseoHome);

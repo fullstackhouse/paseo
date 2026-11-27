@@ -373,6 +373,8 @@ export const PersistedConfigSchema = z
         resumePrompt: z.string().optional(),
         catalogRefreshTimeoutMs: z.number().int().positive().max(2_147_483_647).optional(),
         metadataGeneration: AgentMetadataGenerationSchema.optional(),
+        // FSH-only: how a new chat gets its title (default first-prompt).
+        chatTitles: z.enum(["first-prompt", "generated", "agent"]).optional(),
         skills: z.object({ selection: AgentSkillSelectionSchema.optional() }).strict().optional(),
       })
       .strict()

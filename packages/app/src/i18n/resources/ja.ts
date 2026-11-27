@@ -3288,6 +3288,24 @@ export const ja: TranslationResources = {
           edit: "編集",
           editAccessibilityLabel: "メッセージを編集",
         },
+        chatTitles: {
+          title: "チャットのタイトル",
+          updateFailed: "チャットのタイトルを更新できません",
+          renameWins:
+            "チャットの名前を変更すると自動タイトルは止まります。既存のチャットはそのままです。",
+          options: {
+            "first-prompt": "最初のメッセージ",
+            generated: "一度だけ生成",
+            agent: "エージェントから",
+          },
+          hints: {
+            "first-prompt": "新しいチャットは最初のメッセージの1行目を名前にします。",
+            generated:
+              "新しいチャットには、最初のメッセージから一度だけ生成した短いタイトルが付きます。",
+            agent:
+              "新しいチャットは、エージェントがセッションに付けるタイトルに合わせて変わります。独自のタイトルがないエージェントには生成したタイトルが付きます。",
+          },
+        },
         idleRuntimeCleanup: {
           title: "アイドル状態のエージェントを解放",
           hint: "1 時間のアイドル状態の後にメモリを解放します。",

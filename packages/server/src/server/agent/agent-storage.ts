@@ -57,6 +57,11 @@ const RAW_STORED_AGENT_SCHEMA = z.object({
   lastUserMessageAt: z.string().nullable().optional(),
   workedMs: z.number().optional(),
   title: z.string().nullable().optional(),
+  /**
+   * FSH fork: the title follows the one the agent gives its own session ("From the agent" chat
+   * titles). Set at creation; a manual rename clears it for good.
+   */
+  titleFollowsAgent: z.boolean().optional(),
   labels: z.record(z.string(), z.string()).default({}),
   metadata: z.record(z.string(), z.custom<JsonValue>()).default({}),
   lastStatus: AgentStatusSchema.default("closed"),
@@ -436,6 +441,7 @@ export class AgentStorage {
       }
       // Background is fixed at creation; a runtime opened without it cannot clear it.
       if (existing?.background) record.background = true;
+      if (existing?.titleFollowsAgent) record.titleFollowsAgent = true;
       carryInterruption(record, existing, agent.lifecycle);
       return record;
     });
@@ -452,6 +458,15 @@ export class AgentStorage {
         await this.upsert({ ...record, background: undefined });
       }),
     );
+  }
+
+  /** FSH: whether the agent's title follows the one its provider session keeps. */
+  async setTitleFollowsAgent(agentId: string, follows: boolean): Promise<void> {
+    await this.load();
+    await this.waitForPendingWrite(agentId);
+    const record = await this.get(agentId);
+    if (!record || Boolean(record.titleFollowsAgent) === follows) return;
+    await this.upsert({ ...record, titleFollowsAgent: follows ? true : undefined });
   }
 
   async setTitle(agentId: string, title: string): Promise<void> {

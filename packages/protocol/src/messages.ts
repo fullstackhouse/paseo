@@ -217,6 +217,12 @@ const MutableRelayConfigSchema = z
 export const SnoozedPermissionBehaviorSchema = z.enum(["wake", "badge", "silent"]);
 export type SnoozedPermissionBehavior = z.infer<typeof SnoozedPermissionBehaviorSchema>;
 
+// How a new chat gets its title. first-prompt: the first line of the first message. generated:
+// a short title generated once from the first message. agent: follows the title the agent gives
+// its own session, for providers that keep one; others fall back to generated.
+export const ChatTitleModeSchema = z.enum(["first-prompt", "generated", "agent"]);
+export type ChatTitleMode = z.infer<typeof ChatTitleModeSchema>;
+
 export const MutableDaemonConfigSchema = z
   .object({
     // COMPAT(relayConfig): added in v0.2.6, remove after 2027-01-31 when old daemons are unsupported.
@@ -259,6 +265,8 @@ export const MutableDaemonConfigSchema = z
     // COMPAT(workspaceSnooze): FSH-only, added after v0.13.0, optional while old daemons are supported.
     // What an agent blocked on a permission prompt does to its snoozed workspace.
     snoozedPermission: SnoozedPermissionBehaviorSchema.optional(),
+    // COMPAT(chatTitles): FSH-only, added after v0.17.1, optional while old daemons are supported.
+    chatTitles: ChatTitleModeSchema.optional(),
     appendSystemPrompt: z.string().default(""),
     terminalProfiles: z.array(TerminalProfileSchema).optional(),
     agentProfiles: z.array(AgentProfileSchema).optional(),
@@ -290,6 +298,7 @@ export const MutableDaemonConfigPatchSchema = z
     resumeOnStartup: z.boolean().optional(),
     resumePrompt: z.string().optional(),
     snoozedPermission: SnoozedPermissionBehaviorSchema.optional(),
+    chatTitles: ChatTitleModeSchema.optional(),
     appendSystemPrompt: z.string().optional(),
     terminalProfiles: z.array(TerminalProfileSchema).optional(),
     agentProfiles: z.array(AgentProfileSchema).optional(),
@@ -4333,6 +4342,8 @@ export const ServerInfoStatusPayloadSchema = z
         hostMultiplexing: z.boolean().optional(),
         // COMPAT(usageSetting): added in v0.14, remove after 2027-05-01.
         usageSetting: z.boolean().optional(),
+        // COMPAT(chatTitles): FSH-only, added after v0.17.1, remove gate after 2027-11-27.
+        chatTitles: z.boolean().optional(),
         usageSources: z.boolean().optional(),
         // COMPAT(providerInstallation): added in v0.17.0, remove gate after 2027-05-13.
         providerInstallation: z.boolean().optional(),

@@ -483,6 +483,7 @@ export function wrapSessionProvider(provider: AgentProvider, inner: AgentSession
     getPendingPermissions: () => inner.getPendingPermissions(),
     respondToPermission: (requestId, response) => inner.respondToPermission(requestId, response),
     describePersistence: () => mapPersistenceHandle(provider, inner.describePersistence()),
+    readProviderTitle: inner.readProviderTitle?.bind(inner),
     interrupt: () => inner.interrupt(),
     stopBackgroundWork: inner.stopBackgroundWork?.bind(inner),
     close: () => inner.close(),

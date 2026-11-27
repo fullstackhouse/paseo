@@ -71,6 +71,7 @@ import { PaseoToolsCard } from "./paseo-tools-card";
 import { RestartRecoveryCard } from "./restart-recovery-card";
 import { IdleRuntimeCleanupCard } from "./idle-runtime-cleanup-card";
 import { SnoozedPermissionCard } from "./snoozed-permission-card";
+import { ChatTitlesCard } from "./chat-titles-card";
 import { restartDaemonFromSettings, updateDaemonFromSettings } from "./daemon-lifecycle";
 import { SettingsRevealText } from "@/components/settings/reveal-text";
 
@@ -298,6 +299,7 @@ export function HostAgentsPage({ serverId }: { serverId: string }) {
           <PaseoToolsCard serverId={serverId} />
           <BrowserToolsOptInCard serverId={serverId} />
           <AppendSystemPromptCard serverId={serverId} />
+          <ChatTitlesCard serverId={serverId} />
           <RestartRecoveryCard serverId={serverId} />
           <IdleRuntimeCleanupCard serverId={serverId} />
         </SettingsSection>

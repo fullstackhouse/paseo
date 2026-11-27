@@ -2111,6 +2111,8 @@ export class VoiceAssistantWebSocketServer {
         // COMPAT(relayProtectedSecurity): added in v0.13.0, remove gate after 2027-04-21.
         relayProtectedSecurity: true,
         usageSetting: true,
+        // COMPAT(chatTitles): FSH-only, added after v0.17.1, remove gate after 2027-11-27.
+        chatTitles: true,
         usageSources: true,
         providerInstallation: true,
         ownedSubscriptions: true,

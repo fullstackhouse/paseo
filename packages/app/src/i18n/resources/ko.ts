@@ -3269,6 +3269,22 @@ export const ko: TranslationResources = {
           edit: "편집",
           editAccessibilityLabel: "메시지 편집",
         },
+        chatTitles: {
+          title: "채팅 제목",
+          updateFailed: "채팅 제목을 업데이트할 수 없습니다",
+          renameWins: "채팅 이름을 바꾸면 자동 제목이 멈춥니다. 기존 채팅은 제목을 유지합니다.",
+          options: {
+            "first-prompt": "첫 메시지",
+            generated: "한 번 생성",
+            agent: "에이전트 제목",
+          },
+          hints: {
+            "first-prompt": "새 채팅은 첫 메시지의 첫 줄을 이름으로 사용합니다.",
+            generated: "새 채팅은 첫 메시지로 한 번 생성한 짧은 제목을 받습니다.",
+            agent:
+              "새 채팅은 에이전트가 세션에 붙이는 제목이 바뀔 때마다 따라갑니다. 자체 제목이 없는 에이전트는 생성한 제목을 받습니다.",
+          },
+        },
         idleRuntimeCleanup: {
           title: "유휴 에이전트 해제",
           hint: "1시간 동안 활동이 없으면 메모리를 확보합니다.",

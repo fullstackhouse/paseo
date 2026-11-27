@@ -128,6 +128,7 @@ export const SETTINGS_SEARCH_ENTRIES: SettingsSearchEntry[] = [
     ["settings.host.orchestration.enableTools.title"],
     [{ text: "Browser tools" }],
     ["settings.host.orchestration.systemPrompt.title"],
+    ["settings.host.agents.chatTitles.title"],
     ["settings.host.agents.resumeOnStartup.title", "settings.host.agents.resumeOnStartup.info"],
     [
       "settings.host.agents.idleRuntimeCleanup.title",

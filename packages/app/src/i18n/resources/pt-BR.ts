@@ -3301,6 +3301,24 @@ export const ptBR: TranslationResources = {
           edit: "Editar",
           editAccessibilityLabel: "Editar mensagem",
         },
+        chatTitles: {
+          title: "Títulos de chat",
+          updateFailed: "Não foi possível atualizar os títulos de chat",
+          renameWins:
+            "Renomear um chat interrompe os títulos automáticos. Chats existentes mantêm o seu.",
+          options: {
+            "first-prompt": "Primeira mensagem",
+            generated: "Gerado uma vez",
+            agent: "Do agente",
+          },
+          hints: {
+            "first-prompt": "Novos chats recebem o nome da primeira linha da primeira mensagem.",
+            generated:
+              "Novos chats recebem um título curto gerado uma vez a partir da primeira mensagem.",
+            agent:
+              "Novos chats seguem o título que o agente dá à sua sessão conforme ele muda. Agentes sem título próprio recebem um título gerado.",
+          },
+        },
         idleRuntimeCleanup: {
           title: "Liberar agentes ociosos",
           hint: "Libera memória após uma hora de inatividade.",

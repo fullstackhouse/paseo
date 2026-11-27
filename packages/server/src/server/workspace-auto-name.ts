@@ -1,5 +1,5 @@
 import type pino from "pino";
-import type { FirstAgentContext } from "@getpaseo/protocol/messages";
+import type { ChatTitleMode, FirstAgentContext } from "@getpaseo/protocol/messages";
 
 import { resolveFirstAgentPromptTitle } from "./agent/create-agent-title.js";
 import type { AgentManager } from "./agent/agent-manager.js";
@@ -105,6 +105,50 @@ export class WorkspaceAutoName {
         }),
       { cwd: input.cwd, message: "Failed to auto-name directory workspace title" },
     );
+  }
+
+  /**
+   * FSH: titles a new chat per the host's "Chat titles" setting. "agent" follows the provider
+   * session's own title where the provider keeps one and otherwise generates once, like
+   * "generated". A generated title lands only while the chat still has its first-prompt title.
+   */
+  scheduleForChat(
+    input: {
+      agentId: string;
+      cwd: string;
+      mode: ChatTitleMode;
+      provisionalTitle: string;
+      firstAgentContext: FirstAgentContext;
+    },
+    context: ScheduleContext = {},
+  ): void {
+    if (input.mode === "first-prompt") return;
+    this.schedule(
+      () => this.autoTitleChat({ ...input, currentSelection: context.currentSelection ?? null }),
+      { cwd: input.cwd, message: "Failed to auto-title chat" },
+    );
+  }
+
+  private async autoTitleChat(input: {
+    agentId: string;
+    cwd: string;
+    mode: ChatTitleMode;
+    provisionalTitle: string;
+    firstAgentContext: FirstAgentContext;
+    currentSelection: CurrentSelection;
+  }): Promise<void> {
+    // From the agent still generates: a Claude binary that writes no ai-title in SDK sessions
+    // would otherwise leave the long first-prompt title. Whichever automatic title lands first
+    // stays only until the agent names its session.
+    if (input.mode === "agent") await this.agentManager.followProviderTitle(input.agentId);
+    const generated = await this.generateFromContext({
+      cwd: input.cwd,
+      firstAgentContext: input.firstAgentContext,
+      currentSelection: input.currentSelection,
+    });
+    const title = generated?.title?.trim();
+    if (!title) return;
+    await this.agentManager.replaceAutomaticTitle(input.agentId, input.provisionalTitle, title);
   }
 
   private async maybeAutoNameWorkspaceBranchForFirstAgent(input: {

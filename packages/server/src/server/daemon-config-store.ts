@@ -37,6 +37,7 @@ interface SupportedMutableConfigPatch {
   metadataGeneration?: MutableDaemonConfig["metadataGeneration"];
   autoArchiveAfterMerge?: boolean;
   snoozedPermission?: MutableDaemonConfig["snoozedPermission"];
+  chatTitles?: MutableDaemonConfig["chatTitles"];
   enableTerminalAgentHooks?: boolean;
   idleRuntimeCleanup?: boolean;
   resumeOnStartup?: boolean;
@@ -269,6 +270,7 @@ const RELOADABLE_PATHS = [
   "agents.providers",
   "agents.catalogRefreshTimeoutMs",
   "agents.metadataGeneration",
+  "agents.chatTitles",
   "agents.skills.selection",
   "pluginsEnabled",
   "pluginNotifications",
@@ -299,6 +301,7 @@ const PERSISTED_TO_MUTABLE_PATH = new Map<string, string>([
   ["agents.providers", "providers"],
   ["agents.catalogRefreshTimeoutMs", "catalogRefreshTimeoutMs"],
   ["agents.metadataGeneration", "metadataGeneration"],
+  ["agents.chatTitles", "chatTitles"],
   ["agents.skills.selection", "skills.selection"],
   ["pluginsEnabled", "pluginsEnabled"],
   ["pluginNotifications", "pluginNotifications"],
@@ -372,6 +375,7 @@ function pickSupportedPatchFields(patch: MutableDaemonConfigPatch): SupportedMut
     ...(patch.snoozedPermission !== undefined
       ? { snoozedPermission: patch.snoozedPermission }
       : {}),
+    ...(patch.chatTitles !== undefined ? { chatTitles: patch.chatTitles } : {}),
     ...(patch.enableTerminalAgentHooks !== undefined
       ? { enableTerminalAgentHooks: patch.enableTerminalAgentHooks }
       : {}),
@@ -822,21 +826,27 @@ function mergeMutablePatchIntoPersistedConfig(params: {
   } as PersistedConfig;
 }
 
+function hasMutableAgentPatch(
+  patch: Omit<SupportedMutableConfigPatch, "removeProviders">,
+  removeProviders: readonly string[],
+): boolean {
+  return (
+    patch.providers !== undefined ||
+    patch.metadataGeneration !== undefined ||
+    patch.chatTitles !== undefined ||
+    patch.skills !== undefined ||
+    hasRestartRecoveryPatch(patch) ||
+    patch.idleRuntimeCleanup !== undefined ||
+    removeProviders.length > 0
+  );
+}
+
 function mergeMutableAgentPatch(
   persistedAgents: PersistedConfig["agents"],
   patch: Omit<SupportedMutableConfigPatch, "removeProviders">,
   removeProviders: readonly string[],
 ): PersistedConfig["agents"] {
-  if (
-    patch.providers === undefined &&
-    patch.metadataGeneration === undefined &&
-    patch.skills === undefined &&
-    !hasRestartRecoveryPatch(patch) &&
-    patch.idleRuntimeCleanup === undefined &&
-    removeProviders.length === 0
-  ) {
-    return persistedAgents;
-  }
+  if (!hasMutableAgentPatch(patch, removeProviders)) return persistedAgents;
 
   const next = { ...persistedAgents } as Record<string, unknown>;
   const persistedProviderOverrides = omitProvidersFromOverrides(
@@ -864,6 +874,8 @@ function mergeMutableAgentPatch(
   if (patch.skills?.selection !== undefined) {
     next["skills"] = { selection: patch.skills.selection };
   }
+
+  if (patch.chatTitles !== undefined) next["chatTitles"] = patch.chatTitles;
 
   Object.assign(next, restartRecoveryPatch(patch));
   if (patch.idleRuntimeCleanup !== undefined) {
