@@ -33,7 +33,7 @@ const run = promisify(execFile);
  */
 export const ATTENTION_PLUGINS = {
   "paseo-status": { commit: "8215548e8bdfbe04961ac3cac1ca49eaa4f798c0", dataDir: "status" },
-  "paseo-asks": { commit: "f00ea104e524299faa61c934958d91bbba8f0e18", dataDir: "asks" },
+  "paseo-asks": { commit: "d87fe2abb23157629c44aa0054970fc468a75299", dataDir: "asks" },
   "paseo-prs": { commit: "165fadc552e16d383592167f3315cb052b72b71b", dataDir: "prs" },
 } as const;
 

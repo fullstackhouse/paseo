@@ -152,12 +152,16 @@ test("each agent waiting without an ask gets its own named Sync asks row until i
         title: "Which font should the headings use?",
       }),
     );
-    // TODO(A26): paseo-asks reaches Overview only on its 8 s summary poll; tighten these to ~1 s
-    // once it pushes ask changes to clients.
+    const recordedAt = Date.now();
+    // paseo-asks pushes ask changes to clients, so the ask replaces its agent's Sync asks row
+    // right away instead of on the 8 s summary poll.
     await expect(yourMove).toContainText("Which font should the headings use?", {
-      timeout: 10_000,
+      timeout: 1_500,
     });
-    await expect(syncButtons).toHaveCount(1, { timeout: 10_000 });
+    await expect(syncButtons).toHaveCount(1, { timeout: 1_500 });
+    const replacedAfterMs = Date.now() - recordedAt;
+    console.log(`[attention-e2e] ask replaced its Sync asks row after ${replacedAfterMs} ms`);
+    expect(replacedAfterMs).toBeLessThan(1_500);
     await expect(yourMove).not.toContainText("Pick a font says it waits on you");
     await expect(yourMove).toContainText("Pick a color says it waits on you");
     expect(askId).toMatch(/^A\d+$/);
