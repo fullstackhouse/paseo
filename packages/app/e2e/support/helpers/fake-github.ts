@@ -4,7 +4,7 @@ import path from "node:path";
 
 /**
  * The worker's fake `gh` (e2e-worker.ts) answers the daemon's batched pull request reads
- * (`PaseoChangeRequestRead`) for PRs under `paseo-e2e/*` from this state, so specs can drive PR
+ * (`PaseoChangeRequestRead`) for PRs in `paseo-e2e/attention-fixture` from this state, so specs can drive PR
  * state and GitHub's GraphQL rate limit without the network.
  */
 export interface FakeGitHubPullRequest {
@@ -17,7 +17,7 @@ export interface FakeGitHubPullRequest {
 }
 
 export interface FakeGitHubState {
-  /** Keyed `paseo-e2e/<repo>#<number>`. */
+  /** Keyed `paseo-e2e/attention-fixture#<number>`; other repos pass through to the real `gh`. */
   prs: Record<string, FakeGitHubPullRequest>;
   /** GraphQL's own rateLimit; the daemon pauses reads at or under 40% remaining until `resetAt`. */
   rateLimit: { limit: number; remaining: number; resetAt: string } | null;

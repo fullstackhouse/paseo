@@ -70,12 +70,14 @@ const path = require("path");
 const args = process.argv.slice(2);
 
 // Pull request reads the daemon batches for plugins (PaseoChangeRequestRead) answer from
-// fake-github-state.json beside this script for any PR under paseo-e2e/*, and every such call is
-// appended to fake-github-calls.jsonl. See fake-github.ts.
+// fake-github-state.json beside this script for PRs in paseo-e2e/attention-fixture, and every such
+// call is appended to fake-github-calls.jsonl. See fake-github.ts. Other repos, including the
+// paseo-e2e/local-fixture checkout fixture below, are untouched.
 const queryArg = args[0] === "api" && args[1] === "graphql"
   ? args.find((arg) => arg.startsWith("query="))
   : undefined;
-if (queryArg && queryArg.includes("PaseoChangeRequestRead") && queryArg.includes('owner: "paseo-e2e"')) {
+const attentionRepo = 'owner: "paseo-e2e", name: "attention-fixture"';
+if (queryArg && queryArg.includes("PaseoChangeRequestRead") && queryArg.includes(attentionRepo)) {
   const statePath = path.join(__dirname, "fake-github-state.json");
   const state = fs.existsSync(statePath)
     ? JSON.parse(fs.readFileSync(statePath, "utf8"))
@@ -120,9 +122,12 @@ if (queryArg && queryArg.includes("PaseoChangeRequestRead") && queryArg.includes
   process.stdout.write(JSON.stringify(errors.length ? { data, errors } : { data }));
   process.exit(errors.length ? 1 : 0);
 }
-// Anything else plugins ask GitHub about paseo-e2e/* stays local too: paseo-asks' deployments
-// lookup gets no deployments, and any other call fails instead of reaching github.com.
-if (args.includes("owner=paseo-e2e") || args.some((arg) => arg.includes("paseo-e2e/attention"))) {
+// Anything else plugins ask GitHub about paseo-e2e/attention-fixture stays local too: paseo-asks'
+// deployments lookup gets no deployments, and any other call fails instead of reaching github.com.
+if (
+  (args.includes("owner=paseo-e2e") && args.includes("name=attention-fixture")) ||
+  args.some((arg) => arg.includes("paseo-e2e/attention-fixture"))
+) {
   if (queryArg && queryArg.includes("deployments(")) {
     process.stdout.write(JSON.stringify({ data: { repository: { pullRequest: { commits: { nodes: [] } } } } }));
     process.exit(0);
