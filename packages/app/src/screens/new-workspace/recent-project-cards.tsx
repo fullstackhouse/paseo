@@ -91,7 +91,10 @@ export function RecentProjectCards({
   );
 }
 
-/** "Opus 5.5 · Auto · High": the model names its provider, so the provider shows only without one. */
+/**
+ * "Opus 5.5 · Auto · High": the model names its provider, so the provider shows only without one,
+ * or when another provider offers the same model ("Claude (cloud) · Opus 5.5 · Auto").
+ */
 export function summarizeAgentSetup(
   setup: RecentAgentSetup,
   entries: readonly ProviderSnapshotEntry[] | undefined,
@@ -101,6 +104,13 @@ export function summarizeAgentSetup(
     ?.find((entry) => entry.provider === setup.provider)
     ?.models?.find(
       (candidate) => candidate.id === setup.modelId || candidate.aliases?.includes(setup.modelId),
+    );
+  const sharedModel =
+    model !== undefined &&
+    (entries ?? []).some(
+      (entry) =>
+        entry.provider !== setup.provider &&
+        entry.models?.some((candidate) => candidate.id === model.id),
     );
   const tags = buildAgentProfileTags({
     profile: {
@@ -116,7 +126,7 @@ export function summarizeAgentSetup(
   });
   const hasModel = tags.some((tag) => tag.id === "model");
   return tags
-    .filter((tag) => tag.id !== "features" && !(hasModel && tag.id === "provider"))
+    .filter((tag) => tag.id !== "features" && !(hasModel && !sharedModel && tag.id === "provider"))
     .map((tag) => tag.label)
     .join(" · ");
 }
