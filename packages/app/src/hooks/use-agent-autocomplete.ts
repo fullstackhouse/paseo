@@ -32,6 +32,19 @@ import {
   findActiveFileMention,
   type FileMentionRange,
 } from "@/utils/file-mention-autocomplete";
+import {
+  applyChangeRequestMentionReplacement,
+  filterChangeRequestMentionCandidates,
+  findActiveChangeRequestMention,
+  mergeChangeRequestMentionCandidates,
+  type ChangeRequestMentionRange,
+} from "@/utils/change-request-mention-autocomplete";
+import type { ChangeRequestList } from "@getpaseo/client";
+import { forgeFromRemoteUrl, getForgePresentation } from "@/git/forge";
+import { buildForgeChangeRequestUrl, buildForgeRepositoryUrl } from "@/git/forge-url";
+import { useCheckoutStatusQuery } from "@/git/use-status-query";
+import { useCheckoutPrStatusQuery } from "@/git/use-pr-status-query";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
 
 interface UseAgentAutocompleteInput {
   userInput: string;
@@ -68,6 +81,10 @@ type AgentAutocompleteOption =
       type: "workspace_entry";
       entryPath: string;
       mention: FileMentionRange;
+    })
+  | (AutocompleteOption & {
+      type: "change_request";
+      reference: string;
     });
 
 interface AgentAutocompleteResult {
@@ -84,6 +101,7 @@ interface AgentAutocompleteSnapshot {
   text: string;
   slashCommand: SlashCommandRange | null;
   fileMention: FileMentionRange | null;
+  changeRequestMention: ChangeRequestMentionRange | null;
 }
 
 function resolveAgentAutocompleteSnapshot(input: {
@@ -92,12 +110,14 @@ function resolveAgentAutocompleteSnapshot(input: {
   cursorIndex: number;
   activeSlashCommand: SlashCommandRange | null;
   activeFileMention: FileMentionRange | null;
+  activeChangeRequestMention: ChangeRequestMentionRange | null;
 }): AgentAutocompleteSnapshot {
   if (!input.input) {
     return {
       text: input.userInput,
       slashCommand: input.activeSlashCommand,
       fileMention: input.activeFileMention,
+      changeRequestMention: input.activeChangeRequestMention,
     };
   }
 
@@ -107,6 +127,7 @@ function resolveAgentAutocompleteSnapshot(input: {
     text,
     slashCommand: findActiveSlashCommand({ text, cursorIndex }),
     fileMention: findActiveFileMention({ text, cursorIndex }),
+    changeRequestMention: findActiveChangeRequestMention({ text, cursorIndex }),
   };
 }
 
@@ -220,7 +241,7 @@ function mapCommandToOption(
   };
 }
 
-type AutocompleteMode = "command" | "file" | null;
+type AutocompleteMode = "command" | "file" | "change_request" | null;
 
 interface BuildAutocompleteOptionsInput {
   mode: AutocompleteMode;
@@ -290,15 +311,41 @@ function buildAutocompleteOptions(input: BuildAutocompleteOptionsInput): AgentAu
 
 function resolveAutocompleteMode(args: {
   showFileAutocomplete: boolean;
+  showChangeRequestAutocomplete: boolean;
   showCommandAutocomplete: boolean;
 }): AutocompleteMode {
   if (args.showFileAutocomplete) {
     return "file";
   }
+  // Before commands, so `/review #12` offers pull requests for the argument.
+  if (args.showChangeRequestAutocomplete) {
+    return "change_request";
+  }
   if (args.showCommandAutocomplete) {
     return "command";
   }
   return null;
+}
+
+/** A closed `#` menu (see `resolveChangeRequestMenu`) hides the whole picker. */
+function resolveMenuIsVisible(args: {
+  isVisibleBeforeChangeRequests: boolean;
+  mode: AutocompleteMode;
+  changeRequestMenu: AutocompleteMenu | null;
+}): boolean {
+  if (args.mode === "change_request") return args.changeRequestMenu !== null;
+  return args.isVisibleBeforeChangeRequests;
+}
+
+function resolveAutocompleteQuery(args: {
+  mode: AutocompleteMode;
+  commandFilterQuery: string;
+  fileFilterQuery: string;
+  changeRequestFilterQuery: string | undefined;
+}): string {
+  if (args.mode === "command") return args.commandFilterQuery;
+  if (args.mode === "change_request") return args.changeRequestFilterQuery ?? "";
+  return args.fileFilterQuery;
 }
 
 function resolveAutocompleteIsVisible(args: {
@@ -310,7 +357,7 @@ function resolveAutocompleteIsVisible(args: {
   if (args.mode === "command") {
     return args.canLoadCommands;
   }
-  if (args.mode === "file") {
+  if (args.mode === "file" || args.mode === "change_request") {
     return Boolean(args.serverId) && args.autocompleteCwd.length > 0;
   }
   return false;
@@ -404,6 +451,120 @@ function resolveFileMenu(input: {
   return withEmptyStatus(options, input.t("agentAutocomplete.noFiles"));
 }
 
+/** A pull request the `#` menu offers: from the open list, or read by the exact number typed. */
+interface ChangeRequestMentionItem {
+  number: number;
+  title: string;
+  headRefName: string | null;
+  state: "open" | "merged" | "closed";
+}
+
+const CHANGE_REQUEST_STATE_LABEL_KEYS: Partial<Record<ChangeRequestMentionItem["state"], string>> =
+  {
+    merged: "workspace.git.pr.states.merged",
+    closed: "workspace.git.pr.states.closed",
+  };
+
+/** Open is the norm in this list, so only a merged or closed one is labelled. */
+function describeChangeRequest(item: ChangeRequestMentionItem, t: TFunction): string | undefined {
+  const stateKey = CHANGE_REQUEST_STATE_LABEL_KEYS[item.state];
+  const parts = [stateKey ? t(stateKey) : null, item.headRefName].filter(Boolean);
+  return parts.length > 0 ? parts.join(" · ") : undefined;
+}
+
+function buildChangeRequestOptions(input: {
+  items: readonly ChangeRequestMentionItem[];
+  query: string;
+  numberPrefix: string;
+  t: TFunction;
+}): AgentAutocompleteOption[] {
+  const isNumberQuery = /^\d+$/.test(input.query);
+  // The list opens above the input: the newest or best match sits next to it, preselected.
+  const ordered = orderAutocompleteOptions(
+    filterChangeRequestMentionCandidates(input.items, input.query),
+  );
+  return ordered.map((item) => {
+    const reference = `${input.numberPrefix}${item.number}`;
+    const label = `${reference} ${item.title}`;
+    // A number query leaves the label plain: the typed digits already lead every row.
+    const labelMatches = isNumberQuery
+      ? []
+      : findHighlightRanges(input.query, item.title).map((range) => ({
+          start: range.start + reference.length + 1,
+          length: range.length,
+        }));
+    return {
+      type: "change_request" as const,
+      id: `change_request:${item.number}`,
+      label,
+      labelMatches: input.query ? labelMatches : undefined,
+      icon: "pull-request" as const,
+      description: describeChangeRequest(item, input.t),
+      reference,
+    };
+  });
+}
+
+function resolveChangeRequestListFailure(
+  list: ChangeRequestList | undefined,
+  error: unknown,
+): { kind: "none" } | { kind: "hidden" } | { kind: "failed"; reason?: string } {
+  if (error instanceof Error) return { kind: "failed", reason: error.message };
+  if (!list || list.ok) return { kind: "none" };
+  if (list.reason === "unsupported" || list.reason === "not_found") return { kind: "hidden" };
+  return { kind: "failed", reason: list.error };
+}
+
+function changeRequestLoadingMenu(t: TFunction): AutocompleteMenu {
+  return {
+    options: [],
+    status: { kind: "loading", message: t("agentAutocomplete.loadingChangeRequests") },
+  };
+}
+
+/**
+ * The menu hides where the host can't list the remote's pull requests (no forge it knows, or
+ * a repository it can't find), so a `#` typed there stays plain text.
+ */
+export function resolveChangeRequestMenu(input: {
+  list: ChangeRequestList | undefined;
+  lookedUpItems: readonly ChangeRequestMentionItem[];
+  query: string;
+  numberPrefix: string;
+  isPending: boolean;
+  error: unknown;
+  t: TFunction;
+}): AutocompleteMenu | null {
+  if (input.isPending) return changeRequestLoadingMenu(input.t);
+  const failure = resolveChangeRequestListFailure(input.list, input.error);
+  if (failure.kind === "hidden") return null;
+  if (failure.kind === "failed") {
+    return {
+      options: [],
+      status: {
+        kind: "error",
+        title: input.t("agentAutocomplete.changeRequestsFailed"),
+        reason: failure.reason,
+      },
+    };
+  }
+  const listed = (input.list?.items ?? []).map(
+    (item): ChangeRequestMentionItem => ({
+      number: item.number,
+      title: item.title,
+      headRefName: item.headRef,
+      state: "open",
+    }),
+  );
+  const options = buildChangeRequestOptions({
+    items: mergeChangeRequestMentionCandidates([listed, input.lookedUpItems]),
+    query: input.query,
+    numberPrefix: input.numberPrefix,
+    t: input.t,
+  });
+  return withEmptyStatus(options, input.t("agentAutocomplete.noChangeRequests"));
+}
+
 function withEmptyStatus(options: AgentAutocompleteOption[], emptyText: string): AutocompleteMenu {
   return options.length > 0
     ? { options, status: null }
@@ -488,6 +649,131 @@ function resolveCommandsEmptyText(args: {
   return args.t("agentAutocomplete.noCommands");
 }
 
+/** How long a typed number settles before the picker reads that pull request on its own. */
+const CHANGE_REQUEST_LOOKUP_DEBOUNCE_MS = 250;
+/** Matches the host's list cache, so reopening `#` within it costs no forge call. */
+const CHANGE_REQUEST_STALE_MS = 30_000;
+
+type HostClient = ReturnType<typeof useHostRuntimeClient>;
+
+/**
+ * The open list covers the usual `#`, but a typed number may name an older open one or a
+ * closed or merged one. A settled number that isn't listed is read on its own.
+ */
+function useChangeRequestNumberLookup(input: {
+  client: HostClient;
+  serverId: string;
+  forge: string | null;
+  repositoryUrl: string | null;
+  query: string;
+  list: ChangeRequestList | undefined;
+  enabled: boolean;
+}): ChangeRequestMentionItem[] {
+  const settledQuery = useDebouncedValue(input.query, CHANGE_REQUEST_LOOKUP_DEBOUNCE_MS);
+  const number = /^\d+$/.test(settledQuery) ? Number(settledQuery) : null;
+  const isListed = input.list?.items.some((item) => item.number === number) ?? false;
+  const url =
+    number !== null && input.forge && input.repositoryUrl
+      ? buildForgeChangeRequestUrl(input.forge, input.repositoryUrl, number)
+      : null;
+  const { client } = input;
+  const { data } = useQuery({
+    queryKey: ["changeRequestMentionRead", input.serverId, url],
+    queryFn: async () => {
+      if (!client || !url) return null;
+      const [read] = await client.readChangeRequests([url]);
+      return read ?? null;
+    },
+    enabled: input.enabled && input.list?.ok === true && url !== null && !isListed,
+    staleTime: CHANGE_REQUEST_STALE_MS,
+    retry: false,
+  });
+  return useMemo(() => {
+    if (settledQuery !== input.query || !data?.ok || String(data.number) !== settledQuery) {
+      return [];
+    }
+    return [{ number: data.number, title: data.title, headRefName: null, state: data.state }];
+  }, [data, input.query, settledQuery]);
+}
+
+/**
+ * The `#` menu: the repository's open pull requests from the host's pull request service,
+ * filtered here as the user types, so the menu stays instant after the first `#`.
+ * Null while closed, and where the menu hides (see `resolveChangeRequestMenu`).
+ */
+function useChangeRequestMentionMenu(input: {
+  serverId: string;
+  cwd: string;
+  mention: ChangeRequestMentionRange | null;
+  isOpen: boolean;
+  isConnected: boolean;
+}): AutocompleteMenu | null {
+  const { t } = useTranslation();
+  const client = useHostRuntimeClient(input.serverId);
+  const enabled = input.isOpen && input.isConnected && input.cwd.length > 0;
+  const { status } = useCheckoutStatusQuery({ serverId: input.serverId, cwd: input.cwd });
+  const remoteUrl = status?.remoteUrl ?? null;
+  const cloudForge = forgeFromRemoteUrl(remoteUrl);
+  // A self-hosted remote's forge needs the host to tell; a cloud one is known from its host.
+  // Until the host answers the forge stays unknown, so no prefix or URL grammar is guessed.
+  const prStatus = useCheckoutPrStatusQuery({
+    serverId: input.serverId,
+    cwd: input.cwd,
+    enabled: enabled && remoteUrl !== null && cloudForge === null,
+  });
+  const forge = cloudForge ?? prStatus.resolvedForge;
+  const isForgePending = remoteUrl !== null && forge === null && !prStatus.isError;
+  const repositoryUrl = forge
+    ? buildForgeRepositoryUrl(forge, { remoteUrl, forgeWeb: status?.forgeWeb })
+    : null;
+  const listQuery = useQuery({
+    queryKey: ["changeRequestMentionList", input.serverId, repositoryUrl],
+    queryFn: async () => {
+      if (!client || !repositoryUrl) throw new Error(t("common.errors.daemonClientUnavailable"));
+      return await client.listOpenChangeRequests(repositoryUrl);
+    },
+    enabled: enabled && client !== null && repositoryUrl !== null,
+    staleTime: CHANGE_REQUEST_STALE_MS,
+    retry: false,
+  });
+  const { data: list, error, isPending } = listQuery;
+  const query = input.mention?.query ?? "";
+  const lookedUpItems = useChangeRequestNumberLookup({
+    client,
+    serverId: input.serverId,
+    forge,
+    repositoryUrl,
+    query: query.trim(),
+    list,
+    enabled,
+  });
+  return useMemo(() => {
+    if (!enabled) return null;
+    if (isForgePending) return changeRequestLoadingMenu(t);
+    if (forge === null || repositoryUrl === null) return null;
+    return resolveChangeRequestMenu({
+      list,
+      lookedUpItems,
+      query,
+      numberPrefix: getForgePresentation(forge).numberPrefix,
+      isPending,
+      error,
+      t,
+    });
+  }, [
+    enabled,
+    error,
+    forge,
+    isForgePending,
+    isPending,
+    list,
+    lookedUpItems,
+    query,
+    repositoryUrl,
+    t,
+  ]);
+}
+
 export function useAgentAutocomplete(input: UseAgentAutocompleteInput): AgentAutocompleteResult {
   const { t } = useTranslation();
   const {
@@ -523,6 +809,11 @@ export function useAgentAutocomplete(input: UseAgentAutocompleteInput): AgentAut
     [cursorIndex, userInput],
   );
   const showFileAutocomplete = activeFileMention !== null;
+  const activeChangeRequestMention = useMemo(
+    () => findActiveChangeRequestMention({ text: userInput, cursorIndex }),
+    [cursorIndex, userInput],
+  );
+  const showChangeRequestAutocomplete = activeChangeRequestMention !== null;
   const fileFilterQuery = activeFileMention?.query ?? "";
   const [debouncedFileFilterQuery, setDebouncedFileFilterQuery] = useState(fileFilterQuery);
 
@@ -550,7 +841,11 @@ export function useAgentAutocomplete(input: UseAgentAutocompleteInput): AgentAut
   const client = useHostRuntimeClient(serverId);
   const isConnected = useHostRuntimeIsConnected(serverId);
 
-  const mode = resolveAutocompleteMode({ showFileAutocomplete, showCommandAutocomplete });
+  const mode = resolveAutocompleteMode({
+    showFileAutocomplete,
+    showChangeRequestAutocomplete,
+    showCommandAutocomplete,
+  });
   const canShowAutocomplete = resolveAutocompleteIsVisible({
     mode,
     canLoadCommands,
@@ -571,7 +866,7 @@ export function useAgentAutocomplete(input: UseAgentAutocompleteInput): AgentAut
   });
   const isCommandMenuOpen = mode === "command" && canShowAutocomplete;
   const isLoadingRevealed = useLoadingRevealed(isCommandMenuOpen);
-  const isVisible =
+  const isVisibleBeforeChangeRequests =
     canShowAutocomplete &&
     !(isCommandMenuOpen && commandsState === "loading" && !isLoadingRevealed);
   const { providerLabel, pluginNames } = useCommandSourceNames({
@@ -620,6 +915,19 @@ export function useAgentAutocomplete(input: UseAgentAutocompleteInput): AgentAut
     placeholderData: keepPreviousData,
   });
 
+  const changeRequestMenu = useChangeRequestMentionMenu({
+    serverId,
+    cwd: autocompleteCwd,
+    mention: activeChangeRequestMention,
+    isOpen: mode === "change_request",
+    isConnected,
+  });
+  const isVisible = resolveMenuIsVisible({
+    isVisibleBeforeChangeRequests,
+    mode,
+    changeRequestMenu,
+  });
+
   const commandsEmptyText = resolveCommandsEmptyText({ draft, t });
   const retryCommandsQuery = commandsQuery.retry;
   const retryCommands = useCallback(() => {
@@ -629,6 +937,7 @@ export function useAgentAutocomplete(input: UseAgentAutocompleteInput): AgentAut
   }, [onAutocompleteApplied, retryCommandsQuery]);
   const { options, status } = useMemo<AutocompleteMenu>(() => {
     if (!isVisible) return { options: [], status: null };
+    if (changeRequestMenu) return changeRequestMenu;
     const buildOptions = () =>
       buildAutocompleteOptions({
         activeFileMention,
@@ -663,6 +972,7 @@ export function useAgentAutocomplete(input: UseAgentAutocompleteInput): AgentAut
   }, [
     activeFileMention,
     activeSlashCommand,
+    changeRequestMenu,
     commandFilterQuery,
     commandsEmptyText,
     commandsQuery.commands,
@@ -691,7 +1001,20 @@ export function useAgentAutocomplete(input: UseAgentAutocompleteInput): AgentAut
         cursorIndex,
         activeSlashCommand,
         activeFileMention,
+        activeChangeRequestMention,
       });
+      if (selected.type === "change_request") {
+        if (!current.changeRequestMention) return;
+        setUserInput(
+          applyChangeRequestMentionReplacement({
+            text: current.text,
+            mention: current.changeRequestMention,
+            reference: selected.reference,
+          }),
+        );
+        onAutocompleteApplied?.();
+        return;
+      }
       const selectedIsCommand =
         selected.type === "client_command" ||
         selected.type === "plugin_command" ||
@@ -742,6 +1065,7 @@ export function useAgentAutocomplete(input: UseAgentAutocompleteInput): AgentAut
       cursorIndex,
       activeFileMention,
       activeSlashCommand,
+      activeChangeRequestMention,
     ],
   );
 
@@ -754,7 +1078,12 @@ export function useAgentAutocomplete(input: UseAgentAutocompleteInput): AgentAut
   const { selectedIndex, onKeyPress } = useAutocomplete({
     isVisible,
     options,
-    query: mode === "command" ? commandFilterQuery : fileFilterQuery,
+    query: resolveAutocompleteQuery({
+      mode,
+      commandFilterQuery,
+      fileFilterQuery,
+      changeRequestFilterQuery: activeChangeRequestMention?.query,
+    }),
     onSelectOption: selectOptionFromKeyPress,
     onEscape:
       mode === "command" && activeSlashCommand?.position === "start"

@@ -15,6 +15,7 @@ import {
   CircleAlert,
   File,
   Folder,
+  GitPullRequest,
   Puzzle,
   RotateCw,
   Sparkles,
@@ -37,7 +38,8 @@ export type AutocompleteOptionIcon =
   | "archive"
   | "new-draft"
   | "file"
-  | "directory";
+  | "directory"
+  | "pull-request";
 
 export interface AutocompleteOption {
   id: string;
@@ -73,6 +75,7 @@ const ROW_ICONS = {
   "new-draft": withUnistyles(SquarePen, mutedIconColorMapping),
   file: withUnistyles(File, mutedIconColorMapping),
   directory: withUnistyles(Folder, mutedIconColorMapping),
+  "pull-request": withUnistyles(GitPullRequest, mutedIconColorMapping),
 } satisfies Record<AutocompleteOptionIcon, unknown>;
 const ErrorIcon = withUnistyles(CircleAlert, mutedIconColorMapping);
 const ThemedLoadingSpinner = withUnistyles(LoadingSpinner, mutedIconColorMapping);
