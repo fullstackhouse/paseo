@@ -1081,6 +1081,53 @@ test("a turn carries the origin its prompt was sent with", async () => {
   }
 });
 
+test("only a person's or an agent's prompt moves lastReplyAt", async () => {
+  const session = new SteeringTestSession({ provider: "codex", cwd: process.cwd() });
+  const workdir = mkdtempSync(join(tmpdir(), "agent-reply-at-"));
+  const manager = new AgentManager({
+    clients: {
+      codex: new (class extends TestAgentClient {
+        override async createSession(): Promise<AgentSession> {
+          return session;
+        }
+      })(),
+    },
+    logger,
+  });
+  const agent = await manager.createAgent({ provider: "codex", cwd: workdir }, undefined, {
+    workspaceId: undefined,
+  });
+  let turns = 0;
+  const send = async (text: string, origin: AgentTurnOrigin) => {
+    const turnId = `active-turn-${++turns}`;
+    const run = (async () => {
+      for await (const _event of manager.streamAgent(agent.id, text, {
+        clientMessageId: text,
+        origin,
+      })) {
+      }
+    })();
+    await manager.waitForAgentRunStart(agent.id);
+    session.pushEvent({ type: "turn_completed", provider: "codex", turnId });
+    await run;
+  };
+  try {
+    expect(manager.getAgent(agent.id)?.lastReplyAt).toBeNull();
+    await send("check your asks", { kind: "plugin", pluginId: "paseo-asks" });
+    const afterPlugin = manager.getAgent(agent.id);
+    expect(afterPlugin?.lastUserMessageAt).toBeInstanceOf(Date);
+    expect(afterPlugin?.lastReplyAt).toBeNull();
+
+    await send("go ahead", { kind: "human" });
+    const afterHuman = manager.getAgent(agent.id);
+    expect(afterHuman?.lastReplyAt).toBeInstanceOf(Date);
+    expect(afterHuman?.lastReplyAt?.getTime()).toBe(afterHuman?.lastUserMessageAt?.getTime());
+  } finally {
+    await manager.closeAgent(agent.id);
+    rmSync(workdir, { recursive: true, force: true });
+  }
+});
+
 test("notification batches share the run they start or join", async () => {
   const session = new SteeringTestSession({ provider: "codex", cwd: process.cwd() });
   const workdir = mkdtempSync(join(tmpdir(), "agent-notification-turns-"));

@@ -4416,6 +4416,7 @@ describe("HostRuntimeStore", () => {
         createdAt: new Date(stale.createdAt),
         updatedAt: new Date(stale.updatedAt),
         lastUserMessageAt: null,
+        lastReplyAt: null,
         lastActivityAt: new Date(stale.updatedAt),
         archivedAt: stale.archivedAt ? new Date(stale.archivedAt) : null,
         interruptedAt: null,

@@ -355,10 +355,31 @@ export function partitionSummaryItems(items: readonly WorkspaceSummaryItem[]): {
 }
 
 /**
- * Whether the status card may no longer describe the work: someone prompted an agent after the card's
- * last update and that turn ended without a new card. While an agent runs the card is due for its
- * end-of-turn update, so it isn't flagged. Prompts, not `lastActivityAt`: that moves on renames and
- * mode or model changes, which don't make a summary wrong.
+ * When someone last replied to one of these agents (epoch ms): a person or another agent. Plugin
+ * nudges and Paseo's own prompts (an Asks check, a reminder, a schedule) don't count, so they can't
+ * make a card look outdated or show as "You replied". Archived agents are skipped.
+ */
+export function newestReplyAt(
+  agents: Iterable<Pick<Agent, "archivedAt" | "lastReplyAt" | "lastUserMessageAt">>,
+): number | null {
+  let latest: number | null = null;
+  for (const agent of agents) {
+    if (agent.archivedAt) continue;
+    // COMPAT(turnOrigin): FSH-only, added after v0.17.1, remove after 2027-05-26. Daemons before
+    // lastReplyAt send only lastUserMessageAt, which every prompt moves.
+    const at = (
+      agent.lastReplyAt !== undefined ? agent.lastReplyAt : agent.lastUserMessageAt
+    )?.getTime();
+    if (at !== undefined && (latest === null || at > latest)) latest = at;
+  }
+  return latest;
+}
+
+/**
+ * Whether the status card may no longer describe the work: someone replied to an agent after the
+ * card's last update (`newestReplyAt`) and that turn ended without a new card. While an agent runs
+ * the card is due for its end-of-turn update, so it isn't flagged. Prompts, not `lastActivityAt`: that
+ * moves on renames and mode or model changes, which don't make a summary wrong.
  */
 export function isStatusOutdated(input: {
   updatedAt: number;

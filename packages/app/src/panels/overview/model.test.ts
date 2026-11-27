@@ -29,6 +29,7 @@ import {
   isStatusDone,
   isStatusOutdated,
   isWorkStillOpen,
+  newestReplyAt,
   noPullRequestFacts,
   openMoveKey,
   pinOpenMove,
@@ -357,6 +358,46 @@ describe("isStatusDone", () => {
     expect(isStatusDone({ ...at, status: { ...done, state: "working" } })).toBe(false);
     expect(isStatusDone({ ...at, status: { ...done, answered: true } })).toBe(false);
     expect(isStatusDone({ ...at, status: done, lastPromptAt: 150 })).toBe(false);
+  });
+});
+
+describe("newestReplyAt", () => {
+  const card = { state: "waiting_on_you" as const, summary: "s", updatedAt: 100 };
+  const agent = (lastUserMessageAt: number | null, lastReplyAt?: number | null) => ({
+    archivedAt: null,
+    lastUserMessageAt: lastUserMessageAt === null ? null : new Date(lastUserMessageAt),
+    ...(lastReplyAt === undefined
+      ? {}
+      : { lastReplyAt: lastReplyAt === null ? null : new Date(lastReplyAt) }),
+  });
+  const outdated = (lastPromptAt: number | null) =>
+    isStatusOutdated({ updatedAt: card.updatedAt, agentRunning: false, lastPromptAt });
+
+  it("ignores a plugin prompt sent after the card", () => {
+    // An Asks check at 150 moved lastUserMessageAt but not lastReplyAt.
+    const at = newestReplyAt([agent(150, 80)]);
+    expect(at).toBe(80);
+    expect(outdated(at)).toBe(false);
+  });
+
+  it("counts a person's reply sent after the card", () => {
+    const at = newestReplyAt([agent(150, 150)]);
+    expect(at).toBe(150);
+    expect(outdated(at)).toBe(true);
+  });
+
+  it("falls back to any prompt on daemons that don't send lastReplyAt", () => {
+    const at = newestReplyAt([agent(150)]);
+    expect(at).toBe(150);
+    expect(outdated(at)).toBe(true);
+  });
+
+  it("takes the newest across live agents and skips archived ones", () => {
+    expect(newestReplyAt([agent(90, 90), agent(120, 120)])).toBe(120);
+    expect(newestReplyAt([{ ...agent(300, 300), archivedAt: new Date(400) }, agent(90, 90)])).toBe(
+      90,
+    );
+    expect(newestReplyAt([agent(null, null)])).toBeNull();
   });
 });
 
