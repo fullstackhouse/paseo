@@ -141,4 +141,26 @@ describe("respondToAgentPermission", () => {
       },
     ]);
   });
+
+  test.each([
+    { kind: "human" },
+    { kind: "plugin", pluginId: "paseo-asks" },
+    { kind: "agent", agentId: "agent-parent" },
+  ] as const)("starts the follow-up turn as coming from %o, who answered", async (origin) => {
+    const agentManager = new FakePermissionAgentManager();
+    agentManager.permissionResult = { followUpPrompt: "implement the approved plan" };
+
+    await respondToAgentPermission({
+      agentManager,
+      agentId: "agent-1",
+      requestId: "permission-1",
+      response: { behavior: "allow" },
+      logger,
+      origin,
+    });
+
+    expect(agentManager.streamRuns).toEqual([
+      { agentId: "agent-1", prompt: "implement the approved plan", options: { origin } },
+    ]);
+  });
 });

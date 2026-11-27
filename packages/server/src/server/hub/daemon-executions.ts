@@ -185,6 +185,7 @@ export class DaemonExecutions implements HubExecutionAgents {
     try {
       result = await this.createAgentCommand({
         kind: "mcp",
+        origin: { kind: "system" },
         provider: input.model ? `${input.provider}/${input.model}` : input.provider,
         title: input.prompt,
         initialPrompt: input.prompt,

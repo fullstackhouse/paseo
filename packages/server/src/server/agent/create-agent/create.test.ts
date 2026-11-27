@@ -473,3 +473,63 @@ test("session create with an internal config skips provider session persistence"
   expect(createAgent.mock.calls[1]?.[0]).not.toHaveProperty("internal");
   expect(createAgent.mock.calls[1]?.[2]).not.toHaveProperty("persistSession");
 });
+
+test.each([
+  ["session", { kind: "human" }],
+  ["session", { kind: "plugin", pluginId: "paseo-asks" }],
+  ["mcp", { kind: "agent", agentId: "agent-parent" }],
+  ["mcp", { kind: "system" }],
+] as const)(
+  "%s create starts the initial prompt's turn as coming from %o",
+  async (kind, origin) => {
+    const workdir = mkdtempSync(join(tmpdir(), "create-agent-origin-test-"));
+    const storage = new AgentStorage(join(workdir, "agents"), logger);
+    const agentManager = createRealAgentManager(storage);
+    const turnOrigins: unknown[] = [];
+    const unsubscribe = agentManager.subscribe((event) => {
+      if (event.type === "agent_stream" && event.event.type === "turn_started")
+        turnOrigins.push(event.event.origin);
+    });
+
+    try {
+      const dependencies = {
+        agentManager,
+        agentStorage: storage,
+        logger,
+        providerSnapshotManager: createProviderSnapshotManagerStub().manager,
+      };
+      const { snapshot } = await createAgentCommand(
+        dependencies,
+        kind === "session"
+          ? {
+              kind: "session",
+              config: { provider: "codex", cwd: workdir },
+              workspaceId: "ws-origin",
+              initialPrompt: "Start the job",
+              origin,
+              labels: {},
+              provisionalTitle: null,
+              firstAgentContext: { attachments: [] },
+            }
+          : {
+              kind: "mcp",
+              provider: "codex",
+              cwd: workdir,
+              workspaceId: "ws-origin",
+              title: "Start the job",
+              initialPrompt: "Start the job",
+              origin,
+              promptFailure: "throw",
+              notifyOnFinish: false,
+            },
+      );
+      await agentManager.waitForAgentEvent(snapshot.id, { waitForActive: true });
+
+      // The same run options put the origin on the user message too (agent-manager.test.ts).
+      expect(turnOrigins).toEqual([origin]);
+    } finally {
+      unsubscribe();
+      await removeRealAgentManagerWorkdir({ agentManager, storage, workdir });
+    }
+  },
+);

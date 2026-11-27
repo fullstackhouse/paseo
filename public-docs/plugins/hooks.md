@@ -544,7 +544,7 @@ A live turn starts. Receives `{ agent, turnId, origin? }`. History replay does n
 | `plugin`      | a plugin through its Paseo API; `pluginId` is the plugin the daemon admitted                       |
 | `system`      | the daemon: schedules, restart recovery, pull request updates, a Hub                               |
 
-It is absent on hosts without `server_info.features.turnOrigin` and on turns a provider starts on its own. The turn's `user_message` timeline item carries the same `origin`.
+A new agent's first turn carries the origin of whoever created it, and a turn that answering a permission starts carries the origin of whoever answered. It is absent on hosts without `server_info.features.turnOrigin` and on turns a provider starts on its own. The turn's `user_message` timeline item carries the same `origin`.
 
 ```ts
 server.addHook("agent.turn.before", async ({ agent, turnId, origin }) => {
