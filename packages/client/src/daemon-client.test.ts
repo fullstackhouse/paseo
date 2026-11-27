@@ -4465,6 +4465,46 @@ test("metadata needs a host that advertises entityMetadata and sends nothing to 
   expect(mock.sent).toHaveLength(0);
 });
 
+test("sets an automatic chat title only on hosts that advertise pluginChatTitles", async () => {
+  const openClient = async (features: Record<string, boolean>) => {
+    const mock = createMockTransport();
+    const client = new DaemonClient({
+      url: "ws://test",
+      clientId: "clsk_unit_test",
+      logger: createMockLogger(),
+      reconnect: { enabled: false },
+      transportFactory: () => mock.transport,
+    });
+    clients.push(client);
+    const connectPromise = client.connect();
+    mock.triggerOpen({ features });
+    await connectPromise;
+    return { client, mock };
+  };
+
+  const old = await openClient({});
+  await expect(old.client.setAgentAutomaticTitle("agent-1", "Reviewing")).rejects.toThrow(
+    "Update the host to let plugins name chats.",
+  );
+  expect(old.mock.sent).toHaveLength(0);
+
+  const { client, mock } = await openClient({ pluginChatTitles: true });
+  const result = client.setAgentAutomaticTitle("agent-1", "Reviewing");
+  const request = parseSentFrame(mock.sent[0]);
+  expect(request).toMatchObject({
+    type: "agent.title.automatic.set.request",
+    agentId: "agent-1",
+    title: "Reviewing",
+  });
+  mock.triggerMessage(
+    wrapSessionMessage({
+      type: "agent.title.automatic.set.response",
+      payload: { requestId: request.requestId, agentId: "agent-1", applied: false, error: null },
+    }),
+  );
+  await expect(result).resolves.toEqual({ applied: false });
+});
+
 test("sends internal workspace creation and internal listings only to hosts that support them", async () => {
   const logger = createMockLogger();
   const mock = createMockTransport();

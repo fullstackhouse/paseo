@@ -3903,6 +3903,28 @@ export class DaemonClient {
   }
 
   /**
+   * Replaces the chat's automatic title. `applied` is false when someone chose the current title:
+   * renamed by hand or passed when the chat was created.
+   */
+  async setAgentAutomaticTitle(
+    agentId: string,
+    title: string,
+    requestId?: string,
+  ): Promise<{ applied: boolean }> {
+    // COMPAT(pluginChatTitles): FSH-only, added after v0.17.1, remove gate after 2027-11-27.
+    if (this.lastServerInfoMessage?.features?.pluginChatTitles !== true) {
+      throw new Error("Update the host to let plugins name chats.");
+    }
+    const payload =
+      await this.sendNamespacedCorrelatedSessionRequest<"agent.title.automatic.set.response">({
+        requestId,
+        message: { type: "agent.title.automatic.set.request", agentId, title },
+      });
+    if (payload.error !== null) throw new Error(payload.error);
+    return { applied: payload.applied };
+  }
+
+  /**
    * Snoozes until `until` (ISO), or indefinitely when null; `snoozed: false` wakes it.
    * `wakePrompt` is sent to the workspace's agent when a timed snooze ends.
    */
