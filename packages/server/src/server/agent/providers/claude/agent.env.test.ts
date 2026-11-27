@@ -55,10 +55,15 @@ describe("Claude SDK env", () => {
               command,
               args: [
                 "-e",
-                "process.stdout.write(JSON.stringify({ entrypoint: process.env.CLAUDE_CODE_ENTRYPOINT, parentSession: process.env.CLAUDECODE ?? null }))",
+                "process.stdout.write(JSON.stringify({ entrypoint: process.env.CLAUDE_CODE_ENTRYPOINT, parentSession: process.env.CLAUDECODE ?? null, sdkVersion: process.env.CLAUDE_AGENT_SDK_VERSION }))",
               ],
               cwd: process.cwd(),
-              env: { ...process.env, CLAUDE_CODE_ENTRYPOINT: "sdk-ts", CLAUDECODE: "1" },
+              env: {
+                ...process.env,
+                CLAUDE_CODE_ENTRYPOINT: "sdk-ts",
+                CLAUDECODE: "1",
+                CLAUDE_AGENT_SDK_VERSION: "0.3.326",
+              },
               signal: new AbortController().signal,
             });
             child.stdout.on("data", (chunk: Buffer) => {
@@ -75,6 +80,8 @@ describe("Claude SDK env", () => {
         expect(JSON.parse(output)).toEqual({
           ...(entrypoint === undefined ? {} : { entrypoint }),
           parentSession: null,
+          // Claude Code writes no automatic chat title when both identities are missing.
+          sdkVersion: "0.3.326",
         });
       } finally {
         query.close();

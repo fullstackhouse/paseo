@@ -76,6 +76,11 @@ function applyRuntimeSettingsToClaudeOptions(
       // Session-open hooks may explicitly supply a client identity. Keep inherited
       // SDK/parent identities cleared while honoring this launch-only contribution.
       providerEnvSpec.envOverlay.CLAUDE_CODE_ENTRYPOINT = launchEnv?.CLAUDE_CODE_ENTRYPOINT;
+      // Keep the SDK's own version marker. Without it and without an entrypoint, Claude Code
+      // (2.1.326) labels the process a bare `claude -p` run (`sdk-cli`) and never writes the
+      // automatic chat title (`ai-title`) to the transcript.
+      providerEnvSpec.envOverlay.CLAUDE_AGENT_SDK_VERSION =
+        spawnOptions.env.CLAUDE_AGENT_SDK_VERSION;
       const providerEnv = createExternalProcessEnv(spawnOptions.env, providerEnvSpec.envOverlay);
       const selfNodeCommand = isDefaultRuntime
         ? buildSelfNodeCommand(resolved.args, undefined, providerEnv)
