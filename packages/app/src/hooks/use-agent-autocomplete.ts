@@ -515,11 +515,18 @@ function resolveChangeRequestListFailure(
   return { kind: "failed", reason: list.error };
 }
 
+function changeRequestLoadingMenu(t: TFunction): AutocompleteMenu {
+  return {
+    options: [],
+    status: { kind: "loading", message: t("agentAutocomplete.loadingChangeRequests") },
+  };
+}
+
 /**
  * The menu hides where the host can't list the remote's pull requests (no forge it knows, or
  * a repository it can't find), so a `#` typed there stays plain text.
  */
-function resolveChangeRequestMenu(input: {
+export function resolveChangeRequestMenu(input: {
   list: ChangeRequestList | undefined;
   lookedUpItems: readonly ChangeRequestMentionItem[];
   query: string;
@@ -528,12 +535,7 @@ function resolveChangeRequestMenu(input: {
   error: unknown;
   t: TFunction;
 }): AutocompleteMenu | null {
-  if (input.isPending) {
-    return {
-      options: [],
-      status: { kind: "loading", message: input.t("agentAutocomplete.loadingChangeRequests") },
-    };
-  }
+  if (input.isPending) return changeRequestLoadingMenu(input.t);
   const failure = resolveChangeRequestListFailure(input.list, input.error);
   if (failure.kind === "hidden") return null;
   if (failure.kind === "failed") {
@@ -661,7 +663,7 @@ type HostClient = ReturnType<typeof useHostRuntimeClient>;
 function useChangeRequestNumberLookup(input: {
   client: HostClient;
   serverId: string;
-  forge: string;
+  forge: string | null;
   repositoryUrl: string | null;
   query: string;
   list: ChangeRequestList | undefined;
@@ -671,7 +673,7 @@ function useChangeRequestNumberLookup(input: {
   const number = /^\d+$/.test(settledQuery) ? Number(settledQuery) : null;
   const isListed = input.list?.items.some((item) => item.number === number) ?? false;
   const url =
-    number !== null && input.repositoryUrl
+    number !== null && input.forge && input.repositoryUrl
       ? buildForgeChangeRequestUrl(input.forge, input.repositoryUrl, number)
       : null;
   const { client } = input;
@@ -713,13 +715,17 @@ function useChangeRequestMentionMenu(input: {
   const remoteUrl = status?.remoteUrl ?? null;
   const cloudForge = forgeFromRemoteUrl(remoteUrl);
   // A self-hosted remote's forge needs the host to tell; a cloud one is known from its host.
-  const { resolvedForge } = useCheckoutPrStatusQuery({
+  // Until the host answers the forge stays unknown, so no prefix or URL grammar is guessed.
+  const prStatus = useCheckoutPrStatusQuery({
     serverId: input.serverId,
     cwd: input.cwd,
     enabled: enabled && remoteUrl !== null && cloudForge === null,
   });
-  const forge = cloudForge ?? resolvedForge ?? "github";
-  const repositoryUrl = buildForgeRepositoryUrl(forge, { remoteUrl, forgeWeb: status?.forgeWeb });
+  const forge = cloudForge ?? prStatus.resolvedForge;
+  const isForgePending = remoteUrl !== null && forge === null && !prStatus.isError;
+  const repositoryUrl = forge
+    ? buildForgeRepositoryUrl(forge, { remoteUrl, forgeWeb: status?.forgeWeb })
+    : null;
   const listQuery = useQuery({
     queryKey: ["changeRequestMentionList", input.serverId, repositoryUrl],
     queryFn: async () => {
@@ -741,22 +747,31 @@ function useChangeRequestMentionMenu(input: {
     list,
     enabled,
   });
-  const numberPrefix = getForgePresentation(forge).numberPrefix;
-  return useMemo(
-    () =>
-      enabled && repositoryUrl !== null
-        ? resolveChangeRequestMenu({
-            list,
-            lookedUpItems,
-            query,
-            numberPrefix,
-            isPending,
-            error,
-            t,
-          })
-        : null,
-    [enabled, error, isPending, list, lookedUpItems, numberPrefix, query, repositoryUrl, t],
-  );
+  return useMemo(() => {
+    if (!enabled) return null;
+    if (isForgePending) return changeRequestLoadingMenu(t);
+    if (forge === null || repositoryUrl === null) return null;
+    return resolveChangeRequestMenu({
+      list,
+      lookedUpItems,
+      query,
+      numberPrefix: getForgePresentation(forge).numberPrefix,
+      isPending,
+      error,
+      t,
+    });
+  }, [
+    enabled,
+    error,
+    forge,
+    isForgePending,
+    isPending,
+    list,
+    lookedUpItems,
+    query,
+    repositoryUrl,
+    t,
+  ]);
 }
 
 export function useAgentAutocomplete(input: UseAgentAutocompleteInput): AgentAutocompleteResult {
