@@ -1965,6 +1965,76 @@ describe("PluginAgentClientRegistry", () => {
     await agent.session?.close();
   });
 
+  test.each([
+    { negotiated: [...CAPABILITIES], kept: false },
+    { negotiated: [...CAPABILITIES, "permission.tool_policy" as const], kept: true },
+  ])(
+    "keeps plugin-added tool grants only when the provider negotiates permission.tool_policy (kept: $kept)",
+    async ({ negotiated, kept }) => {
+      const logger = createTestLogger();
+      const harness = createProviderHarness({ capabilities: negotiated });
+      const plugins = new PluginAgentClientRegistry(logger);
+      plugins.replace([harness.registration]);
+      const registry = buildProviderRegistry(logger, { pluginProviders: plugins.definitions() });
+      const prs = { type: "http" as const, url: "http://127.0.0.1:1/mcp" };
+      const manager = new AgentManager({
+        logger,
+        clients: { "plugin-direct": registry["plugin-direct"].createClient(logger) },
+        providerDefinitions: { "plugin-direct": registry["plugin-direct"] },
+        pluginLifecycle: {
+          emit: () => {},
+          before: async (name, request) =>
+            name === "agent.create.before"
+              ? {
+                  ...request,
+                  config: {
+                    ...request.config,
+                    mcpServers: { ...request.config.mcpServers, prs },
+                    toolPolicy: {
+                      preapproved: [
+                        ...(request.config.toolPolicy?.preapproved ?? []),
+                        { kind: "mcp" as const, server: "prs", tool: "prs_link" },
+                      ],
+                    },
+                  },
+                  pluginAdditions: {
+                    mcpServers: { prs: "paseo-prs" },
+                    toolGrants: { "prs.prs_link": "paseo-prs" },
+                  },
+                }
+              : request,
+        },
+      });
+
+      const agent = await manager.createAgent(
+        { provider: "plugin-direct", cwd: tmpdir() },
+        undefined,
+        { workspaceId: undefined },
+      );
+      const open = harness.inputs.find((input) => input.type === "session.open");
+      expect(open?.type === "session.open" ? open.config.toolPolicy : null).toEqual(
+        kept ? { preapproved: [{ kind: "mcp", server: "prs", tool: "prs_link" }] } : undefined,
+      );
+      await agent.session?.close();
+
+      if (!kept) {
+        await expect(
+          manager.createAgent(
+            {
+              provider: "plugin-direct",
+              cwd: tmpdir(),
+              mcpServers: { hub: { type: "http", url: "https://hub.test/mcp" } },
+              toolPolicy: { preapproved: [{ kind: "mcp", server: "hub", tool: "run" }] },
+            },
+            undefined,
+            { workspaceId: undefined },
+          ),
+        ).rejects.toThrow("permission.tool_policy");
+      }
+      await plugins.shutdown();
+    },
+  );
+
   test("rejects an external session link that is not http(s)", () => {
     const parsed = ProviderEventSchema.safeParse({
       type: "session.opened",
