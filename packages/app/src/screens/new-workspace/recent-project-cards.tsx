@@ -1,19 +1,21 @@
-import { useCallback, useMemo, type ReactElement } from "react";
+import { useCallback, useMemo, useState, type ReactElement } from "react";
 import { useTranslation } from "react-i18next";
-import {
-  ScrollView,
-  Text,
-  View,
-  type PressableStateCallbackType,
-  type StyleProp,
-  type ViewStyle,
-} from "react-native";
-import { StyleSheet } from "react-native-unistyles";
+import { ScrollView, Text, View, type StyleProp, type ViewStyle } from "react-native";
+import { Pin, PinOff } from "lucide-react-native";
+import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import type { ProviderSnapshotEntry } from "@getpaseo/protocol/agent-types";
 import { buildAgentProfileTags } from "@/agent-profiles";
 import { SettingsSection } from "@/components/settings/headings/settings-section";
-import { PressHighlight } from "@/components/ui/press-highlight";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
+import type { MenuTriggerState } from "@/components/ui/menu";
 import { useProvidersSnapshot } from "@/hooks/use-providers-snapshot";
+import { usePinnedProjectsStore } from "@/projects/pins/store";
+import type { Theme } from "@/styles/theme";
 import type { RecentAgentSetup } from "@/stores/session-store-hooks";
 import { formatCompactTimeAgo } from "@/utils/time";
 import { ProjectIcon } from "./form/icons";
@@ -23,7 +25,8 @@ import type { RecentProjectChoice } from "./project-picker";
  * "Recent projects": the host's latest projects as cards, each naming the setup its last agent ran
  * with. Choosing one picks the project and that setup in one click. `grid` sits under the composer
  * on wide layouts; `scroll` is a single swipeable row above the compact fields. Cards keep their
- * order when you pick, so one never moves under the pointer.
+ * order when you pick, so one never moves under the pointer. Right click (long press on touch)
+ * pins or unpins the card's project, for sidebars grouped by status that show no project rows.
  */
 export function RecentProjectCards({
   kind = "recent",
@@ -153,9 +156,9 @@ function RecentProjectCard({
   const timeAgo = lastUsedAt > 0 ? formatCompactTimeAgo(new Date(lastUsedAt)) : "";
   const handlePress = useCallback(() => onSelect(choice), [choice, onSelect]);
   const cardStyle = useCallback(
-    ({ pressed, hovered }: PressableStateCallbackType & { hovered?: boolean }) => [
+    ({ pressed, hovered, open }: MenuTriggerState) => [
       styles.card,
-      !disabled && hovered && styles.cardHovered,
+      !disabled && (hovered || open) && styles.cardHovered,
       selected && styles.cardSelected,
       !disabled && pressed && styles.cardPressed,
       disabled && styles.cardDisabled,
@@ -166,34 +169,68 @@ function RecentProjectCard({
     () => [project.projectName, summary].filter(Boolean).join(", "),
     [project.projectName, summary],
   );
+  const [menuOpen, setMenuOpen] = useState(false);
   return (
-    <PressHighlight
-      onPress={handlePress}
-      disabled={disabled}
-      style={cardStyle}
-      highlightStyle={styles.cardHighlight}
-      accessibilityRole="radio"
-      accessibilityLabel={accessibilityLabel}
-      aria-checked={selected}
+    <ContextMenu open={menuOpen} onOpenChange={setMenuOpen}>
+      <ContextMenuTrigger
+        onPress={handlePress}
+        disabled={disabled}
+        style={cardStyle}
+        highlightStyle={styles.cardHighlight}
+        accessibilityRole="radio"
+        accessibilityLabel={accessibilityLabel}
+        aria-checked={selected}
+        testID={testID}
+      >
+        <View style={styles.titleLine}>
+          <ProjectIcon
+            projectViewKey={project.viewKey}
+            projectName={project.projectName}
+            iconDataUri={iconDataUri}
+          />
+          <Text style={styles.name} numberOfLines={1}>
+            {project.projectName}
+          </Text>
+          {timeAgo ? <Text style={styles.time}>{timeAgo}</Text> : null}
+        </View>
+        {/* Always rendered (a no-break space when empty), so a project with no agent yet keeps the
+            card's height. */}
+        <Text style={styles.summary} numberOfLines={1}>
+          {summary || "\u00a0"}
+        </Text>
+      </ContextMenuTrigger>
+      <ContextMenuContent align="start" width={200} testID={`${testID}-menu`}>
+        <PinProjectMenuItem projectViewKey={project.viewKey} testID={`${testID}-pin`} />
+      </ContextMenuContent>
+    </ContextMenu>
+  );
+}
+
+const foregroundMutedColorMapping = (theme: Theme) => ({ color: theme.colors.foregroundMuted });
+const ThemedPin = withUnistyles(Pin);
+const ThemedPinOff = withUnistyles(PinOff);
+const pinLeadingIcon = <ThemedPin size={14} uniProps={foregroundMutedColorMapping} />;
+const pinOffLeadingIcon = <ThemedPinOff size={14} uniProps={foregroundMutedColorMapping} />;
+
+function PinProjectMenuItem({
+  projectViewKey,
+  testID,
+}: {
+  projectViewKey: string;
+  testID: string;
+}): ReactElement {
+  const { t } = useTranslation();
+  const isPinned = usePinnedProjectsStore((state) => state.pinnedViewKeys.includes(projectViewKey));
+  const togglePin = usePinnedProjectsStore((state) => state.togglePin);
+  const handleSelect = useCallback(() => togglePin(projectViewKey), [projectViewKey, togglePin]);
+  return (
+    <ContextMenuItem
+      leading={isPinned ? pinOffLeadingIcon : pinLeadingIcon}
+      onSelect={handleSelect}
       testID={testID}
     >
-      <View style={styles.titleLine}>
-        <ProjectIcon
-          projectViewKey={project.viewKey}
-          projectName={project.projectName}
-          iconDataUri={iconDataUri}
-        />
-        <Text style={styles.name} numberOfLines={1}>
-          {project.projectName}
-        </Text>
-        {timeAgo ? <Text style={styles.time}>{timeAgo}</Text> : null}
-      </View>
-      {/* Always rendered (a no-break space when empty), so a project with no agent yet keeps the
-          card's height. */}
-      <Text style={styles.summary} numberOfLines={1}>
-        {summary || "\u00a0"}
-      </Text>
-    </PressHighlight>
+      {isPinned ? t("sidebar.project.actions.unpin") : t("sidebar.project.actions.pin")}
+    </ContextMenuItem>
   );
 }
 
