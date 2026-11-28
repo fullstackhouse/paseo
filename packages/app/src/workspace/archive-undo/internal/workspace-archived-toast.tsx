@@ -1,8 +1,7 @@
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
-import { Button } from "@/components/ui/button";
+import { ActionToast } from "@/components/action-toast";
 import { Shortcut } from "@/components/ui/shortcut";
 import { useShortcutKeys } from "@/hooks/use-shortcut-keys";
 
@@ -15,35 +14,19 @@ export function WorkspaceArchivedToast({ onUndo }: { onUndo: () => void }) {
   );
 
   return (
-    <View style={styles.row}>
-      <Text style={styles.message}>{t("sidebar.workspace.toasts.archived")}</Text>
-      <Button
-        size="sm"
-        onPress={onUndo}
-        testID="workspace-archived-toast-undo"
-        trailing={undoShortcut}
-      >
-        {t("sidebar.workspace.toasts.undoArchive")}
-      </Button>
-    </View>
+    <ActionToast
+      message={t("sidebar.workspace.toasts.archived")}
+      actionLabel={t("sidebar.workspace.toasts.undoArchive")}
+      onAction={onUndo}
+      actionTrailing={undoShortcut}
+      actionTestID="workspace-archived-toast-undo"
+    />
   );
 }
 
 const styles = StyleSheet.create((theme) => ({
-  row: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    alignItems: "center",
-    gap: theme.spacing[2],
-  },
   // Cancels the badge's own inset, which would otherwise add to the button's gap.
   shortcut: {
     marginLeft: -theme.spacing[1],
-  },
-  message: {
-    flexShrink: 1,
-    color: theme.colors.foreground,
-    fontSize: theme.fontSize.base,
-    fontWeight: theme.fontWeight.normal,
   },
 }));

@@ -46,13 +46,21 @@ export interface ModalComponent extends FunctionComponent<ModalProps> {
 
 export type ToastVariant = "default" | "info" | "success" | "warning" | "error";
 
+/** A button in the toast, such as Undo. Pressing it closes the toast. Hosts before it show the message alone. */
+export interface ToastAction {
+  label: string;
+  onPress(): void;
+}
+
 export interface ToastOptions {
   variant?: ToastVariant;
   durationMs?: number;
+  action?: ToastAction;
 }
 
 export interface ToastApi {
-  show(message: string, options?: ToastOptions): void;
+  /** Returns a function that closes this toast; older hosts return nothing. */
+  show(message: string, options?: ToastOptions): (() => void) | void;
   error(message: string): void;
 }
 
