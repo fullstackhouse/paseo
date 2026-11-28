@@ -2869,6 +2869,8 @@ export class Session {
         return this.handleAgentMetadataUpdateRequest(msg);
       case "workspace.metadata.update.request":
         return this.handleWorkspaceMetadataUpdateRequest(msg);
+      case "agent.title.automatic.set.request":
+        return this.handleAgentTitleAutomaticSetRequest(msg);
       default:
         return undefined;
     }
@@ -5004,6 +5006,31 @@ export class Session {
         "session: workspace.background.set.request error",
       );
       emitResponse(false, getErrorMessageOr(error, "Failed to set workspace visibility"));
+    }
+  }
+
+  /** FSH: a plugin names the chat, unless someone chose its current title. */
+  private async handleAgentTitleAutomaticSetRequest(
+    request: Extract<SessionInboundMessage, { type: "agent.title.automatic.set.request" }>,
+  ): Promise<void> {
+    const { agentId, title, requestId } = request;
+    const logContext = { agentId, requestId };
+    this.sessionLogger.info(logContext, "session: agent.title.automatic.set.request");
+    const emitResponse = (applied: boolean, error: string | null) => {
+      this.emit({
+        type: "agent.title.automatic.set.response",
+        payload: { requestId, agentId, applied, error },
+      });
+    };
+
+    try {
+      emitResponse(await this.agentManager.setPluginTitle(agentId, title), null);
+    } catch (error) {
+      this.sessionLogger.error(
+        { ...logContext, err: error },
+        "session: agent.title.automatic.set.request error",
+      );
+      emitResponse(false, getErrorMessageOr(error, "Failed to set the chat title"));
     }
   }
 
@@ -9726,7 +9753,7 @@ export class Session {
     if (stored && !stored.title && !stored.lastUserMessageAt) {
       const { provisionalTitle } = resolveCreateAgentTitles({ initialPrompt: text });
       if (!provisionalTitle) return;
-      await this.agentManager.setTitle(agentId, provisionalTitle);
+      await this.agentManager.setTitle(agentId, provisionalTitle, { source: "automatic" });
       this.scheduleChatTitle({
         agentId,
         cwd: stored.cwd,

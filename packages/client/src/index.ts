@@ -561,6 +561,12 @@ export interface PaseoAgentHandle {
   setOptions(patch: Record<string, unknown>): Promise<void>;
   /** Top-level keys replace; `null` removes the key. Needs a host with `entityMetadata`. */
   setMetadata(patch: Record<string, JsonValue>): Promise<void>;
+  /**
+   * Replaces the chat's automatic title (the first prompt, a generated title or the agent's own).
+   * `applied` is false when someone chose the current title: renamed by hand or passed when the
+   * chat was created. Needs `server_info.features.pluginChatTitles`.
+   */
+  setAutomaticTitle(title: string, requestId?: string): Promise<{ applied: boolean }>;
   /** Sends a prompt and resolves when that turn finishes or needs attention. */
   run(text: string, options?: PaseoAgentRunOptions): Promise<PaseoAgentRunResult>;
   /** Waits for the current turn, including one started with `prompt`. */
@@ -1471,6 +1477,8 @@ function createAgentHandleFactory(
         const metadata = await daemonClient.setAgentMetadata(id, patch);
         if (current) current = { ...current, metadata };
       },
+      setAutomaticTitle: (title, requestId) =>
+        daemonClient.setAgentAutomaticTitle(id, title, requestId),
       respondToPermission: async ({ requestId, response }) => {
         await daemonClient.respondToPermission(id, requestId, response);
       },

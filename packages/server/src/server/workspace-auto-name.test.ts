@@ -78,6 +78,8 @@ function createTitleHarness(input: {
   workspaceTitle: string | null;
   agents: TitleHarnessAgent[];
   kind?: "directory" | "worktree" | "local_checkout";
+  /** Runs while the workspace title is written, after the agents were read. */
+  duringWorkspaceWrite?: (agentTitles: Map<string, string | null>) => void;
 }) {
   let workspace = createPersistedWorkspaceRecord({
     workspaceId: "workspace-title-sync",
@@ -93,8 +95,10 @@ function createTitleHarness(input: {
   const emitted = deferred();
   const agentManager = {
     getAgent: (id: string) => (agentTitles.has(id) ? { id } : null),
-    setTitle: async (id: string, title: string) => {
+    replaceAutomaticTitle: async (id: string, expected: string | null, title: string) => {
+      if ((agentTitles.get(id) ?? null) !== expected) return false;
       agentTitles.set(id, title);
+      return true;
     },
   } as unknown as AgentManager;
   const autoName = new WorkspaceAutoName({
@@ -114,6 +118,7 @@ function createTitleHarness(input: {
     workspaceRegistry: {
       update: async (_workspaceId, updater) => {
         workspace = updater(workspace);
+        input.duringWorkspaceWrite?.(agentTitles);
         return workspace;
       },
     },
@@ -197,6 +202,19 @@ describe("single-agent workspaces share one name with their agent", () => {
 
     expect(harness.workspaceTitle()).toBe("Summarize release status");
     expect(harness.agentTitle("agent-1")).toBe(PROMPT);
+  });
+
+  test("an agent renamed while the workspace title is written keeps its new title", async () => {
+    const harness = createTitleHarness({
+      workspaceTitle: PROMPT,
+      agents: [{ id: "agent-1", title: PROMPT }],
+      duringWorkspaceWrite: (agentTitles) => agentTitles.set("agent-1", "Reviewing the release"),
+    });
+
+    await harness.generate(PROMPT);
+
+    expect(harness.workspaceTitle()).toBe("Summarize release status");
+    expect(harness.agentTitle("agent-1")).toBe("Reviewing the release");
   });
 
   test("internal agents don't count as a second agent", async () => {

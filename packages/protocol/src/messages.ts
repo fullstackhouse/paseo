@@ -1294,6 +1294,16 @@ export const WorkspaceAttentionReportRequestSchema = z.object({
   requestId: z.string(),
 });
 
+// COMPAT(pluginChatTitles): FSH-only, added after v0.17.1, remove gate after 2027-11-27.
+// Sets an automatic chat title. The host applies it only while the chat's title is automatic: not
+// renamed by hand, and not passed by whoever created the chat.
+export const AgentTitleAutomaticSetRequestSchema = z.object({
+  type: z.literal("agent.title.automatic.set.request"),
+  agentId: z.string(),
+  title: z.string(),
+  requestId: z.string(),
+});
+
 // COMPAT(workspaceBackgroundSet): FSH-only, added after v0.13.0, remove gate after 2027-05-05.
 // Moves an existing workspace into or out of background discovery.
 export const WorkspaceBackgroundSetRequestSchema = z.object({
@@ -2574,6 +2584,18 @@ export const WorkspaceMetadataUpdateResponseSchema = z.object({
     metadata: EntityMetadataSchema.nullable(),
     error: z.string().nullable(),
   }),
+});
+
+export const AgentTitleAutomaticSetResponsePayloadSchema = z.object({
+  requestId: z.string(),
+  agentId: z.string(),
+  applied: z.boolean(),
+  error: z.string().nullable(),
+});
+
+export const AgentTitleAutomaticSetResponseSchema = z.object({
+  type: z.literal("agent.title.automatic.set.response"),
+  payload: AgentTitleAutomaticSetResponsePayloadSchema,
 });
 
 export const WorkspaceBackgroundSetResponsePayloadSchema = z.object({
@@ -4091,6 +4113,7 @@ export const SessionInboundMessageSchema = z.discriminatedUnion("type", [
   WorkspacePinSetRequestSchema,
   WorkspaceBaseBranchSetRequestSchema,
   WorkspaceBackgroundSetRequestSchema,
+  AgentTitleAutomaticSetRequestSchema,
   WorkspaceSnoozeSetRequestSchema,
   WorkspaceGroupSetRequestSchema,
   WorkspaceAppearanceSetRequestSchema,
@@ -4497,6 +4520,8 @@ export const ServerInfoStatusPayloadSchema = z
         usageSetting: z.boolean().optional(),
         // COMPAT(chatTitles): FSH-only, added after v0.17.1, remove gate after 2027-11-27.
         chatTitles: z.boolean().optional(),
+        // COMPAT(pluginChatTitles): FSH-only, added after v0.17.1, remove gate after 2027-11-27.
+        pluginChatTitles: z.boolean().optional(),
         usageSources: z.boolean().optional(),
         // COMPAT(providerInstallation): added in v0.17.0, remove gate after 2027-05-13.
         providerInstallation: z.boolean().optional(),
@@ -8461,6 +8486,7 @@ export const SessionOutboundMessageSchema = z.discriminatedUnion("type", [
   WorkspacePinSetResponseSchema,
   WorkspaceBaseBranchSetResponseSchema,
   WorkspaceBackgroundSetResponseSchema,
+  AgentTitleAutomaticSetResponseSchema,
   WorkspaceSnoozeSetResponseSchema,
   WorkspaceGroupSetResponseSchema,
   WorkspaceAppearanceSetResponseSchema,
@@ -8696,6 +8722,7 @@ export type WorkspaceTitleSetResponsePayload = z.infer<
 export type WorkspacePinSetResponse = z.infer<typeof WorkspacePinSetResponseSchema>;
 export type WorkspacePinSetResponsePayload = z.infer<typeof WorkspacePinSetResponsePayloadSchema>;
 export type WorkspaceBackgroundSetResponse = z.infer<typeof WorkspaceBackgroundSetResponseSchema>;
+export type AgentTitleAutomaticSetResponse = z.infer<typeof AgentTitleAutomaticSetResponseSchema>;
 export type WorkspaceSnoozeSetResponse = z.infer<typeof WorkspaceSnoozeSetResponseSchema>;
 export type WorkspaceGroupSetResponse = z.infer<typeof WorkspaceGroupSetResponseSchema>;
 export type WorkspaceAppearanceSetResponse = z.infer<typeof WorkspaceAppearanceSetResponseSchema>;
@@ -8902,6 +8929,7 @@ export type AgentMetadataUpdateResponse = z.infer<typeof AgentMetadataUpdateResp
 export type WorkspaceMetadataUpdateResponse = z.infer<typeof WorkspaceMetadataUpdateResponseSchema>;
 export type WorkspaceBaseBranchSetRequest = z.infer<typeof WorkspaceBaseBranchSetRequestSchema>;
 export type WorkspaceBackgroundSetRequest = z.infer<typeof WorkspaceBackgroundSetRequestSchema>;
+export type AgentTitleAutomaticSetRequest = z.infer<typeof AgentTitleAutomaticSetRequestSchema>;
 export type WorkspaceSnoozeSetRequest = z.infer<typeof WorkspaceSnoozeSetRequestSchema>;
 export type WorkspaceGroupSetRequest = z.infer<typeof WorkspaceGroupSetRequestSchema>;
 export type WorkspaceAppearanceSetRequest = z.infer<typeof WorkspaceAppearanceSetRequestSchema>;

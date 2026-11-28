@@ -2119,6 +2119,8 @@ export class VoiceAssistantWebSocketServer {
         usageSetting: true,
         // COMPAT(chatTitles): FSH-only, added after v0.17.1, remove gate after 2027-11-27.
         chatTitles: true,
+        // COMPAT(pluginChatTitles): FSH-only, added after v0.17.1, remove gate after 2027-11-27.
+        pluginChatTitles: true,
         usageSources: true,
         providerInstallation: true,
         ownedSubscriptions: true,

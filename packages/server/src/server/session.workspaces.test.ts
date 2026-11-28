@@ -172,6 +172,7 @@ interface SessionTestAccess {
   }>;
   handleArchiveAgentRequest(agentId: string, requestId: string): Promise<unknown>;
   handleMessage(message: unknown, source?: object): Promise<unknown>;
+  prepareAgentMessage(agentId: string, text: string): Promise<void>;
   handleCreatePaseoWorktreeRequest(params: unknown): Promise<unknown>;
   listAgentPayloads(...args: unknown[]): Promise<unknown[]>;
   listFetchWorkspacesEntries(params: unknown): Promise<ListFetchResult>;
@@ -590,6 +591,7 @@ function createSessionForWorkspaceTests(
       newName: string,
     ) => Promise<{ previousBranch: string | null; currentBranch: string | null }>;
     generateWorkspaceName?: () => Promise<GeneratedWorkspaceName | null>;
+    daemonConfig?: Record<string, unknown>;
   } = {},
 ): TestSession {
   const logger = {
@@ -757,7 +759,7 @@ function createSessionForWorkspaceTests(
       }),
       renameCurrentBranch: options.renameCurrentBranch,
       daemonConfigStore: asDaemonConfigStore({
-        get: () => ({ mcp: { injectIntoAgents: false }, providers: {} }),
+        get: () => ({ mcp: { injectIntoAgents: false }, providers: {}, ...options.daemonConfig }),
         onChange: () => () => {},
       }),
       mcpBaseUrl: null,
@@ -8733,6 +8735,79 @@ test("workspace.attention.report.request passes the report to the host and repli
     accepted: true,
     woke: true,
     error: null,
+  });
+});
+
+describe("agent.title.automatic.set.request", () => {
+  async function requestPluginTitle(
+    setPluginTitle: (agentId: string, title: string) => Promise<boolean>,
+  ) {
+    const emitted: SessionOutboundMessage[] = [];
+    const session = asTestSession(
+      createSessionForWorkspaceTests({
+        onMessage: (message) => emitted.push(message),
+        agentManager: { setPluginTitle },
+      }),
+    );
+    await session.handleMessage({
+      type: "agent.title.automatic.set.request",
+      agentId: "agent-1",
+      title: "Reviewing the login fix",
+      requestId: "req-title",
+    });
+    return findByType(emitted, "agent.title.automatic.set.response")?.payload;
+  }
+
+  test("sets the title", async () => {
+    const setPluginTitle = vi.fn(async () => true);
+
+    expect(await requestPluginTitle(setPluginTitle)).toEqual({
+      requestId: "req-title",
+      agentId: "agent-1",
+      applied: true,
+      error: null,
+    });
+    expect(setPluginTitle).toHaveBeenCalledWith("agent-1", "Reviewing the login fix");
+  });
+
+  test("reports a title someone chose as not applied", async () => {
+    expect(await requestPluginTitle(vi.fn(async () => false))).toMatchObject({
+      applied: false,
+      error: null,
+    });
+  });
+
+  test("replies with the error when the chat is missing", async () => {
+    const setPluginTitle = vi.fn(async () => {
+      throw new Error("Agent not found: agent-1");
+    });
+
+    expect(await requestPluginTitle(setPluginTitle)).toMatchObject({
+      applied: false,
+      error: "Agent not found: agent-1",
+    });
+  });
+
+  test("a chat's first prompt gives it an automatic title", async () => {
+    const setTitle = vi.fn(async () => {});
+    const session = asTestSession(
+      createSessionForWorkspaceTests({
+        agentManager: {
+          waitForAgentClose: async () => {},
+          getAgent: () => ({ id: "agent-1", cwd: REPO_CWD }),
+          setTitle,
+        },
+        agentStorage: {
+          get: async () => ({ id: "agent-1", cwd: REPO_CWD, title: null, lastUserMessageAt: null }),
+        },
+        daemonConfig: { chatTitles: "first-prompt" },
+      }),
+    );
+    await session.prepareAgentMessage("agent-1", "fix the login redirect");
+
+    expect(setTitle).toHaveBeenCalledWith("agent-1", "fix the login redirect", {
+      source: "automatic",
+    });
   });
 });
 
