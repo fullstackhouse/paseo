@@ -970,6 +970,11 @@ export interface AgentClient {
   isAvailable(signal?: AbortSignal, options?: FetchCatalogOptions): Promise<boolean>;
   getDiagnostic?(): Promise<{ diagnostic: string }>;
   /**
+   * Whether new sessions can hold exact MCP tool grants (`config.toolPolicy`), when that is only
+   * known once the provider is reached. Absent: the provider definition decides.
+   */
+  supportsToolPolicy?(): Promise<boolean>;
+  /**
    * Installation links and the installed version. The same contract as plugin providers'
    * `ProviderRegistration.installation`; built-ins resolve their own launch inside `inspect`.
    * Never consulted by availability, discovery, or session creation.

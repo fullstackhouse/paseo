@@ -250,6 +250,10 @@ class ProviderRuntime {
     return this.connection?.capabilities ?? [];
   }
 
+  async supportsCapability(capability: ProviderCapability): Promise<boolean> {
+    return (await this.getConnection()).capabilities.includes(capability);
+  }
+
   get isClosed(): boolean {
     return this.closed;
   }
@@ -1061,6 +1065,10 @@ class PluginAgentClient implements AgentClient {
 
   get capabilities(): AgentCapabilityFlags {
     return agentCapabilities(this.runtime.negotiatedCapabilities);
+  }
+
+  async supportsToolPolicy(): Promise<boolean> {
+    return await this.runtime.supportsCapability("permission.tool_policy");
   }
 
   async createSession(

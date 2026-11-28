@@ -1741,7 +1741,7 @@ export class AgentManager {
       };
       options = { ...options, env: request.env, metadata: request.metadata ?? options.metadata };
       pluginAdditions = request.pluginAdditions;
-      config = this.dropUnsupportedPluginGrants(config, pluginAdditions);
+      config = await this.dropUnsupportedPluginGrants(config, pluginAdditions);
     }
     await this.deleteAgentState(resolvedAgentId);
     const prepared = await this.prepareSessionConfig(config, resolvedAgentId, {
@@ -4882,17 +4882,14 @@ export class AgentManager {
   /**
    * Tool preapprovals that `agent.create.before` hooks added, on a provider that can't hold exact MCP
    * tool grants: dropped with a warning per plugin, so the plugin's tools still attach and prompt.
-   * Grants the caller sent stay and fail in `applyProviderConfiguration`.
+   * Grants the caller sent stay and fail in `applyProviderConfiguration` or at session open.
    */
-  private dropUnsupportedPluginGrants(
+  private async dropUnsupportedPluginGrants(
     config: AgentSessionConfig,
     additions: PluginConfigAdditions | undefined,
-  ): AgentSessionConfig {
+  ): Promise<AgentSessionConfig> {
     if (!config.toolPolicy || !additions) return config;
-    const definition = this.providerDefinitions.get(config.provider);
-    if (definition?.applyToolPolicy && definition.supportsExactMcpPreapproval !== false) {
-      return config;
-    }
+    if (await this.supportsToolPolicy(config.provider)) return config;
     const owners: Record<string, string> = {};
     const kept = config.toolPolicy.preapproved.filter((grant) => {
       const owner = additions.toolGrants[`${grant.server}.${grant.tool}`];
@@ -4910,6 +4907,15 @@ export class AgentManager {
       ...config,
       toolPolicy: kept.length > 0 ? { ...config.toolPolicy, preapproved: kept } : undefined,
     };
+  }
+
+  private async supportsToolPolicy(provider: AgentProvider): Promise<boolean> {
+    const definition = this.providerDefinitions.get(provider);
+    if (!definition?.applyToolPolicy || definition.supportsExactMcpPreapproval === false) {
+      return false;
+    }
+    const client = this.clients.get(provider);
+    return client?.supportsToolPolicy ? await client.supportsToolPolicy() : true;
   }
 
   private async initializeAgentTimelineForRegister(params: {
